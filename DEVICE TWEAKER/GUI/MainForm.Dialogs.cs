@@ -17,6 +17,8 @@ public sealed partial class MainForm
         dialog.Font = _dialogFont;
         dialog.Icon = Icon;
 
+        string normalized = NormalizeDialogMessage(message);
+
         int padding = UiScale(20);
         int maxTextWidth = UiScale(520);
         int minWidth = UiScale(360);
@@ -24,29 +26,31 @@ public sealed partial class MainForm
         int buttonHeight = UiScale(32);
         int buttonGap = UiScale(16);
 
-        Size textSize = TextRenderer.MeasureText(
-            message,
-            _dialogFont,
-            new Size(maxTextWidth, int.MaxValue),
-            TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl);
-
-        int clientWidth = Math.Max(minWidth, textSize.Width + (padding * 2));
-        int clientHeight = padding + textSize.Height + buttonGap + buttonHeight + padding;
-
-        dialog.ClientSize = new Size(clientWidth, clientHeight);
-
         Label messageLabel = new()
         {
-            AutoSize = false,
-            Size = new Size(clientWidth - (padding * 2), textSize.Height),
-            Location = new Point(padding, padding),
-            Text = message,
+            AutoSize = true,
+            MaximumSize = new Size(maxTextWidth, 0),
+            Text = normalized,
             ForeColor = _fgMain,
             BackColor = _bgForm,
             UseMnemonic = false,
             TextAlign = ContentAlignment.MiddleCenter,
             Font = _dialogFont,
+            UseCompatibleTextRendering = true,
         };
+
+        Size textSize = messageLabel.GetPreferredSize(new Size(maxTextWidth, 0));
+        int clientWidth = Math.Max(minWidth, textSize.Width + (padding * 2));
+        int labelWidth = clientWidth - (padding * 2);
+        messageLabel.MaximumSize = new Size(labelWidth, 0);
+        textSize = messageLabel.GetPreferredSize(new Size(labelWidth, 0));
+
+        int clientHeight = padding + textSize.Height + buttonGap + buttonHeight + padding;
+        dialog.ClientSize = new Size(clientWidth, clientHeight);
+
+        messageLabel.AutoSize = false;
+        messageLabel.Size = new Size(labelWidth, textSize.Height);
+        messageLabel.Location = new Point(padding, padding);
 
         Button okButton = new()
         {
@@ -91,6 +95,8 @@ public sealed partial class MainForm
         dialog.Font = _dialogFont;
         dialog.Icon = Icon;
 
+        string normalized = NormalizeDialogMessage(message);
+
         int padding = UiScale(20);
         int maxTextWidth = UiScale(520);
         int minWidth = UiScale(360);
@@ -98,29 +104,31 @@ public sealed partial class MainForm
         int buttonHeight = UiScale(32);
         int buttonGap = UiScale(16);
 
-        Size textSize = TextRenderer.MeasureText(
-            message,
-            _dialogFont,
-            new Size(maxTextWidth, int.MaxValue),
-            TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl);
-
-        int buttonRowWidth = (buttonWidth * 2) + buttonGap;
-        int clientWidth = Math.Max(minWidth, Math.Max(textSize.Width + (padding * 2), buttonRowWidth + (padding * 2)));
-        int clientHeight = padding + textSize.Height + buttonGap + buttonHeight + padding;
-        dialog.ClientSize = new Size(clientWidth, clientHeight);
-
         Label messageLabel = new()
         {
-            AutoSize = false,
-            Size = new Size(clientWidth - (padding * 2), textSize.Height),
-            Location = new Point(padding, padding),
-            Text = message,
+            AutoSize = true,
+            MaximumSize = new Size(maxTextWidth, 0),
+            Text = normalized,
             ForeColor = _fgMain,
             BackColor = _bgForm,
             UseMnemonic = false,
             TextAlign = ContentAlignment.MiddleCenter,
             Font = _dialogFont,
+            UseCompatibleTextRendering = true,
         };
+
+        Size textSize = messageLabel.GetPreferredSize(new Size(maxTextWidth, 0));
+        int buttonRowWidth = (buttonWidth * 2) + buttonGap;
+        int clientWidth = Math.Max(minWidth, Math.Max(textSize.Width + (padding * 2), buttonRowWidth + (padding * 2)));
+        int labelWidth = clientWidth - (padding * 2);
+        messageLabel.MaximumSize = new Size(labelWidth, 0);
+        textSize = messageLabel.GetPreferredSize(new Size(labelWidth, 0));
+        int clientHeight = padding + textSize.Height + buttonGap + buttonHeight + padding;
+        dialog.ClientSize = new Size(clientWidth, clientHeight);
+
+        messageLabel.AutoSize = false;
+        messageLabel.Size = new Size(labelWidth, textSize.Height);
+        messageLabel.Location = new Point(padding, padding);
 
         int buttonsTop = padding + textSize.Height + buttonGap;
         int rowLeft = (clientWidth - buttonRowWidth) / 2;
@@ -169,6 +177,17 @@ public sealed partial class MainForm
     private bool ShowThemedConfirm(string message)
     {
         return ShowThemedConfirm(message, "DEVICE TWEAKER");
+    }
+
+    private static string NormalizeDialogMessage(string message)
+    {
+        if (string.IsNullOrEmpty(message))
+        {
+            return string.Empty;
+        }
+
+        string normalized = message.Replace("\r\n", "\n").Replace("\r", "\n");
+        return normalized.Replace("\n", Environment.NewLine);
     }
 
     private void ApplyTitleBarTheme(Form form)

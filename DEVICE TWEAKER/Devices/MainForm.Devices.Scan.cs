@@ -128,6 +128,42 @@ public sealed partial class MainForm
         return null;
     }
 
+    private int? GetNdisRssQueues(string instanceId)
+    {
+        string enumPath = $@"SYSTEM\CurrentControlSet\Enum\{instanceId}";
+        string? ckPath = GetClassKeyForDevice(instanceId);
+        if (!string.IsNullOrWhiteSpace(ckPath))
+        {
+            try
+            {
+                using RegistryKey? ck = Registry.LocalMachine.OpenSubKey(ckPath);
+                object? val = ck?.GetValue("*NumRssQueues");
+                if (TryParseRegistryInt(val, out int result))
+                {
+                    return result;
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        try
+        {
+            using RegistryKey? ek = Registry.LocalMachine.OpenSubKey(enumPath);
+            object? val = ek?.GetValue("*NumRssQueues");
+            if (TryParseRegistryInt(val, out int result))
+            {
+                return result;
+            }
+        }
+        catch
+        {
+        }
+
+        return null;
+    }
+
     private void SetNdisBaseCore(string instanceId, int baseCore)
     {
         if (baseCore < 0)
@@ -154,6 +190,137 @@ public sealed partial class MainForm
         }
     }
 
+    private void SetNdisRssQueues(string instanceId, int queues)
+    {
+        if (queues < 1)
+        {
+            queues = 1;
+        }
+
+        string? ckPath = GetClassKeyForDevice(instanceId);
+        if (!string.IsNullOrWhiteSpace(ckPath))
+        {
+            try
+            {
+                using RegistryKey? ck = Registry.LocalMachine.CreateSubKey(ckPath);
+                ck?.SetValue("*NumRssQueues", queues, RegistryValueKind.DWord);
+                WriteLog($"RSS.SET: {instanceId} -> *NumRssQueues={queues} (class key)");
+            }
+            catch
+            {
+            }
+        }
+        else
+        {
+            WriteLog($"RSS.SET.SKIP: {instanceId} class key not found; *NumRssQueues not written");
+        }
+    }
+
+    private static bool TryParseRegistryInt(object? value, out int result)
+    {
+        result = 0;
+        if (value is null)
+        {
+            return false;
+        }
+
+        switch (value)
+        {
+            case int i:
+                result = i;
+                return true;
+            case uint ui:
+                result = unchecked((int)ui);
+                return true;
+            case long l:
+                result = unchecked((int)l);
+                return true;
+            case ulong ul:
+                result = unchecked((int)ul);
+                return true;
+            case short s:
+                result = s;
+                return true;
+            case ushort us:
+                result = us;
+                return true;
+            case byte b:
+                result = b;
+                return true;
+            case sbyte sb:
+                result = sb;
+                return true;
+            case string str when int.TryParse(str, out int parsed):
+                result = parsed;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static bool HasNonZeroAssignmentOverride(object? value)
+    {
+        if (value is null)
+        {
+            return false;
+        }
+
+        switch (value)
+        {
+            case byte[] bytes:
+                return bytes.Any(b => b != 0);
+            case int i:
+                return i != 0;
+            case uint ui:
+                return ui != 0;
+            case long l:
+                return l != 0;
+            case ulong ul:
+                return ul != 0;
+            case short s:
+                return s != 0;
+            case ushort us:
+                return us != 0;
+            case byte b:
+                return b != 0;
+            case sbyte sb:
+                return sb != 0;
+            case string str when ulong.TryParse(str, out ulong parsed):
+                return parsed != 0;
+            default:
+                return false;
+        }
+    }
+
+    private bool HasNonDefaultInterruptAffinity(string regBase)
+    {
+        string affPath = regBase + @"\Device Parameters\Interrupt Management\Affinity Policy";
+        try
+        {
+            using RegistryKey? affKey = Registry.LocalMachine.OpenSubKey(affPath);
+            if (affKey is null)
+            {
+                return false;
+            }
+
+            if (TryParseRegistryInt(affKey.GetValue("DevicePolicy"), out int policy) && policy != 0)
+            {
+                return true;
+            }
+
+            if (TryParseRegistryInt(affKey.GetValue("DevicePriority"), out int priority) && priority != 2)
+            {
+                return true;
+            }
+
+            return HasNonZeroAssignmentOverride(affKey.GetValue("AssignmentSetOverride"));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private void ClearNdisBaseCore(string instanceId)
     {
         string? ckPath = GetClassKeyForDevice(instanceId);
@@ -166,6 +333,24 @@ public sealed partial class MainForm
         {
             using RegistryKey? ck = Registry.LocalMachine.OpenSubKey(ckPath, writable: true);
             ck?.DeleteValue("*RssBaseProcNumber", throwOnMissingValue: false);
+        }
+        catch
+        {
+        }
+    }
+
+    private void ClearNdisRssQueues(string instanceId)
+    {
+        string? ckPath = GetClassKeyForDevice(instanceId);
+        if (string.IsNullOrWhiteSpace(ckPath))
+        {
+            return;
+        }
+
+        try
+        {
+            using RegistryKey? ck = Registry.LocalMachine.OpenSubKey(ckPath, writable: true);
+            ck?.DeleteValue("*NumRssQueues", throwOnMissingValue: false);
         }
         catch
         {
@@ -363,12 +548,6 @@ public sealed partial class MainForm
                 continue;
             }
 
-            if (Regex.IsMatch(d.InstanceId, "(?i)^PCI\\\\VEN_10DE&DEV_1AE[0-9A-F]"))
-            {
-                WriteLog($"SCAN: skipped NVIDIA USB/XHCI controller {d.InstanceId}");
-                continue;
-            }
-
             if (skipPatterns.Any(p => Regex.IsMatch(d.InstanceId, p, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)))
             {
                 WriteLog($"SCAN: skipped filtered device {d.InstanceId}");
@@ -533,13 +712,19 @@ public sealed partial class MainForm
 
                 if (string.IsNullOrWhiteSpace(usbText))
                 {
-                    WriteLog($"SCAN: skipped USB controller (no attached roles) {d.InstanceId} name=\"{name}\"");
-                    continue;
+                    if (!HasNonDefaultInterruptAffinity(regBase))
+                    {
+                        WriteLog($"SCAN: skipped USB controller (no attached roles) {d.InstanceId} name=\"{name}\"");
+                        continue;
+                    }
+
+                    WriteLog($"SCAN: keeping USB controller (no attached roles, custom affinity present) {d.InstanceId} name=\"{name}\"");
                 }
             }
 
             string audioText = string.Empty;
             List<string>? rawList = null;
+            bool isSpdifOnlyAudio = false;
             if (kind == DeviceKind.AUDIO)
             {
                 if (audioEndpoints.TryGetValue(d.InstanceId, out List<string>? names))
@@ -549,8 +734,12 @@ public sealed partial class MainForm
 
                 if (rawList is not null && rawList.Count > 0)
                 {
+                    bool hasSpdifEndpoint = rawList.Any(IsSpdifAudioEndpointsText);
+                    bool hasNonSpdifEndpoint = rawList.Any(endpoint => !IsSpdifAudioEndpointsText(endpoint));
+                    isSpdifOnlyAudio = hasSpdifEndpoint && !hasNonSpdifEndpoint;
+
                     audioText = FormatAudioEndpointsSummary(rawList);
-                    bool isDisplayAudio = IsDisplayHdmiaudio(d.InstanceId, name) || IsDisplayAudioEndpointsText(audioText);
+                    bool isDisplayAudio = !isSpdifOnlyAudio && (IsDisplayHdmiaudio(d.InstanceId, name) || IsDisplayAudioEndpointsText(audioText));
                     if (isDisplayAudio && !string.IsNullOrWhiteSpace(audioText))
                     {
                         audioText = Regex.Replace(audioText, "^(?i)HDMI AUDIO(?:\\s*#\\d+)?\\s*-?\\s*", string.Empty, RegexOptions.CultureInvariant);
@@ -559,6 +748,15 @@ public sealed partial class MainForm
                         audioText = string.IsNullOrWhiteSpace(audioText) ? transportLabel : $"{transportLabel} - {audioText}";
                     }
                 }
+            }
+
+            if (kind == DeviceKind.AUDIO && isSpdifOnlyAudio)
+            {
+                string endpointsLog = rawList is not null && rawList.Count > 0
+                    ? string.Join("; ", rawList)
+                    : audioText;
+                WriteLog($"SCAN: skipped AUDIO device (filtered S/PDIF endpoint) {d.InstanceId} class={d.Class} name=\"{name}\" endpoints=\"{endpointsLog}\"");
+                continue;
             }
 
             if (kind == DeviceKind.AUDIO && (rawList is null || rawList.Count == 0))

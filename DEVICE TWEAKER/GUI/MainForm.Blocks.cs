@@ -48,6 +48,10 @@ public sealed partial class MainForm
         {
             title = $"{device.Name} [{device.UsbRoles}]";
         }
+        else if (device.Kind == DeviceKind.USB)
+        {
+            title = $"{device.Name} [No HID roles]";
+        }
         else if (device.Kind == DeviceKind.NET_NDIS)
         {
             title = $"{device.Name} [NDIS]";
@@ -190,6 +194,7 @@ public sealed partial class MainForm
                 FlatStyle = FlatStyle.Flat,
             };
             StyleCpuCheckbox(cb, i);
+            cb.Tag = i;
             if (device.Kind == DeviceKind.STOR)
             {
                 cb.AutoCheck = false;
@@ -409,8 +414,44 @@ public sealed partial class MainForm
             cmbPolicy.Enabled = false;
         }
 
-        settingsPanel.Controls.AddRange([lblPolicy, cmbPolicy]);
-        rowTop = cmbPolicy.Bottom + rowGap;
+        if (device.Kind != DeviceKind.NET_NDIS)
+        {
+            settingsPanel.Controls.AddRange([lblPolicy, cmbPolicy]);
+            rowTop = cmbPolicy.Bottom + rowGap;
+        }
+        else
+        {
+            lblPolicy.Visible = false;
+            cmbPolicy.Visible = false;
+        }
+
+        Label lblRssQueues = new()
+        {
+            Text = "RSS Queues:",
+            AutoSize = true,
+            Location = new Point(0, rowTop + labelOffset),
+            ForeColor = _fgMain,
+            Visible = device.Kind == DeviceKind.NET_NDIS,
+        };
+
+        NumericUpDown nudRssQueues = new()
+        {
+            Location = new Point(valueX, rowTop),
+            Size = UiScale(70, 26),
+            Minimum = 1,
+            Maximum = Math.Max(1, _maxLogical),
+            Value = 1,
+            BackColor = Color.FromArgb(18, 18, 22),
+            ForeColor = _fgMain,
+            BorderStyle = BorderStyle.FixedSingle,
+            Visible = device.Kind == DeviceKind.NET_NDIS,
+        };
+
+        if (device.Kind == DeviceKind.NET_NDIS)
+        {
+            settingsPanel.Controls.AddRange([lblRssQueues, nudRssQueues]);
+            rowTop = nudRssQueues.Bottom + rowGap;
+        }
 
         int imodCheckSize = UiScale(14);
         int imodCheckGap = UiScale(4);
@@ -577,6 +618,7 @@ public sealed partial class MainForm
             PrioCombo = cmbPrio,
             PolicyCombo = cmbPolicy,
             PolicyLabel = lblPolicy,
+            RssQueueBox = device.Kind == DeviceKind.NET_NDIS ? nudRssQueues : null,
             ImodAutoCheck = chkImod,
             ImodBox = txtImod,
             ImodDefaultLabel = lblImodDefault,
@@ -587,13 +629,34 @@ public sealed partial class MainForm
 
         foreach (CheckBox cb in cpuBoxes)
         {
-            cb.Tag = block;
             cb.CheckedChanged += (_, _) =>
             {
-                if (cb.Tag is DeviceBlock b && b.SuppressCpuEvents == 0)
+                if (block.SuppressCpuEvents == 0)
                 {
-                    RecalcAffinityMask(b);
+                    if (block.Kind == DeviceKind.NET_NDIS)
+                    {
+                        HandleNdisCheckboxChanged(block, cb);
+                    }
+                    else
+                    {
+                        RecalcAffinityMask(block);
+                    }
                 }
+            };
+        }
+
+        if (block.Kind == DeviceKind.NET_NDIS && block.RssQueueBox is not null)
+        {
+            block.RssQueueBox.ValueChanged += (_, _) =>
+            {
+                if (block.SuppressCpuEvents > 0)
+                {
+                    return;
+                }
+
+                int baseCore = block.RssBaseCore ?? GetFirstCheckedCore(block) ?? 0;
+                int queues = ClampRssQueueCount((int)block.RssQueueBox.Value);
+                ApplyNdisSelection(block, baseCore, queues);
             };
         }
 

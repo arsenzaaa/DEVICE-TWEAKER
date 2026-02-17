@@ -172,6 +172,15 @@ public sealed partial class MainForm
         int storCount = _blocks.Count(b => b.Kind == DeviceKind.STOR);
         HashSet<string> skipAutoIds = new(StringComparer.OrdinalIgnoreCase);
 
+        foreach (DeviceBlock usbBlock in usbBlocks)
+        {
+            if (string.IsNullOrWhiteSpace(usbBlock.Device.UsbRoles))
+            {
+                skipAutoIds.Add(usbBlock.Device.InstanceId);
+                WriteLog($"AUTO.SKIP.USB: {usbBlock.Device.InstanceId} no HID roles (manual/reset only)");
+            }
+        }
+
         int netCount = netNdisBlocks.Count + netCxBlocks.Count;
         bool hasWiFiOnly = wifiIds.Count > 0 && netCount == 0;
         WriteLog(
@@ -187,16 +196,16 @@ public sealed partial class MainForm
             string desc = audioBlock.Device.Name;
             string audioText = audioBlock.Device.AudioEndpoints;
 
+            bool isSpdif = IsSpdifAudioEndpointsText(audioText);
             bool isDisplay = IsDisplayHdmiaudio(pnpId, desc) || IsDisplayAudioEndpointsText(audioText);
-            if (!isDisplay)
+            if (!isDisplay && !isSpdif)
             {
                 continue;
             }
-            else
-            {
-                skipAutoIds.Add(pnpId);
-                WriteLog($"AUTO.SKIP.AUDIO: {pnpId} classified as display/HDMI audio (name=\"{desc}\" endpoints=\"{audioText}\")");
-            }
+
+            skipAutoIds.Add(pnpId);
+            string reason = isSpdif ? "digital S/PDIF audio" : "display/HDMI audio";
+            WriteLog($"AUTO.SKIP.AUDIO: {pnpId} classified as {reason} (name=\"{desc}\" endpoints=\"{audioText}\")");
         }
 
         foreach (DeviceBlock block in _blocks)
@@ -258,7 +267,8 @@ public sealed partial class MainForm
             WriteLog($"AUTO.RESET: {block.Device.InstanceId} Kind={block.Kind} maskAfter=0x{afterMask:X} policyAfter={afterPolicy} skipAuto={isSkipAuto}");
             if (isSkipAuto)
             {
-                WriteLog($"AUTO.RESET.SKIP: {block.Device.InstanceId} Kind={block.Kind} reason=display/HDMI audio");
+                string reason = IsSpdifAudioEndpointsText(block.Device.AudioEndpoints) ? "digital S/PDIF audio" : "display/HDMI audio";
+                WriteLog($"AUTO.RESET.SKIP: {block.Device.InstanceId} Kind={block.Kind} reason={reason}");
             }
         }
 
@@ -368,6 +378,27 @@ public sealed partial class MainForm
                 block.SuppressCpuEvents--;
             }
 
+            int? ndisAutoQueues = null;
+            if (block.Kind == DeviceKind.NET_NDIS)
+            {
+                // AUTO keeps NDIS on a single logical processor to avoid implicit SMT spread via RSS queues.
+                block.RssBaseCore = lps[0];
+                if (block.RssQueueBox is not null)
+                {
+                    block.SuppressCpuEvents++;
+                    try
+                    {
+                        block.RssQueueBox.Value = 1;
+                    }
+                    finally
+                    {
+                        block.SuppressCpuEvents--;
+                    }
+
+                    ndisAutoQueues = (int)block.RssQueueBox.Value;
+                }
+            }
+
             if (block.Kind != DeviceKind.NET_NDIS && block.PolicyCombo.Enabled)
             {
                 block.PolicyCombo.SelectedItem = "SpecCPU";
@@ -380,7 +411,14 @@ public sealed partial class MainForm
                 DeviceKind.NET_NDIS or DeviceKind.NET_CX => "NET",
                 _ => block.Kind.ToString(),
             };
-            WriteLog($"AUTO: {labelText} {block.Device.InstanceId} -> LPs=[{string.Join(',', lps)}] policy={block.PolicyCombo.SelectedItem}");
+            if (block.Kind == DeviceKind.NET_NDIS)
+            {
+                WriteLog($"AUTO: {labelText} {block.Device.InstanceId} -> LPs=[{string.Join(',', lps)}] policy={block.PolicyCombo.SelectedItem} queues={(ndisAutoQueues ?? 1)}");
+            }
+            else
+            {
+                WriteLog($"AUTO: {labelText} {block.Device.InstanceId} -> LPs=[{string.Join(',', lps)}] policy={block.PolicyCombo.SelectedItem}");
+            }
         }
 
         WriteLog("AUTO: Invoke-AutoOptimization done");
