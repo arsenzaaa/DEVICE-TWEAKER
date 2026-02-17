@@ -1,0 +1,14 @@
+# Build output and intermediate artifacts
+DEVICE TWEAKER/bin/
+DEVICE TWEAKER/obj/
+DEVICE TWEAKER/artifacts/
+
+# Logs and local publish checks
+DEVICE TWEAKER/**/*.log
+DEVICE TWEAKER/**/size-check/
+
+# IDE/user-local files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates

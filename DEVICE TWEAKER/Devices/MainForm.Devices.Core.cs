@@ -163,8 +163,12 @@ public sealed partial class MainForm
             return false;
         }
 
-        string lower = t.ToLowerInvariant();
-        if (Regex.IsMatch(lower, "(?i)hdmi|display audio|monitor|displayport|digital audio|dp\\b"))
+        if (IsSpdifAudioEndpointsText(t))
+        {
+            return false;
+        }
+
+        if (Regex.IsMatch(t, "(?i)hdmi|display\\s*audio|monitor|монитор|displayport|\\bdp\\b"))
         {
             return true;
         }
@@ -172,6 +176,35 @@ public sealed partial class MainForm
         if (Regex.IsMatch(t, "^[A-Z0-9]{3,}$", RegexOptions.CultureInvariant) && Regex.IsMatch(t, "\\d", RegexOptions.CultureInvariant))
         {
             return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsSpdifAudioEndpointsText(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        string t = text.Trim();
+        if (t == "[UNKNOWN]")
+        {
+            return false;
+        }
+
+        bool hasDisplayHint = Regex.IsMatch(t, "(?i)hdmi|display\\s*audio|monitor|монитор|displayport|\\bdp\\b");
+        bool hasSpdifToken = Regex.IsMatch(t, "(?i)s\\s*/?\\s*p\\s*d\\s*i\\s*f|spdif|iec\\s*958|toslink");
+        if (hasSpdifToken)
+        {
+            return !hasDisplayHint;
+        }
+
+        bool hasDigitalToken = Regex.IsMatch(t, "(?i)digital\\s+audio|цифров(ое|ой)\\s+аудио|цифров(ой|ое)\\s+выход");
+        if (hasDigitalToken)
+        {
+            return !hasDisplayHint;
         }
 
         return false;

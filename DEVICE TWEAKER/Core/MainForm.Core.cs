@@ -49,6 +49,7 @@ public sealed partial class MainForm : Form
         UpdateUiScale();
         AutoScaleMode = AutoScaleMode.None;
 
+        EnableDetailedLog();
         InitializeCpu();
         InitializeGui();
         ApplyAppIcon();
@@ -228,6 +229,7 @@ public sealed partial class MainForm : Form
         InitializeDetailedLogFile();
 
         WriteLog("LOG: detailed logging ENABLED");
+        WriteLog($"LOG.VERSION: {GetAppVersion()}");
 
         try
         {
@@ -342,6 +344,27 @@ public sealed partial class MainForm : Form
             .Trim();
     }
 
+    private static string GetAppVersion()
+    {
+        try
+        {
+            Assembly asm = Assembly.GetExecutingAssembly();
+            AssemblyInformationalVersionAttribute? info =
+                asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+            if (!string.IsNullOrWhiteSpace(info?.InformationalVersion))
+            {
+                return info.InformationalVersion;
+            }
+
+            Version? ver = asm.GetName().Version;
+            return ver?.ToString() ?? "unknown";
+        }
+        catch
+        {
+            return "unknown";
+        }
+    }
+
     private static string FormatIndexList(List<int> values)
     {
         return values.Count == 0 ? "none" : string.Join(',', values);
@@ -355,6 +378,92 @@ public sealed partial class MainForm : Form
         }
 
         return FlattenLogText(value).Replace("\"", "'");
+    }
+
+    private static int? TryParseLeadingInt(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string text = value.Trim();
+        int i = 0;
+        while (i < text.Length && char.IsDigit(text[i]))
+        {
+            i++;
+        }
+
+        if (i == 0)
+        {
+            return null;
+        }
+
+        return int.TryParse(text[..i], out int result) ? result : null;
+    }
+
+    private static int? ParseLimitText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return 0;
+        }
+
+        string text = value.Trim();
+        if (string.Equals(text, "0", StringComparison.OrdinalIgnoreCase))
+        {
+            return 0;
+        }
+
+        if (string.Equals(text, "unlimited", StringComparison.OrdinalIgnoreCase))
+        {
+            return 0;
+        }
+
+        if (int.TryParse(text, out int parsed))
+        {
+            return parsed < 0 ? 0 : parsed;
+        }
+
+        return null;
+    }
+
+    private static ulong BuildUiMask(DeviceBlock block)
+    {
+        ulong mask = 0;
+        for (int i = 0; i < block.CpuBoxes.Count; i++)
+        {
+            if (block.CpuBoxes[i].Checked)
+            {
+                mask |= 1UL << i;
+            }
+        }
+
+        return mask;
+    }
+
+    private static int MapPrioText(string? text)
+    {
+        return text switch
+        {
+            "Low" => 1,
+            "High" => 3,
+            _ => 2,
+        };
+    }
+
+    private static int? MapPolicyText(string? text)
+    {
+        return text switch
+        {
+            "MachineDefault" => 0,
+            "All" => 1,
+            "Single" => 2,
+            "AllClose" => 3,
+            "SpecCPU" => 4,
+            "SpreadMessages" => 5,
+            _ => null,
+        };
     }
 
     private static string FormatRegistryValue(object? value)
@@ -436,6 +545,76 @@ public sealed partial class MainForm : Form
         }
     }
 
+    private static int? TryGetRegInt(RegistryKey? key, string name)
+    {
+        if (key is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            object? value = key.GetValue(name);
+            return value switch
+            {
+                int i => i,
+                uint ui => unchecked((int)ui),
+                long l => unchecked((int)l),
+                ulong ul => unchecked((int)ul),
+                short s16 => s16,
+                ushort u16 => u16,
+                byte b => b,
+                sbyte sb => sb,
+                string s when int.TryParse(s, out int parsed) => parsed,
+                _ => null,
+            };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static ulong? TryGetAssignmentMask(RegistryKey? key)
+    {
+        if (key is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            object? raw = key.GetValue("AssignmentSetOverride");
+            if (raw is byte[] bytes)
+            {
+                if (bytes.Length >= 8)
+                {
+                    return BitConverter.ToUInt64(bytes, 0);
+                }
+
+                if (bytes.Length >= 4)
+                {
+                    return BitConverter.ToUInt32(bytes, 0);
+                }
+
+                return null;
+            }
+
+            return raw switch
+            {
+                int i => (uint)i,
+                uint ui => ui,
+                long l => (ulong)l,
+                ulong ul => ul,
+                _ => null,
+            };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static string FormatAssignmentOverride(object? value)
     {
         if (value is byte[] bytes)
@@ -503,6 +682,59 @@ public sealed partial class MainForm : Form
         return text;
     }
 
+    private static string StripDevicePathPrefix(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return string.Empty;
+        }
+
+        string text = path.Trim();
+        if (text.StartsWith(@"\??\", StringComparison.OrdinalIgnoreCase))
+        {
+            text = text.Substring(@"\??\".Length);
+        }
+
+        if (text.StartsWith(@"\\?\"))
+        {
+            text = text.Substring(@"\\?\".Length);
+        }
+
+        return text;
+    }
+
+    private static string EnsureAbsoluteWindowsPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return string.Empty;
+        }
+
+        string text = path.Trim();
+        if (Path.IsPathRooted(text))
+        {
+            return text;
+        }
+
+        string winDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        string systemDir = Environment.SystemDirectory;
+        string trimmed = text.TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        if (trimmed.StartsWith("System32\\", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("SysWOW64\\", StringComparison.OrdinalIgnoreCase))
+        {
+            return Path.Combine(winDir, trimmed);
+        }
+
+        if (trimmed.StartsWith("Drivers\\", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("DriverStore\\", StringComparison.OrdinalIgnoreCase))
+        {
+            return Path.Combine(systemDir, trimmed);
+        }
+
+        return Path.Combine(winDir, trimmed);
+    }
+
     private static string ResolveImagePath(string? rawPath)
     {
         if (string.IsNullOrWhiteSpace(rawPath))
@@ -512,7 +744,9 @@ public sealed partial class MainForm : Form
 
         string expanded = Environment.ExpandEnvironmentVariables(rawPath.Trim());
         string extracted = ExtractImagePath(expanded);
-        return ExpandSystemRootAlias(extracted);
+        string stripped = StripDevicePathPrefix(extracted);
+        string expandedRoot = ExpandSystemRootAlias(stripped);
+        return EnsureAbsoluteWindowsPath(expandedRoot);
     }
 
     private static FileVersionInfo? TryGetFileVersionInfo(string path)
@@ -610,8 +844,9 @@ public sealed partial class MainForm : Form
         public string? CompatibleIds { get; init; }
     }
 
-    private Dictionary<string, SignedDriverInfo> BuildSignedDriverInfoMap()
+    private Dictionary<string, SignedDriverInfo> BuildSignedDriverInfoMap(out string? error)
     {
+        error = null;
         Dictionary<string, SignedDriverInfo> map = new(StringComparer.OrdinalIgnoreCase);
         try
         {
@@ -652,8 +887,9 @@ public sealed partial class MainForm : Form
                 map[key] = info;
             }
         }
-        catch
+        catch (Exception ex)
         {
+            error = ex.Message;
         }
 
         return map;
@@ -666,7 +902,21 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        Dictionary<string, SignedDriverInfo> signedDriverMap = BuildSignedDriverInfoMap();
+        int issueCount = 0;
+        Dictionary<string, SignedDriverInfo> signedDriverMap = BuildSignedDriverInfoMap(out string? wmiError);
+        bool wmiMapEmpty = signedDriverMap.Count == 0;
+        if (!string.IsNullOrWhiteSpace(wmiError))
+        {
+            WriteLog($"GUI.ISSUE: reason=wmiQueryFailed error=\"{SanitizeLogValue(wmiError)}\"");
+            issueCount++;
+        }
+        else if (wmiMapEmpty)
+        {
+            WriteLog("GUI.ISSUE: reason=wmiQueryEmpty");
+            issueCount++;
+        }
+
+        WriteLog($"GUI.WMI: signedDrivers={signedDriverMap.Count}");
 
         string safeReason = string.IsNullOrWhiteSpace(reason) ? "unknown" : reason.Trim();
         WriteLog($"GUI.SNAPSHOT: start reason={safeReason}");
@@ -718,7 +968,7 @@ public sealed partial class MainForm : Form
             string infoReg = FlattenLogText(b.InfoLabel.Tag as string);
             WriteLog($"GUI.BLOCK.INFO: idx={i} text=\"{infoText}\" reg=\"{infoReg}\"");
 
-            LogGuiBlockDetails(b, i, signedDriverMap);
+            issueCount += LogGuiBlockDetails(b, i, signedDriverMap, wmiMapEmpty);
         }
 
         if (_reservedCpuPanel?.Tag is ReservedCpuPanelTag tag)
@@ -735,11 +985,13 @@ public sealed partial class MainForm : Form
             WriteLog("GUI.RESERVED: none");
         }
 
+        WriteLog($"GUI.ISSUE.SUMMARY: count={issueCount}");
         WriteLog($"GUI.SNAPSHOT: end reason={safeReason}");
     }
 
-    private void LogGuiBlockDetails(DeviceBlock block, int index, Dictionary<string, SignedDriverInfo> signedDriverMap)
+    private int LogGuiBlockDetails(DeviceBlock block, int index, Dictionary<string, SignedDriverInfo> signedDriverMap, bool wmiMapEmpty)
     {
+        int issues = 0;
         try
         {
             string instanceId = block.Device.InstanceId;
@@ -850,7 +1102,14 @@ public sealed partial class MainForm : Form
             {
                 int? rssBase = GetNdisBaseCore(instanceId);
                 string rssText = rssBase.HasValue ? rssBase.Value.ToString() : string.Empty;
-                WriteLog($"GUI.BLOCK.RSS: idx={index} baseCore={rssText}");
+                int? rssQueues = GetNdisRssQueues(instanceId);
+                string rssQueueText = rssQueues.HasValue ? rssQueues.Value.ToString() : string.Empty;
+                WriteLog($"GUI.BLOCK.RSS: idx={index} baseCore={rssText} queues={rssQueueText}");
+                issues += LogGuiBlockIssues(block, index, normalizedId, signedDriverMap, wmiMapEmpty, enumProblemRaw, svcImageRaw, svcImageResolved, drvInfo, msiKey, affKey, rssBase);
+            }
+            else
+            {
+                issues += LogGuiBlockIssues(block, index, normalizedId, signedDriverMap, wmiMapEmpty, enumProblemRaw, svcImageRaw, svcImageResolved, drvInfo, msiKey, affKey, null);
             }
 
             WriteLog($"GUI.BLOCK.EXTRA: idx={index} usbIsXhci={block.Device.UsbIsXhci} usbHasDevices={block.Device.UsbHasDevices}");
@@ -867,7 +1126,205 @@ public sealed partial class MainForm : Form
         catch (Exception ex)
         {
             WriteLog($"GUI.BLOCK.DETAIL.ERROR: idx={index} error={ex.Message}");
+            issues++;
         }
+
+        return issues;
+    }
+
+    private int LogGuiBlockIssues(
+        DeviceBlock block,
+        int index,
+        string normalizedId,
+        Dictionary<string, SignedDriverInfo> signedDriverMap,
+        bool wmiMapEmpty,
+        string enumProblemRaw,
+        string svcImageRaw,
+        string svcImageResolved,
+        FileVersionInfo? drvInfo,
+        RegistryKey? msiKey,
+        RegistryKey? affKey,
+        int? rssBase)
+    {
+        int issues = 0;
+
+        void LogIssue(string reason, string? detail = null)
+        {
+            if (string.IsNullOrWhiteSpace(detail))
+            {
+                WriteLog($"GUI.ISSUE: idx={index} id={block.Device.InstanceId} reason={reason}");
+            }
+            else
+            {
+                WriteLog($"GUI.ISSUE: idx={index} id={block.Device.InstanceId} reason={reason} {detail}");
+            }
+
+            issues++;
+        }
+
+        int? problemCode = TryParseLeadingInt(enumProblemRaw);
+        if (problemCode.HasValue && problemCode.Value != 0)
+        {
+            LogIssue("cmProblem", $"code={SanitizeLogValue(enumProblemRaw)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(svcImageRaw) && string.IsNullOrWhiteSpace(svcImageResolved))
+        {
+            LogIssue("svcImageUnresolved", $"raw=\"{SanitizeLogValue(svcImageRaw)}\"");
+        }
+        else if (!string.IsNullOrWhiteSpace(svcImageResolved) && drvInfo is null)
+        {
+            LogIssue("driverFileMissing", $"path=\"{SanitizeLogValue(svcImageResolved)}\"");
+        }
+
+        if (!wmiMapEmpty && !signedDriverMap.ContainsKey(normalizedId))
+        {
+            LogIssue("wmiSignedDriverMissing");
+        }
+
+        if (block.Kind == DeviceKind.NET_NDIS)
+        {
+            if (!rssBase.HasValue)
+            {
+                LogIssue("rssBaseMissing");
+            }
+
+            int rssQueues = GetNdisRssQueues(block.Device.InstanceId) ?? 1;
+            if (rssQueues < 1)
+            {
+                rssQueues = 1;
+            }
+
+            if (rssQueues > _maxLogical)
+            {
+                rssQueues = _maxLogical;
+            }
+
+            int selectedCount = 0;
+            for (int i = 0; i < block.CpuBoxes.Count; i++)
+            {
+                if (!block.CpuBoxes[i].Checked)
+                {
+                    continue;
+                }
+
+                selectedCount++;
+            }
+
+            if (selectedCount != rssQueues)
+            {
+                LogIssue("rssBaseSelection", $"selected={selectedCount} expected={rssQueues}");
+            }
+            else if (rssBase.HasValue && rssBase.Value >= 0 && rssBase.Value < block.CpuBoxes.Count && !block.CpuBoxes[rssBase.Value].Checked)
+            {
+                LogIssue("rssBaseMismatch", $"uiMissingBase={rssBase.Value}");
+            }
+
+            if (block.PolicyCombo.Enabled)
+            {
+                LogIssue("rssPolicyEnabled");
+            }
+        }
+        else if (block.Kind == DeviceKind.STOR)
+        {
+            if (block.PolicyCombo.Enabled)
+            {
+                LogIssue("storPolicyEnabled");
+            }
+        }
+
+        string uiMsiText = block.MsiCombo.SelectedItem?.ToString() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(uiMsiText))
+        {
+            LogIssue("msiUiMissing");
+        }
+
+        string uiPrioText = block.PrioCombo.SelectedItem?.ToString() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(uiPrioText))
+        {
+            LogIssue("prioUiMissing");
+        }
+
+        if (block.Kind != DeviceKind.NET_NDIS)
+        {
+            string uiPolicyText = block.PolicyCombo.SelectedItem?.ToString() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(uiPolicyText))
+            {
+                LogIssue("policyUiMissing");
+            }
+        }
+
+        if (!block.Device.IsTestDevice)
+        {
+            int uiMsi = uiMsiText == "Enabled" ? 1 : 0;
+            int? regMsi = TryGetRegInt(msiKey, "MSISupported");
+            if (regMsi.HasValue && regMsi.Value != uiMsi)
+            {
+                LogIssue("msiMismatch", $"ui={SanitizeLogValue(uiMsiText)} reg={regMsi.Value}");
+            }
+            else if (!regMsi.HasValue && uiMsi != 0)
+            {
+                LogIssue("msiMismatch", $"ui={SanitizeLogValue(uiMsiText)} reg=missing");
+            }
+
+            int? uiLimit = ParseLimitText(block.LimitBox.Text);
+            int? regLimitRaw = TryGetRegInt(msiKey, "MessageNumberLimit");
+            int regLimit = regLimitRaw ?? 0;
+            if (!uiLimit.HasValue)
+            {
+                LogIssue("msiLimitInvalid", $"ui=\"{SanitizeLogValue(block.LimitBox.Text)}\"");
+            }
+            else if (uiLimit.Value != regLimit)
+            {
+                string suffix = regLimitRaw.HasValue ? string.Empty : " regMissing=1";
+                LogIssue("msiLimitMismatch", $"ui={uiLimit.Value} reg={regLimit}{suffix}");
+            }
+
+            int uiPrio = MapPrioText(uiPrioText);
+            int? regPrioRaw = TryGetRegInt(affKey, "DevicePriority");
+            int regPrio = regPrioRaw ?? 2;
+            if (regPrio != uiPrio)
+            {
+                string suffix = regPrioRaw.HasValue ? string.Empty : " regMissing=1";
+                LogIssue("prioMismatch", $"ui={SanitizeLogValue(uiPrioText)} reg={regPrio}{suffix}");
+            }
+
+            if (block.Kind != DeviceKind.NET_NDIS)
+            {
+                string uiPolicyText = block.PolicyCombo.SelectedItem?.ToString() ?? string.Empty;
+                int? uiPolicy = MapPolicyText(uiPolicyText);
+                if (uiPolicy is null)
+                {
+                    LogIssue("policyUiInvalid", $"ui={SanitizeLogValue(uiPolicyText)}");
+                }
+                else
+                {
+                    int? regPolicyRaw = TryGetRegInt(affKey, "DevicePolicy");
+                    int regPolicy = regPolicyRaw ?? 0;
+                    if (regPolicy != uiPolicy.Value)
+                    {
+                        string suffix = regPolicyRaw.HasValue ? string.Empty : " regMissing=1";
+                        LogIssue("policyMismatch", $"ui={SanitizeLogValue(uiPolicyText)} reg={regPolicy}{suffix}");
+                    }
+                }
+
+                ulong uiMask = BuildUiMask(block);
+                if (uiMask != block.AffinityMask)
+                {
+                    LogIssue("uiMaskOutOfSync", $"ui=0x{uiMask:X} state=0x{block.AffinityMask:X}");
+                }
+
+                ulong? regMaskRaw = TryGetAssignmentMask(affKey);
+                ulong regMask = regMaskRaw ?? 0;
+                if (uiMask != regMask)
+                {
+                    string suffix = regMaskRaw.HasValue ? string.Empty : " regMissing=1";
+                    LogIssue("maskMismatch", $"ui=0x{uiMask:X} reg=0x{regMask:X}{suffix}");
+                }
+            }
+        }
+
+        return issues;
     }
 
     private void DisableDetailedLog()

@@ -25,7 +25,7 @@ public sealed partial class MainForm
 
             string? usageRole = GetHidUsageRole(usagePage, usageId);
             string? pnpRole = GetPnpHidRole(pnpDev);
-            string? role = ResolveHidRole(product, productRole, usageRole, pnpRole);
+            string? role = ResolveHidRole(product, inst, productRole, usageRole, pnpRole);
 
             if (string.IsNullOrWhiteSpace(inst) || string.IsNullOrWhiteSpace(role))
             {
@@ -104,6 +104,29 @@ public sealed partial class MainForm
         return list;
     }
 
+    private static bool IsKnownInternalVendorHid(string productName)
+    {
+        if (string.IsNullOrWhiteSpace(productName))
+        {
+            return false;
+        }
+
+        return Regex.IsMatch(
+            productName,
+            "(?i)^ite\\s+device\\(\\d+\\)$",
+            RegexOptions.CultureInvariant);
+    }
+
+    private static bool IsCollectionLevelHid(string? instanceId)
+    {
+        if (string.IsNullOrWhiteSpace(instanceId))
+        {
+            return false;
+        }
+
+        return Regex.IsMatch(instanceId, "(?i)&COL\\d+", RegexOptions.CultureInvariant);
+    }
+
     private string? GetHidProductType(string productName)
     {
         if (string.IsNullOrWhiteSpace(productName))
@@ -111,8 +134,13 @@ public sealed partial class MainForm
             return null;
         }
 
+        if (IsKnownInternalVendorHid(productName))
+        {
+            return null;
+        }
+
         string name = productName.ToLowerInvariant();
-        if (Regex.IsMatch(name, "(?i)headset|headphone|earbud|earphone|microphone|\\bmic\\b|usb audio|audio|sound card|soundcard|speaker|speakers|dac|blackshark|kraken|barracuda|nari|seiren|hammerhead|tiamat|thresher|manowar|opus", RegexOptions.CultureInvariant))
+        if (Regex.IsMatch(name, "(?i)headset|headphone|earbud|earphone|microphone|\\bmic\\b|usb audio|audio|sound card|soundcard|speaker|speakers|dac|surround\\s*sound|virtual\\s*surround|blackshark|kraken|barracuda|nari|seiren|hammerhead|tiamat|thresher|manowar|opus", RegexOptions.CultureInvariant))
         {
             return null;
         }
@@ -386,8 +414,24 @@ public sealed partial class MainForm
             RegexOptions.CultureInvariant);
     }
 
-    private static string? ResolveHidRole(string productName, string? productRole, string? usageRole, string? pnpRole)
+    private static string? ResolveHidRole(string productName, string? instanceId, string? productRole, string? usageRole, string? pnpRole)
     {
+        // Collection-level HID nodes are often vendor-defined helper endpoints.
+        // If they have no usage/PNP evidence, do not classify them by product-name heuristics.
+        if (IsCollectionLevelHid(instanceId)
+            && string.IsNullOrWhiteSpace(usageRole)
+            && string.IsNullOrWhiteSpace(pnpRole))
+        {
+            return null;
+        }
+
+        if (IsKnownInternalVendorHid(productName)
+            && string.IsNullOrWhiteSpace(usageRole)
+            && string.IsNullOrWhiteSpace(pnpRole))
+        {
+            return null;
+        }
+
         if (!string.IsNullOrWhiteSpace(productRole))
         {
             if (string.IsNullOrWhiteSpace(usageRole)
@@ -478,7 +522,7 @@ public sealed partial class MainForm
 
             string? usageRole = GetHidUsageRole(usagePage, usageId);
             string? pnpRole = GetPnpHidRole(pnpDev);
-            string? role = ResolveHidRole(product, productRole, usageRole, pnpRole);
+            string? role = ResolveHidRole(product, inst, productRole, usageRole, pnpRole);
 
             string? usbAncestor = null;
             string? currId = inst;

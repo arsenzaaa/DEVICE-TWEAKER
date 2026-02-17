@@ -32,6 +32,105 @@ public sealed partial class MainForm
         }
     }
 
+    private int ClampRssQueueCount(int value)
+    {
+        if (value < 1)
+        {
+            value = 1;
+        }
+
+        if (value > _maxLogical)
+        {
+            value = _maxLogical;
+        }
+
+        return value;
+    }
+
+    private int? GetFirstCheckedCore(DeviceBlock block)
+    {
+        for (int i = 0; i < block.CpuBoxes.Count; i++)
+        {
+            if (block.CpuBoxes[i].Checked)
+            {
+                return i;
+            }
+        }
+
+        return null;
+    }
+
+    private void ApplyNdisSelection(DeviceBlock block, int baseCore, int queues)
+    {
+        int clampedQueues = ClampRssQueueCount(queues);
+        int maxBase = Math.Max(0, _maxLogical - clampedQueues);
+        if (baseCore < 0)
+        {
+            baseCore = 0;
+        }
+        else if (baseCore > maxBase)
+        {
+            baseCore = maxBase;
+        }
+
+        block.RssBaseCore = baseCore;
+
+        if (block.RssQueueBox is not null && (int)block.RssQueueBox.Value != clampedQueues)
+        {
+            block.SuppressCpuEvents++;
+            try
+            {
+                block.RssQueueBox.Value = clampedQueues;
+            }
+            finally
+            {
+                block.SuppressCpuEvents--;
+            }
+        }
+
+        HashSet<int> selected = [];
+        for (int i = 0; i < clampedQueues; i++)
+        {
+            selected.Add(baseCore + i);
+        }
+
+        block.SuppressCpuEvents++;
+        try
+        {
+            foreach (CheckBox cb in block.CpuBoxes)
+            {
+                if (cb.Tag is not int core)
+                {
+                    continue;
+                }
+                bool isSelected = selected.Contains(core);
+                cb.Checked = isSelected;
+                cb.AutoCheck = !isSelected;
+            }
+        }
+        finally
+        {
+            block.SuppressCpuEvents--;
+        }
+
+        RecalcAffinityMask(block);
+    }
+
+    private void HandleNdisCheckboxChanged(DeviceBlock block, CheckBox sender)
+    {
+        if (!sender.Checked)
+        {
+            return;
+        }
+
+        if (sender.Tag is not int baseCore)
+        {
+            return;
+        }
+        int queues = ClampRssQueueCount(block.RssQueueBox?.Value is decimal val ? (int)val : 1);
+        ApplyNdisSelection(block, baseCore, queues);
+    }
+
     private void LoadBlockSettings(DeviceBlock block)
     {
         block.SuppressCpuEvents++;
@@ -119,30 +218,34 @@ public sealed partial class MainForm
             block.PolicyCombo.Items.Add("RSS base core");
             block.PolicyCombo.SelectedIndex = 0;
             block.PolicyCombo.Enabled = false;
+            block.PolicyLabel.Visible = false;
+            block.PolicyCombo.Visible = false;
 
             int? baseCore = isTestDevice ? 0 : GetNdisBaseCore(block.Device.InstanceId);
+            int queues = isTestDevice ? 1 : GetNdisRssQueues(block.Device.InstanceId) ?? 1;
+            queues = ClampRssQueueCount(queues);
+
+            block.SuppressCpuEvents++;
+            try
+            {
+                if (block.RssQueueBox is not null)
+                {
+                    block.RssQueueBox.Value = queues;
+                }
+            }
+            finally
+            {
+                block.SuppressCpuEvents--;
+            }
+
+            block.RssBaseCore = baseCore;
             if (baseCore is >= 0 && baseCore < _maxLogical)
             {
-                ulong mask = 1UL << baseCore.Value;
-                block.AffinityMask = mask;
-
-                block.SuppressCpuEvents++;
-                try
-                {
-                    for (int i = 0; i < block.CpuBoxes.Count; i++)
-                    {
-                        ulong bit = 1UL << i;
-                        block.CpuBoxes[i].Checked = (mask & bit) != 0;
-                    }
-                }
-                finally
-                {
-                    block.SuppressCpuEvents--;
-                }
+                ApplyNdisSelection(block, baseCore.Value, queues);
             }
 
             string loadPrefix = isTestDevice ? "LOAD.TEST" : "LOAD";
-            WriteLog($"{loadPrefix}: NET_NDIS {block.Device.InstanceId} MSI={(msiSupported == 1 ? "Enabled" : "Disabled")} Limit={(limitPresent ? limit.ToString() : "Unlimited")} PrioVal={prioValue} BaseCore={(baseCore ?? -1)} Mask=0x{block.AffinityMask:X}");
+            WriteLog($"{loadPrefix}: NET_NDIS {block.Device.InstanceId} MSI={(msiSupported == 1 ? "Enabled" : "Disabled")} Limit={(limitPresent ? limit.ToString() : "Unlimited")} PrioVal={prioValue} BaseCore={(baseCore ?? -1)} Queues={queues} Mask=0x{block.AffinityMask:X}");
         }
         else
         {
@@ -426,17 +529,18 @@ public sealed partial class MainForm
 
         if (block.Kind == DeviceKind.NET_NDIS)
         {
-            int baseCore = 0;
-            for (int i = 0; i < block.CpuBoxes.Count; i++)
+            int queues = ClampRssQueueCount(block.RssQueueBox?.Value is decimal val ? (int)val : 1);
+            int baseCore = block.RssBaseCore ?? GetFirstCheckedCore(block) ?? 0;
+            int maxBase = Math.Max(0, _maxLogical - queues);
+            if (baseCore > maxBase)
             {
-                if (block.CpuBoxes[i].Checked)
-                {
-                    baseCore = i;
-                    break;
-                }
+                baseCore = maxBase;
             }
 
-            WriteLog($"APPLY: NET_NDIS {block.Device.InstanceId} baseCore={baseCore}");
+            ApplyNdisSelection(block, baseCore, queues);
+
+            WriteLog($"APPLY: NET_NDIS {block.Device.InstanceId} baseCore={baseCore} queues={queues}");
+            SetNdisRssQueues(block.Device.InstanceId, queues);
             SetNdisBaseCore(block.Device.InstanceId, baseCore);
             return;
         }
@@ -547,6 +651,7 @@ public sealed partial class MainForm
         if (block.Kind == DeviceKind.NET_NDIS)
         {
             ClearNdisBaseCore(block.Device.InstanceId);
+            ClearNdisRssQueues(block.Device.InstanceId);
         }
 
         WriteLog($"RESET: {block.Device.InstanceId} kind={block.Kind} -> cleared priority/affinity (MSI left unchanged by design)");

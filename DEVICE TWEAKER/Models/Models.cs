@@ -103,6 +103,7 @@ internal sealed class DeviceBlock
     public required ComboBox PrioCombo { get; init; }
     public required ComboBox PolicyCombo { get; init; }
     public required Label PolicyLabel { get; init; }
+    public NumericUpDown? RssQueueBox { get; init; }
     public required CheckBox ImodAutoCheck { get; init; }
     public required TextBox ImodBox { get; init; }
     public required Label ImodDefaultLabel { get; init; }
@@ -111,6 +112,7 @@ internal sealed class DeviceBlock
     public ulong AffinityMask { get; set; }
     public int? IrqCount { get; set; }
     public int SuppressCpuEvents { get; set; }
+    public int? RssBaseCore { get; set; }
 }
 
 internal sealed record UsbControllerInfo(string ControllerPNPID, string ControllerName);
