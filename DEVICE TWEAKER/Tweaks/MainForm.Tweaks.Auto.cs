@@ -36,6 +36,18 @@ public sealed partial class MainForm
         return (primaryP.OrderBy(x => x).ToList(), primaryE.OrderBy(x => x).ToList());
     }
 
+    private static int GetAutoAssignmentPriority(DeviceKind kind)
+    {
+        return kind switch
+        {
+            DeviceKind.USB => 1,
+            DeviceKind.GPU => 2,
+            DeviceKind.NET_NDIS or DeviceKind.NET_CX => 3,
+            DeviceKind.AUDIO => 4,
+            _ => 5,
+        };
+    }
+
     private void InvokeAutoOptimization()
     {
         if (_blocks.Count == 0)
@@ -311,7 +323,13 @@ public sealed partial class MainForm
             .Where(b => b.Kind != DeviceKind.STOR)
             .Where(b => !wifiIds.Contains(b.Device.InstanceId))
             .Where(b => !skipAutoIds.Contains(b.Device.InstanceId))
+            .Select((block, index) => new { block, index })
+            .OrderBy(x => GetAutoAssignmentPriority(x.block.Kind))
+            .ThenBy(x => x.index)
+            .Select(x => x.block)
             .ToList();
+
+        WriteLog($"AUTO.ORDER: [{string.Join(" | ", orderedBlocks.Select(b => $"{b.Kind}:{b.Device.InstanceId}"))}]");
 
         int audioCount = orderedBlocks.Count(b => b.Kind == DeviceKind.AUDIO);
         if (useAudioE && audioCount > 0)
