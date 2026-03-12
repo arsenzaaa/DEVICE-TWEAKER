@@ -852,7 +852,7 @@ public sealed partial class MainForm : Form
         {
             using ManagementObjectSearcher searcher = new(
                 "root\\CIMV2",
-                "SELECT DeviceID, DeviceName, DeviceClass, ClassGuid, Manufacturer, DriverVersion, DriverDate, DriverProviderName, DriverName, InfName, FriendlyName, Description, Location, IsSigned, Signer, HardwareID, CompatibleID FROM Win32_PnPSignedDriver");
+                "SELECT DeviceID, DeviceName, DeviceClass, ClassGuid, Manufacturer, DriverVersion, DriverDate, DriverProviderName, DriverName, InfName, FriendlyName, Description, Location, IsSigned, Signer, HardWareID, CompatID FROM Win32_PnPSignedDriver");
 
             foreach (ManagementObject mo in searcher.Get())
             {
@@ -880,8 +880,8 @@ public sealed partial class MainForm : Form
                     Location = GetWmiString(mo, "Location"),
                     IsSigned = GetWmiString(mo, "IsSigned"),
                     Signer = GetWmiString(mo, "Signer"),
-                    HardwareIds = GetWmiStringArray(mo, "HardwareID"),
-                    CompatibleIds = GetWmiStringArray(mo, "CompatibleID"),
+                    HardwareIds = GetWmiStringArray(mo, "HardWareID"),
+                    CompatibleIds = GetWmiStringArray(mo, "CompatID"),
                 };
 
                 map[key] = info;
