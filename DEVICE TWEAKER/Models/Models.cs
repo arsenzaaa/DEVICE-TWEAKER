@@ -84,6 +84,7 @@ internal sealed class DeviceInfo
     public string UsbRoles { get; init; } = string.Empty;
     public string AudioEndpoints { get; init; } = string.Empty;
     public string StorageTag { get; init; } = string.Empty;
+    public bool IsIntegratedGpu { get; init; }
     public bool Wifi { get; init; }
     public bool UsbIsXhci { get; init; }
     public bool UsbHasDevices { get; init; }

@@ -401,7 +401,7 @@ public sealed partial class MainForm
         block.InfoLabel.Tag = GetFullRegPath($"HKLM\\{regBase}");
     }
 
-    private void SaveBlockSettings(DeviceBlock block)
+    private void SaveBlockSettings(DeviceBlock block, bool msiOnlyForIntegratedGpu = false)
     {
         if (block.Device.IsTestDevice)
         {
@@ -440,6 +440,12 @@ public sealed partial class MainForm
         }
         catch
         {
+        }
+
+        if (msiOnlyForIntegratedGpu && block.Kind == DeviceKind.GPU && block.Device.IsIntegratedGpu)
+        {
+            WriteLog($"APPLY: {block.Device.InstanceId} MSI={mode} Kind={block.Kind} mode=autoIntegratedGpuMsiOnly");
+            return;
         }
 
         string limitText = block.LimitBox.Text?.Trim() ?? string.Empty;

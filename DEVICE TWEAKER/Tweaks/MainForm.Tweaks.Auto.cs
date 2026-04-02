@@ -180,9 +180,13 @@ public sealed partial class MainForm
         List<DeviceBlock> netNdisBlocks = _blocks.Where(b => b.Kind == DeviceKind.NET_NDIS && !wifiIds.Contains(b.Device.InstanceId)).ToList();
         List<DeviceBlock> netCxBlocks = _blocks.Where(b => b.Kind == DeviceKind.NET_CX && !wifiIds.Contains(b.Device.InstanceId)).ToList();
         List<DeviceBlock> gpuBlocks = _blocks.Where(b => b.Kind == DeviceKind.GPU).ToList();
+        List<DeviceBlock> integratedGpuBlocks = gpuBlocks.Where(b => b.Device.IsIntegratedGpu).ToList();
         List<DeviceBlock> audioBlocks = _blocks.Where(b => b.Kind == DeviceKind.AUDIO).ToList();
         int storCount = _blocks.Count(b => b.Kind == DeviceKind.STOR);
         HashSet<string> skipAutoIds = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> msiOnlyGpuIds = integratedGpuBlocks
+            .Select(b => b.Device.InstanceId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         foreach (DeviceBlock usbBlock in usbBlocks)
         {
@@ -196,7 +200,7 @@ public sealed partial class MainForm
         int netCount = netNdisBlocks.Count + netCxBlocks.Count;
         bool hasWiFiOnly = wifiIds.Count > 0 && netCount == 0;
         WriteLog(
-            $"AUTO.SUMMARY: GPU={gpuBlocks.Count} NET={netCount} USB={usbBlocks.Count} AUDIO={audioBlocks.Count} STOR={storCount} WIFI={wifiIds.Count} WiFiOnly={hasWiFiOnly} targetCCD=[{string.Join(',', targetCcdLps)}] primaryP=[{string.Join(',', primaryP)}] primaryE=[{string.Join(',', primaryE)}]");
+            $"AUTO.SUMMARY: GPU={gpuBlocks.Count} GPUi={integratedGpuBlocks.Count} NET={netCount} USB={usbBlocks.Count} AUDIO={audioBlocks.Count} STOR={storCount} WIFI={wifiIds.Count} WiFiOnly={hasWiFiOnly} targetCCD=[{string.Join(',', targetCcdLps)}] primaryP=[{string.Join(',', primaryP)}] primaryE=[{string.Join(',', primaryE)}]");
         if (hasWiFiOnly)
         {
             WriteLog("AUTO.WIFI-ONLY: no wired NET adapters found; skipping NET affinity.");
@@ -223,6 +227,7 @@ public sealed partial class MainForm
         foreach (DeviceBlock block in _blocks)
         {
             bool isSkipAuto = skipAutoIds.Contains(block.Device.InstanceId);
+            bool isMsiOnlyGpu = msiOnlyGpuIds.Contains(block.Device.InstanceId);
             bool isWifi = wifiIds.Contains(block.Device.InstanceId);
             ulong beforeMask = block.AffinityMask;
             string beforePolicy = block.PolicyCombo.SelectedItem?.ToString() ?? "(none)";
@@ -233,6 +238,15 @@ public sealed partial class MainForm
                 block.MsiCombo.SelectedItem = "Enabled";
                 block.PrioCombo.SelectedItem = "High";
                 WriteLog($"AUTO.WIFI.SKIP: {block.Device.InstanceId} -> MSI=Enabled Prio=High (affinity/limit preserved)");
+                continue;
+            }
+
+            if (isMsiOnlyGpu)
+            {
+                string msiBefore = block.MsiCombo.SelectedItem?.ToString() ?? "(none)";
+                block.MsiCombo.SelectedItem = "Enabled";
+                string msiAfter = block.MsiCombo.SelectedItem?.ToString() ?? "(none)";
+                WriteLog($"AUTO.SKIP.GPU: {block.Device.InstanceId} integrated=1 msiBefore={msiBefore} msiAfter={msiAfter} reason=integratedGpuAutoSkip");
                 continue;
             }
 
@@ -323,6 +337,7 @@ public sealed partial class MainForm
             .Where(b => b.Kind != DeviceKind.STOR)
             .Where(b => !wifiIds.Contains(b.Device.InstanceId))
             .Where(b => !skipAutoIds.Contains(b.Device.InstanceId))
+            .Where(b => !msiOnlyGpuIds.Contains(b.Device.InstanceId))
             .Select((block, index) => new { block, index })
             .OrderBy(x => GetAutoAssignmentPriority(x.block.Kind))
             .ThenBy(x => x.index)

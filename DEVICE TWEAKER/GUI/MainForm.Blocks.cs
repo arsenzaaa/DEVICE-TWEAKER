@@ -44,7 +44,11 @@ public sealed partial class MainForm
     private string BuildDeviceBlockTitle(DeviceInfo device)
     {
         string title = device.Name;
-        if (device.Kind == DeviceKind.USB && !string.IsNullOrWhiteSpace(device.UsbRoles))
+        if (device.Kind == DeviceKind.GPU && device.IsIntegratedGpu)
+        {
+            title = $"{device.Name} [iGPU]";
+        }
+        else if (device.Kind == DeviceKind.USB && !string.IsNullOrWhiteSpace(device.UsbRoles))
         {
             title = $"{device.Name} [{device.UsbRoles}]";
         }

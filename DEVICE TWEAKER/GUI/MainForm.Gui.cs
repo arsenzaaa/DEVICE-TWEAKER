@@ -416,7 +416,7 @@ public sealed partial class MainForm
                     continue;
                 }
 
-                SaveBlockSettings(b);
+                SaveBlockSettings(b, msiOnlyForIntegratedGpu: true);
             }
 
             WriteLog("UI: AUTO-OPTIMIZATION applied and saved");

@@ -611,12 +611,6 @@ public sealed partial class MainForm
                 continue;
             }
 
-            if (Regex.IsMatch(name, "(?i)Intel\\s*(?:\\(R\\))?\\s*UHD\\s*Graphics\\b"))
-            {
-                WriteLog($"SCAN: skipped filtered device (Intel UHD Graphics) {d.InstanceId} class={d.Class} name=\"{name}\"");
-                continue;
-            }
-
             if (string.Equals(d.Class, "Display", StringComparison.OrdinalIgnoreCase)
                 && (Regex.IsMatch(name, "(?i)VirtualBox") || Regex.IsMatch(d.InstanceId, "(?i)VEN_80EE")))
             {
@@ -777,6 +771,8 @@ public sealed partial class MainForm
                 storageTag = GetStorageTagForDevice(displayName, physicalDisks);
             }
 
+            bool isIntegratedGpu = kind == DeviceKind.GPU && IsIntegratedGpuDevice(d.InstanceId, displayName);
+
             DeviceInfo devInfo = new()
             {
                 Name = displayName,
@@ -787,13 +783,15 @@ public sealed partial class MainForm
                 UsbRoles = usbText,
                 AudioEndpoints = audioText,
                 StorageTag = storageTag,
+                IsIntegratedGpu = isIntegratedGpu,
                 Wifi = isWifi,
                 UsbIsXhci = usbIsXhci,
                 UsbHasDevices = usbHasDevices,
             };
 
             devices.Add(devInfo);
-            WriteLog($"SCAN: device {d.InstanceId} kind={kind} class={d.Class} name=\"{displayName}\" reg=HKLM\\{regBase} usbRoles=\"{usbText}\" audio=\"{audioText}\"");
+            string gpuTypeLog = isIntegratedGpu ? " gpuType=iGPU" : string.Empty;
+            WriteLog($"SCAN: device {d.InstanceId} kind={kind} class={d.Class} name=\"{displayName}\"{gpuTypeLog} reg=HKLM\\{regBase} usbRoles=\"{usbText}\" audio=\"{audioText}\"");
         }
 
         devices = devices

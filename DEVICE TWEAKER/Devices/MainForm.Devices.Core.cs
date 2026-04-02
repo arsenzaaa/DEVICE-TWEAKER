@@ -19,6 +19,32 @@ public sealed partial class MainForm
         return NativeCfgMgr32.TryGetParentInstanceId(id, out string? parent) ? parent : null;
     }
 
+    private static bool IsIntegratedGpuDevice(string instanceId, string name)
+    {
+        string text = $"{instanceId} {name}".Trim();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        if (Regex.IsMatch(text, "(?i)Intel\\s*(?:\\(R\\))?\\s*(?:UHD|HD|Iris(?:\\s+Xe)?)(?:\\s+Graphics)?\\b"))
+        {
+            return true;
+        }
+
+        if (Regex.IsMatch(text, "(?i)Intel\\s*(?:\\(R\\))?\\s*Arc(?:\\(TM\\))?\\s+Graphics\\b"))
+        {
+            return true;
+        }
+
+        if (Regex.IsMatch(text, "(?i)AMD\\s+Radeon(?:\\(TM\\))?(?:\\s+[A-Z0-9-]+)*\\s+Graphics\\b"))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     private static bool IsWiFiDevice(string pnpid, string name, string service)
     {
         if (Regex.IsMatch(name, "(?i)Wi-?Fi|Wireless|802\\.11|WLAN"))

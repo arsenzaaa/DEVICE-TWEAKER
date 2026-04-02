@@ -486,12 +486,22 @@ public sealed partial class MainForm
             Margin = new Padding(0, 0, 0, 0),
         };
 
+        CheckBox testIntegratedGpuCheck = new()
+        {
+            Text = "Integrated GPU (iGPU)",
+            AutoSize = true,
+            BackColor = _bgForm,
+            ForeColor = _fgMain,
+            Margin = new Padding(0, 0, 12, 0),
+        };
+
         FlowLayoutPanel testDeviceOptionsPanel = NewRowFlowPanel();
         testDeviceOptionsPanel.WrapContents = true;
         testDeviceOptionsPanel.Margin = new Padding(0, 0, 0, 6);
         testDeviceOptionsPanel.Controls.Add(testWifiCheck);
         testDeviceOptionsPanel.Controls.Add(testXhciCheck);
         testDeviceOptionsPanel.Controls.Add(testHasDevicesCheck);
+        testDeviceOptionsPanel.Controls.Add(testIntegratedGpuCheck);
 
         Label testDeviceOptionsLabel = NewDialogLabel("Options:");
         testDevicesLayout.Controls.Add(testDeviceOptionsLabel, 0, 8);
@@ -537,7 +547,7 @@ public sealed partial class MainForm
         testDevicesLayout.Controls.Add(testDeviceButtonsPanel, 0, 12);
         testDevicesLayout.SetColumnSpan(testDeviceButtonsPanel, 2);
 
-        Label testHintLabel = NewHintLabel("Tip: use roles like Mouse, Keyboard, Gamepad, Webcam, Microphone. Audio endpoints like Speakers.");
+        Label testHintLabel = NewHintLabel("Tip: use roles like Mouse, Keyboard, Gamepad, Webcam, Microphone. Audio endpoints like Speakers. For GPUs, use the iGPU checkbox to mark integrated graphics.");
         testDevicesLayout.Controls.Add(testHintLabel, 0, 13);
         testDevicesLayout.SetColumnSpan(testHintLabel, 2);
 
@@ -569,6 +579,7 @@ public sealed partial class MainForm
             bool isAudio = kind == DeviceKind.AUDIO;
             bool isNet = kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX;
             bool isStor = kind == DeviceKind.STOR;
+            bool isGpu = kind == DeviceKind.GPU;
 
             testUsbRolesBox.Enabled = isUsb;
             testAudioBox.Enabled = isAudio;
@@ -576,6 +587,12 @@ public sealed partial class MainForm
             testWifiCheck.Enabled = isNet;
             testXhciCheck.Enabled = isUsb;
             testHasDevicesCheck.Enabled = isUsb;
+            testIntegratedGpuCheck.Enabled = isGpu;
+
+            if (!isGpu)
+            {
+                testIntegratedGpuCheck.Checked = false;
+            }
 
             if (isUsb && string.IsNullOrWhiteSpace(testUsbRolesBox.Text))
             {
@@ -682,7 +699,7 @@ public sealed partial class MainForm
                 storageTag = "SSD";
             }
 
-            DeviceInfo testDevice = CreateTestDevice(kind, name, usbRoles, audioEndpoints, storageTag, testWifiCheck.Checked, testXhciCheck.Checked, testHasDevicesCheck.Checked);
+            DeviceInfo testDevice = CreateTestDevice(kind, name, usbRoles, audioEndpoints, storageTag, testWifiCheck.Checked, testXhciCheck.Checked, testHasDevicesCheck.Checked, testIntegratedGpuCheck.Checked);
             _testDevices.Add(testDevice);
             WriteLog($"TEST.DEV.ADD: {testDevice.InstanceId} Kind={kind} Name=\"{testDevice.Name}\"");
 
@@ -1641,7 +1658,8 @@ public sealed partial class MainForm
         string storageTag,
         bool wifi,
         bool usbIsXhci,
-        bool usbHasDevices)
+        bool usbHasDevices,
+        bool integratedGpu)
     {
         _testDeviceSequence++;
         int seq = _testDeviceSequence;
@@ -1673,6 +1691,7 @@ public sealed partial class MainForm
             UsbRoles = isUsb ? usbRoles : string.Empty,
             AudioEndpoints = isAudio ? audioEndpoints : string.Empty,
             StorageTag = isStor ? storageTag : string.Empty,
+            IsIntegratedGpu = kind == DeviceKind.GPU && integratedGpu,
             Wifi = isNet && wifi,
             UsbIsXhci = isUsb && usbIsXhci,
             UsbHasDevices = isUsb && usbHasDevices,
@@ -1686,6 +1705,10 @@ public sealed partial class MainForm
         if (device.Kind == DeviceKind.USB && !string.IsNullOrWhiteSpace(device.UsbRoles))
         {
             label += $" [{device.UsbRoles}]";
+        }
+        else if (device.Kind == DeviceKind.GPU && device.IsIntegratedGpu)
+        {
+            label += " [iGPU]";
         }
         else if (device.Kind == DeviceKind.AUDIO && !string.IsNullOrWhiteSpace(device.AudioEndpoints))
         {
