@@ -40,7 +40,7 @@ public sealed partial class MainForm
 
         const string developerHandle = "@arsenza";
         const string developerUrl = "https://t.me/arsenzaa";
-        string subtitleText = $"alpha version, this script was developed by {developerHandle}";
+        string subtitleText = $"beta version 0.0.4 - developed by {developerHandle}";
 
         LinkLabel logoSubtitle = new()
         {
@@ -105,41 +105,49 @@ public sealed partial class MainForm
             Padding = new Padding(UiScale(28), UiScale(2), UiScale(28), UiScale(2)),
         };
 
-        string prefixText = "Hyper-Threading";
-        string statusText = string.Empty;
-        if (!string.IsNullOrWhiteSpace(_smtText))
+        Label NewCpuFlagPrefix(string text) => new()
         {
-            string[] parts = _smtText.Split(':', 2, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 1)
-            {
-                prefixText = parts[0].Trim();
-            }
-
-            if (parts.Length >= 2)
-            {
-                statusText = parts[1].Trim().ToUpperInvariant();
-            }
-        }
-
-        string prefixDisplay = prefixText;
-        string statusDisplay = string.IsNullOrWhiteSpace(statusText) ? string.Empty : $"- {statusText}";
-
-        _htPrefixLabel = new Label
-        {
-            Text = prefixDisplay,
+            Text = text,
             AutoSize = true,
             Font = _htFont,
             ForeColor = _fgMain,
             Margin = new Padding(0),
         };
 
-        _htStatusLabel = new Label
+        Label NewCpuFlagStatus() => new()
         {
-            Text = statusDisplay,
             AutoSize = true,
             Font = _htFont,
-            Margin = new Padding(UiScale(2), 0, 0, 0),
+            ForeColor = _statusInactive,
+            Margin = new Padding(UiScale(4), 0, 0, 0),
         };
+
+        void AddCpuFlag(FlowLayoutPanel panel, Label prefix, Label status)
+        {
+            panel.Controls.Add(prefix);
+            panel.Controls.Add(status);
+        }
+
+        void AddCpuFlagSeparator(FlowLayoutPanel panel)
+        {
+            panel.Controls.Add(new Label
+            {
+                Text = "|",
+                AutoSize = true,
+                Font = _htFont,
+                ForeColor = _statusSeparator,
+                Margin = new Padding(UiScale(14), 0, UiScale(14), 0),
+            });
+        }
+
+        _htPrefixLabel = NewCpuFlagPrefix("Hyper-Threading");
+        _htStatusLabel = NewCpuFlagStatus();
+        _hybridCpuPrefixLabel = NewCpuFlagPrefix("Hybrid CPU");
+        _hybridCpuStatusLabel = NewCpuFlagStatus();
+        _cppcPrefixLabel = NewCpuFlagPrefix("CPPC");
+        _cppcStatusLabel = NewCpuFlagStatus();
+        _dualCcdPrefixLabel = NewCpuFlagPrefix("Dual-CCD");
+        _dualCcdStatusLabel = NewCpuFlagStatus();
 
         _cpuHeaderLabel = new Label
         {
@@ -151,7 +159,7 @@ public sealed partial class MainForm
             Margin = new Padding(0, 0, 0, UiScale(1)),
         };
 
-        FlowLayoutPanel htChip = new()
+        FlowLayoutPanel cpuFlagsPanel = new()
         {
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
@@ -160,8 +168,14 @@ public sealed partial class MainForm
             Margin = new Padding(0),
             BackColor = _bgPanel,
         };
-        htChip.Controls.Add(_htPrefixLabel);
-        htChip.Controls.Add(_htStatusLabel);
+        _cpuFlagsPanel = cpuFlagsPanel;
+        AddCpuFlag(cpuFlagsPanel, _htPrefixLabel, _htStatusLabel);
+        AddCpuFlagSeparator(cpuFlagsPanel);
+        AddCpuFlag(cpuFlagsPanel, _hybridCpuPrefixLabel, _hybridCpuStatusLabel);
+        AddCpuFlagSeparator(cpuFlagsPanel);
+        AddCpuFlag(cpuFlagsPanel, _cppcPrefixLabel, _cppcStatusLabel);
+        AddCpuFlagSeparator(cpuFlagsPanel);
+        AddCpuFlag(cpuFlagsPanel, _dualCcdPrefixLabel, _dualCcdStatusLabel);
 
         TableLayoutPanel statusLayout = new()
         {
@@ -187,11 +201,11 @@ public sealed partial class MainForm
             }
         };
         _cpuHeaderLabel.Anchor = AnchorStyles.None;
-        htChip.Anchor = AnchorStyles.None;
+        cpuFlagsPanel.Anchor = AnchorStyles.None;
         _cpuHeaderLabel.Margin = new Padding(0, 0, 0, UiScale(6));
-        htChip.Margin = new Padding(0);
+        cpuFlagsPanel.Margin = new Padding(0);
         statusLayout.Controls.Add(_cpuHeaderLabel, 0, 1);
-        statusLayout.Controls.Add(htChip, 0, 2);
+        statusLayout.Controls.Add(cpuFlagsPanel, 0, 2);
         statusPanel.Controls.Add(statusLayout);
 
         UpdateCpuHeaderUi();
@@ -210,8 +224,9 @@ public sealed partial class MainForm
         Button btnAuto = NewTopButton("AUTO-OPTIMIZATION");
         Button btnIrq = NewTopButton("CALCULATE IRQ COUNTS");
         Button btnReset = NewTopButton("RESET ALL");
+        Button btnRestore = NewTopButton("RESTORE");
 
-        foreach (Button b in new[] { btnScan, btnApply, btnAuto, btnIrq, btnReset })
+        foreach (Button b in new[] { btnScan, btnApply, btnAuto, btnIrq, btnReset, btnRestore })
         {
             SetTopButtonBaseStyle(b);
             b.MouseEnter += (_, _) => SetTopButtonHoverStyle(b);
@@ -274,7 +289,7 @@ public sealed partial class MainForm
         buttonsGrid.Controls.Add(btnScan, 2, 0);
         buttonsGrid.Controls.Add(btnReset, 0, 1);
         buttonsGrid.Controls.Add(btnIrq, 1, 1);
-        buttonsGrid.Controls.Add(_btnLog, 2, 1);
+        buttonsGrid.Controls.Add(btnRestore, 2, 1);
 
         buttonsHost.Controls.Add(buttonsGrid, 1, 0);
         buttonPanel.Controls.Add(buttonsHost);
@@ -286,7 +301,7 @@ public sealed partial class MainForm
             BackColor = _accent,
         };
 
-        _devicesHost = new Panel
+        _devicesHost = new BufferedPanel
         {
             Dock = DockStyle.Fill,
             BackColor = _bgForm,
@@ -295,12 +310,12 @@ public sealed partial class MainForm
         };
 
         int scrollWidth = UiScale(14);
-        _devicesPanel = new Panel
+        _devicesPanel = new BufferedPanel
         {
             Dock = DockStyle.None,
             BackColor = _bgForm,
             AutoScroll = false,
-            Padding = new Padding(UiScale(24), UiScale(12), UiScale(32) + scrollWidth, UiScale(32)),
+            Padding = new Padding(UiScale(24), UiScale(12), UiScale(24), UiScale(32)),
         };
         _devicesPanel.Location = new Point(0, 0);
         _devicesPanel.SizeChanged += (_, _) => SyncDevicesScrollBar();
@@ -368,6 +383,7 @@ public sealed partial class MainForm
         btnApply.Click += (_, _) =>
         {
             WriteLog("UI: APPLY button clicked");
+            CreateDeviceTweakerBackup("pre-apply", showDialog: false);
             foreach (DeviceBlock b in _blocks)
             {
                 if (b.Device.Wifi)
@@ -384,6 +400,7 @@ public sealed partial class MainForm
             {
                 WriteLog($"IMOD.NOTE: {imodNote}");
             }
+            RefreshImodCurrentValues(reason: "apply");
             string message = "All changes have been applied and saved.";
             message += "\nPlease reboot your PC to finish applying them.";
 
@@ -393,8 +410,30 @@ public sealed partial class MainForm
         btnAuto.Click += (_, _) =>
         {
             WriteLog("UI: AUTO-OPTIMIZATION button clicked");
-            InvokeAutoOptimization();
-            bool applyImod = _blocks.Any(b => IsUsbImodTarget(b.Device) && b.ImodAutoCheck.Checked);
+            bool hasUsbImodTarget = _blocks.Any(b => IsUsbImodTarget(b.Device));
+            bool optimizeUsbImod = false;
+            if (hasUsbImodTarget)
+            {
+                optimizeUsbImod = ShowThemedConfirm(
+                    "USB IMOD tuning is available for detected XHCI controller(s).\n\nApply it during auto-optimization?",
+                    "USB IMOD TUNING",
+                    "APPLY",
+                    "SKIP");
+                WriteLog($"AUTO.IMOD.PROMPT: {(optimizeUsbImod ? "accepted" : "declined")}");
+            }
+            else
+            {
+                WriteLog("AUTO.IMOD.PROMPT: skipped (no eligible XHCI controllers)");
+            }
+
+            if (!_testAutoDryRun)
+            {
+                BackupLocation backupLocation = PromptBackupLocationForAuto();
+                CreateDeviceTweakerBackup("pre-auto", showDialog: false, backupLocation);
+            }
+
+            InvokeAutoOptimization(optimizeUsbImod);
+            bool applyImod = optimizeUsbImod && hasUsbImodTarget;
 
             if (_testAutoDryRun)
             {
@@ -430,7 +469,7 @@ public sealed partial class MainForm
             }
             else
             {
-                WriteLog("IMOD skipped (AUTO-OPTIMIZATION): no IMOD Interval selections");
+                WriteLog("IMOD skipped (AUTO-OPTIMIZATION): no eligible XHCI controllers");
             }
             string autoMessage = "Auto-optimization completed and saved.";
             autoMessage += "\nPlease reboot your PC to finish applying the changes.";
@@ -447,7 +486,13 @@ public sealed partial class MainForm
         btnReset.Click += (_, _) =>
         {
             WriteLog("UI: RESET ALL button clicked");
+            CreateDeviceTweakerBackup("pre-reset", showDialog: false);
             ResetAllTweaks();
+        };
+        btnRestore.Click += (_, _) =>
+        {
+            WriteLog("UI: RESTORE button clicked");
+            RestoreLatestDeviceTweakerBackup();
         };
 
         Resize += (_, _) => LayoutBlocks();
@@ -564,7 +609,12 @@ public sealed partial class MainForm
             return;
         }
 
-        _devicesPanel.Width = _devicesHost.ClientSize.Width;
+        int contentWidth = GetDevicesViewportWidth();
+        if (_devicesPanel.Width != contentWidth)
+        {
+            _devicesPanel.Width = contentWidth;
+        }
+
         if (_devicesPanel.Left != 0)
         {
             _devicesPanel.Left = 0;
@@ -604,6 +654,28 @@ public sealed partial class MainForm
 
         int delta = e.Delta > 0 ? -_devicesScroll.SmallChange : _devicesScroll.SmallChange;
         _devicesScroll.Value += delta;
+    }
+
+    private void ForwardDevicesMouseWheel(object? sender, MouseEventArgs e)
+    {
+        int before = _devicesScroll is null ? 0 : _devicesScroll.Value;
+        HandleDevicesMouseWheel(e);
+
+        if (_devicesScroll is not null
+            && _devicesScroll.Value != before
+            && e is HandledMouseEventArgs handled)
+        {
+            handled.Handled = true;
+        }
+    }
+
+    private void WireDevicesMouseWheelForwarding(Control root)
+    {
+        root.MouseWheel += ForwardDevicesMouseWheel;
+        foreach (Control child in root.Controls)
+        {
+            WireDevicesMouseWheelForwarding(child);
+        }
     }
 
     private bool IsCursorOverDevicesHost()

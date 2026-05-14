@@ -13,6 +13,7 @@ public sealed partial class MainForm
         public HashSet<int> ECoreLps { get; } = new();
         public Dictionary<int, int> CoreMap { get; } = new();
         public Dictionary<int, int>? CcdMap { get; set; }
+        public Dictionary<int, int> CppcRatings { get; } = new();
         public string CpuName { get; set; } = string.Empty;
     }
 
@@ -40,31 +41,104 @@ public sealed partial class MainForm
             return;
         }
 
-        string prefixText = "Hyper-Threading";
-        string statusText = string.Empty;
-        if (!string.IsNullOrWhiteSpace(_smtText))
+        static string OnOff(bool enabled) => enabled ? "On" : "Off";
+
+        void SetHeaderFlag(Label? prefixLabel, Label? statusLabel, string name, string value, bool active)
         {
-            string[] parts = _smtText.Split(':', 2, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 1)
+            if (prefixLabel is null || statusLabel is null)
             {
-                prefixText = parts[0].Trim();
+                return;
             }
 
-            if (parts.Length >= 2)
-            {
-                statusText = parts[1].Trim().ToUpperInvariant();
-            }
+            prefixLabel.Text = $"{name} -";
+            statusLabel.Text = value;
+            statusLabel.Visible = true;
+            statusLabel.ForeColor = active ? _statusActive : _statusInactive;
         }
 
-        string prefixDisplay = prefixText;
-        string statusDisplay = string.IsNullOrWhiteSpace(statusText) ? string.Empty : $"- {statusText}";
-        _htPrefixLabel.Text = prefixDisplay;
-        _htStatusLabel.Text = statusDisplay;
-        _htStatusLabel.Visible = !string.IsNullOrWhiteSpace(statusText);
+        void AddHeaderFlag(Label? prefixLabel, Label? statusLabel)
+        {
+            if (_cpuFlagsPanel is null || prefixLabel is null || statusLabel is null)
+            {
+                return;
+            }
 
-        bool isDisabled = statusText.Contains("DISABLED", StringComparison.OrdinalIgnoreCase)
-            || statusText.Contains("OFF", StringComparison.OrdinalIgnoreCase);
-        _htStatusLabel.ForeColor = isDisabled ? _mutedText : _fgMain;
+            if (_cpuFlagsPanel.Controls.Count > 0)
+            {
+                _cpuFlagsPanel.Controls.Add(new Label
+                {
+                    Text = "|",
+                    AutoSize = true,
+                    Font = _htFont,
+                    ForeColor = _statusSeparator,
+                    Margin = new Padding(UiScale(14), 0, UiScale(14), 0),
+                });
+            }
+
+            _cpuFlagsPanel.Controls.Add(prefixLabel);
+            _cpuFlagsPanel.Controls.Add(statusLabel);
+        }
+
+        bool IsReusableHeaderFlagControl(Control control)
+        {
+            return ReferenceEquals(control, _htPrefixLabel)
+                || ReferenceEquals(control, _htStatusLabel)
+                || ReferenceEquals(control, _hybridCpuPrefixLabel)
+                || ReferenceEquals(control, _hybridCpuStatusLabel)
+                || ReferenceEquals(control, _cppcPrefixLabel)
+                || ReferenceEquals(control, _cppcStatusLabel)
+                || ReferenceEquals(control, _dualCcdPrefixLabel)
+                || ReferenceEquals(control, _dualCcdStatusLabel);
+        }
+
+        bool smtEnabled = _cpuInfo?.Topology.ByCore.Values.Any(g => g.Count > 1) == true;
+        if (_smtText.Contains("DISABLED", StringComparison.OrdinalIgnoreCase)
+            || _smtText.Contains("OFF", StringComparison.OrdinalIgnoreCase))
+        {
+            smtEnabled = false;
+        }
+        else if (_smtText.Contains("ENABLED", StringComparison.OrdinalIgnoreCase)
+            || _smtText.Contains("ON", StringComparison.OrdinalIgnoreCase))
+        {
+            smtEnabled = true;
+        }
+
+        string threadingName = _smtText.Contains("Hyper-Threading", StringComparison.OrdinalIgnoreCase)
+            ? "Hyper-Threading"
+            : "SMT";
+        bool hasHybridCpu = HasHybridCpu();
+        bool hasDualCcdCpu = HasDualCcdCpu();
+
+        SetHeaderFlag(_htPrefixLabel, _htStatusLabel, threadingName, OnOff(smtEnabled), smtEnabled);
+        SetHeaderFlag(_hybridCpuPrefixLabel, _hybridCpuStatusLabel, "Hybrid CPU", OnOff(hasHybridCpu), hasHybridCpu);
+        SetHeaderFlag(_cppcPrefixLabel, _cppcStatusLabel, "CPPC", OnOff(_cppcEnabled), _cppcEnabled);
+        SetHeaderFlag(_dualCcdPrefixLabel, _dualCcdStatusLabel, "Dual-CCD", hasDualCcdCpu ? "True" : "False", hasDualCcdCpu);
+
+        _cpuFlagsPanel?.SuspendLayout();
+        try
+        {
+            if (_cpuFlagsPanel is not null)
+            {
+                foreach (Control control in _cpuFlagsPanel.Controls.Cast<Control>().ToArray())
+                {
+                    if (!IsReusableHeaderFlagControl(control))
+                    {
+                        control.Dispose();
+                    }
+                }
+
+                _cpuFlagsPanel.Controls.Clear();
+            }
+
+            AddHeaderFlag(_htPrefixLabel, _htStatusLabel);
+            AddHeaderFlag(_hybridCpuPrefixLabel, _hybridCpuStatusLabel);
+            AddHeaderFlag(_cppcPrefixLabel, _cppcStatusLabel);
+            AddHeaderFlag(_dualCcdPrefixLabel, _dualCcdStatusLabel);
+        }
+        finally
+        {
+            _cpuFlagsPanel?.ResumeLayout();
+        }
     }
 
     private void ShowTestAdminDialog()
@@ -76,6 +150,7 @@ public sealed partial class MainForm
         dialog.MaximizeBox = false;
         dialog.MinimizeBox = false;
         dialog.ShowInTaskbar = false;
+        dialog.AutoScaleMode = AutoScaleMode.None;
         dialog.BackColor = _bgForm;
         dialog.ForeColor = _fgMain;
         dialog.Font = _baseFont;
@@ -115,7 +190,7 @@ public sealed partial class MainForm
         {
             Text = _testCpuActive ? "Test CPU mode: ACTIVE" : "Test CPU mode: OFF",
             AutoSize = true,
-            ForeColor = _testCpuActive ? _statusDanger : _mutedText,
+            ForeColor = _testCpuActive ? _statusActive : _statusInactive,
             Margin = new Padding(0, 0, 0, 12),
         };
         layout.Controls.Add(statusLabel, 0, 1);
@@ -212,6 +287,28 @@ public sealed partial class MainForm
 
         int currentLogical = Math.Min(MaxAffinityBits, GetCurrentLogicalCount());
 
+        Label cpuPresetLabel = NewDialogLabel("CPU preset:");
+        ComboBox cpuPresetCombo = NewDialogCombo(320);
+        cpuPresetCombo.Items.AddRange(new object[]
+        {
+            "Manual / current",
+            "Intel 8P/16T classic",
+            "Intel 6P+8E/20T hybrid",
+            "Intel 8P+16E/32T hybrid",
+            "Intel Core Ultra 9 285K 8P+16E/24T",
+            "AMD Ryzen 8C/16T 1 CCD",
+            "AMD Ryzen 12C/24T 2 CCD",
+            "AMD Ryzen 16C/32T 2 CCD",
+            "AMD Ryzen X3D 16C/32T 2 CCD boost-preferred",
+        });
+        cpuPresetCombo.SelectedIndex = 0;
+        Button cpuPresetButton = NewDialogButton("LOAD");
+        cpuPresetButton.Size = new Size(84, 26);
+        cpuPresetButton.Margin = new Padding(8, 0, 0, 6);
+        FlowLayoutPanel cpuPresetPanel = NewRowFlowPanel();
+        cpuPresetPanel.Controls.Add(cpuPresetCombo);
+        cpuPresetPanel.Controls.Add(cpuPresetButton);
+
         Label logicalLabel = NewDialogLabel("Total logical processors:");
         NumericUpDown logicalUpDown = NewNumericUpDown(1, MaxAffinityBits, currentLogical);
 
@@ -223,6 +320,9 @@ public sealed partial class MainForm
         ComboBox htStateCombo = NewDialogCombo(160);
         htStateCombo.Items.AddRange(new object[] { "Enabled", "Disabled" });
 
+        Label cppcRatingsLabel = NewDialogLabel("CPPC ratings:");
+        TextBox cppcRatingsBox = NewDialogTextBox(420);
+
         bool useHyperThreadingLabel = ResolveUseHyperThreadingLabel(_smtText);
         bool suppressSmtSync = false;
         bool smtAutoGenActive = false;
@@ -233,7 +333,26 @@ public sealed partial class MainForm
         int[] ccdAssign = BuildAssignmentsFromGroupsText(GetCurrentCcdGroupsText(), currentLogical, out ccdGroupCount);
         bool[] eAssign = BuildECoreFlags(GetCurrentECoreText(), currentLogical);
 
+        string GetCurrentCppcRatingsText()
+        {
+            if (!_cppcEnabled || _cppcRatings.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            return string.Join(
+                ", ",
+                _cppcRatings
+                    .Where(kvp => kvp.Key >= 0 && kvp.Key < (int)logicalUpDown.Value)
+                    .OrderBy(kvp => kvp.Key)
+                    .Select(kvp => $"{kvp.Key}={kvp.Value}"));
+        }
+
+        cppcRatingsBox.Text = GetCurrentCppcRatingsText();
+
         Label groupCountLabel = NewDialogLabel("Group counts:");
+        groupCountLabel.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+        groupCountLabel.Margin = new Padding(0, 14, 12, 10);
         Label assignmentsLabel = NewDialogLabel("LP assignments (manual):");
 
         Label coreGroupCountLabel = NewInlineLabel("Core groups:");
@@ -241,13 +360,14 @@ public sealed partial class MainForm
         NumericUpDown coreGroupCountUpDown = NewNumericUpDown(1, Math.Max(1, currentLogical), coreGroupCount);
         int maxCcdGroupsInit = Math.Min(2, Math.Max(1, currentLogical));
         NumericUpDown ccdGroupCountUpDown = NewNumericUpDown(1, maxCcdGroupsInit, ccdGroupCount);
-        coreGroupCountUpDown.Margin = new Padding(0, 0, 12, 0);
-        ccdGroupCountUpDown.Margin = new Padding(0, 0, 0, 0);
-        coreGroupCountLabel.Margin = new Padding(0, 4, 6, 0);
-        ccdGroupCountLabel.Margin = new Padding(16, 4, 6, 0);
+        coreGroupCountUpDown.Margin = new Padding(0, 0, 12, 6);
+        ccdGroupCountUpDown.Margin = new Padding(0, 0, 0, 6);
+        coreGroupCountLabel.Margin = new Padding(0, 5, 6, 0);
+        ccdGroupCountLabel.Margin = new Padding(20, 5, 6, 0);
 
         FlowLayoutPanel groupCountPanel = NewRowFlowPanel();
-        groupCountPanel.Margin = Padding.Empty;
+        groupCountPanel.Margin = new Padding(0, 12, 0, 8);
+        groupCountPanel.Padding = new Padding(0, 0, 0, 0);
         groupCountPanel.Controls.Add(coreGroupCountLabel);
         groupCountPanel.Controls.Add(coreGroupCountUpDown);
         groupCountPanel.Controls.Add(ccdGroupCountLabel);
@@ -265,13 +385,13 @@ public sealed partial class MainForm
         assignmentsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 60F));
         assignmentsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170F));
         assignmentsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170F));
-        assignmentsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90F));
+        assignmentsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 116F));
 
         Panel assignmentsHost = NewBoxPanel();
         assignmentsHost.AutoSize = true;
         assignmentsHost.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         assignmentsHost.Dock = DockStyle.Top;
-        assignmentsHost.Margin = new Padding(0, 0, 0, 6);
+        assignmentsHost.Margin = new Padding(0, 4, 0, 10);
         assignmentsHost.Controls.Add(assignmentsTable);
 
         bool suppressAssignmentEvents = false;
@@ -314,22 +434,28 @@ public sealed partial class MainForm
 
         SetSmtState(ResolveSmtEnabled(_smtText, GetSmtEnabledFallback()), useHyperThreadingLabel, false);
 
-        layout.Controls.Add(cpuNameLabel, 0, 2);
-        layout.Controls.Add(cpuNameTextBox, 1, 2);
-        layout.Controls.Add(logicalLabel, 0, 3);
-        layout.Controls.Add(logicalUpDown, 1, 3);
-        layout.Controls.Add(smtStateLabel, 0, 4);
-        layout.Controls.Add(smtStateCombo, 1, 4);
-        layout.Controls.Add(htStateLabel, 0, 5);
-        layout.Controls.Add(htStateCombo, 1, 5);
-        layout.Controls.Add(groupCountLabel, 0, 6);
-        layout.Controls.Add(groupCountPanel, 1, 6);
-        layout.Controls.Add(assignmentsLabel, 0, 7);
-        layout.Controls.Add(assignmentsHost, 1, 7);
+        layout.Controls.Add(cpuPresetLabel, 0, 2);
+        layout.Controls.Add(cpuPresetPanel, 1, 2);
+        layout.Controls.Add(cpuNameLabel, 0, 3);
+        layout.Controls.Add(cpuNameTextBox, 1, 3);
+        layout.Controls.Add(logicalLabel, 0, 4);
+        layout.Controls.Add(logicalUpDown, 1, 4);
+        layout.Controls.Add(smtStateLabel, 0, 5);
+        layout.Controls.Add(smtStateCombo, 1, 5);
+        layout.Controls.Add(htStateLabel, 0, 6);
+        layout.Controls.Add(htStateCombo, 1, 6);
+        layout.Controls.Add(cppcRatingsLabel, 0, 7);
+        layout.Controls.Add(cppcRatingsBox, 1, 7);
+        _copyToolTip.SetToolTip(cppcRatingsBox, "Optional. Format: 0=120, 1=110, 2=100 or just 120,110,100. Empty = CPPC off in test mode.");
+        _copyToolTip.SetToolTip(cpuPresetCombo, "Loads a synthetic topology for AUTO planner testing. You can still edit LP/core/CCD/E-core/CPPC values after loading.");
+        layout.Controls.Add(groupCountLabel, 0, 8);
+        layout.Controls.Add(groupCountPanel, 1, 8);
+        layout.Controls.Add(assignmentsLabel, 0, 9);
+        layout.Controls.Add(assignmentsHost, 1, 9);
 
         Label helpLabel = NewHintLabel("How to use: set group counts, then assign each LP to a Core group and a CCD group. Tick E-core where needed.");
         helpLabel.Margin = new Padding(0, 10, 0, 4);
-        layout.Controls.Add(helpLabel, 0, 8);
+        layout.Controls.Add(helpLabel, 0, 10);
         layout.SetColumnSpan(helpLabel, 2);
 
         Label noteLabel = new()
@@ -339,7 +465,7 @@ public sealed partial class MainForm
             ForeColor = _mutedText,
             Margin = new Padding(0, 0, 0, 12),
         };
-        layout.Controls.Add(noteLabel, 0, 9);
+        layout.Controls.Add(noteLabel, 0, 11);
         layout.SetColumnSpan(noteLabel, 2);
 
         Label testSectionLabel = new()
@@ -350,7 +476,7 @@ public sealed partial class MainForm
             ForeColor = _accent,
             Margin = new Padding(0, 8, 0, 6),
         };
-        layout.Controls.Add(testSectionLabel, 0, 10);
+        layout.Controls.Add(testSectionLabel, 0, 12);
         layout.SetColumnSpan(testSectionLabel, 2);
 
         Panel testDevicesPanel = NewBoxPanel();
@@ -370,7 +496,7 @@ public sealed partial class MainForm
         };
         testDevicesLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140F));
         testDevicesLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        testDevicesLayout.RowCount = 14;
+        testDevicesLayout.RowCount = 15;
         for (int i = 0; i < testDevicesLayout.RowCount; i++)
         {
             testDevicesLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -430,6 +556,12 @@ public sealed partial class MainForm
         testDevicesLayout.Controls.Add(testNameLabel, 0, 3);
         testDevicesLayout.Controls.Add(testNameBox, 1, 3);
 
+        Label testPnpIdLabel = NewDialogLabel("PNP ID:");
+        TextBox testPnpIdBox = NewDialogTextBox(360);
+        _copyToolTip.SetToolTip(testPnpIdBox, @"Optional fake hardware ID. Example: PCI\VEN_10EC&DEV_8125\TEST for NIC ITR profile preview.");
+        testDevicesLayout.Controls.Add(testPnpIdLabel, 0, 4);
+        testDevicesLayout.Controls.Add(testPnpIdBox, 1, 4);
+
         Label testKindLabel = NewDialogLabel("Kind:");
         ComboBox testKindCombo = NewDialogCombo(180);
         testKindCombo.Items.Add(DeviceKind.USB);
@@ -439,23 +571,23 @@ public sealed partial class MainForm
         testKindCombo.Items.Add(DeviceKind.NET_CX);
         testKindCombo.Items.Add(DeviceKind.STOR);
         testKindCombo.SelectedIndex = 0;
-        testDevicesLayout.Controls.Add(testKindLabel, 0, 4);
-        testDevicesLayout.Controls.Add(testKindCombo, 1, 4);
+        testDevicesLayout.Controls.Add(testKindLabel, 0, 5);
+        testDevicesLayout.Controls.Add(testKindCombo, 1, 5);
 
         Label testUsbRolesLabel = NewDialogLabel("USB roles:");
         TextBox testUsbRolesBox = NewDialogTextBox(360);
-        testDevicesLayout.Controls.Add(testUsbRolesLabel, 0, 5);
-        testDevicesLayout.Controls.Add(testUsbRolesBox, 1, 5);
+        testDevicesLayout.Controls.Add(testUsbRolesLabel, 0, 6);
+        testDevicesLayout.Controls.Add(testUsbRolesBox, 1, 6);
 
         Label testAudioLabel = NewDialogLabel("Audio endpoints:");
         TextBox testAudioBox = NewDialogTextBox(360);
-        testDevicesLayout.Controls.Add(testAudioLabel, 0, 6);
-        testDevicesLayout.Controls.Add(testAudioBox, 1, 6);
+        testDevicesLayout.Controls.Add(testAudioLabel, 0, 7);
+        testDevicesLayout.Controls.Add(testAudioBox, 1, 7);
 
         Label testStorageLabel = NewDialogLabel("Storage tag:");
         TextBox testStorageBox = NewDialogTextBox(180);
-        testDevicesLayout.Controls.Add(testStorageLabel, 0, 7);
-        testDevicesLayout.Controls.Add(testStorageBox, 1, 7);
+        testDevicesLayout.Controls.Add(testStorageLabel, 0, 8);
+        testDevicesLayout.Controls.Add(testStorageBox, 1, 8);
 
         CheckBox testWifiCheck = new()
         {
@@ -504,18 +636,18 @@ public sealed partial class MainForm
         testDeviceOptionsPanel.Controls.Add(testIntegratedGpuCheck);
 
         Label testDeviceOptionsLabel = NewDialogLabel("Options:");
-        testDevicesLayout.Controls.Add(testDeviceOptionsLabel, 0, 8);
-        testDevicesLayout.Controls.Add(testDeviceOptionsPanel, 1, 8);
+        testDevicesLayout.Controls.Add(testDeviceOptionsLabel, 0, 9);
+        testDevicesLayout.Controls.Add(testDeviceOptionsPanel, 1, 9);
 
         Button addTestDeviceButton = NewDialogButton("ADD FAKE DEVICE");
         addTestDeviceButton.Size = new Size(180, 30);
         addTestDeviceButton.Anchor = AnchorStyles.Left;
         addTestDeviceButton.Margin = new Padding(0, 4, 0, 10);
-        testDevicesLayout.Controls.Add(addTestDeviceButton, 0, 9);
+        testDevicesLayout.Controls.Add(addTestDeviceButton, 0, 10);
         testDevicesLayout.SetColumnSpan(addTestDeviceButton, 2);
 
         Label testListLabel = NewHeaderLabel($"Current test devices: {_testDevices.Count}");
-        testDevicesLayout.Controls.Add(testListLabel, 0, 10);
+        testDevicesLayout.Controls.Add(testListLabel, 0, 11);
         testDevicesLayout.SetColumnSpan(testListLabel, 2);
 
         ListBox testDeviceListBox = new()
@@ -528,7 +660,7 @@ public sealed partial class MainForm
             SelectionMode = SelectionMode.One,
             Margin = new Padding(0, 0, 0, 6),
         };
-        testDevicesLayout.Controls.Add(testDeviceListBox, 0, 11);
+        testDevicesLayout.Controls.Add(testDeviceListBox, 0, 12);
         testDevicesLayout.SetColumnSpan(testDeviceListBox, 2);
 
         Button removeTestDeviceButton = NewDialogButton("REMOVE SELECTED");
@@ -544,15 +676,15 @@ public sealed partial class MainForm
         testDeviceButtonsPanel.Margin = new Padding(0, 0, 0, 6);
         testDeviceButtonsPanel.Controls.Add(removeTestDeviceButton);
         testDeviceButtonsPanel.Controls.Add(clearTestDeviceButton);
-        testDevicesLayout.Controls.Add(testDeviceButtonsPanel, 0, 12);
+        testDevicesLayout.Controls.Add(testDeviceButtonsPanel, 0, 13);
         testDevicesLayout.SetColumnSpan(testDeviceButtonsPanel, 2);
 
-        Label testHintLabel = NewHintLabel("Tip: use roles like Mouse, Keyboard, Gamepad, Webcam, Microphone. Audio endpoints like Speakers. For GPUs, use the iGPU checkbox to mark integrated graphics.");
-        testDevicesLayout.Controls.Add(testHintLabel, 0, 13);
+        Label testHintLabel = NewHintLabel(@"Tip: use roles like Mouse, Keyboard, Gamepad, Webcam, Microphone. For NIC ITR preview use PNP ID like PCI\VEN_10EC&DEV_8125\TEST.");
+        testDevicesLayout.Controls.Add(testHintLabel, 0, 14);
         testDevicesLayout.SetColumnSpan(testHintLabel, 2);
 
         testDevicesPanel.Controls.Add(testDevicesLayout);
-        layout.Controls.Add(testDevicesPanel, 0, 11);
+        layout.Controls.Add(testDevicesPanel, 0, 13);
         layout.SetColumnSpan(testDevicesPanel, 2);
 
         bool suppressTestDeviceToggle = false;
@@ -580,14 +712,31 @@ public sealed partial class MainForm
             bool isNet = kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX;
             bool isStor = kind == DeviceKind.STOR;
             bool isGpu = kind == DeviceKind.GPU;
+            bool hasOptions = isUsb || isNet || isGpu;
 
             testUsbRolesBox.Enabled = isUsb;
             testAudioBox.Enabled = isAudio;
             testStorageBox.Enabled = isStor;
+
+            testDeviceOptionsLabel.Visible = hasOptions;
+            testDeviceOptionsPanel.Visible = hasOptions;
+            testWifiCheck.Visible = isNet;
             testWifiCheck.Enabled = isNet;
+            testWifiCheck.TabStop = isNet;
+            testXhciCheck.Visible = isUsb;
             testXhciCheck.Enabled = isUsb;
+            testXhciCheck.TabStop = isUsb;
+            testHasDevicesCheck.Visible = isUsb;
             testHasDevicesCheck.Enabled = isUsb;
+            testHasDevicesCheck.TabStop = isUsb;
+            testIntegratedGpuCheck.Visible = isGpu;
             testIntegratedGpuCheck.Enabled = isGpu;
+            testIntegratedGpuCheck.TabStop = isGpu;
+
+            if (!isNet)
+            {
+                testWifiCheck.Checked = false;
+            }
 
             if (!isGpu)
             {
@@ -680,6 +829,7 @@ public sealed partial class MainForm
             }
 
             string name = testNameBox.Text?.Trim() ?? string.Empty;
+            string pnpIdOverride = testPnpIdBox.Text?.Trim() ?? string.Empty;
             string usbRoles = testUsbRolesBox.Text?.Trim() ?? string.Empty;
             string audioEndpoints = testAudioBox.Text?.Trim() ?? string.Empty;
             string storageTag = testStorageBox.Text?.Trim() ?? string.Empty;
@@ -699,7 +849,7 @@ public sealed partial class MainForm
                 storageTag = "SSD";
             }
 
-            DeviceInfo testDevice = CreateTestDevice(kind, name, usbRoles, audioEndpoints, storageTag, testWifiCheck.Checked, testXhciCheck.Checked, testHasDevicesCheck.Checked, testIntegratedGpuCheck.Checked);
+            DeviceInfo testDevice = CreateTestDevice(kind, name, pnpIdOverride, usbRoles, audioEndpoints, storageTag, testWifiCheck.Checked, testXhciCheck.Checked, testHasDevicesCheck.Checked, testIntegratedGpuCheck.Checked);
             _testDevices.Add(testDevice);
             WriteLog($"TEST.DEV.ADD: {testDevice.InstanceId} Kind={kind} Name=\"{testDevice.Name}\"");
 
@@ -1099,6 +1249,174 @@ public sealed partial class MainForm
             }
         }
 
+        string FormatPresetCppc(Dictionary<int, int> ratings)
+        {
+            return string.Join(
+                ", ",
+                ratings
+                    .OrderBy(kvp => kvp.Key)
+                    .Select(kvp => $"{kvp.Key}={kvp.Value}"));
+        }
+
+        void LoadSyntheticPreset(
+            string name,
+            int logicalCount,
+            int physicalCoreCount,
+            int ccdCount,
+            bool smtEnabled,
+            bool useHyperLabel,
+            int[] coreMap,
+            int[] ccdMap,
+            bool[] eCoreMap,
+            Dictionary<int, int> cppcRatings)
+        {
+            if (logicalCount <= 0 || logicalCount > MaxAffinityBits)
+            {
+                return;
+            }
+
+            suppressAssignmentEvents = true;
+            try
+            {
+                logicalUpDown.Value = logicalCount;
+                coreGroupCountUpDown.Maximum = Math.Max(1, logicalCount);
+                ccdGroupCountUpDown.Maximum = Math.Min(2, Math.Max(1, logicalCount));
+                coreGroupCountUpDown.Value = Math.Max(1, Math.Min(physicalCoreCount, (int)coreGroupCountUpDown.Maximum));
+                ccdGroupCountUpDown.Value = Math.Max(1, Math.Min(ccdCount, (int)ccdGroupCountUpDown.Maximum));
+
+                coreAssign = ResizeAssignments(coreMap, logicalCount);
+                ccdAssign = ResizeAssignments(ccdMap, logicalCount);
+                eAssign = ResizeFlags(eCoreMap, logicalCount);
+                ClampAssignments(coreAssign, (int)coreGroupCountUpDown.Value);
+                ClampAssignments(ccdAssign, (int)ccdGroupCountUpDown.Value);
+            }
+            finally
+            {
+                suppressAssignmentEvents = false;
+            }
+
+            SetSmtState(smtEnabled, useHyperLabel, false);
+            cpuNameTextBox.Text = name;
+            cppcRatingsBox.Text = FormatPresetCppc(cppcRatings);
+            BuildAssignmentRows();
+            syncDialogScroll?.Invoke();
+            WriteLog($"TESTCPU.PRESET: loaded name=\"{name}\" logical={logicalCount} physical={physicalCoreCount} ccd={ccdCount} smt={smtEnabled} cppcCount={cppcRatings.Count}");
+        }
+
+        void LoadIntelHybridPreset(string name, int pCores, int eCores, bool pCoreHt)
+        {
+            int logicalCount = (pCores * (pCoreHt ? 2 : 1)) + eCores;
+            if (logicalCount > MaxAffinityBits)
+            {
+                logicalCount = MaxAffinityBits;
+            }
+
+            int physicalCoreCount = pCores + eCores;
+            int[] coreMap = new int[logicalCount];
+            int[] ccdMap = new int[logicalCount];
+            bool[] eCoreMap = new bool[logicalCount];
+            Dictionary<int, int> cppc = [];
+
+            int lp = 0;
+            for (int core = 0; core < pCores && lp < logicalCount; core++)
+            {
+                int threads = pCoreHt ? 2 : 1;
+                int rating = core < 2 ? 140 - (core * 5) : 120 - Math.Min(12, core);
+                for (int t = 0; t < threads && lp < logicalCount; t++)
+                {
+                    coreMap[lp] = core;
+                    ccdMap[lp] = 0;
+                    eCoreMap[lp] = false;
+                    cppc[lp] = rating;
+                    lp++;
+                }
+            }
+
+            for (int e = 0; e < eCores && lp < logicalCount; e++)
+            {
+                int core = pCores + e;
+                coreMap[lp] = core;
+                ccdMap[lp] = 0;
+                eCoreMap[lp] = true;
+                cppc[lp] = 70 - Math.Min(20, e);
+                lp++;
+            }
+
+            LoadSyntheticPreset(name, logicalCount, physicalCoreCount, 1, pCoreHt, true, coreMap, ccdMap, eCoreMap, cppc);
+        }
+
+        void LoadAmdPreset(string name, int physicalCores, int ccdCount, bool boostCcdPreferred)
+        {
+            int logicalCount = Math.Min(MaxAffinityBits, physicalCores * 2);
+            int[] coreMap = new int[logicalCount];
+            int[] ccdMap = new int[logicalCount];
+            bool[] eCoreMap = new bool[logicalCount];
+            Dictionary<int, int> cppc = [];
+
+            int coresPerCcd = Math.Max(1, (int)Math.Ceiling(physicalCores / (double)Math.Max(1, ccdCount)));
+            int lp = 0;
+            for (int core = 0; core < physicalCores && lp < logicalCount; core++)
+            {
+                int ccd = Math.Min(ccdCount - 1, core / coresPerCcd);
+                int rating = 0;
+                if (boostCcdPreferred)
+                {
+                    rating = ccd == ccdCount - 1
+                        ? 130 - Math.Min(12, core - (coresPerCcd * ccd))
+                        : 100 - Math.Min(10, core);
+                }
+
+                for (int t = 0; t < 2 && lp < logicalCount; t++)
+                {
+                    coreMap[lp] = core;
+                    ccdMap[lp] = ccd;
+                    eCoreMap[lp] = false;
+                    if (boostCcdPreferred)
+                    {
+                        cppc[lp] = rating;
+                    }
+
+                    lp++;
+                }
+            }
+
+            LoadSyntheticPreset(name, logicalCount, physicalCores, ccdCount, true, false, coreMap, ccdMap, eCoreMap, cppc);
+        }
+
+        void ApplySelectedCpuPreset()
+        {
+            string preset = cpuPresetCombo.SelectedItem?.ToString() ?? string.Empty;
+            switch (preset)
+            {
+                case "Manual / current":
+                    return;
+                case "Intel 8P/16T classic":
+                    LoadIntelHybridPreset("Intel 8P/16T classic", pCores: 8, eCores: 0, pCoreHt: true);
+                    break;
+                case "Intel 6P+8E/20T hybrid":
+                    LoadIntelHybridPreset("Intel 6P+8E/20T hybrid", pCores: 6, eCores: 8, pCoreHt: true);
+                    break;
+                case "Intel 8P+16E/32T hybrid":
+                    LoadIntelHybridPreset("Intel 8P+16E/32T hybrid", pCores: 8, eCores: 16, pCoreHt: true);
+                    break;
+                case "Intel Core Ultra 9 285K 8P+16E/24T":
+                    LoadIntelHybridPreset("Intel Core Ultra 9 285K 8P+16E/24T", pCores: 8, eCores: 16, pCoreHt: false);
+                    break;
+                case "AMD Ryzen 8C/16T 1 CCD":
+                    LoadAmdPreset("AMD Ryzen 8C/16T 1 CCD", physicalCores: 8, ccdCount: 1, boostCcdPreferred: false);
+                    break;
+                case "AMD Ryzen 12C/24T 2 CCD":
+                    LoadAmdPreset("AMD Ryzen 12C/24T 2 CCD", physicalCores: 12, ccdCount: 2, boostCcdPreferred: false);
+                    break;
+                case "AMD Ryzen 16C/32T 2 CCD":
+                    LoadAmdPreset("AMD Ryzen 16C/32T 2 CCD", physicalCores: 16, ccdCount: 2, boostCcdPreferred: false);
+                    break;
+                case "AMD Ryzen X3D 16C/32T 2 CCD boost-preferred":
+                    LoadAmdPreset("AMD Ryzen X3D 16C/32T 2 CCD boost-preferred", physicalCores: 16, ccdCount: 2, boostCcdPreferred: true);
+                    break;
+            }
+        }
+
         void FillGroupCombo(ComboBox combo, int groupCount)
         {
             combo.BeginUpdate();
@@ -1180,7 +1498,7 @@ public sealed partial class MainForm
 
                 CheckBox eCheck = new()
                 {
-                    Text = "E",
+                    Text = "E-Core",
                     AutoSize = true,
                     BackColor = _bgForm,
                     ForeColor = _fgMain,
@@ -1271,7 +1589,70 @@ public sealed partial class MainForm
             syncDialogScroll?.Invoke();
         }
 
-        TestCpuConfig BuildConfigFromAssignments()
+        bool TryParseTestCppcRatings(string text, int logicalCount, out Dictionary<int, int> ratings, out string error)
+        {
+            ratings = [];
+            error = string.Empty;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return true;
+            }
+
+            string[] parts = text
+                .Split([',', ';', ' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            int sequentialLp = 0;
+            foreach (string part in parts)
+            {
+                string token = part.Trim();
+                if (token.Length == 0)
+                {
+                    continue;
+                }
+
+                int lp;
+                string ratingText;
+                int sep = token.IndexOf('=');
+                if (sep < 0)
+                {
+                    sep = token.IndexOf(':');
+                }
+
+                if (sep >= 0)
+                {
+                    string lpText = token[..sep].Trim();
+                    ratingText = token[(sep + 1)..].Trim();
+                    if (!int.TryParse(lpText, NumberStyles.Integer, CultureInfo.InvariantCulture, out lp))
+                    {
+                        error = $"Bad CPPC LP index: {lpText}";
+                        return false;
+                    }
+                }
+                else
+                {
+                    lp = sequentialLp;
+                    ratingText = token;
+                }
+
+                sequentialLp = Math.Max(sequentialLp + 1, lp + 1);
+                if (lp < 0 || lp >= logicalCount)
+                {
+                    error = $"CPPC LP index out of range: {lp}";
+                    return false;
+                }
+
+                if (!int.TryParse(ratingText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int rating) || rating < 0)
+                {
+                    error = $"Bad CPPC rating for LP {lp}: {ratingText}";
+                    return false;
+                }
+
+                ratings[lp] = rating;
+            }
+
+            return true;
+        }
+
+        TestCpuConfig BuildConfigFromAssignments(IReadOnlyDictionary<int, int> cppcRatings)
         {
             int logicalCount = (int)logicalUpDown.Value;
             int coreCount = (int)coreGroupCountUpDown.Value;
@@ -1308,12 +1689,25 @@ public sealed partial class MainForm
                 }
             }
 
+            foreach (KeyValuePair<int, int> pair in cppcRatings)
+            {
+                config.CppcRatings[pair.Key] = pair.Value;
+            }
+
             return config;
         }
 
         logicalUpDown.ValueChanged += (_, _) => RefreshAssignmentUi(false);
         coreGroupCountUpDown.ValueChanged += (_, _) => RefreshAssignmentUi(false);
         ccdGroupCountUpDown.ValueChanged += (_, _) => RefreshAssignmentUi(true);
+        cpuPresetButton.Click += (_, _) => ApplySelectedCpuPreset();
+        cpuPresetCombo.SelectedIndexChanged += (_, _) =>
+        {
+            if (cpuPresetCombo.SelectedIndex > 0)
+            {
+                ApplySelectedCpuPreset();
+            }
+        };
 
         BuildAssignmentRows();
 
@@ -1336,10 +1730,16 @@ public sealed partial class MainForm
         applyButton.Margin = new Padding(6, 0, 6, 0);
         applyButton.Click += (_, _) =>
         {
-            TestCpuConfig config = BuildConfigFromAssignments();
+            if (!TryParseTestCppcRatings(cppcRatingsBox.Text, (int)logicalUpDown.Value, out Dictionary<int, int> cppcRatings, out string cppcError))
+            {
+                ShowThemedInfo($"CPPC ratings are invalid.\n{cppcError}");
+                return;
+            }
+
+            TestCpuConfig config = BuildConfigFromAssignments(cppcRatings);
             ApplyTestCpuConfig(config);
             statusLabel.Text = "Test CPU mode: ACTIVE";
-            statusLabel.ForeColor = _statusDanger;
+            statusLabel.ForeColor = _statusActive;
         };
 
         Button resetButton = NewDialogButton("RESET TO REAL");
@@ -1350,10 +1750,11 @@ public sealed partial class MainForm
         {
             DisableTestCpuMode();
             statusLabel.Text = "Test CPU mode: OFF";
-            statusLabel.ForeColor = _mutedText;
+            statusLabel.ForeColor = _statusInactive;
             logicalUpDown.Value = Math.Min(MaxAffinityBits, GetCurrentLogicalCount());
             LoadAssignmentsFromCurrentCpu();
             SyncSmtStateFromCurrent();
+            cppcRatingsBox.Text = GetCurrentCppcRatingsText();
         };
 
         Button closeButton = NewDialogButton("CLOSE");
@@ -1446,21 +1847,20 @@ public sealed partial class MainForm
 
             int contentHeight = contentPanel.Height;
             int viewportHeight = contentHost.ClientSize.Height;
-            int offset = Math.Max(0, -contentPanel.Top);
+            int maxOffset = Math.Max(0, contentHeight - viewportHeight);
+            int offset = Math.Max(0, Math.Min(maxOffset, -contentPanel.Top));
             bool needsScroll = contentHeight > viewportHeight + 1;
 
             dialogScroll.Visible = needsScroll;
+            contentPanel.Location = needsScroll
+                ? new Point(0, -offset)
+                : new Point(0, 0);
 
             syncingDialogScroll = true;
             dialogScroll.Maximum = Math.Max(contentHeight, 1);
             dialogScroll.ViewportSize = Math.Max(viewportHeight, 1);
             dialogScroll.Value = needsScroll ? offset : 0;
             syncingDialogScroll = false;
-
-            if (!needsScroll)
-            {
-                contentPanel.Location = new Point(0, 0);
-            }
         }
 
         dialogScroll.ValueChanged += (_, _) =>
@@ -1471,7 +1871,6 @@ public sealed partial class MainForm
             }
 
             SetDialogScrollOffset(dialogScroll.Value);
-            SyncDialogScrollBar();
         };
 
         layout.SizeChanged += (_, _) => SyncDialogScrollBar();
@@ -1486,6 +1885,10 @@ public sealed partial class MainForm
 
             int delta = e.Delta > 0 ? -dialogScroll.SmallChange : dialogScroll.SmallChange;
             dialogScroll.Value += delta;
+            if (e is HandledMouseEventArgs handled)
+            {
+                handled.Handled = true;
+            }
         };
 
         contentHost.Controls.Add(contentPanel);
@@ -1503,7 +1906,7 @@ public sealed partial class MainForm
 
         dialog.PerformLayout();
         int desiredHeight = layout.PreferredSize.Height + buttons.Height + 12;
-        int maxHeight = Screen.FromControl(dialog).WorkingArea.Height - 80;
+        int maxHeight = Math.Min(760, Screen.FromControl(dialog).WorkingArea.Height - 140);
         int targetHeight = Math.Min(maxHeight, Math.Max(520, desiredHeight));
         dialog.ClientSize = new Size(dialog.ClientSize.Width, targetHeight);
         syncDialogScroll = SyncDialogScrollBar;
@@ -1653,6 +2056,7 @@ public sealed partial class MainForm
     private DeviceInfo CreateTestDevice(
         DeviceKind kind,
         string name,
+        string pnpIdOverride,
         string usbRoles,
         string audioEndpoints,
         string storageTag,
@@ -1663,7 +2067,9 @@ public sealed partial class MainForm
     {
         _testDeviceSequence++;
         int seq = _testDeviceSequence;
-        string id = $"TEST\\{kind}\\{seq:D4}";
+        string id = string.IsNullOrWhiteSpace(pnpIdOverride)
+            ? $"TEST\\{kind}\\{seq:D4}"
+            : pnpIdOverride.Trim().Replace('/', '\\');
         string displayName = string.IsNullOrWhiteSpace(name) ? $"Test {kind} {seq:D2}" : name.Trim();
         string className = kind switch
         {
@@ -1686,7 +2092,7 @@ public sealed partial class MainForm
             Name = displayName,
             InstanceId = id,
             Class = className,
-            RegBase = $@"TEST\{kind}\{seq:D4}",
+            RegBase = $@"SYSTEM\CurrentControlSet\Enum\{id}",
             Kind = kind,
             UsbRoles = isUsb ? usbRoles : string.Empty,
             AudioEndpoints = isAudio ? audioEndpoints : string.Empty,
@@ -1774,6 +2180,46 @@ public sealed partial class MainForm
             CcdMap = ccdMap,
         };
         UpdateEfficiencyClassMap(topo);
+        _cppcRatings.Clear();
+        _cppcRanks.Clear();
+        _cppcEnabled = false;
+        if (config.CppcRatings.Count > 0)
+        {
+            Dictionary<int, int> collected = config.CppcRatings
+                .Where(kvp => kvp.Key >= 0 && kvp.Key < topo.Logical)
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            List<int> uniqueRatings = collected.Values.Distinct().OrderByDescending(v => v).ToList();
+            if (uniqueRatings.Count > 1)
+            {
+                int rank = 1;
+                foreach (int rating in uniqueRatings)
+                {
+                    foreach (KeyValuePair<int, int> item in collected.Where(kvp => kvp.Value == rating).OrderBy(kvp => kvp.Key))
+                    {
+                        _cppcRatings[item.Key] = item.Value;
+                        _cppcRanks[item.Key] = rank;
+                    }
+
+                    rank++;
+                }
+
+                _cppcEnabled = _cppcRanks.Count > 0;
+                string ratingsText = string.Join(
+                    " ",
+                    _cppcRatings
+                        .OrderBy(kvp => kvp.Key)
+                        .Select(kvp => $"CPU{kvp.Key}=R{kvp.Value}/#{_cppcRanks[kvp.Key]}"));
+                WriteLog($"TESTCPU.CPPC: enabled count={_cppcRanks.Count} {ratingsText}");
+            }
+            else
+            {
+                WriteLog($"TESTCPU.CPPC: disabled, all test ratings share rating={uniqueRatings.FirstOrDefault()} count={collected.Count}");
+            }
+        }
+        else
+        {
+            WriteLog("TESTCPU.CPPC: disabled (not specified)");
+        }
 
         _cpuGroupCount = 1;
         _cpuLpByIndex.Clear();
@@ -1788,7 +2234,7 @@ public sealed partial class MainForm
         }
 
         _maxLogical = Math.Min(topo.Logical, MaxAffinityBits);
-        _grpHeight = 120 + (_maxLogical * 24) + 160;
+        _grpHeight = UiScale(120) + (_maxLogical * UiScale(24)) + UiScale(160);
 
         string smtPrefix = config.UseHyperThreadingLabel ? "Hyper-Threading" : "SMT";
         _smtText = config.SmtEnabled

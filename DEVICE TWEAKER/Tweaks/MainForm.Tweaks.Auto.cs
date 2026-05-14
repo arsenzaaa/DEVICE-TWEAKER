@@ -4,6 +4,42 @@ namespace DeviceTweakerCS;
 
 public sealed partial class MainForm
 {
+    private enum AutoAffinityRole
+    {
+        Gpu,
+        InputMouse,
+        InputController,
+        Keyboard,
+        Nic,
+        Audio,
+        OtherUsb,
+        Other,
+    }
+
+    private sealed class AutoAffinityPlanSlot
+    {
+        public required DeviceBlock Block { get; init; }
+        public required AutoAffinityRole Role { get; init; }
+        public required int Need { get; init; }
+        public required int OriginalIndex { get; init; }
+        public List<int> Lps { get; } = [];
+        public string Reason { get; set; } = string.Empty;
+    }
+
+    private sealed class AutoCpuUnit
+    {
+        public required int Id { get; init; }
+        public required int PrimaryLp { get; init; }
+        public required List<int> Lps { get; init; }
+        public required bool IsECore { get; init; }
+        public required int Ccd { get; init; }
+        public required int Rating { get; init; }
+        public required int Rank { get; init; }
+
+        public bool HasCore0 => Lps.Contains(0);
+        public bool HasSmt => Lps.Count > 1;
+    }
+
     private (List<int> P, List<int> E)? GetAutoCpuSets()
     {
         if (_cpuInfo is null)
@@ -33,7 +69,144 @@ public sealed partial class MainForm
             }
         }
 
-        return (primaryP.OrderBy(x => x).ToList(), primaryE.OrderBy(x => x).ToList());
+        return (SortAutoCpuCandidates(primaryP, preferStrongest: true), SortAutoCpuCandidates(primaryE, preferStrongest: false));
+    }
+
+    private List<AutoCpuUnit> BuildAutoCpuUnits(IReadOnlyCollection<int>? allowedLps)
+    {
+        if (_cpuInfo is null)
+        {
+            return [];
+        }
+
+        HashSet<int>? allowed = allowedLps is { Count: > 0 }
+            ? new HashSet<int>(allowedLps)
+            : null;
+
+        List<AutoCpuUnit> units = [];
+        foreach (KeyValuePair<int, List<CpuLpInfo>> pair in _cpuInfo.Topology.ByCore.OrderBy(kvp => kvp.Value.Min(lp => lp.LP)))
+        {
+            List<CpuLpInfo> members = pair.Value
+                .Where(lp => lp.LP >= 0 && lp.LP < _maxLogical)
+                .Where(lp => allowed is null || allowed.Contains(lp.LP))
+                .OrderBy(lp => lp.LP)
+                .ToList();
+
+            if (members.Count == 0)
+            {
+                continue;
+            }
+
+            CpuLpInfo primary = members[0];
+            int rating = members
+                .Select(lp => _cppcRatings.TryGetValue(lp.LP, out int value) ? value : 0)
+                .DefaultIfEmpty(0)
+                .Max();
+            int rank = members
+                .Select(lp => _cppcRanks.TryGetValue(lp.LP, out int value) ? value : int.MaxValue)
+                .DefaultIfEmpty(int.MaxValue)
+                .Min();
+            int ccd = _cpuInfo.CcdMap.TryGetValue(primary.LP, out int ccdValue) ? ccdValue : 0;
+
+            units.Add(new AutoCpuUnit
+            {
+                Id = pair.Key,
+                PrimaryLp = primary.LP,
+                Lps = members.Select(lp => lp.LP).ToList(),
+                IsECore = IsEfficiencyCore(primary),
+                Ccd = ccd,
+                Rating = rating,
+                Rank = rank,
+            });
+        }
+
+        return units;
+    }
+
+    private List<AutoCpuUnit> SortAutoCpuUnits(IEnumerable<AutoCpuUnit> units, bool preferStrongest)
+    {
+        List<AutoCpuUnit> list = units
+            .Where(unit => unit.PrimaryLp >= 0 && unit.PrimaryLp < _maxLogical)
+            .GroupBy(unit => unit.Id)
+            .Select(group => group.First())
+            .ToList();
+
+        if (!_cppcEnabled)
+        {
+            return list.OrderBy(unit => unit.PrimaryLp).ToList();
+        }
+
+        List<AutoCpuUnit> sorted = list
+            .OrderBy(unit => unit.Rank)
+            .ThenByDescending(unit => unit.Rating)
+            .ThenBy(unit => unit.PrimaryLp)
+            .ToList();
+
+        if (!preferStrongest)
+        {
+            sorted.Reverse();
+        }
+
+        return sorted;
+    }
+
+    private string FormatAutoCpuUnits(IEnumerable<AutoCpuUnit> units)
+    {
+        return string.Join(
+            ',',
+            units.Select(unit =>
+            {
+                string smt = unit.HasSmt ? $"/smt=[{string.Join('+', unit.Lps)}]" : string.Empty;
+                string type = unit.IsECore ? "E" : "P";
+                if (_cppcEnabled && unit.Rank != int.MaxValue)
+                {
+                    return $"{unit.PrimaryLp}:{type}:R{unit.Rating}/#{unit.Rank}{smt}";
+                }
+
+                return $"{unit.PrimaryLp}:{type}{smt}";
+            }));
+    }
+
+    private List<int> SortAutoCpuCandidates(IEnumerable<int> logicalProcessors, bool preferStrongest)
+    {
+        List<int> lps = logicalProcessors
+            .Where(lp => lp >= 0 && lp < _maxLogical)
+            .Distinct()
+            .ToList();
+
+        if (!_cppcEnabled)
+        {
+            return lps.OrderBy(lp => lp).ToList();
+        }
+
+        IOrderedEnumerable<int> ordered = lps
+            .OrderBy(lp => _cppcRanks.TryGetValue(lp, out int rank) ? rank : int.MaxValue)
+            .ThenByDescending(lp => _cppcRatings.TryGetValue(lp, out int rating) ? rating : int.MinValue)
+            .ThenBy(lp => lp);
+
+        List<int> sorted = ordered.ToList();
+        if (!preferStrongest)
+        {
+            sorted.Reverse();
+        }
+
+        return sorted;
+    }
+
+    private string FormatAutoCpuCandidates(IEnumerable<int> logicalProcessors)
+    {
+        return string.Join(
+            ',',
+            logicalProcessors.Select(lp =>
+            {
+                if (_cppcEnabled && _cppcRanks.TryGetValue(lp, out int rank))
+                {
+                    int rating = _cppcRatings.TryGetValue(lp, out int value) ? value : 0;
+                    return $"{lp}:R{rating}/#{rank}";
+                }
+
+                return lp.ToString();
+            }));
     }
 
     private static int GetAutoAssignmentPriority(DeviceKind kind)
@@ -48,7 +221,253 @@ public sealed partial class MainForm
         };
     }
 
-    private void InvokeAutoOptimization()
+    private static AutoAffinityRole GetAutoAffinityRole(DeviceBlock block)
+    {
+        return block.Kind switch
+        {
+            DeviceKind.GPU => AutoAffinityRole.Gpu,
+            DeviceKind.NET_NDIS or DeviceKind.NET_CX => AutoAffinityRole.Nic,
+            DeviceKind.AUDIO => AutoAffinityRole.Audio,
+            DeviceKind.USB => GetAutoUsbAffinityRole(block.Device.UsbRoles ?? string.Empty),
+            _ => AutoAffinityRole.Other,
+        };
+    }
+
+    private static AutoAffinityRole GetAutoUsbAffinityRole(string roles)
+    {
+        if (HasRoleText(roles, "Mouse"))
+        {
+            return AutoAffinityRole.InputMouse;
+        }
+
+        if (HasRoleText(roles, "Gamepad") || HasRoleText(roles, "Controller"))
+        {
+            return AutoAffinityRole.InputController;
+        }
+
+        if (HasRoleText(roles, "Keyboard"))
+        {
+            return AutoAffinityRole.Keyboard;
+        }
+
+        if (HasRoleText(roles, "Audio")
+            || HasRoleText(roles, "Microphone")
+            || HasRoleText(roles, "Speaker"))
+        {
+            return AutoAffinityRole.Audio;
+        }
+
+        return AutoAffinityRole.OtherUsb;
+    }
+
+    private static int GetAutoAffinityRolePriority(AutoAffinityRole role)
+    {
+        return role switch
+        {
+            AutoAffinityRole.InputMouse => 0,
+            AutoAffinityRole.InputController => 1,
+            AutoAffinityRole.Gpu => 2,
+            AutoAffinityRole.Nic => 3,
+            AutoAffinityRole.Keyboard => 4,
+            AutoAffinityRole.Audio => 5,
+            AutoAffinityRole.OtherUsb => 6,
+            _ => 7,
+        };
+    }
+
+    private static bool IsInputAffinityRole(AutoAffinityRole role)
+    {
+        return role is AutoAffinityRole.InputMouse or AutoAffinityRole.InputController or AutoAffinityRole.Keyboard;
+    }
+
+    private static string BuildAutoUsbImodRoleProfile(string roles)
+    {
+        Dictionary<string, uint> roleValues = new(StringComparer.OrdinalIgnoreCase);
+        if (HasRoleText(roles, "Mouse"))
+        {
+            roleValues["Mouse"] = 0x0;
+        }
+
+        if (HasRoleText(roles, "Keyboard"))
+        {
+            roleValues["Keyboard"] = ImodDefaultInterval;
+        }
+
+        if (HasRoleText(roles, "Audio") || HasRoleText(roles, "Microphone") || HasRoleText(roles, "Speaker"))
+        {
+            roleValues["Audio"] = 0xFA0;
+        }
+
+        if (HasRoleText(roles, "Gamepad"))
+        {
+            roleValues["Gamepad"] = ImodDefaultInterval;
+        }
+
+        if (HasRoleText(roles, "Webcam"))
+        {
+            roleValues["Webcam"] = ImodDefaultInterval;
+        }
+
+        return roleValues.Count > 0
+            ? FormatImodRoleIntervals(roleValues)
+            : GetDefaultRoleImodText();
+    }
+
+    private static bool HasRoleText(string roles, string role)
+    {
+        return !string.IsNullOrWhiteSpace(roles)
+            && Regex.IsMatch(roles, $@"(?i)\b{Regex.Escape(role)}\b");
+    }
+
+    private static string FormatAutoResultRole(AutoAffinityRole role)
+    {
+        return role switch
+        {
+            AutoAffinityRole.InputMouse => "Input mouse",
+            AutoAffinityRole.InputController => "Input controller",
+            AutoAffinityRole.Keyboard => "Keyboard",
+            AutoAffinityRole.Gpu => "GPU",
+            AutoAffinityRole.Nic => "Network",
+            AutoAffinityRole.Audio => "Audio",
+            AutoAffinityRole.OtherUsb => "Other USB",
+            _ => "Other",
+        };
+    }
+
+    private static string FormatAutoResultKind(DeviceKind kind)
+    {
+        return kind switch
+        {
+            DeviceKind.NET_NDIS => "NET_NDIS",
+            DeviceKind.NET_CX => "NET_CX",
+            _ => kind.ToString(),
+        };
+    }
+
+    private static string FormatAutoResultPicker(ThemedDropDownPicker? picker)
+    {
+        return picker?.SelectedItem?.ToString() ?? "n/a";
+    }
+
+    private static string FormatAutoResultDeviceName(DeviceBlock block)
+    {
+        string name = SanitizeLogValue(block.Device.Name);
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            name = block.Device.InstanceId;
+        }
+
+        string roles = SanitizeLogValue(block.Device.UsbRoles);
+        if (block.Kind == DeviceKind.USB && !string.IsNullOrWhiteSpace(roles))
+        {
+            return $"{name} roles=\"{roles}\"";
+        }
+
+        return name;
+    }
+
+    private void WriteAutoOptimizationResultSummary(
+        bool optimizeUsbImod,
+        bool usingP,
+        IReadOnlyList<int> primaryP,
+        IReadOnlyList<int> primaryE,
+        IReadOnlyList<int> targetCcdLps,
+        IReadOnlyList<DeviceBlock> usbBlocks,
+        IReadOnlyList<DeviceBlock> gpuBlocks,
+        IReadOnlyList<DeviceBlock> integratedGpuBlocks,
+        int netCount,
+        IReadOnlyList<DeviceBlock> audioBlocks,
+        int storCount,
+        IReadOnlyCollection<string> wifiIds,
+        IReadOnlyCollection<string> msiOnlyGpuIds,
+        IReadOnlyDictionary<string, string> skipReasons,
+        IReadOnlyList<AutoAffinityPlanSlot> planSlots,
+        IReadOnlyCollection<int> consumedCores,
+        IReadOnlyCollection<int> inputShareCores)
+    {
+        List<int> assignedLps = planSlots
+            .SelectMany(slot => slot.Lps)
+            .Distinct()
+            .OrderBy(lp => lp)
+            .ToList();
+
+        List<int> reservedLps = consumedCores
+            .Where(lp => !assignedLps.Contains(lp))
+            .Distinct()
+            .OrderBy(lp => lp)
+            .ToList();
+
+        int assigned = planSlots.Count(slot => slot.Lps.Count > 0);
+        int skipped = planSlots.Count(slot => slot.Lps.Count == 0)
+            + wifiIds.Count
+            + msiOnlyGpuIds.Count
+            + skipReasons.Count
+            + storCount;
+
+        string imodState = optimizeUsbImod
+            ? "enabled for eligible XHCI"
+            : "skipped by user/no eligible target";
+
+        WriteLog($"AUTO.RESULT.MODE: {(_testAutoDryRun ? "dry-run preview, nothing saved" : "apply mode")} | CPU={(usingP ? "P-cores" : "E-cores")} | primaryP=[{string.Join(',', primaryP)}] primaryE=[{string.Join(',', primaryE)}] targetCCD=[{string.Join(',', targetCcdLps)}]");
+        WriteLog($"AUTO.RESULT.DETECTED: USB={usbBlocks.Count} GPU={gpuBlocks.Count} iGPU={integratedGpuBlocks.Count} NET={netCount} AUDIO={audioBlocks.Count} STOR={storCount} WiFi={wifiIds.Count} | USB IMOD={imodState}");
+
+        foreach (AutoAffinityPlanSlot slot in planSlots.Where(slot => slot.Lps.Count > 0))
+        {
+            DeviceBlock block = slot.Block;
+            string lps = string.Join(',', slot.Lps);
+            string name = FormatAutoResultDeviceName(block);
+            string role = FormatAutoResultRole(slot.Role);
+            string kind = FormatAutoResultKind(block.Kind);
+            string policy = FormatAutoResultPicker(block.PolicyCombo);
+            string msi = FormatAutoResultPicker(block.MsiCombo);
+            string prio = FormatAutoResultPicker(block.PrioCombo);
+            string extra = string.Empty;
+
+            if (block.Kind == DeviceKind.NET_NDIS)
+            {
+                string mode = FormatAutoResultPicker(block.NdisModeCombo);
+                string queues = block.RssQueueBox?.Value.ToString() ?? "n/a";
+                extra = $" | NDIS={mode} queues={queues}";
+            }
+            else if (block.Kind == DeviceKind.USB && IsUsbImodTarget(block.Device))
+            {
+                string imod = SanitizeLogValue(block.ImodBox.Text);
+                extra = $" | IMOD={(string.IsNullOrWhiteSpace(imod) ? "n/a" : imod)}";
+            }
+
+            WriteLog($"AUTO.RESULT.APPLIED: {role} | {kind} | \"{name}\" -> CPU=[{lps}] mask=0x{block.AffinityMask:X} MSI={msi} prio={prio} policy={policy}{extra} | reason={slot.Reason}");
+        }
+
+        foreach (AutoAffinityPlanSlot slot in planSlots.Where(slot => slot.Lps.Count == 0))
+        {
+            DeviceBlock block = slot.Block;
+            WriteLog($"AUTO.RESULT.SKIPPED: {FormatAutoResultRole(slot.Role)} | {FormatAutoResultKind(block.Kind)} | \"{FormatAutoResultDeviceName(block)}\" -> no safe CPU core");
+        }
+
+        foreach (DeviceBlock block in _blocks.Where(block => wifiIds.Contains(block.Device.InstanceId)))
+        {
+            WriteLog($"AUTO.RESULT.SKIPPED: WiFi | {FormatAutoResultKind(block.Kind)} | \"{FormatAutoResultDeviceName(block)}\" -> affinity preserved, MSI/prio only");
+        }
+
+        foreach (DeviceBlock block in _blocks.Where(block => msiOnlyGpuIds.Contains(block.Device.InstanceId)))
+        {
+            WriteLog($"AUTO.RESULT.SKIPPED: Integrated GPU | {FormatAutoResultKind(block.Kind)} | \"{FormatAutoResultDeviceName(block)}\" -> affinity preserved, MSI only");
+        }
+
+        foreach (DeviceBlock block in _blocks.Where(block => skipReasons.ContainsKey(block.Device.InstanceId)))
+        {
+            WriteLog($"AUTO.RESULT.SKIPPED: {FormatAutoResultKind(block.Kind)} | \"{FormatAutoResultDeviceName(block)}\" -> {skipReasons[block.Device.InstanceId]}");
+        }
+
+        if (storCount > 0)
+        {
+            WriteLog($"AUTO.RESULT.SKIPPED: Storage devices={storCount} -> AUTO does not touch storage affinity");
+        }
+
+        WriteLog($"AUTO.RESULT.FINAL: assigned={assigned} skippedOrPreserved={skipped} usedLPs=[{string.Join(',', assignedLps)}] reservedSpacingLPs=[{string.Join(',', reservedLps)}] inputShareLPs=[{string.Join(',', inputShareCores.Distinct().OrderBy(lp => lp))}]");
+    }
+
+    private void InvokeAutoOptimization(bool optimizeUsbImod)
     {
         if (_blocks.Count == 0)
         {
@@ -56,6 +475,15 @@ public sealed partial class MainForm
         }
 
         WriteLog("AUTO: Invoke-AutoOptimization start");
+        if (_testAutoDryRun)
+        {
+            WriteLog("AUTO.THROTTLE: dry-run -> skipped");
+        }
+        else
+        {
+            ApplyAutoRawMouseThrottle();
+        }
+
         if (_testAutoDryRun)
         {
             ResetReservedCpuSetsPreview();
@@ -115,14 +543,19 @@ public sealed partial class MainForm
 
         if (primaryP.Count == 0 && allP.Count > 0)
         {
-            primaryP = allP;
+            primaryP = SortAutoCpuCandidates(allP, preferStrongest: true);
             WriteLog($"AUTO: P fallback -> using all P cores from map: [{string.Join(',', primaryP)}]");
         }
 
         if (primaryE.Count == 0 && allE.Count > 0)
         {
-            primaryE = allE;
+            primaryE = SortAutoCpuCandidates(allE, preferStrongest: false);
         }
+
+        primaryP = SortAutoCpuCandidates(primaryP, preferStrongest: true);
+        primaryE = SortAutoCpuCandidates(primaryE, preferStrongest: false);
+        allP = SortAutoCpuCandidates(allP, preferStrongest: true);
+        allE = SortAutoCpuCandidates(allE, preferStrongest: false);
 
         int pCount = primaryP.Count;
         if (pCount <= 0)
@@ -131,35 +564,48 @@ public sealed partial class MainForm
         }
 
         WriteLog($"AUTO: CPU primary P=[{string.Join(',', primaryP)}] E=[{string.Join(',', primaryE)}]");
-
-        List<int> coreOrder = primaryP.Count > 0 ? primaryP : primaryE;
-        bool usingP = primaryP.Count > 0;
-        bool zeroAvailable = coreOrder.Contains(0);
-        List<int> available = [];
-        int coreIndex = 0;
-        int extras = 0;
-        Queue<int> audioQueue = new(primaryE.Where(lp => lp != 0));
-        int audioECount = 0;
-        int audioEAssigned = 0;
-        bool useAudioE = primaryP.Count > 0 && audioQueue.Count > 0;
-
-        List<int> TakeNext(int count)
+        if (_cppcEnabled)
         {
-            List<int> lps = [];
-            while (lps.Count < count && coreIndex < available.Count)
-            {
-                lps.Add(available[coreIndex]);
-                coreIndex++;
-            }
-
-            if (lps.Count == count && extras > 0 && coreIndex < available.Count)
-            {
-                coreIndex++;
-                extras--;
-            }
-
-            return lps;
+            WriteLog($"AUTO.CPPC: primaryP=[{FormatAutoCpuCandidates(primaryP)}] primaryE=[{FormatAutoCpuCandidates(primaryE)}] allP=[{FormatAutoCpuCandidates(allP)}] allE=[{FormatAutoCpuCandidates(allE)}]");
         }
+
+        HashSet<int> primaryPSet = primaryP.ToHashSet();
+        HashSet<int> primaryESet = primaryE.ToHashSet();
+        List<AutoCpuUnit> allCpuUnits = BuildAutoCpuUnits(targetCcdLps);
+        List<AutoCpuUnit> primaryPUnits = SortAutoCpuUnits(
+            allCpuUnits.Where(unit => !unit.IsECore && primaryPSet.Contains(unit.PrimaryLp)),
+            preferStrongest: true);
+        List<AutoCpuUnit> primaryEUnits = SortAutoCpuUnits(
+            allCpuUnits.Where(unit => unit.IsECore && primaryESet.Contains(unit.PrimaryLp)),
+            preferStrongest: false);
+
+        if (primaryPUnits.Count == 0)
+        {
+            primaryPUnits = SortAutoCpuUnits(allCpuUnits.Where(unit => !unit.IsECore), preferStrongest: true);
+        }
+
+        if (primaryEUnits.Count == 0)
+        {
+            primaryEUnits = SortAutoCpuUnits(allCpuUnits.Where(unit => unit.IsECore), preferStrongest: false);
+        }
+
+        bool usingP = primaryPUnits.Count > 0;
+        List<AutoCpuUnit> preferredUnits = usingP ? primaryPUnits : primaryEUnits;
+        List<AutoCpuUnit> audioEUnits = usingP
+            ? primaryEUnits.Where(unit => !unit.HasCore0).ToList()
+            : [];
+        Dictionary<int, AutoCpuUnit> unitById = allCpuUnits
+            .GroupBy(unit => unit.Id)
+            .ToDictionary(group => group.Key, group => group.First());
+        Dictionary<int, AutoCpuUnit> unitByLp = allCpuUnits
+            .SelectMany(unit => unit.Lps.Select(lp => new { lp, unit }))
+            .GroupBy(item => item.lp)
+            .ToDictionary(group => group.Key, group => group.First().unit);
+        HashSet<int> consumedCores = new();
+        List<int> inputShareCores = [];
+        HashSet<int> reservedUnitIds = new();
+        Dictionary<int, List<AutoAffinityPlanSlot>> assignedSlotsByUnit = new();
+        List<int> inputShareUnitIds = [];
 
         foreach (IGrouping<DeviceKind, DeviceBlock> g in _blocks.GroupBy(b => b.Kind))
         {
@@ -184,6 +630,7 @@ public sealed partial class MainForm
         List<DeviceBlock> audioBlocks = _blocks.Where(b => b.Kind == DeviceKind.AUDIO).ToList();
         int storCount = _blocks.Count(b => b.Kind == DeviceKind.STOR);
         HashSet<string> skipAutoIds = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string> skipReasons = new(StringComparer.OrdinalIgnoreCase);
         HashSet<string> msiOnlyGpuIds = integratedGpuBlocks
             .Select(b => b.Device.InstanceId)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -193,6 +640,7 @@ public sealed partial class MainForm
             if (string.IsNullOrWhiteSpace(usbBlock.Device.UsbRoles))
             {
                 skipAutoIds.Add(usbBlock.Device.InstanceId);
+                skipReasons[usbBlock.Device.InstanceId] = "USB controller has no detected HID roles, left for manual/reset only";
                 WriteLog($"AUTO.SKIP.USB: {usbBlock.Device.InstanceId} no HID roles (manual/reset only)");
             }
         }
@@ -221,6 +669,7 @@ public sealed partial class MainForm
 
             skipAutoIds.Add(pnpId);
             string reason = isSpdif ? "digital S/PDIF audio" : "display/HDMI audio";
+            skipReasons[pnpId] = $"{reason}, left untouched by AUTO";
             WriteLog($"AUTO.SKIP.AUDIO: {pnpId} classified as {reason} (name=\"{desc}\" endpoints=\"{audioText}\")");
         }
 
@@ -269,7 +718,7 @@ public sealed partial class MainForm
             {
                 block.MsiCombo.SelectedItem = "Enabled";
                 block.LimitBox.Text = "0";
-                block.PrioCombo.SelectedItem = "Normal";
+                block.PrioCombo.SelectedItem = "Undefined";
                 if (block.Kind != DeviceKind.NET_NDIS && block.PolicyCombo.Enabled)
                 {
                     block.PolicyCombo.SelectedItem = "MachineDefault";
@@ -298,95 +747,412 @@ public sealed partial class MainForm
             }
         }
 
-        bool anyChecked = usbBlocks.Any(b => IsUsbImodTarget(b.Device) && b.ImodAutoCheck.Checked);
-        if (!anyChecked)
+        List<DeviceBlock> imodTargets = usbBlocks.Where(b => IsUsbImodTarget(b.Device)).ToList();
+        if (!optimizeUsbImod)
         {
-            WriteLog("AUTO.IMOD: no checkboxes selected -> skipping");
+            WriteLog("AUTO.IMOD: skipped by user choice");
+        }
+        else if (imodTargets.Count == 0)
+        {
+            WriteLog("AUTO.IMOD: no eligible XHCI controllers -> skipping");
         }
         else
         {
-            string imodDefault = FormatImodValue(ImodDefaultInterval);
-            string imodDisabled = FormatImodValue(0);
-            foreach (DeviceBlock block in usbBlocks.Where(b => IsUsbImodTarget(b.Device)))
+            foreach (DeviceBlock block in imodTargets)
             {
-                if (!block.ImodAutoCheck.Checked)
-                {
-                    WriteLog($"AUTO.IMOD.SKIP: {block.Device.InstanceId} checkbox=off");
-                    continue;
-                }
-
                 string roles = block.Device.UsbRoles ?? string.Empty;
                 bool hasKeyboard = Regex.IsMatch(roles, "(?i)\\bKeyboard\\b");
                 bool hasMouse = Regex.IsMatch(roles, "(?i)\\bMouse\\b");
 
                 string before = block.ImodBox.Text?.Trim() ?? string.Empty;
-                if (hasKeyboard && hasMouse)
-                {
-                    block.ImodBox.Text = imodDisabled;
-                    WriteLog($"AUTO.IMOD: {block.Device.InstanceId} -> {imodDisabled} (roles=\"{roles}\", prev={before})");
-                }
-                else
-                {
-                    block.ImodBox.Text = imodDefault;
-                    WriteLog($"AUTO.IMOD: {block.Device.InstanceId} -> {imodDefault} (roles=\"{roles}\", prev={before})");
-                }
+                string roleProfile = BuildAutoUsbImodRoleProfile(roles);
+                block.ImodBox.Text = roleProfile;
+                block.ImodAutoCheck.Checked = true;
+                UpdateImodSelectorsFromText(block);
+                WriteLog(
+                    $"AUTO.IMOD: {block.Device.InstanceId} -> role-profile {roleProfile} (roles=\"{roles}\", hasMouse={hasMouse}, hasKeyboard={hasKeyboard}, prev={before})");
             }
         }
 
-        List<DeviceBlock> orderedBlocks = _blocks
+        List<AutoAffinityPlanSlot> planSlots = _blocks
             .Where(b => b.Kind != DeviceKind.STOR)
             .Where(b => !wifiIds.Contains(b.Device.InstanceId))
             .Where(b => !skipAutoIds.Contains(b.Device.InstanceId))
             .Where(b => !msiOnlyGpuIds.Contains(b.Device.InstanceId))
             .Select((block, index) => new { block, index })
-            .OrderBy(x => GetAutoAssignmentPriority(x.block.Kind))
-            .ThenBy(x => x.index)
-            .Select(x => x.block)
+            .Select(x => new AutoAffinityPlanSlot
+            {
+                Block = x.block,
+                Role = GetAutoAffinityRole(x.block),
+                Need = x.block.Kind == DeviceKind.GPU ? 2 : 1,
+                OriginalIndex = x.index,
+            })
+            .OrderBy(x => GetAutoAffinityRolePriority(x.Role))
+            .ThenBy(x => x.OriginalIndex)
             .ToList();
 
-        WriteLog($"AUTO.ORDER: [{string.Join(" | ", orderedBlocks.Select(b => $"{b.Kind}:{b.Device.InstanceId}"))}]");
+        WriteLog($"AUTO.PLAN.CPU: using={(usingP ? "P" : "E")} preferredUnits=[{FormatAutoCpuUnits(preferredUnits)}] audioE=[{FormatAutoCpuUnits(audioEUnits)}]");
+        WriteLog($"AUTO.PLAN.SLOTS: [{string.Join(" | ", planSlots.Select(s => $"{s.Role}:{s.Block.Kind}:{s.Block.Device.InstanceId}"))}]");
 
-        int audioCount = orderedBlocks.Count(b => b.Kind == DeviceKind.AUDIO);
-        if (useAudioE && audioCount > 0)
-        {
-            audioECount = Math.Min(audioCount, audioQueue.Count);
-        }
+        int inputPreferredNeed = planSlots.Count(s => s.Role is AutoAffinityRole.InputMouse or AutoAffinityRole.InputController);
+        int gpuPreferredNeed = planSlots.Where(s => s.Role == AutoAffinityRole.Gpu).Sum(s => s.Need);
+        int nicPreferredNeed = planSlots.Count(s => s.Role == AutoAffinityRole.Nic);
+        int keyboardPreferredNeed = planSlots.Count(s => s.Role == AutoAffinityRole.Keyboard);
+        int audioSlots = planSlots.Count(s => s.Role == AutoAffinityRole.Audio);
+        int audioPreferredNeed = Math.Max(0, audioSlots - audioEUnits.Count);
+        int requiredPreferredUnitCount = inputPreferredNeed + gpuPreferredNeed + nicPreferredNeed + keyboardPreferredNeed + audioPreferredNeed;
+        int nonCore0PreferredUnits = preferredUnits.Count(unit => !unit.HasCore0);
+        bool avoidCore0WhenPossible = nonCore0PreferredUnits >= Math.Min(requiredPreferredUnitCount, preferredUnits.Count);
+        int spacingEligibleUnits = avoidCore0WhenPossible ? nonCore0PreferredUnits : preferredUnits.Count;
+        int spacingSkips = Math.Max(0, spacingEligibleUnits - Math.Min(spacingEligibleUnits, requiredPreferredUnitCount));
+        WriteLog($"AUTO.PLAN.UNITS: required={requiredPreferredUnitCount} available={preferredUnits.Count} nonCore0={nonCore0PreferredUnits} avoidCore0={avoidCore0WhenPossible} spacingEligible={spacingEligibleUnits} spacing={spacingSkips}");
 
-        int totalNeeded = orderedBlocks.Sum(b => b.Kind == DeviceKind.GPU ? 2 : 1) - audioECount;
-        if (totalNeeded < 0)
+        List<AutoCpuUnit> GetCandidateUnits(IEnumerable<AutoCpuUnit> units, bool allowCore0, bool preferWeak = false)
         {
-            totalNeeded = 0;
-        }
-        available = coreOrder.Where(lp => lp != 0).ToList();
-        if (available.Count < totalNeeded && zeroAvailable)
-        {
-            available.Add(0);
-        }
-
-        extras = Math.Max(0, available.Count - totalNeeded);
-        coreIndex = 0;
-
-        foreach (DeviceBlock block in orderedBlocks)
-        {
-            int need = block.Kind == DeviceKind.GPU ? 2 : 1;
-            List<int> lps;
-            if (useAudioE && block.Kind == DeviceKind.AUDIO && audioEAssigned < audioECount)
+            List<AutoCpuUnit> ordered = units
+                .Where(unit => !reservedUnitIds.Contains(unit.Id))
+                .ToList();
+            if (preferWeak)
             {
-                lps = audioQueue.Count > 0 ? [audioQueue.Dequeue()] : [];
-                if (lps.Count > 0)
+                ordered.Reverse();
+            }
+
+            if (!allowCore0)
+            {
+                return ordered.Where(unit => !unit.HasCore0).ToList();
+            }
+
+            if (!avoidCore0WhenPossible)
+            {
+                return ordered;
+            }
+
+            return ordered
+                .Where(unit => !unit.HasCore0)
+                .Concat(ordered.Where(unit => unit.HasCore0))
+                .ToList();
+        }
+
+        void ReserveUnit(AutoCpuUnit unit, string reason)
+        {
+            reservedUnitIds.Add(unit.Id);
+            consumedCores.Add(unit.PrimaryLp);
+            WriteLog($"AUTO.PLAN.UNIT.RESERVE: LP={unit.PrimaryLp} unit={unit.Id} ccd={unit.Ccd} type={(unit.IsECore ? "E" : "P")} reason={reason}");
+        }
+
+        AutoCpuUnit? TakeDedicatedUnit(bool allowCore0, bool preferWeak = false, bool useAudioE = false)
+        {
+            List<AutoCpuUnit> source = useAudioE ? audioEUnits : preferredUnits;
+            AutoCpuUnit? unit = GetCandidateUnits(source, allowCore0, preferWeak).FirstOrDefault();
+            if (unit is not null)
+            {
+                ReserveUnit(unit, preferWeak ? "dedicated-weak" : "dedicated");
+            }
+
+            return unit;
+        }
+
+        List<AutoCpuUnit> TakeDedicatedUnits(int count, bool allowCore0, bool preferWeak = false)
+        {
+            List<AutoCpuUnit> selected = GetCandidateUnits(preferredUnits, allowCore0, preferWeak)
+                .Take(count)
+                .ToList();
+
+            if (selected.Count < count)
+            {
+                return [];
+            }
+
+            foreach (AutoCpuUnit unit in selected)
+            {
+                ReserveUnit(unit, "dedicated-group");
+            }
+
+            return selected;
+        }
+
+        AutoCpuUnit? FindInputShareUnit()
+        {
+            foreach (int unitId in inputShareUnitIds)
+            {
+                if (unitById.TryGetValue(unitId, out AutoCpuUnit? unit))
                 {
-                    audioEAssigned++;
+                    return unit;
+                }
+            }
+
+            return null;
+        }
+
+        static int SelectUnitLp(AutoCpuUnit unit, bool preferSibling)
+        {
+            if (preferSibling && unit.Lps.Count > 1)
+            {
+                int sibling = unit.Lps.FirstOrDefault(lp => lp != unit.PrimaryLp);
+                if (sibling >= 0)
+                {
+                    return sibling;
+                }
+            }
+
+            return unit.PrimaryLp;
+        }
+
+        void AssignSlot(AutoAffinityPlanSlot slot, IEnumerable<AutoCpuUnit> units, string reason, bool preferSiblingForShared = false)
+        {
+            slot.Lps.Clear();
+            List<AutoCpuUnit> selectedUnits = units
+                .Where(unit => unit.PrimaryLp >= 0 && unit.PrimaryLp < _maxLogical)
+                .DistinctBy(unit => unit.Id)
+                .ToList();
+
+            slot.Lps.AddRange(selectedUnits
+                .Select(unit => SelectUnitLp(unit, preferSiblingForShared))
+                .Where(lp => lp >= 0 && lp < _maxLogical)
+                .Distinct());
+            slot.Reason = reason;
+
+            foreach (AutoCpuUnit unit in selectedUnits)
+            {
+                if (!assignedSlotsByUnit.TryGetValue(unit.Id, out List<AutoAffinityPlanSlot>? slots))
+                {
+                    slots = [];
+                    assignedSlotsByUnit[unit.Id] = slots;
+                }
+
+                if (!slots.Contains(slot))
+                {
+                    slots.Add(slot);
+                }
+            }
+
+            if (slot.Lps.Count > 0 && IsInputAffinityRole(slot.Role))
+            {
+                foreach (int lp in slot.Lps)
+                {
+                    if (!inputShareCores.Contains(lp))
+                    {
+                        inputShareCores.Add(lp);
+                    }
+                }
+
+                foreach (AutoCpuUnit unit in selectedUnits)
+                {
+                    if (!inputShareUnitIds.Contains(unit.Id))
+                    {
+                        inputShareUnitIds.Add(unit.Id);
+                    }
+                }
+            }
+
+            foreach (int lp in slot.Lps)
+            {
+                consumedCores.Add(lp);
+            }
+        }
+
+        void SkipSpacingUnitIfAvailable(string afterReason)
+        {
+            if (spacingSkips <= 0)
+            {
+                return;
+            }
+
+            AutoCpuUnit? unit = GetCandidateUnits(preferredUnits, allowCore0: false).FirstOrDefault();
+            if (unit is null)
+            {
+                return;
+            }
+
+            ReserveUnit(unit, $"spacing-after-{afterReason}");
+            spacingSkips--;
+            WriteLog($"AUTO.PLAN.SPACING: after={afterReason} reservedUnit={unit.Id} LP={unit.PrimaryLp} remaining={spacingSkips}");
+        }
+
+        foreach (AutoAffinityPlanSlot slot in planSlots.Where(s => s.Role is AutoAffinityRole.InputMouse or AutoAffinityRole.InputController))
+        {
+            AutoCpuUnit? unit = TakeDedicatedUnit(allowCore0: true);
+            if (unit is null)
+            {
+                WriteLog($"AUTO.PLAN.SKIP: role={slot.Role} {slot.Block.Kind} {slot.Block.Device.InstanceId} reason=no-input-unit");
+                continue;
+            }
+
+            AssignSlot(slot, [unit], "input-dedicated-unit");
+            if (slot.Lps.Count > 0)
+            {
+                SkipSpacingUnitIfAvailable("input");
+            }
+        }
+
+        foreach (AutoAffinityPlanSlot slot in planSlots.Where(s => s.Role == AutoAffinityRole.Gpu))
+        {
+            List<AutoCpuUnit> units = TakeDedicatedUnits(slot.Need, allowCore0: true);
+            if (units.Count < slot.Need)
+            {
+                WriteLog($"AUTO.PLAN.SKIP: role={slot.Role} {slot.Block.Kind} {slot.Block.Device.InstanceId} reason=no-gpu-physical-pair");
+                continue;
+            }
+
+            AssignSlot(slot, units, "gpu-dedicated-physical-pair");
+            if (slot.Lps.Count > 0)
+            {
+                SkipSpacingUnitIfAvailable("gpu");
+            }
+        }
+
+        foreach (AutoAffinityPlanSlot slot in planSlots.Where(s => s.Role == AutoAffinityRole.Nic))
+        {
+            AutoCpuUnit? unit = TakeDedicatedUnit(allowCore0: true);
+            if (unit is null)
+            {
+                WriteLog($"AUTO.PLAN.SKIP: role={slot.Role} NET {slot.Block.Device.InstanceId} reason=no-safe-nic-unit");
+                continue;
+            }
+
+            AssignSlot(slot, [unit], "nic-dedicated-unit");
+            if (slot.Lps.Count > 0)
+            {
+                SkipSpacingUnitIfAvailable("nic");
+            }
+        }
+
+        foreach (AutoAffinityPlanSlot slot in planSlots.Where(s => s.Role == AutoAffinityRole.Keyboard))
+        {
+            AutoCpuUnit? unit = TakeDedicatedUnit(allowCore0: true);
+            if (unit is not null)
+            {
+                AssignSlot(slot, [unit], "keyboard-dedicated-unit");
+                if (slot.Lps.Count > 0)
+                {
+                    SkipSpacingUnitIfAvailable("keyboard");
                 }
             }
             else
             {
-                lps = TakeNext(need);
+                AutoCpuUnit? shareUnit = FindInputShareUnit();
+                if (shareUnit is not null)
+                {
+                    AssignSlot(slot, [shareUnit], "keyboard-shared-with-input-unit", preferSiblingForShared: true);
+                }
+                else
+                {
+                    WriteLog($"AUTO.PLAN.SKIP: role={slot.Role} USB {slot.Block.Device.InstanceId} reason=no-keyboard-unit");
+                }
+            }
+        }
+
+        foreach (AutoAffinityPlanSlot slot in planSlots.Where(s => s.Role == AutoAffinityRole.Audio))
+        {
+            AutoCpuUnit? eUnit = TakeDedicatedUnit(allowCore0: false, useAudioE: true);
+            if (eUnit is not null)
+            {
+                AssignSlot(slot, [eUnit], "audio-e-unit");
+                continue;
             }
 
+            AutoCpuUnit? weakUnit = TakeDedicatedUnit(allowCore0: true, preferWeak: true);
+            if (weakUnit is not null)
+            {
+                AssignSlot(slot, [weakUnit], "audio-dedicated-weak-unit");
+            }
+            else
+            {
+                WriteLog($"AUTO.PLAN.SKIP: role={slot.Role} AUDIO {slot.Block.Device.InstanceId} reason=no-audio-unit");
+            }
+        }
+
+        foreach (AutoAffinityPlanSlot slot in planSlots.Where(s => s.Role is AutoAffinityRole.OtherUsb or AutoAffinityRole.Other))
+        {
+            AutoCpuUnit? unit = TakeDedicatedUnit(allowCore0: false, preferWeak: true);
+            if (unit is not null)
+            {
+                AssignSlot(slot, [unit], "other-dedicated-if-free-unit");
+            }
+            else
+            {
+                WriteLog($"AUTO.PLAN.SKIP: role={slot.Role} {slot.Block.Kind} {slot.Block.Device.InstanceId} reason=no-other-unit");
+            }
+        }
+
+        void BlockSlot(AutoAffinityPlanSlot slot, string reason)
+        {
+            if (slot.Lps.Count == 0)
+            {
+                return;
+            }
+
+            WriteLog($"AUTO.VALIDATION.BLOCK: role={slot.Role} {slot.Block.Kind} {slot.Block.Device.InstanceId} lps=[{string.Join(',', slot.Lps)}] reason={reason}");
+            slot.Lps.Clear();
+            slot.Reason = $"validation-blocked: {reason}";
+        }
+
+        foreach (AutoAffinityPlanSlot slot in planSlots.Where(s => s.Lps.Count > 0))
+        {
+            if (slot.Lps.Any(lp => lp < 0 || lp >= _maxLogical || !unitByLp.ContainsKey(lp)))
+            {
+                BlockSlot(slot, "invalid logical processor");
+                continue;
+            }
+
+            if (slot.Role == AutoAffinityRole.Gpu)
+            {
+                List<AutoCpuUnit> gpuUnits = slot.Lps
+                    .Select(lp => unitByLp[lp])
+                    .DistinctBy(unit => unit.Id)
+                    .ToList();
+                if (slot.Lps.Count < slot.Need || gpuUnits.Count < slot.Need)
+                {
+                    BlockSlot(slot, "GPU requires two different physical P-core units");
+                    continue;
+                }
+
+                if (gpuUnits.Any(unit => unit.IsECore))
+                {
+                    BlockSlot(slot, "GPU assigned to E-core unit");
+                }
+            }
+        }
+
+        foreach (KeyValuePair<int, List<AutoAffinityPlanSlot>> pair in assignedSlotsByUnit)
+        {
+            List<AutoAffinityPlanSlot> activeSlots = pair.Value.Where(slot => slot.Lps.Count > 0).ToList();
+            if (activeSlots.Count <= 1)
+            {
+                continue;
+            }
+
+            bool hasGpu = activeSlots.Any(slot => slot.Role == AutoAffinityRole.Gpu);
+            bool hasInput = activeSlots.Any(slot => slot.Role is AutoAffinityRole.InputMouse or AutoAffinityRole.InputController);
+            bool hasNicOrAudio = activeSlots.Any(slot => slot.Role is AutoAffinityRole.Nic or AutoAffinityRole.Audio);
+
+            if (hasGpu)
+            {
+                foreach (AutoAffinityPlanSlot slot in activeSlots.Where(slot => slot.Role != AutoAffinityRole.Gpu))
+                {
+                    BlockSlot(slot, "sharing with GPU unit is not allowed");
+                }
+            }
+
+            if (hasInput && hasNicOrAudio)
+            {
+                foreach (AutoAffinityPlanSlot slot in activeSlots.Where(slot => slot.Role is AutoAffinityRole.Nic or AutoAffinityRole.Audio))
+                {
+                    BlockSlot(slot, "NIC/audio sharing with input unit is not allowed");
+                }
+            }
+        }
+
+        WriteLog($"AUTO.VALIDATION: assigned={planSlots.Count(slot => slot.Lps.Count > 0)} blocked={planSlots.Count(slot => slot.Reason.StartsWith("validation-blocked", StringComparison.OrdinalIgnoreCase))}");
+
+        foreach (AutoAffinityPlanSlot slot in planSlots)
+        {
+            DeviceBlock block = slot.Block;
+            List<int> lps = slot.Lps;
             if (lps.Count == 0)
             {
                 string label = block.Kind == DeviceKind.NET_NDIS || block.Kind == DeviceKind.NET_CX ? "NET" : block.Kind.ToString();
-                WriteLog($"AUTO: {label} {block.Device.InstanceId} -> no available LP ({(usingP ? "P" : "E")}-core list exhausted)");
+                WriteLog($"AUTO.PLAN.SKIP: role={slot.Role} {label} {block.Device.InstanceId} reason=no-safe-core");
                 continue;
             }
 
@@ -414,8 +1180,9 @@ public sealed partial class MainForm
             int? ndisAutoQueues = null;
             if (block.Kind == DeviceKind.NET_NDIS)
             {
-                // AUTO keeps NDIS on a single logical processor to avoid implicit SMT spread via RSS queues.
                 block.RssBaseCore = lps[0];
+                NdisRssRuntimeState runtime = GetNdisRssRuntimeState(block.Device.InstanceId);
+                block.NdisRssRuntime = runtime;
                 if (block.RssQueueBox is not null)
                 {
                     block.SuppressCpuEvents++;
@@ -430,6 +1197,10 @@ public sealed partial class MainForm
 
                     ndisAutoQueues = (int)block.RssQueueBox.Value;
                 }
+
+                NdisAffinityMode smartMode = ChooseSmartNdisAffinityMode(block, ndisAutoQueues ?? 1, out string ndisReason);
+                SetNdisModeCombo(block, smartMode);
+                WriteLog($"AUTO.NDIS.MODE: {block.Device.InstanceId} mode={FormatNdisAffinityMode(smartMode)} reason=\"{ndisReason}\" {FormatNdisRssRuntimeState(runtime)}");
             }
 
             if (block.Kind != DeviceKind.NET_NDIS && block.PolicyCombo.Enabled)
@@ -446,14 +1217,33 @@ public sealed partial class MainForm
             };
             if (block.Kind == DeviceKind.NET_NDIS)
             {
-                WriteLog($"AUTO: {labelText} {block.Device.InstanceId} -> LPs=[{string.Join(',', lps)}] policy={block.PolicyCombo.SelectedItem} queues={(ndisAutoQueues ?? 1)}");
+                WriteLog($"AUTO.PLAN.ASSIGN: role={slot.Role} {labelText} {block.Device.InstanceId} -> LPs=[{string.Join(',', lps)}] policy={block.PolicyCombo.SelectedItem} queues={(ndisAutoQueues ?? 1)} reason={slot.Reason}");
             }
             else
             {
-                WriteLog($"AUTO: {labelText} {block.Device.InstanceId} -> LPs=[{string.Join(',', lps)}] policy={block.PolicyCombo.SelectedItem}");
+                WriteLog($"AUTO.PLAN.ASSIGN: role={slot.Role} {labelText} {block.Device.InstanceId} -> LPs=[{string.Join(',', lps)}] policy={block.PolicyCombo.SelectedItem} reason={slot.Reason}");
             }
         }
 
+        WriteLog($"AUTO.PLAN.FINAL: consumed=[{string.Join(',', consumedCores.OrderBy(x => x))}] inputShare=[{string.Join(',', inputShareCores.Distinct().OrderBy(x => x))}] assigned={planSlots.Count(s => s.Lps.Count > 0)} skipped={planSlots.Count(s => s.Lps.Count == 0)}");
+        WriteAutoOptimizationResultSummary(
+            optimizeUsbImod,
+            usingP,
+            primaryP,
+            primaryE,
+            targetCcdLps,
+            usbBlocks,
+            gpuBlocks,
+            integratedGpuBlocks,
+            netCount,
+            audioBlocks,
+            storCount,
+            wifiIds,
+            msiOnlyGpuIds,
+            skipReasons,
+            planSlots,
+            consumedCores,
+            inputShareCores);
         WriteLog("AUTO: Invoke-AutoOptimization done");
     }
 
@@ -479,14 +1269,14 @@ public sealed partial class MainForm
         }
 
         ResetReservedCpuSets();
-        ResetImodIntervalsToDefault();
+        ResetImodIntervalsToDefault("reset-all");
 
         LogGuiSnapshot("reset-all");
         ShowThemedInfo(
             "All Device Tweaker changes have been cleared.\nPlease reboot your PC to fully revert device behavior.");
     }
 
-    private void ResetImodIntervalsToDefault()
+    private void ResetImodIntervalsToDefault(string reason = "reset-imod")
     {
         string defaultText = FormatImodValue(ImodDefaultInterval);
         bool hasUsb = false;
@@ -513,5 +1303,9 @@ public sealed partial class MainForm
         }
 
         RemoveImodPersistenceFiles();
+        if (hasUsb)
+        {
+            RefreshImodCurrentValues(reason: reason);
+        }
     }
 }

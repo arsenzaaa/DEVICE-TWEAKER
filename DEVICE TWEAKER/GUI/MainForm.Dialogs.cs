@@ -80,7 +80,7 @@ public sealed partial class MainForm
         ShowThemedInfo(message, "DEVICE TWEAKER");
     }
 
-    private bool ShowThemedConfirm(string message, string title)
+    private bool ShowThemedConfirm(string message, string title, string yesText = "YES", string noText = "NO")
     {
         using Form dialog = new();
         dialog.Text = title;
@@ -135,7 +135,7 @@ public sealed partial class MainForm
 
         Button yesButton = new()
         {
-            Text = "YES",
+            Text = yesText,
             DialogResult = DialogResult.Yes,
             Size = new Size(buttonWidth, buttonHeight),
             Location = new Point(rowLeft, buttonsTop),
@@ -150,7 +150,7 @@ public sealed partial class MainForm
 
         Button noButton = new()
         {
-            Text = "NO",
+            Text = noText,
             DialogResult = DialogResult.No,
             Size = new Size(buttonWidth, buttonHeight),
             Location = new Point(rowLeft + buttonWidth + buttonGap, buttonsTop),
@@ -177,6 +177,119 @@ public sealed partial class MainForm
     private bool ShowThemedConfirm(string message)
     {
         return ShowThemedConfirm(message, "DEVICE TWEAKER");
+    }
+
+    private RestoreChoice ShowRestoreChoiceDialog(string? latestBackupPath)
+    {
+        using Form dialog = new();
+        dialog.Text = "RESTORE";
+        dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
+        dialog.StartPosition = FormStartPosition.CenterParent;
+        dialog.MaximizeBox = false;
+        dialog.MinimizeBox = false;
+        dialog.ShowInTaskbar = false;
+        dialog.AutoScaleMode = AutoScaleMode.None;
+        dialog.BackColor = _bgForm;
+        dialog.ForeColor = _fgMain;
+        dialog.Font = _dialogFont;
+        dialog.Icon = Icon;
+
+        bool hasBackup = !string.IsNullOrWhiteSpace(latestBackupPath);
+        string backupLine = hasBackup
+            ? $"Latest backup:\n{latestBackupPath}"
+            : "Latest backup:\nnot found";
+        string message = "Choose restore mode.\n\n"
+            + "RESET TO DEFAULT clears DEVICE TWEAKER changes and ignores backup files.\n"
+            + "RESTORE BACKUP restores the latest saved snapshot; it may already contain applied tweaks.\n\n"
+            + backupLine;
+        string normalized = NormalizeDialogMessage(message);
+
+        int padding = UiScale(20);
+        int maxTextWidth = UiScale(620);
+        int minWidth = UiScale(620);
+        int buttonWidth = UiScale(160);
+        int buttonHeight = UiScale(32);
+        int buttonGap = UiScale(14);
+
+        Label messageLabel = new()
+        {
+            AutoSize = true,
+            MaximumSize = new Size(maxTextWidth, 0),
+            Text = normalized,
+            ForeColor = _fgMain,
+            BackColor = _bgForm,
+            UseMnemonic = false,
+            TextAlign = ContentAlignment.MiddleCenter,
+            Font = _dialogFont,
+            UseCompatibleTextRendering = true,
+        };
+
+        Size textSize = messageLabel.GetPreferredSize(new Size(maxTextWidth, 0));
+        int buttonRowWidth = (buttonWidth * 3) + (buttonGap * 2);
+        int clientWidth = Math.Max(minWidth, Math.Max(textSize.Width + (padding * 2), buttonRowWidth + (padding * 2)));
+        int labelWidth = clientWidth - (padding * 2);
+        messageLabel.MaximumSize = new Size(labelWidth, 0);
+        textSize = messageLabel.GetPreferredSize(new Size(labelWidth, 0));
+        int clientHeight = padding + textSize.Height + buttonGap + buttonHeight + padding;
+        dialog.ClientSize = new Size(clientWidth, clientHeight);
+
+        messageLabel.AutoSize = false;
+        messageLabel.Size = new Size(labelWidth, textSize.Height);
+        messageLabel.Location = new Point(padding, padding);
+
+        RestoreChoice choice = RestoreChoice.Cancel;
+        int buttonsTop = padding + textSize.Height + buttonGap;
+        int rowLeft = (clientWidth - buttonRowWidth) / 2;
+
+        Button MakeButton(string text, RestoreChoice value, int left, bool enabled = true)
+        {
+            Button button = new()
+            {
+                Text = text,
+                Size = new Size(buttonWidth, buttonHeight),
+                Location = new Point(left, buttonsTop),
+                FlatStyle = FlatStyle.Flat,
+                Font = _buttonFont,
+                UseVisualStyleBackColor = false,
+                Cursor = enabled ? Cursors.Hand : Cursors.Default,
+                Enabled = enabled,
+            };
+
+            SetTopButtonBaseStyle(button);
+            if (!enabled)
+            {
+                button.ForeColor = Color.FromArgb(120, 120, 125);
+                button.FlatAppearance.BorderColor = Color.FromArgb(80, 80, 86);
+            }
+            else
+            {
+                button.MouseEnter += (_, _) => SetTopButtonHoverStyle(button);
+                button.MouseLeave += (_, _) => SetTopButtonBaseStyle(button);
+                button.Click += (_, _) =>
+                {
+                    choice = value;
+                    dialog.DialogResult = DialogResult.OK;
+                    dialog.Close();
+                };
+            }
+
+            return button;
+        }
+
+        Button resetButton = MakeButton("RESET DEFAULT", RestoreChoice.ResetDefault, rowLeft);
+        Button backupButton = MakeButton("RESTORE BACKUP", RestoreChoice.RestoreBackup, rowLeft + buttonWidth + buttonGap, hasBackup);
+        Button cancelButton = MakeButton("CANCEL", RestoreChoice.Cancel, rowLeft + ((buttonWidth + buttonGap) * 2));
+
+        dialog.Controls.Add(messageLabel);
+        dialog.Controls.Add(resetButton);
+        dialog.Controls.Add(backupButton);
+        dialog.Controls.Add(cancelButton);
+
+        dialog.AcceptButton = resetButton;
+        dialog.CancelButton = cancelButton;
+        dialog.Shown += (_, _) => ApplyTitleBarTheme(dialog);
+
+        return dialog.ShowDialog(this) == DialogResult.OK ? choice : RestoreChoice.Cancel;
     }
 
     private static string NormalizeDialogMessage(string message)

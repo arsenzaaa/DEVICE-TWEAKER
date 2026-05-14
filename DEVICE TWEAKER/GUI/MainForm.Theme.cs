@@ -10,6 +10,10 @@ public sealed partial class MainForm
     private readonly Color _accentDark = Color.FromArgb(190, 190, 190);
     private readonly Color _border = Color.FromArgb(150, 150, 150);
     private readonly Color _statusDanger = Color.FromArgb(255, 80, 60);
+    private readonly Color _statusActive = Color.FromArgb(208, 230, 250);
+    private readonly Color _statusInactive = Color.FromArgb(145, 145, 152);
+    private readonly Color _statusPrefix = Color.FromArgb(172, 180, 190);
+    private readonly Color _statusSeparator = Color.FromArgb(70, 70, 78);
     private readonly Color _mutedText = Color.FromArgb(200, 200, 200);
     private readonly Color _mutedWarn = Color.FromArgb(255, 80, 60);
 
@@ -43,6 +47,7 @@ public sealed partial class MainForm
     {
         if (disposing)
         {
+            DisposeRawPolling();
             _copyToolTip?.Dispose();
             _appIcon?.Dispose();
             _baseFont.Dispose();

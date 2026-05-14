@@ -1,15 +1,17 @@
-﻿using System.Management;
+using System.Management;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32;
 using System.Diagnostics;
+using System.Globalization;
 
 namespace DeviceTweakerCS;
 
 public sealed partial class MainForm : Form
 {
     private readonly List<DeviceBlock> _blocks = [];
+    private readonly Dictionary<string, NdisRssRuntimeState> _ndisRssRuntimeCache = new(StringComparer.OrdinalIgnoreCase);
 
     private Panel _devicesHost = null!;
     private Panel _devicesPanel = null!;
@@ -28,24 +30,26 @@ public sealed partial class MainForm : Form
     private Label? _cpuHeaderLabel;
     private Label? _htPrefixLabel;
     private Label? _htStatusLabel;
+    private Label? _hybridCpuPrefixLabel;
+    private Label? _hybridCpuStatusLabel;
+    private Label? _cppcPrefixLabel;
+    private Label? _cppcStatusLabel;
+    private Label? _dualCcdPrefixLabel;
+    private Label? _dualCcdStatusLabel;
+    private FlowLayoutPanel? _cpuFlagsPanel;
 
     private bool _detailedLogEnabled;
     private string? _detailedLogPath;
     private bool _syncingScroll;
     private bool? _lastGpuDriverDetected;
     private bool _pendingGpuDriverWarning;
+    private string? _imodKernelCiBlockStatus;
+    private string? _imodKernelCiBlockDetail;
+    private DateTime _imodKernelCiBlockStatusUtc;
+    private int _imodReadbackGeneration;
 
-    public MainForm() : this(false)
+    public MainForm()
     {
-    }
-
-    private MainForm(bool headless)
-    {
-        if (headless)
-        {
-            return;
-        }
-
         UpdateUiScale();
         AutoScaleMode = AutoScaleMode.None;
 
@@ -53,13 +57,14 @@ public sealed partial class MainForm : Form
         InitializeCpu();
         InitializeGui();
         ApplyAppIcon();
-        RefreshBlocks();
     }
 
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
         ApplyTitleBarTheme();
+        InitializeRawPolling();
+        BeginInvoke(new Action(() => RefreshBlocks()));
         if (_pendingGpuDriverWarning)
         {
             _pendingGpuDriverWarning = false;
@@ -290,7 +295,13 @@ public sealed partial class MainForm : Form
                 int ccdId = _cpuInfo.CcdMap.TryGetValue(e.LP, out int cid) ? cid : 0;
                 string localText = e.LocalIndex >= 0 ? $" Local={e.LocalIndex}" : string.Empty;
                 string idText = e.CpuSetId >= 0 ? $" Id={e.CpuSetId}" : string.Empty;
-                WriteLog($"CPU.ENTRY: G{e.Group} L{e.LP}{localText}{idText} Core={e.Core} CCD={ccdId} SMT={isSecondaryThread} EffClass={e.EffClass}");
+                string typeText = IsEfficiencyCore(e) ? "E" : isSecondaryThread ? "P/HT" : "P";
+                string cppcText = _cppcRanks.TryGetValue(e.LP, out int rank)
+                    ? _cppcRatings.TryGetValue(e.LP, out int rating)
+                        ? $" CPPC=R{rating}/#{rank} Preferred={(rank == 1 ? 1 : 0)}"
+                        : $" CPPC=#{rank} Preferred={(rank == 1 ? 1 : 0)}"
+                    : " CPPC=unavailable Preferred=0";
+                WriteLog($"CPU.ENTRY: G{e.Group} L{e.LP}{localText}{idText} Core={e.Core} Type={typeText} CCD={ccdId} SMT={isSecondaryThread} EffClass={e.EffClass}{cppcText}");
             }
 
             Dictionary<int, List<int>> ccdGroups = new();
@@ -322,10 +333,11 @@ public sealed partial class MainForm : Form
                 string name = !string.IsNullOrWhiteSpace(b.Device.Name) ? b.Device.Name : b.Device.InstanceId;
                 string cls = b.Device.Class ?? string.Empty;
                 string usb = b.Device.UsbRoles ?? string.Empty;
+                string usbPolling = b.Device.UsbPollingRates ?? string.Empty;
                 string audio = b.Device.AudioEndpoints ?? string.Empty;
 
                 WriteLog(
-                    $"BOOT.DEV: {b.Device.InstanceId} Kind={b.Kind} Class={cls} Name=\"{name}\" MSI={msi} Prio={prio} Policy={policy} Mask=0x{b.AffinityMask:X} UsbRoles=\"{usb}\" Audio=\"{audio}\"");
+                    $"BOOT.DEV: {b.Device.InstanceId} Kind={b.Kind} Class={cls} Name=\"{name}\" MSI={msi} Prio={prio} Policy={policy} Mask=0x{b.AffinityMask:X} UsbRoles=\"{usb}\" UsbPolling=\"{usbPolling}\" Audio=\"{audio}\"");
             }
         }
     }
@@ -442,13 +454,15 @@ public sealed partial class MainForm : Form
         return mask;
     }
 
-    private static int MapPrioText(string? text)
+    private static int? MapPrioText(string? text)
     {
         return text switch
         {
             "Low" => 1,
+            "Normal" => 2,
             "High" => 3,
-            _ => 2,
+            "Undefined" => null,
+            _ => null,
         };
     }
 
@@ -924,10 +938,12 @@ public sealed partial class MainForm : Form
         string cpuHeader = _cpuHeaderLabel?.Text ?? _cpuHeaderText;
         string htPrefix = _htPrefixLabel?.Text ?? string.Empty;
         string htStatus = _htStatusLabel?.Text ?? string.Empty;
-        bool htVisible = _htStatusLabel?.Visible ?? false;
+        string hybridCpuStatus = _hybridCpuStatusLabel?.Text ?? string.Empty;
+        string cppcStatus = _cppcStatusLabel?.Text ?? string.Empty;
+        string dualCcdStatus = _dualCcdStatusLabel?.Text ?? string.Empty;
 
         WriteLog(
-            $"GUI.HEADER: cpuHeader=\"{FlattenLogText(cpuHeader)}\" htPrefix=\"{FlattenLogText(htPrefix)}\" htStatus=\"{FlattenLogText(htStatus)}\" htVisible={htVisible} smtText=\"{FlattenLogText(_smtText)}\"");
+            $"GUI.HEADER: cpuHeader=\"{FlattenLogText(cpuHeader)}\" smt=\"{FlattenLogText(htPrefix)} {FlattenLogText(htStatus)}\" hybridCpu=\"{FlattenLogText(hybridCpuStatus)}\" cppc=\"{FlattenLogText(cppcStatus)}\" dualCcd=\"{FlattenLogText(dualCcdStatus)}\" smtText=\"{FlattenLogText(_smtText)}\"");
         WriteLog(
             $"GUI.STATE: blocks={_blocks.Count} maxLogical={_maxLogical} groupCount={_cpuGroupCount} testCpu={_testCpuActive} testDevicesEnabled={_testDevicesEnabled} testDevicesOnly={_testDevicesOnly} autoDryRun={_testAutoDryRun}");
 
@@ -937,7 +953,7 @@ public sealed partial class MainForm : Form
             string title = BuildDeviceBlockTitle(b.Device);
             string logTitle = b.Kind == DeviceKind.STOR ? $"{title} {StorageAffinityNoteText}" : title;
             WriteLog(
-                $"GUI.BLOCK: idx={i} title=\"{FlattenLogText(logTitle)}\" kind={b.Kind} id={b.Device.InstanceId} name=\"{FlattenLogText(b.Device.Name)}\" class=\"{FlattenLogText(b.Device.Class)}\" test={b.Device.IsTestDevice} wifi={b.Device.Wifi} roles=\"{FlattenLogText(b.Device.UsbRoles)}\" audio=\"{FlattenLogText(b.Device.AudioEndpoints)}\" storage=\"{FlattenLogText(b.Device.StorageTag)}\"");
+                $"GUI.BLOCK: idx={i} title=\"{FlattenLogText(logTitle)}\" kind={b.Kind} id={b.Device.InstanceId} name=\"{FlattenLogText(b.Device.Name)}\" class=\"{FlattenLogText(b.Device.Class)}\" test={b.Device.IsTestDevice} wifi={b.Device.Wifi} roles=\"{FlattenLogText(b.Device.UsbRoles)}\" usbPolling=\"{FlattenLogText(b.Device.UsbPollingRates)}\" audio=\"{FlattenLogText(b.Device.AudioEndpoints)}\" storage=\"{FlattenLogText(b.Device.StorageTag)}\"");
 
             List<int> selected = [];
             for (int cpu = 0; cpu < b.CpuBoxes.Count; cpu++)
@@ -961,8 +977,27 @@ public sealed partial class MainForm : Form
 
             string imodValue = b.ImodBox.Text?.Trim() ?? string.Empty;
             string imodDefault = FlattenLogText(b.ImodDefaultLabel.Text);
+            string imodCurrent = FlattenLogText(b.ImodCurrentLabel.Text);
+            string imodMap = FlattenLogText(b.ImodMapLabel?.Text);
+            string imodMapDetail = FlattenLogText(b.ImodMapLabel?.Tag as string);
             WriteLog(
-                $"GUI.BLOCK.IMOD: idx={i} visible={b.ImodAutoCheck.Visible} checked={b.ImodAutoCheck.Checked} value=\"{imodValue}\" default=\"{imodDefault}\"");
+                $"GUI.BLOCK.IMOD: idx={i} visible={b.ImodAutoCheck.Visible} checked={b.ImodAutoCheck.Checked} value=\"{imodValue}\" default=\"{imodDefault}\" current=\"{imodCurrent}\" map=\"{imodMap}\" detail=\"{imodMapDetail}\"");
+
+            if (b.NdisModeCombo is not null)
+            {
+                string ndisMode = b.NdisModeCombo.SelectedItem?.ToString() ?? string.Empty;
+                string rssQueues = b.RssQueueBox is not null ? ((int)b.RssQueueBox.Value).ToString(CultureInfo.InvariantCulture) : string.Empty;
+                string activeRss = b.NdisRssRuntime is null ? "Unknown" : FormatNdisRuntimeBool(b.NdisRssRuntime.Enabled);
+                WriteLog($"GUI.BLOCK.NDIS: idx={i} mode={ndisMode} rssBase={(b.RssBaseCore?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)} rssQueues={rssQueues} activeRss={activeRss}");
+            }
+
+            if (b.NicItrBox is not null)
+            {
+                string nicItrValue = b.NicItrBox.Text?.Trim() ?? string.Empty;
+                string nicItrStatus = FlattenLogText(b.NicItrStatusLabel?.Text);
+                string nicItrTime = FlattenLogText(b.NicItrTimeLabel?.Text);
+                WriteLog($"GUI.BLOCK.NICITR: idx={i} value=\"{nicItrValue}\" status=\"{nicItrStatus}\" time=\"{nicItrTime}\"");
+            }
 
             string infoText = FlattenLogText(b.InfoLabel.Text);
             string infoReg = FlattenLogText(b.InfoLabel.Tag as string);
@@ -1104,7 +1139,16 @@ public sealed partial class MainForm : Form
                 string rssText = rssBase.HasValue ? rssBase.Value.ToString() : string.Empty;
                 int? rssQueues = GetNdisRssQueues(instanceId);
                 string rssQueueText = rssQueues.HasValue ? rssQueues.Value.ToString() : string.Empty;
-                WriteLog($"GUI.BLOCK.RSS: idx={index} baseCore={rssText} queues={rssQueueText}");
+                string rssBaseGroupRaw = ReadRegNumeric(classKey, "*RssBaseProcGroup");
+                string rssMaxProcessorsRaw = ReadRegNumeric(classKey, "*MaxRssProcessors");
+                string rssMaxGroupRaw = ReadRegNumeric(classKey, "*RSSMaxProcGroup");
+                string rssMaxProcRaw = ReadRegNumeric(classKey, "*RssMaxProcNumber");
+                string rssNumaRaw = ReadRegNumeric(classKey, "*NumaNodeId");
+                WriteLog($"GUI.BLOCK.RSS: idx={index} baseCore={rssText} queues={rssQueueText} baseGroup={SanitizeLogValue(rssBaseGroupRaw)} maxProcessors={SanitizeLogValue(rssMaxProcessorsRaw)} maxGroup={SanitizeLogValue(rssMaxGroupRaw)} maxProc={SanitizeLogValue(rssMaxProcRaw)} numa={SanitizeLogValue(rssNumaRaw)}");
+                NdisRssRuntimeState runtime = GetNdisRssRuntimeState(instanceId);
+                block.NdisRssRuntime = runtime;
+                WriteLog($"GUI.BLOCK.RSS.ACTIVE: idx={index} {FormatNdisRssRuntimeState(runtime)}");
+                LogNdisRssComparison("GUI.BLOCK", instanceId, runtime, rssBase, rssQueues, TryParseLeadingInt(rssMaxProcessorsRaw));
                 issues += LogGuiBlockIssues(block, index, normalizedId, signedDriverMap, wmiMapEmpty, enumProblemRaw, svcImageRaw, svcImageResolved, drvInfo, msiKey, affKey, rssBase);
             }
             else
@@ -1162,6 +1206,12 @@ public sealed partial class MainForm : Form
             issues++;
         }
 
+        if (block.Device.IsTestDevice)
+        {
+            WriteLog($"GUI.TEST.BLOCK: idx={index} id={block.Device.InstanceId} registryCheck=skipped");
+            return issues;
+        }
+
         int? problemCode = TryParseLeadingInt(enumProblemRaw);
         if (problemCode.HasValue && problemCode.Value != 0)
         {
@@ -1184,9 +1234,17 @@ public sealed partial class MainForm : Form
 
         if (block.Kind == DeviceKind.NET_NDIS)
         {
-            if (!rssBase.HasValue)
+            NdisAffinityMode ndisMode = GetSelectedNdisAffinityMode(block);
+            bool expectsRss = ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both;
+            bool expectsIrq = ndisMode is NdisAffinityMode.IrqPolicy or NdisAffinityMode.Both;
+
+            if (expectsRss && !rssBase.HasValue)
             {
                 LogIssue("rssBaseMissing");
+            }
+            else if (!expectsRss && rssBase.HasValue)
+            {
+                LogIssue("rssBaseUnexpected", $"mode={FormatNdisAffinityMode(ndisMode)} base={rssBase.Value}");
             }
 
             int rssQueues = GetNdisRssQueues(block.Device.InstanceId) ?? 1;
@@ -1211,13 +1269,23 @@ public sealed partial class MainForm : Form
                 selectedCount++;
             }
 
-            if (selectedCount != rssQueues)
+            if (expectsRss && selectedCount != rssQueues)
             {
                 LogIssue("rssBaseSelection", $"selected={selectedCount} expected={rssQueues}");
             }
-            else if (rssBase.HasValue && rssBase.Value >= 0 && rssBase.Value < block.CpuBoxes.Count && !block.CpuBoxes[rssBase.Value].Checked)
+            else if (expectsRss && rssBase.HasValue && rssBase.Value >= 0 && rssBase.Value < block.CpuBoxes.Count && !block.CpuBoxes[rssBase.Value].Checked)
             {
                 LogIssue("rssBaseMismatch", $"uiMissingBase={rssBase.Value}");
+            }
+
+            if (expectsIrq && !block.Device.IsTestDevice)
+            {
+                int? irqPolicy = TryGetRegInt(affKey, "DevicePolicy");
+                ulong irqMask = TryGetAssignmentMask(affKey) ?? 0;
+                if (irqPolicy != 4 || irqMask == 0)
+                {
+                    LogIssue("rssIrqPolicyMissing", $"mode={FormatNdisAffinityMode(ndisMode)} policy={(irqPolicy?.ToString(CultureInfo.InvariantCulture) ?? "missing")} mask=0x{irqMask:X}");
+                }
             }
 
             if (block.PolicyCombo.Enabled)
@@ -1280,13 +1348,26 @@ public sealed partial class MainForm : Form
                 LogIssue("msiLimitMismatch", $"ui={uiLimit.Value} reg={regLimit}{suffix}");
             }
 
-            int uiPrio = MapPrioText(uiPrioText);
+            int? uiPrio = MapPrioText(uiPrioText);
             int? regPrioRaw = TryGetRegInt(affKey, "DevicePriority");
-            int regPrio = regPrioRaw ?? 2;
-            if (regPrio != uiPrio)
+            if (uiPrio.HasValue)
             {
-                string suffix = regPrioRaw.HasValue ? string.Empty : " regMissing=1";
-                LogIssue("prioMismatch", $"ui={SanitizeLogValue(uiPrioText)} reg={regPrio}{suffix}");
+                if (!regPrioRaw.HasValue || regPrioRaw.Value != uiPrio.Value)
+                {
+                    string regText = regPrioRaw.HasValue ? regPrioRaw.Value.ToString(CultureInfo.InvariantCulture) : "missing";
+                    LogIssue("prioMismatch", $"ui={SanitizeLogValue(uiPrioText)} reg={regText}");
+                }
+            }
+            else if (string.Equals(uiPrioText, "Undefined", StringComparison.OrdinalIgnoreCase))
+            {
+                if (regPrioRaw.HasValue)
+                {
+                    LogIssue("prioMismatch", $"ui=Undefined reg={regPrioRaw.Value}");
+                }
+            }
+            else
+            {
+                LogIssue("prioUiInvalid", $"ui={SanitizeLogValue(uiPrioText)}");
             }
 
             if (block.Kind != DeviceKind.NET_NDIS)

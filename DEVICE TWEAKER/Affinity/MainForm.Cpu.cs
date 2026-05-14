@@ -1,6 +1,9 @@
 ﻿using System.Management;
+using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics.X86;
+using System.Text.RegularExpressions;
 
 namespace DeviceTweakerCS;
 
@@ -12,6 +15,9 @@ public sealed partial class MainForm
     private readonly Dictionary<int, int> _cpuIndexByCpuSetId = new();
     private readonly HashSet<int> _effClassP = new();
     private readonly HashSet<int> _effClassE = new();
+    private readonly Dictionary<int, int> _cppcRatings = new();
+    private readonly Dictionary<int, int> _cppcRanks = new();
+    private bool _cppcEnabled;
     private int _maxLogical;
     private int _grpHeight;
     private int _cpuGroupCount = 1;
@@ -49,6 +55,7 @@ public sealed partial class MainForm
             CcdMap = ccdMap,
         };
         UpdateEfficiencyClassMap(cpuRaw);
+        LoadCppcRatings(cpuRaw.Logical);
 
         _cpuGroupCount = Math.Max(1, cpuRaw.LPs.Select(lp => lp.Group).Distinct().Count());
         _cpuLpByIndex.Clear();
@@ -77,6 +84,153 @@ public sealed partial class MainForm
             WriteLog($"CPU.GROUPS: using group0 for affinity UI (KAFFINITY max {MaxAffinityBits})");
         }
         WriteLog($"CPU.IDENT: {cpuVendor.Name} | Vendor={cpuVendor.Vendor} | SMT/HT={_smtText}");
+    }
+
+    private void LoadCppcRatings(int logicalCount)
+    {
+        _cppcRatings.Clear();
+        _cppcRanks.Clear();
+        _cppcEnabled = false;
+
+        try
+        {
+            string xmlText = QueryKernelProcessorPowerEvents(Math.Max(logicalCount * 4, 16));
+            if (string.IsNullOrWhiteSpace(xmlText))
+            {
+                WriteLog("CPU.CPPC: no Event ID 55 data");
+                return;
+            }
+
+            Dictionary<int, int> collected = [];
+            foreach (Match eventMatch in Regex.Matches(xmlText, "<Event\\b.*?</Event>", RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+            {
+                string eventXml = eventMatch.Value;
+                if (!TryReadEventDataInt(eventXml, "Number", out int processor)
+                    || !TryReadEventDataInt(eventXml, "MaximumPerformancePercent", out int performance))
+                {
+                    continue;
+                }
+
+                if (processor >= 0 && processor < logicalCount)
+                {
+                    collected.TryAdd(processor, performance);
+                }
+
+                if (collected.Count >= logicalCount)
+                {
+                    break;
+                }
+            }
+
+            if (collected.Count == 0)
+            {
+                WriteLog("CPU.CPPC: Event ID 55 present but ratings were not parsed");
+                return;
+            }
+
+            List<int> uniqueRatings = collected.Values.Distinct().OrderByDescending(v => v).ToList();
+            if (uniqueRatings.Count <= 1)
+            {
+                WriteLog($"CPU.CPPC: disabled, all parsed cores share rating={uniqueRatings.FirstOrDefault()} count={collected.Count}");
+                return;
+            }
+
+            int rank = 1;
+            foreach (int rating in uniqueRatings)
+            {
+                foreach (KeyValuePair<int, int> item in collected.Where(kvp => kvp.Value == rating))
+                {
+                    _cppcRatings[item.Key] = item.Value;
+                    _cppcRanks[item.Key] = rank;
+                }
+
+                rank++;
+            }
+
+            _cppcEnabled = _cppcRanks.Count > 0;
+            string ratingsText = string.Join(
+                " ",
+                _cppcRatings
+                    .OrderBy(kvp => kvp.Key)
+                    .Select(kvp => $"CPU{kvp.Key}=R{kvp.Value}/#{_cppcRanks[kvp.Key]}"));
+            WriteLog($"CPU.CPPC: enabled count={_cppcRanks.Count} {ratingsText}");
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"CPU.CPPC: unavailable: {ex.Message}");
+            _cppcEnabled = false;
+        }
+    }
+
+    private bool HasHybridCpu()
+    {
+        if (_cpuInfo?.Topology is null)
+        {
+            return false;
+        }
+
+        if (_effClassE.Count > 0)
+        {
+            return true;
+        }
+
+        return _cpuInfo.Topology.LPs
+            .Select(lp => lp.EffClass)
+            .Where(eff => eff >= 0)
+            .Distinct()
+            .Skip(1)
+            .Any();
+    }
+
+    private bool HasDualCcdCpu()
+    {
+        return _cpuInfo?.CcdMap.Values
+            .Distinct()
+            .Skip(1)
+            .Any() == true;
+    }
+
+    private static string QueryKernelProcessorPowerEvents(int maxEvents)
+    {
+        using Process process = new();
+        process.StartInfo = new ProcessStartInfo
+        {
+            FileName = "wevtutil.exe",
+            Arguments = $"qe System /q:\"*[System[Provider[@Name='Microsoft-Windows-Kernel-Processor-Power'] and EventID=55]]\" /c:{maxEvents.ToString(CultureInfo.InvariantCulture)} /rd:true /f:xml",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+
+        process.Start();
+        string output = process.StandardOutput.ReadToEnd();
+        _ = process.StandardError.ReadToEnd();
+        if (!process.WaitForExit(2500))
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+            }
+
+            return string.Empty;
+        }
+
+        return process.ExitCode == 0 ? output : string.Empty;
+    }
+
+    private static bool TryReadEventDataInt(string eventXml, string name, out int value)
+    {
+        value = 0;
+        Match match = Regex.Match(
+            eventXml,
+            $"<Data\\s+Name=['\"]{Regex.Escape(name)}['\"]>(?<value>[^<]+)</Data>",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        return match.Success
+            && int.TryParse(match.Groups["value"].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
     }
 
     private void UpdateEfficiencyClassMap(CpuTopology topo)
@@ -440,33 +594,60 @@ public sealed partial class MainForm
 
         int ccdId = _cpuInfo.CcdMap.TryGetValue(lpIndex, out int cid) ? cid : 0;
 
-        string suffix = "P";
+        string coreType = "P-Core";
         Color textColor = _cpuTextP;
         if (IsEfficiencyCore(lpInfo))
         {
-            suffix = "E";
+            coreType = "E-Core";
             textColor = _cpuTextE;
         }
         else if (isHyper)
         {
-            suffix = "T";
+            coreType = "P-Core/HT";
             textColor = _cpuTextSmt;
         }
 
-        string groupText = string.Empty;
+        bool showCcd = HasDualCcdCpu();
+        List<string> cpuLabelParts = [coreType];
+        if (showCcd)
+        {
+            cpuLabelParts.Add($"CCD{ccdId}");
+        }
+
         if (_cpuGroupCount > 1)
         {
             string localText = lpInfo.LocalIndex >= 0 ? $"/L{lpInfo.LocalIndex}" : string.Empty;
-            groupText = $", G{lpInfo.Group}{localText}";
+            cpuLabelParts.Add($"G{lpInfo.Group}{localText}");
         }
 
-        cb.Text = $"CPU {lpIndex} ({suffix}, CCD {ccdId}{groupText})";
+        string cppcTooltip = "CPPC: unavailable";
+        if (_cppcEnabled && _cppcRanks.TryGetValue(lpIndex, out int rank))
+        {
+            if (_cppcRatings.TryGetValue(lpIndex, out int rating))
+            {
+                cpuLabelParts.Add(rank == 1 ? $"R{rating}, Pref" : $"R{rating}, #{rank}");
+                cppcTooltip = rank == 1
+                    ? $"CPPC: rating {rating}, preferred rank #1"
+                    : $"CPPC: rating {rating}, rank #{rank}";
+            }
+            else
+            {
+                cpuLabelParts.Add(rank == 1 ? "Pref" : $"#{rank}");
+                cppcTooltip = rank == 1 ? "CPPC: preferred rank #1" : $"CPPC: rank #{rank}";
+            }
+        }
+
+        cb.Text = $"CPU {lpIndex} ({string.Join(", ", cpuLabelParts)})";
         cb.AutoSize = true;
         cb.FlatStyle = FlatStyle.Standard;
         cb.UseVisualStyleBackColor = false;
-        cb.BackColor = ccdId == 1 ? Color.FromArgb(70, 30, 30) : _bgGroup;
+        cb.BackColor = showCcd && ccdId == 1 ? Color.FromArgb(70, 30, 30) : _bgGroup;
         cb.ForeColor = textColor;
         cb.Padding = new Padding(UiScale(2), 0, 0, 0);
         cb.Margin = Padding.Empty;
+        string ccdTooltip = showCcd ? $", CCD {ccdId}" : string.Empty;
+        _copyToolTip?.SetToolTip(
+            cb,
+            $"CPU {lpIndex}: {(IsEfficiencyCore(lpInfo) ? "E-core" : isHyper ? "P-core SMT sibling" : "P-core")}{ccdTooltip}, Group {lpInfo.Group}, Core {lpInfo.Core}, Local {lpInfo.LocalIndex}. {cppcTooltip}");
     }
 }

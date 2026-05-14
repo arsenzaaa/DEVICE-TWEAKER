@@ -1,4 +1,4 @@
-#define NOMINMAX
+﻿#define NOMINMAX
 #include <windows.h>
 #include <cfgmgr32.h>
 #include <setupapi.h>
@@ -29,21 +29,22 @@ constexpr uint32_t kDefaultInterval = 0x0;
 constexpr uint32_t kDefaultHcsparamsOffset = 0x4;
 constexpr uint32_t kDefaultRtsoff = 0x18;
 
-constexpr const wchar_t* kWinIoServiceName = L"WINIO";
-constexpr const wchar_t* kDriverFileName = L"winio.sys";
+constexpr const wchar_t* kImodDriverServiceName = L"DeviceTweakerImod2";
+constexpr const wchar_t* kImodDriverDevicePath = L"\\\\.\\DeviceTweakerImod2";
+constexpr const wchar_t* kDriverFileName = L"DTIMOD.sys";
 constexpr const wchar_t* kConfigFileName = L"imod-config.ini";
 
-constexpr uint32_t FILE_DEVICE_WINIO = 0x00008010;
-constexpr uint32_t WINIO_IOCTL_INDEX = 0x810;
+constexpr uint32_t FILE_DEVICE_IMOD = 0x00008010;
+constexpr uint32_t IMOD_IOCTL_INDEX = 0x810;
 
-constexpr uint32_t IoctlWinioMapPhysToLin =
-    CTL_CODE(FILE_DEVICE_WINIO, WINIO_IOCTL_INDEX, METHOD_BUFFERED, FILE_ANY_ACCESS);
-constexpr uint32_t IoctlWinioUnmapPhysAddr =
-    CTL_CODE(FILE_DEVICE_WINIO, WINIO_IOCTL_INDEX + 1, METHOD_BUFFERED, FILE_ANY_ACCESS);
-constexpr uint32_t IoctlWinioEnableDirectIo =
-    CTL_CODE(FILE_DEVICE_WINIO, WINIO_IOCTL_INDEX + 2, METHOD_BUFFERED, FILE_ANY_ACCESS);
-constexpr uint32_t IoctlWinioDisableDirectIo =
-    CTL_CODE(FILE_DEVICE_WINIO, WINIO_IOCTL_INDEX + 3, METHOD_BUFFERED, FILE_ANY_ACCESS);
+constexpr uint32_t IoctlImodMapPhysicalMemory =
+    CTL_CODE(FILE_DEVICE_IMOD, IMOD_IOCTL_INDEX, METHOD_BUFFERED, FILE_ANY_ACCESS);
+constexpr uint32_t IoctlImodUnmapPhysicalMemory =
+    CTL_CODE(FILE_DEVICE_IMOD, IMOD_IOCTL_INDEX + 1, METHOD_BUFFERED, FILE_ANY_ACCESS);
+constexpr uint32_t IoctlImodReadPhysicalMemory =
+    CTL_CODE(FILE_DEVICE_IMOD, IMOD_IOCTL_INDEX + 2, METHOD_BUFFERED, FILE_ANY_ACCESS);
+constexpr uint32_t IoctlImodWritePhysicalMemory =
+    CTL_CODE(FILE_DEVICE_IMOD, IMOD_IOCTL_INDEX + 3, METHOD_BUFFERED, FILE_ANY_ACCESS);
 
 #pragma pack(push, 1)
 struct PhysStruct {
@@ -52,6 +53,13 @@ struct PhysStruct {
     uint64_t physicalMemoryHandle;
     uint64_t physMemLin;
     uint64_t physSection;
+};
+
+struct PhysAccessStruct {
+    uint64_t physAddress;
+    uint32_t accessSizeInBytes;
+    uint32_t reserved;
+    uint64_t value;
 };
 #pragma pack(pop)
 
@@ -79,9 +87,8 @@ struct Config {
     std::vector<ControllerOverride> overrides;
 };
 
-struct WinIoContext {
+struct ImodDriverContext {
     HANDLE driverHandle = INVALID_HANDLE_VALUE;
-    bool is64BitOS = false;
     bool serviceCreated = false;
     std::wstring driverPath;
 };
@@ -247,6 +254,15 @@ std::wstring GetCurrentDirectoryPath() {
     return std::wstring(buffer, length);
 }
 
+std::wstring GetWindowsDirectoryPath() {
+    wchar_t buffer[MAX_PATH] = {};
+    const UINT length = GetWindowsDirectoryW(buffer, static_cast<UINT>(std::size(buffer)));
+    if (length == 0 || length >= std::size(buffer)) {
+        return L"";
+    }
+    return std::wstring(buffer, length);
+}
+
 std::wstring ParentPath(const std::wstring& path) {
     const size_t slashPos = path.find_last_of(L"\\/");
     if (slashPos == std::wstring::npos) {
@@ -255,7 +271,7 @@ std::wstring ParentPath(const std::wstring& path) {
     return path.substr(0, slashPos);
 }
 
-std::wstring FindFileInCommonPaths(const wchar_t* fileName) {
+std::wstring FindFileNearExecutable(const wchar_t* fileName) {
     std::vector<std::wstring> candidates;
 
     const std::wstring cwd = GetCurrentDirectoryPath();
@@ -286,11 +302,19 @@ std::wstring FindFileInCommonPaths(const wchar_t* fileName) {
 }
 
 std::wstring FindDriverPath() {
-    return FindFileInCommonPaths(kDriverFileName);
+    const std::wstring windowsDir = GetWindowsDirectoryPath();
+    if (!windowsDir.empty()) {
+        const std::wstring stagedPath = windowsDir + L"\\" + kDriverFileName;
+        if (FileExists(stagedPath)) {
+            return stagedPath;
+        }
+    }
+
+    return FindFileNearExecutable(kDriverFileName);
 }
 
 std::wstring FindConfigPath() {
-    return FindFileInCommonPaths(kConfigFileName);
+    return FindFileNearExecutable(kConfigFileName);
 }
 
 bool IsAdmin() {
@@ -304,18 +328,6 @@ bool IsAdmin() {
         FreeSid(adminGroup);
     }
     return isAdmin == TRUE;
-}
-
-bool Is64BitOS() {
-#if defined(_WIN64)
-    return true;
-#else
-    BOOL wow64 = FALSE;
-    if (!IsWow64Process(GetCurrentProcess(), &wow64)) {
-        return false;
-    }
-    return wow64 == TRUE;
-#endif
 }
 
 bool GetDevicePropertyData(HDEVINFO devInfoSet, SP_DEVINFO_DATA* devInfo, DWORD property,
@@ -735,29 +747,7 @@ bool EnumerateXhciControllers(std::vector<UsbControllerInfo>* out, std::wstring*
     return true;
 }
 
-bool EnableDirectIo(const WinIoContext& ctx, std::wstring* error) {
-    if (ctx.is64BitOS) {
-        return true;
-    }
-    DWORD bytesReturned = 0;
-    if (!DeviceIoControl(ctx.driverHandle, IoctlWinioEnableDirectIo, nullptr, 0, nullptr, 0, &bytesReturned, nullptr)) {
-        if (error) {
-            *error = L"failed to enable direct I/O: " + GetLastErrorMessage(GetLastError());
-        }
-        return false;
-    }
-    return true;
-}
-
-void DisableDirectIo(const WinIoContext& ctx) {
-    if (ctx.is64BitOS || ctx.driverHandle == INVALID_HANDLE_VALUE) {
-        return;
-    }
-    DWORD bytesReturned = 0;
-    DeviceIoControl(ctx.driverHandle, IoctlWinioDisableDirectIo, nullptr, 0, nullptr, 0, &bytesReturned, nullptr);
-}
-
-bool MapPhysicalMemory(const WinIoContext& ctx, uint64_t address, uint64_t size, PhysStruct* out, std::wstring* error) {
+bool MapPhysicalMemory(const ImodDriverContext& ctx, uint64_t address, uint64_t size, PhysStruct* out, std::wstring* error) {
     PhysStruct phys{};
     phys.physMemSizeInBytes = size;
     phys.physAddress = address;
@@ -765,7 +755,7 @@ bool MapPhysicalMemory(const WinIoContext& ctx, uint64_t address, uint64_t size,
     DWORD bytesReturned = 0;
     if (!DeviceIoControl(
             ctx.driverHandle,
-            IoctlWinioMapPhysToLin,
+            IoctlImodMapPhysicalMemory,
             &phys, sizeof(phys),
             &phys, sizeof(phys),
             &bytesReturned,
@@ -787,12 +777,12 @@ bool MapPhysicalMemory(const WinIoContext& ctx, uint64_t address, uint64_t size,
     return true;
 }
 
-bool UnmapPhysicalMemory(const WinIoContext& ctx, const PhysStruct& phys, std::wstring* error) {
+bool UnmapPhysicalMemory(const ImodDriverContext& ctx, const PhysStruct& phys, std::wstring* error) {
     PhysStruct local = phys;
     DWORD bytesReturned = 0;
     if (!DeviceIoControl(
             ctx.driverHandle,
-            IoctlWinioUnmapPhysAddr,
+            IoctlImodUnmapPhysicalMemory,
             &local, sizeof(local),
             &local, sizeof(local),
             &bytesReturned,
@@ -805,36 +795,67 @@ bool UnmapPhysicalMemory(const WinIoContext& ctx, const PhysStruct& phys, std::w
     return true;
 }
 
-bool ReadPhys32(const WinIoContext& ctx, uint64_t address, uint32_t* value, std::wstring* error) {
-    PhysStruct phys{};
-    if (!MapPhysicalMemory(ctx, address, 4, &phys, error)) {
+bool ReadPhys32(const ImodDriverContext& ctx, uint64_t address, uint32_t* value, std::wstring* error) {
+    PhysAccessStruct access{};
+    access.physAddress = address;
+    access.accessSizeInBytes = sizeof(uint32_t);
+
+    DWORD bytesReturned = 0;
+    if (!DeviceIoControl(
+            ctx.driverHandle,
+            IoctlImodReadPhysicalMemory,
+            &access, sizeof(access),
+            &access, sizeof(access),
+            &bytesReturned,
+            nullptr)) {
+        if (error) {
+            *error = L"failed to read physical memory: " + GetLastErrorMessage(GetLastError());
+        }
         return false;
     }
 
-    const volatile uint32_t* ptr = reinterpret_cast<volatile uint32_t*>(static_cast<uintptr_t>(phys.physMemLin));
-    const uint32_t result = *ptr;
-
-    if (!UnmapPhysicalMemory(ctx, phys, error)) {
+    if (bytesReturned < sizeof(access)) {
+        if (error) {
+            *error = L"failed to read physical memory: short driver response";
+        }
         return false;
     }
 
-    *value = result;
+    *value = static_cast<uint32_t>(access.value);
     return true;
 }
 
-bool WritePhys32(const WinIoContext& ctx, uint64_t address, uint32_t value, std::wstring* error) {
-    PhysStruct phys{};
-    if (!MapPhysicalMemory(ctx, address, 4, &phys, error)) {
+bool WritePhys32(const ImodDriverContext& ctx, uint64_t address, uint32_t value, std::wstring* error) {
+    PhysAccessStruct access{};
+    access.physAddress = address;
+    access.accessSizeInBytes = sizeof(uint32_t);
+    access.value = value;
+
+    DWORD bytesReturned = 0;
+    if (!DeviceIoControl(
+            ctx.driverHandle,
+            IoctlImodWritePhysicalMemory,
+            &access, sizeof(access),
+            &access, sizeof(access),
+            &bytesReturned,
+            nullptr)) {
+        if (error) {
+            *error = L"failed to write physical memory: " + GetLastErrorMessage(GetLastError());
+        }
         return false;
     }
 
-    volatile uint32_t* ptr = reinterpret_cast<volatile uint32_t*>(static_cast<uintptr_t>(phys.physMemLin));
-    *ptr = value;
-
-    if (!UnmapPhysicalMemory(ctx, phys, error)) {
-        return false;
-    }
     return true;
+}
+
+bool WriteImodInterval(const ImodDriverContext& ctx, uint64_t address, uint32_t interval, std::wstring* error) {
+    uint32_t currentValue = 0;
+    if (!ReadPhys32(ctx, address, &currentValue, error)) {
+        return false;
+    }
+
+    const uint32_t mergedValue = (currentValue & 0xFFFF0000U) | (interval & 0xFFFFU);
+    return WritePhys32(ctx, address, mergedValue, error);
 }
 
 bool QueryServiceStatus(SC_HANDLE service, SERVICE_STATUS_PROCESS* status) {
@@ -844,7 +865,24 @@ bool QueryServiceStatus(SC_HANDLE service, SERVICE_STATUS_PROCESS* status) {
         sizeof(SERVICE_STATUS_PROCESS), &bytesNeeded) != FALSE;
 }
 
-bool EnsureWinIoService(WinIoContext& ctx, std::wstring* error) {
+bool IsImodDriverDeviceAvailable() {
+    HANDLE device = CreateFileW(
+        kImodDriverDevicePath,
+        GENERIC_READ | GENERIC_WRITE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
+        nullptr,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr);
+    if (device == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+
+    CloseHandle(device);
+    return true;
+}
+
+bool EnsureImodDriverService(ImodDriverContext& ctx, std::wstring* error) {
     SC_HANDLE scm = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
     if (!scm) {
         if (error) {
@@ -853,21 +891,21 @@ bool EnsureWinIoService(WinIoContext& ctx, std::wstring* error) {
         return false;
     }
 
-    SC_HANDLE service = OpenServiceW(scm, kWinIoServiceName, SERVICE_ALL_ACCESS);
+    SC_HANDLE service = OpenServiceW(scm, kImodDriverServiceName, SERVICE_ALL_ACCESS);
     if (!service) {
         const DWORD lastError = GetLastError();
         if (lastError != ERROR_SERVICE_DOES_NOT_EXIST) {
             CloseServiceHandle(scm);
             if (error) {
-                *error = L"failed to open WINIO service: " + GetLastErrorMessage(lastError);
+                *error = L"failed to open IMOD driver service: " + GetLastErrorMessage(lastError);
             }
             return false;
         }
 
         service = CreateServiceW(
             scm,
-            kWinIoServiceName,
-            kWinIoServiceName,
+            kImodDriverServiceName,
+            kImodDriverServiceName,
             SERVICE_ALL_ACCESS,
             SERVICE_KERNEL_DRIVER,
             SERVICE_DEMAND_START,
@@ -881,17 +919,50 @@ bool EnsureWinIoService(WinIoContext& ctx, std::wstring* error) {
         if (!service) {
             CloseServiceHandle(scm);
             if (error) {
-                *error = L"failed to create WINIO service: " + GetLastErrorMessage(GetLastError());
+                *error = L"failed to create IMOD driver service: " + GetLastErrorMessage(GetLastError());
             }
             return false;
         }
         ctx.serviceCreated = true;
+    } else if (!ChangeServiceConfigW(
+                   service,
+                   SERVICE_NO_CHANGE,
+                   SERVICE_NO_CHANGE,
+                   SERVICE_NO_CHANGE,
+                   ctx.driverPath.c_str(),
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr,
+                   nullptr)) {
+        const DWORD lastError = GetLastError();
+        CloseServiceHandle(service);
+        CloseServiceHandle(scm);
+        if (error) {
+            *error = L"failed to configure IMOD driver service path: " + GetLastErrorMessage(lastError);
+        }
+        return false;
     }
 
     SERVICE_STATUS_PROCESS status{};
     bool wasRunning = false;
     if (QueryServiceStatus(service, &status)) {
         wasRunning = status.dwCurrentState == SERVICE_RUNNING;
+    }
+
+    if (wasRunning && !IsImodDriverDeviceAvailable()) {
+        SERVICE_STATUS stopStatus{};
+        ControlService(service, SERVICE_CONTROL_STOP, &stopStatus);
+
+        for (int i = 0; i < 25; ++i) {
+            SERVICE_STATUS_PROCESS check{};
+            if (!QueryServiceStatus(service, &check) || check.dwCurrentState == SERVICE_STOPPED) {
+                wasRunning = false;
+                break;
+            }
+            Sleep(200);
+        }
     }
 
     if (!wasRunning) {
@@ -901,7 +972,7 @@ bool EnsureWinIoService(WinIoContext& ctx, std::wstring* error) {
                 CloseServiceHandle(service);
                 CloseServiceHandle(scm);
                 if (error) {
-                    *error = L"failed to start WINIO service: " + GetLastErrorMessage(lastError);
+                    *error = L"failed to start IMOD driver service: " + GetLastErrorMessage(lastError);
                 }
                 return false;
             }
@@ -913,13 +984,13 @@ bool EnsureWinIoService(WinIoContext& ctx, std::wstring* error) {
     return true;
 }
 
-void StopWinIoServiceIfNeeded(const WinIoContext& ctx) {
+void StopImodDriverServiceIfNeeded(const ImodDriverContext& ctx) {
     SC_HANDLE scm = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
     if (!scm) {
         return;
     }
 
-    SC_HANDLE service = OpenServiceW(scm, kWinIoServiceName, SERVICE_ALL_ACCESS);
+    SC_HANDLE service = OpenServiceW(scm, kImodDriverServiceName, SERVICE_ALL_ACCESS);
     if (!service) {
         CloseServiceHandle(scm);
         return;
@@ -947,15 +1018,13 @@ void StopWinIoServiceIfNeeded(const WinIoContext& ctx) {
     CloseServiceHandle(scm);
 }
 
-bool InitializeWinIo(WinIoContext& ctx, std::wstring* error) {
-    ctx.is64BitOS = Is64BitOS();
-
-    if (!EnsureWinIoService(ctx, error)) {
+bool InitializeImodDriver(ImodDriverContext& ctx, std::wstring* error) {
+    if (!EnsureImodDriverService(ctx, error)) {
         return false;
     }
 
     ctx.driverHandle = CreateFileW(
-        L"\\\\.\\WINIO",
+        kImodDriverDevicePath,
         GENERIC_READ | GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE,
         nullptr,
@@ -964,27 +1033,21 @@ bool InitializeWinIo(WinIoContext& ctx, std::wstring* error) {
         nullptr);
     if (ctx.driverHandle == INVALID_HANDLE_VALUE) {
         if (error) {
-            *error = L"failed to open \\\\.\\WINIO: " + GetLastErrorMessage(GetLastError());
+            *error = L"failed to open " + std::wstring(kImodDriverDevicePath) + L": " + GetLastErrorMessage(GetLastError());
         }
-        return false;
-    }
-
-    if (!EnableDirectIo(ctx, error)) {
         return false;
     }
 
     return true;
 }
 
-void ShutdownWinIo(WinIoContext& ctx) {
-    DisableDirectIo(ctx);
-
+void ShutdownImodDriver(ImodDriverContext& ctx) {
     if (ctx.driverHandle != INVALID_HANDLE_VALUE) {
         CloseHandle(ctx.driverHandle);
         ctx.driverHandle = INVALID_HANDLE_VALUE;
     }
 
-    StopWinIoServiceIfNeeded(ctx);
+    StopImodDriverServiceIfNeeded(ctx);
 }
 
 }
@@ -1004,7 +1067,7 @@ int wmain(int argc, wchar_t* argv[]) {
 
     std::wstring driverPath = FindDriverPath();
     if (driverPath.empty()) {
-        std::wcout << L"error: winio.sys not exists" << std::endl;
+        std::wcout << L"error: DTIMOD.sys not exists" << std::endl;
         return 1;
     }
 
@@ -1025,23 +1088,23 @@ int wmain(int argc, wchar_t* argv[]) {
         return 1;
     }
 
-    WinIoContext winio;
-    winio.driverPath = driverPath;
+    ImodDriverContext imodDriver;
+    imodDriver.driverPath = driverPath;
     std::wstring driverError;
-    if (!InitializeWinIo(winio, &driverError)) {
+    if (!InitializeImodDriver(imodDriver, &driverError)) {
         std::wcout << L"error: " << driverError << std::endl;
-        ShutdownWinIo(winio);
+        ShutdownImodDriver(imodDriver);
         return 1;
     }
 
-    ScopeExit cleanup([&]() { ShutdownWinIo(winio); });
+    ScopeExit cleanup([&]() { ShutdownImodDriver(imodDriver); });
 
     if (!configPath.empty()) {
         std::wcout << L"config = " << configPath << L" (overrides: " << config.overrides.size() << L")" << std::endl;
     } else {
         std::wcout << L"config = defaults (no " << kConfigFileName << L" found)" << std::endl;
     }
-    std::wcout << L"winio.sys = " << driverPath << std::endl << std::endl;
+    std::wcout << L"DTIMOD.sys = " << driverPath << std::endl << std::endl;
 
     for (const auto& controller : controllers) {
         if (controller.problemCode == CM_PROB_DISABLED) {
@@ -1108,16 +1171,16 @@ int wmain(int argc, wchar_t* argv[]) {
         uint32_t hcsparamsValue = 0;
         uint32_t rtsoffValue = 0;
         std::wstring ioError;
-        if (!ReadPhys32(winio, capabilityAddress + hcsparamsOffset, &hcsparamsValue, &ioError)) {
+        if (!ReadPhys32(imodDriver, capabilityAddress + hcsparamsOffset, &hcsparamsValue, &ioError)) {
             std::wcout << L"error: failed to read XHCI registers: " << ioError << std::endl << std::endl;
             continue;
         }
-        if (!ReadPhys32(winio, capabilityAddress + rtsoff, &rtsoffValue, &ioError)) {
+        if (!ReadPhys32(imodDriver, capabilityAddress + rtsoff, &rtsoffValue, &ioError)) {
             std::wcout << L"error: failed to read XHCI registers: " << ioError << std::endl << std::endl;
             continue;
         }
 
-        const uint32_t maxIntrs = (hcsparamsValue >> 8) & 0xFF;
+        const uint32_t maxIntrs = (hcsparamsValue >> 8) & 0x7FF;
         const uint64_t runtimeAddress = capabilityAddress + rtsoffValue;
 
         std::wcout << L"  max_intrs = " << maxIntrs
@@ -1148,10 +1211,10 @@ int wmain(int argc, wchar_t* argv[]) {
                 std::wcout << L"interrupter_address = runtime_address + 0x24 + (0x20 * index) = "
                            << ToHex(runtimeAddress) << L" + 0x24 + (0x20 * " << i << L") = "
                            << interrupterHex << std::endl;
-                std::wcout << L"Write DWORD = " << ToHex(desiredInterval) << std::endl;
+                std::wcout << L"Write IMOD interval = " << ToHex(desiredInterval) << std::endl;
             }
 
-            if (!WritePhys32(winio, interrupterAddress, desiredInterval, &ioError)) {
+            if (!WriteImodInterval(imodDriver, interrupterAddress, desiredInterval, &ioError)) {
                 std::wcout << L"error: failed to write IMOD interval at "
                            << interrupterHex << L": " << ioError << std::endl;
                 ++writeFailures;
@@ -1164,3 +1227,5 @@ int wmain(int argc, wchar_t* argv[]) {
 
     return 0;
 }
+
+

@@ -2,10 +2,25 @@
 DEVICE TWEAKER/bin/
 DEVICE TWEAKER/obj/
 DEVICE TWEAKER/artifacts/
+DEVICE TWEAKER/IMOD/Driver/build/
+DEVICE TWEAKER/IMOD/Driver/obj/
+DEVICE TWEAKER/IMOD/build/
+DEVICE TWEAKER/IMOD/IMOD/intermediates/
+DEVICE TWEAKER/IMOD/IMOD/intermidates/
 
 # Logs and local publish checks
 DEVICE TWEAKER/**/*.log
 DEVICE TWEAKER/**/size-check/
+DEVICE TWEAKER/**/*.tmp
+DEVICE TWEAKER/**/*.bak
+DEVICE TWEAKER/**/*.pdb
+DEVICE TWEAKER/**/*.ilk
+DEVICE TWEAKER/**/*.idb
+DEVICE TWEAKER/**/*.iobj
+DEVICE TWEAKER/**/*.ipdb
+DEVICE TWEAKER/**/*.recipe
+DEVICE TWEAKER/**/*.tlog
+DEVICE TWEAKER/**/*.lastbuildstate
 
 # IDE/user-local files
 *.user
