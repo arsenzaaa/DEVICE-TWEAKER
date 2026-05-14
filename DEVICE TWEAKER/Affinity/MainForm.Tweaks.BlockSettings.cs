@@ -60,6 +60,252 @@ public sealed partial class MainForm
         return null;
     }
 
+    private NdisAffinityMode GetSelectedNdisAffinityMode(DeviceBlock block)
+    {
+        string mode = block.NdisModeCombo?.SelectedItem?.ToString() ?? "RSS";
+        return mode.ToUpperInvariant() switch
+        {
+            "IRQ" => NdisAffinityMode.IrqPolicy,
+            "BOTH" => NdisAffinityMode.Both,
+            _ => NdisAffinityMode.Rss,
+        };
+    }
+
+    private static string FormatNdisAffinityMode(NdisAffinityMode mode)
+    {
+        return mode switch
+        {
+            NdisAffinityMode.IrqPolicy => "IRQ",
+            NdisAffinityMode.Both => "BOTH",
+            _ => "RSS",
+        };
+    }
+
+    private static string FormatNdisRuntimeValue(int? value)
+    {
+        return value.HasValue ? value.Value.ToString() : "-";
+    }
+
+    private static string FormatNdisRuntimeBool(bool? value)
+    {
+        return value.HasValue ? (value.Value ? "Enabled" : "Disabled") : "Unknown";
+    }
+
+    private static string FormatNdisRssRuntimeState(NdisRssRuntimeState? state)
+    {
+        if (state is null)
+        {
+            return "active=Unknown";
+        }
+
+        return $"adapterFound={state.AdapterFound} rssFound={state.RssFound} active={FormatNdisRuntimeBool(state.Enabled)} adapter=\"{state.AdapterName}\" desc=\"{state.InterfaceDescription}\" base=G{FormatNdisRuntimeValue(state.BaseProcessorGroup)}:{FormatNdisRuntimeValue(state.BaseProcessorNumber)} max=G{FormatNdisRuntimeValue(state.MaxProcessorGroup)}:{FormatNdisRuntimeValue(state.MaxProcessorNumber)} maxProcessors={FormatNdisRuntimeValue(state.MaxProcessors)} queues={FormatNdisRuntimeValue(state.NumberOfReceiveQueues)} profile=\"{state.Profile}\" error=\"{state.Error}\"";
+    }
+
+    private static string BuildNdisRssConflictText(NdisRssRuntimeState? state, int? registryBase, int? registryQueues, int? registryMaxProcessors)
+    {
+        if (state is null)
+        {
+            return string.Empty;
+        }
+
+        bool registryConfigured = registryBase.HasValue || registryQueues.HasValue || registryMaxProcessors.HasValue;
+        if (!state.RssFound)
+        {
+            return registryConfigured ? "registry RSS values exist but active RSS readback is unavailable" : string.Empty;
+        }
+
+        if (state.Enabled == false)
+        {
+            return registryConfigured ? "registry RSS values exist but active RSS is disabled" : string.Empty;
+        }
+
+        List<string> parts = [];
+        if (registryBase.HasValue && state.BaseProcessorNumber.HasValue && registryBase.Value != state.BaseProcessorNumber.Value)
+        {
+            parts.Add($"base registry={registryBase.Value} active={state.BaseProcessorNumber.Value}");
+        }
+
+        if (registryQueues.HasValue && state.NumberOfReceiveQueues.HasValue && registryQueues.Value != state.NumberOfReceiveQueues.Value)
+        {
+            parts.Add($"queues registry={registryQueues.Value} active={state.NumberOfReceiveQueues.Value}");
+        }
+
+        if (registryMaxProcessors.HasValue && state.MaxProcessors.HasValue && registryMaxProcessors.Value != state.MaxProcessors.Value)
+        {
+            parts.Add($"maxProcessors registry={registryMaxProcessors.Value} active={state.MaxProcessors.Value}");
+        }
+
+        return parts.Count > 0 ? string.Join("; ", parts) : string.Empty;
+    }
+
+    private void LogNdisRssComparison(string prefix, string instanceId, NdisRssRuntimeState? state, int? registryBase, int? registryQueues, int? registryMaxProcessors)
+    {
+        string conflict = BuildNdisRssConflictText(state, registryBase, registryQueues, registryMaxProcessors);
+        if (string.IsNullOrWhiteSpace(conflict))
+        {
+            WriteLog($"{prefix}.RSS.CHECK: {instanceId} registryBase={(registryBase?.ToString() ?? "-")} registryQueues={(registryQueues?.ToString() ?? "-")} registryMaxProcessors={(registryMaxProcessors?.ToString() ?? "-")} activeStatus=ok");
+            return;
+        }
+
+        WriteLog($"{prefix}.RSS.CONFLICT: {instanceId} {conflict}");
+    }
+
+    private NdisAffinityMode ChooseSmartNdisAffinityMode(DeviceBlock block, int plannedQueues, out string reason)
+    {
+        NdisRssRuntimeState runtime = block.NdisRssRuntime ?? GetNdisRssRuntimeState(block.Device.InstanceId);
+        block.NdisRssRuntime = runtime;
+
+        bool runtimeRssKnown = runtime.RssFound;
+        bool runtimeRssActive = runtime.RssFound && runtime.Enabled == true;
+        bool registryRssConfigured = GetNdisBaseCore(block.Device.InstanceId).HasValue || GetNdisRssQueues(block.Device.InstanceId).HasValue;
+        bool registryRssCapable = TestNdisRssBasePresent(block.Device.InstanceId);
+        bool rssCapable = runtimeRssKnown || registryRssCapable || registryRssConfigured;
+        bool msiEnabled = string.Equals(block.MsiCombo.SelectedItem?.ToString(), "Enabled", StringComparison.OrdinalIgnoreCase);
+        bool multiQueue = plannedQueues > 1
+            || (runtime.NumberOfReceiveQueues.HasValue && runtime.NumberOfReceiveQueues.Value > 1)
+            || (runtime.MaxProcessors.HasValue && runtime.MaxProcessors.Value > 1);
+
+        if (rssCapable && msiEnabled && (runtimeRssActive || registryRssConfigured))
+        {
+            reason = $"RSS capable + MSI enabled + {(runtimeRssActive ? "active RSS" : "registry RSS")} -> BOTH";
+            return NdisAffinityMode.Both;
+        }
+
+        if (rssCapable && msiEnabled && multiQueue)
+        {
+            reason = "RSS capable + MSI enabled + multi-queue adapter -> BOTH";
+            return NdisAffinityMode.Both;
+        }
+
+        if (rssCapable)
+        {
+            reason = msiEnabled
+                ? "RSS capable + MSI enabled but no active/registry RSS yet -> RSS"
+                : "RSS capable but MSI is not enabled yet -> RSS";
+            return NdisAffinityMode.Rss;
+        }
+
+        reason = "RSS not detected -> IRQ";
+        return NdisAffinityMode.IrqPolicy;
+    }
+
+    private void SetNdisModeCombo(DeviceBlock block, NdisAffinityMode mode)
+    {
+        if (block.NdisModeCombo is null)
+        {
+            return;
+        }
+
+        string text = FormatNdisAffinityMode(mode);
+        if (block.NdisModeCombo.Items.Count == 0)
+        {
+            block.NdisModeCombo.Items.AddRange(["RSS", "IRQ", "BOTH"]);
+        }
+
+        block.NdisModeCombo.SelectedItem = text;
+    }
+
+    private static ulong ReadAffinityMaskValue(object? rawOverride)
+    {
+        return rawOverride switch
+        {
+            byte[] bytes when bytes.Length >= 8 => BitConverter.ToUInt64(bytes, 0),
+            byte[] bytes when bytes.Length >= 4 => BitConverter.ToUInt32(bytes, 0),
+            int intVal => (uint)intVal,
+            uint uintVal => uintVal,
+            long longVal => (ulong)longVal,
+            ulong ulongVal => ulongVal,
+            _ => 0,
+        };
+    }
+
+    private static (int Policy, ulong Mask) ReadAffinityPolicyState(string affPath)
+    {
+        int policy = 0;
+        ulong mask = 0;
+
+        try
+        {
+            using RegistryKey? affKey = Registry.LocalMachine.OpenSubKey(affPath);
+            if (affKey is null)
+            {
+                return (policy, mask);
+            }
+
+            if (affKey.GetValue("DevicePolicy") is int pv)
+            {
+                policy = pv;
+            }
+
+            mask = ReadAffinityMaskValue(affKey.GetValue("AssignmentSetOverride"));
+        }
+        catch
+        {
+        }
+
+        return (policy, mask);
+    }
+
+    private void ApplyMaskToCpuBoxes(DeviceBlock block, ulong mask)
+    {
+        block.AffinityMask = mask;
+        block.SuppressCpuEvents++;
+        try
+        {
+            for (int i = 0; i < block.CpuBoxes.Count; i++)
+            {
+                ulong bit = 1UL << i;
+                block.CpuBoxes[i].Checked = (mask & bit) != 0;
+            }
+        }
+        finally
+        {
+            block.SuppressCpuEvents--;
+        }
+
+        RecalcAffinityMask(block);
+    }
+
+    private void WriteNdisIrqPolicy(DeviceBlock block)
+    {
+        string affPath = block.Device.RegBase + @"\Device Parameters\Interrupt Management\Affinity Policy";
+        try
+        {
+            Registry.LocalMachine.CreateSubKey(affPath)?.Dispose();
+            using RegistryKey? affKey = Registry.LocalMachine.OpenSubKey(affPath, writable: true);
+            if (affKey is null)
+            {
+                return;
+            }
+
+            ulong mask = block.AffinityMask;
+            affKey.SetValue("DevicePolicy", 4, RegistryValueKind.DWord);
+            byte[] bytes = IntPtr.Size >= 8 ? BitConverter.GetBytes(mask) : BitConverter.GetBytes((uint)mask);
+            affKey.SetValue("AssignmentSetOverride", bytes, RegistryValueKind.Binary);
+            WriteLog($"RSS.IRQ.SET: {block.Device.InstanceId} DevicePolicy=4 mask=0x{mask:X}");
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"RSS.IRQ.SET: {block.Device.InstanceId} failed: {ex.Message}");
+        }
+    }
+
+    private void ClearNdisIrqPolicy(DeviceBlock block)
+    {
+        string affPath = block.Device.RegBase + @"\Device Parameters\Interrupt Management\Affinity Policy";
+        try
+        {
+            using RegistryKey? affKey = Registry.LocalMachine.OpenSubKey(affPath, writable: true);
+            affKey?.DeleteValue("DevicePolicy", throwOnMissingValue: false);
+            affKey?.DeleteValue("AssignmentSetOverride", throwOnMissingValue: false);
+            WriteLog($"RSS.IRQ.CLEAR: {block.Device.InstanceId}");
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"RSS.IRQ.CLEAR: {block.Device.InstanceId} failed: {ex.Message}");
+        }
+    }
+
     private void ApplyNdisSelection(DeviceBlock block, int baseCore, int queues)
     {
         int clampedQueues = ClampRssQueueCount(queues);
@@ -186,7 +432,7 @@ public sealed partial class MainForm
         block.MsiCombo.SelectedItem = msiSupported == 1 ? "Enabled" : "Disabled";
         block.LimitBox.Text = limitPresent && limit > 0 ? limit.ToString() : "0";
 
-        int prioValue = 2;
+        int? prioValue = null;
         string prioAffPath = intBase + @"\Affinity Policy";
         if (!isTestDevice)
         {
@@ -206,8 +452,9 @@ public sealed partial class MainForm
         block.PrioCombo.SelectedItem = prioValue switch
         {
             1 => "Low",
+            2 => "Normal",
             3 => "High",
-            _ => "Normal",
+            _ => "Undefined",
         };
 
         block.PolicyCombo.Items.Clear();
@@ -222,8 +469,25 @@ public sealed partial class MainForm
             block.PolicyCombo.Visible = false;
 
             int? baseCore = isTestDevice ? 0 : GetNdisBaseCore(block.Device.InstanceId);
-            int queues = isTestDevice ? 1 : GetNdisRssQueues(block.Device.InstanceId) ?? 1;
+            int? registryQueues = isTestDevice ? 1 : GetNdisRssQueues(block.Device.InstanceId);
+            int queues = registryQueues ?? 1;
             queues = ClampRssQueueCount(queues);
+            block.NdisRssRuntime = isTestDevice
+                ? EmptyNdisRssRuntimeState("test-device")
+                : GetNdisRssRuntimeState(block.Device.InstanceId);
+            (int irqPolicy, ulong irqMask) = isTestDevice
+                ? (0, 0UL)
+                : ReadAffinityPolicyState(prioAffPath);
+            bool hasRss = baseCore.HasValue;
+            bool hasIrqPolicy = irqPolicy == 4 && irqMask != 0;
+            NdisAffinityMode ndisMode = hasRss && hasIrqPolicy
+                ? NdisAffinityMode.Both
+                : hasIrqPolicy
+                    ? NdisAffinityMode.IrqPolicy
+                    : hasRss || block.NdisRssRuntime.RssFound
+                        ? NdisAffinityMode.Rss
+                        : NdisAffinityMode.IrqPolicy;
+            SetNdisModeCombo(block, ndisMode);
 
             block.SuppressCpuEvents++;
             try
@@ -243,9 +507,30 @@ public sealed partial class MainForm
             {
                 ApplyNdisSelection(block, baseCore.Value, queues);
             }
+            else if (hasIrqPolicy)
+            {
+                int selectedCount = Math.Max(1, Enumerable.Range(0, block.CpuBoxes.Count).Count(i => (irqMask & (1UL << i)) != 0));
+                if (block.RssQueueBox is not null)
+                {
+                    block.SuppressCpuEvents++;
+                    try
+                    {
+                        block.RssQueueBox.Value = ClampRssQueueCount(selectedCount);
+                    }
+                    finally
+                    {
+                        block.SuppressCpuEvents--;
+                    }
+                }
+
+                block.RssBaseCore = Enumerable.Range(0, block.CpuBoxes.Count).FirstOrDefault(i => (irqMask & (1UL << i)) != 0);
+                ApplyMaskToCpuBoxes(block, irqMask);
+            }
 
             string loadPrefix = isTestDevice ? "LOAD.TEST" : "LOAD";
-            WriteLog($"{loadPrefix}: NET_NDIS {block.Device.InstanceId} MSI={(msiSupported == 1 ? "Enabled" : "Disabled")} Limit={(limitPresent ? limit.ToString() : "Unlimited")} PrioVal={prioValue} BaseCore={(baseCore ?? -1)} Queues={queues} Mask=0x{block.AffinityMask:X}");
+            WriteLog($"{loadPrefix}.RSS.ACTIVE: {block.Device.InstanceId} {FormatNdisRssRuntimeState(block.NdisRssRuntime)}");
+            LogNdisRssComparison(loadPrefix, block.Device.InstanceId, block.NdisRssRuntime, baseCore, registryQueues, null);
+            WriteLog($"{loadPrefix}: NET_NDIS {block.Device.InstanceId} MSI={(msiSupported == 1 ? "Enabled" : "Disabled")} Limit={(limitPresent ? limit.ToString() : "Unlimited")} PrioVal={prioValue} Mode={FormatNdisAffinityMode(ndisMode)} BaseCore={(baseCore ?? -1)} Queues={queues} IrqPolicy={irqPolicy} IrqMask=0x{irqMask:X} Mask=0x{block.AffinityMask:X}");
         }
         else
         {
@@ -267,26 +552,7 @@ public sealed partial class MainForm
                             policyVal = pv;
                         }
 
-                        object? rawOverride = affKey.GetValue("AssignmentSetOverride");
-                        if (rawOverride is byte[] bytes && bytes.Length >= 4)
-                        {
-                            if (bytes.Length >= 8)
-                            {
-                                mask = BitConverter.ToUInt64(bytes, 0);
-                            }
-                            else
-                            {
-                                mask = BitConverter.ToUInt32(bytes, 0);
-                            }
-                        }
-                        else if (rawOverride is int intVal)
-                        {
-                            mask = (uint)intVal;
-                        }
-                        else if (rawOverride is long longVal)
-                        {
-                            mask = (ulong)longVal;
-                        }
+                        mask = ReadAffinityMaskValue(affKey.GetValue("AssignmentSetOverride"));
                     }
                 }
                 catch
@@ -334,34 +600,82 @@ public sealed partial class MainForm
                 string defaultText = FormatImodValue(config.GlobalInterval);
                 block.ImodDefaultLabel.Text = $"default: {defaultText}";
                 block.ImodDefaultLabel.Tag = defaultText;
+                string currentText = block.ImodCurrentLabel.Text ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(currentText)
+                    || currentText.Equals("current: -", StringComparison.OrdinalIgnoreCase)
+                    || currentText.Equals("current: reading...", StringComparison.OrdinalIgnoreCase))
+                {
+                    block.ImodCurrentLabel.Text = "current: unavailable";
+                    block.ImodCurrentLabel.ForeColor = _statusInactive;
+                }
 
                 ImodConfigEntry? overrideEntry = FindImodOverride(block.Device.InstanceId, config);
                 if (overrideEntry?.Enabled == false)
                 {
                     block.ImodBox.Text = string.Empty;
+                    block.ImodAutoCheck.Checked = false;
                 }
                 else
                 {
-                    uint interval = GetEffectiveImodInterval(block.Device.InstanceId, config);
-                    block.ImodBox.Text = FormatImodValue(interval);
+                    bool hasCustomOverride = false;
+                    if (overrideEntry?.RoleIntervals is { Count: > 0 } roleIntervals)
+                    {
+                        block.ImodBox.Text = FormatImodRoleIntervals(roleIntervals);
+                        hasCustomOverride = roleIntervals.Values.Any(value => value != config.GlobalInterval);
+                    }
+                    else if (overrideEntry?.Intervals is { Count: > 0 } intervals)
+                    {
+                        block.ImodBox.Text = FormatImodVector(intervals);
+                        hasCustomOverride = intervals.Any(value => value != config.GlobalInterval);
+                    }
+                    else
+                    {
+                        uint interval = GetEffectiveImodInterval(block.Device.InstanceId, config);
+                        block.ImodBox.Text = FormatImodValue(interval);
+                        hasCustomOverride = overrideEntry?.Interval.HasValue == true
+                            && interval != config.GlobalInterval;
+                    }
+
+                    block.ImodAutoCheck.Checked = hasCustomOverride;
                 }
             }
             else
             {
                 block.ImodBox.Text = string.Empty;
+                block.ImodAutoCheck.Checked = false;
                 block.ImodDefaultLabel.Text = string.Empty;
                 block.ImodDefaultLabel.Tag = null;
+                block.ImodCurrentLabel.Text = string.Empty;
             }
         }
         else
         {
             block.ImodBox.Text = string.Empty;
+            block.ImodAutoCheck.Checked = false;
             block.ImodDefaultLabel.Text = string.Empty;
             block.ImodDefaultLabel.Tag = null;
+            block.ImodCurrentLabel.Text = string.Empty;
         }
 
+        LoadRawMouseThrottleControls(block);
+        RefreshNicItrBlock(block);
+        UpdateImodSelectorsFromText(block);
+        UpdateBlockInfoText(block);
+    }
+
+    private void UpdateBlockInfoText(
+        DeviceBlock block,
+        string? usbRolesOverride = null,
+        string? usbPollingOverride = null,
+        string? usbLivePollingOverride = null)
+    {
         string shortPnp = GetShortPnpId(block.Device.InstanceId);
         string displayReg = GetDisplayRegPath(block.Device.InstanceId);
+        string regBase = block.Device.RegBase;
+        string usbRoles = usbRolesOverride ?? block.Device.UsbRoles;
+        string usbPolling = usbPollingOverride ?? block.Device.UsbPollingRates;
+        string usbLivePolling = usbLivePollingOverride ?? string.Empty;
+
         StringBuilder info = new();
         if (block.Device.IsTestDevice)
         {
@@ -371,20 +685,41 @@ public sealed partial class MainForm
         info.AppendLine($"Class: {block.Device.Class}");
         info.Append($"Registry: {displayReg}");
 
-        if (block.Device.Kind == DeviceKind.USB && !string.IsNullOrWhiteSpace(block.Device.UsbRoles))
+        if (block.Device.Kind == DeviceKind.USB && !string.IsNullOrWhiteSpace(usbRoles))
         {
             info.AppendLine();
-            info.Append($"HID: {block.Device.UsbRoles}");
+            info.Append($"HID: {usbRoles}");
+            if (!string.IsNullOrWhiteSpace(usbPolling))
+            {
+                info.AppendLine();
+                info.Append($"Polling: {usbPolling}");
+            }
         }
         else if (block.Device.Kind == DeviceKind.NET_NDIS)
         {
             info.AppendLine();
-            info.Append("Net type: NDIS (RSS)");
+            string ndisMode = FormatNdisAffinityMode(GetSelectedNdisAffinityMode(block));
+            info.Append($"Net type: NDIS ({ndisMode})");
+            if (block.NdisRssRuntime is NdisRssRuntimeState runtime && runtime.RssFound)
+            {
+                info.AppendLine();
+                info.Append($"RSS: {FormatNdisRuntimeBool(runtime.Enabled)} base {FormatNdisRuntimeValue(runtime.BaseProcessorNumber)} queues {FormatNdisRuntimeValue(runtime.NumberOfReceiveQueues)}");
+            }
+            if (TryGetNicItrProfile(block.Device.InstanceId) is NicItrProfile nicProfile)
+            {
+                info.AppendLine();
+                info.Append($"NIC ITR: {nicProfile.FamilyName}");
+            }
         }
         else if (block.Device.Kind == DeviceKind.NET_CX)
         {
             info.AppendLine();
             info.Append("Net type: NetAdapterCx");
+            if (TryGetNicItrProfile(block.Device.InstanceId) is NicItrProfile nicProfile)
+            {
+                info.AppendLine();
+                info.Append($"NIC ITR: {nicProfile.FamilyName}");
+            }
         }
         else if (block.Device.Kind == DeviceKind.STOR)
         {
@@ -397,8 +732,17 @@ public sealed partial class MainForm
             info.Append($"Audio endpoints: {block.Device.AudioEndpoints}");
         }
 
-        block.InfoLabel.Text = info.ToString();
-        block.InfoLabel.Tag = GetFullRegPath($"HKLM\\{regBase}");
+        string infoText = info.ToString();
+        if (!string.Equals(block.InfoLabel.Text, infoText, StringComparison.Ordinal))
+        {
+            block.InfoLabel.Text = infoText;
+        }
+
+        string fullRegPath = GetFullRegPath($"HKLM\\{regBase}");
+        if (!string.Equals(block.InfoLabel.Tag as string, fullRegPath, StringComparison.Ordinal))
+        {
+            block.InfoLabel.Tag = fullRegPath;
+        }
     }
 
     private void SaveBlockSettings(DeviceBlock block, bool msiOnlyForIntegratedGpu = false)
@@ -480,11 +824,7 @@ public sealed partial class MainForm
                 }
                 else
                 {
-                    MessageBox.Show(
-                        "MSI Limit must be a whole number. Leave empty or set 0 for unlimited. Value has been reset to 0 (unlimited).",
-                        "DEVICE TWEAKER",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning);
+                    ShowThemedInfo("MSI Limit must be a whole number. Leave empty or set 0 for unlimited. Value has been reset to 0 (unlimited).");
 
                     msiKey.DeleteValue("MessageNumberLimit", throwOnMissingValue: false);
                     block.LimitBox.Text = "0";
@@ -506,18 +846,26 @@ public sealed partial class MainForm
         {
         }
 
-        string prioStr = block.PrioCombo.SelectedItem?.ToString() ?? "Normal";
-        int prioVal = prioStr switch
+        string prioStr = block.PrioCombo.SelectedItem?.ToString() ?? "Undefined";
+        int? prioVal = prioStr switch
         {
             "Low" => 1,
+            "Normal" => 2,
             "High" => 3,
-            _ => 2,
+            _ => null,
         };
 
         try
         {
             using RegistryKey? prioKey = Registry.LocalMachine.OpenSubKey(prioAffPath, writable: true);
-            prioKey?.SetValue("DevicePriority", prioVal, RegistryValueKind.DWord);
+            if (prioVal.HasValue)
+            {
+                prioKey?.SetValue("DevicePriority", prioVal.Value, RegistryValueKind.DWord);
+            }
+            else
+            {
+                prioKey?.DeleteValue("DevicePriority", throwOnMissingValue: false);
+            }
         }
         catch
         {
@@ -545,9 +893,36 @@ public sealed partial class MainForm
 
             ApplyNdisSelection(block, baseCore, queues);
 
-            WriteLog($"APPLY: NET_NDIS {block.Device.InstanceId} baseCore={baseCore} queues={queues}");
-            SetNdisRssQueues(block.Device.InstanceId, queues);
-            SetNdisBaseCore(block.Device.InstanceId, baseCore);
+            NdisAffinityMode ndisMode = GetSelectedNdisAffinityMode(block);
+            if (ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both)
+            {
+                SetNdisRssQueues(block.Device.InstanceId, queues);
+                SetNdisBaseCore(block.Device.InstanceId, baseCore);
+                SetNdisRssExtraValues(block.Device.InstanceId, baseCore, queues);
+            }
+            else
+            {
+                ClearNdisBaseCore(block.Device.InstanceId);
+                ClearNdisRssQueues(block.Device.InstanceId);
+                ClearNdisRssExtraValues(block.Device.InstanceId);
+            }
+
+            if (ndisMode is NdisAffinityMode.IrqPolicy or NdisAffinityMode.Both)
+            {
+                WriteNdisIrqPolicy(block);
+            }
+            else
+            {
+                ClearNdisIrqPolicy(block);
+            }
+
+            WriteLog($"APPLY: NET_NDIS {block.Device.InstanceId} mode={FormatNdisAffinityMode(ndisMode)} baseCore={baseCore} queues={queues} mask=0x{block.AffinityMask:X}");
+            _ndisRssRuntimeCache.Remove(NormalizeInstanceId(block.Device.InstanceId));
+            block.NdisRssRuntime = GetNdisRssRuntimeState(block.Device.InstanceId);
+            WriteLog($"APPLY.RSS.ACTIVE: {block.Device.InstanceId} {FormatNdisRssRuntimeState(block.NdisRssRuntime)}");
+            int? appliedRssBase = ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both ? baseCore : null;
+            int? appliedRssQueues = ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both ? queues : null;
+            LogNdisRssComparison("APPLY", block.Device.InstanceId, block.NdisRssRuntime, appliedRssBase, appliedRssQueues, appliedRssQueues);
             return;
         }
 
@@ -658,6 +1033,7 @@ public sealed partial class MainForm
         {
             ClearNdisBaseCore(block.Device.InstanceId);
             ClearNdisRssQueues(block.Device.InstanceId);
+            ClearNdisRssExtraValues(block.Device.InstanceId);
         }
 
         WriteLog($"RESET: {block.Device.InstanceId} kind={block.Kind} -> cleared priority/affinity (MSI left unchanged by design)");

@@ -13,6 +13,28 @@ internal enum DeviceKind
     OTHER,
 }
 
+internal enum NdisAffinityMode
+{
+    Rss,
+    IrqPolicy,
+    Both,
+}
+
+internal sealed record NdisRssRuntimeState(
+    bool AdapterFound,
+    bool RssFound,
+    bool? Enabled,
+    int? BaseProcessorGroup,
+    int? BaseProcessorNumber,
+    int? MaxProcessorGroup,
+    int? MaxProcessorNumber,
+    int? MaxProcessors,
+    int? NumberOfReceiveQueues,
+    string AdapterName,
+    string InterfaceDescription,
+    string Profile,
+    string Error);
+
 internal sealed record CpuVendorInfo(string Name, string Vendor);
 
 internal sealed record CpuLpInfo(
@@ -74,6 +96,33 @@ internal sealed class CpuInfo
     public required Dictionary<int, int> CcdMap { get; init; }
 }
 
+internal sealed class DeviceIrqInfo
+{
+    public int Count { get; private set; }
+    public List<long> IrqNumbers { get; } = [];
+    public string MsiStatus { get; set; } = "Unknown";
+    public string Source { get; set; } = "WMI";
+
+    public void AddIrq(long? irqNumber)
+    {
+        Count++;
+        if (!irqNumber.HasValue)
+        {
+            return;
+        }
+
+        IrqNumbers.Add(irqNumber.Value);
+        if (irqNumber.Value > 999)
+        {
+            MsiStatus = "Enabled";
+        }
+        else if (MsiStatus == "Unknown")
+        {
+            MsiStatus = "Disabled";
+        }
+    }
+}
+
 internal sealed class DeviceInfo
 {
     public required string Name { get; init; }
@@ -82,6 +131,7 @@ internal sealed class DeviceInfo
     public required string RegBase { get; init; }
     public required DeviceKind Kind { get; init; }
     public string UsbRoles { get; init; } = string.Empty;
+    public string UsbPollingRates { get; init; } = string.Empty;
     public string AudioEndpoints { get; init; } = string.Empty;
     public string StorageTag { get; init; } = string.Empty;
     public bool IsIntegratedGpu { get; init; }
@@ -96,24 +146,40 @@ internal sealed class DeviceBlock
     public required DeviceInfo Device { get; init; }
     public required DeviceKind Kind { get; init; }
     public required Panel Group { get; init; }
+    public required Label TitleLabel { get; init; }
     public required List<CheckBox> CpuBoxes { get; init; }
     public required Label AffinityLabel { get; init; }
     public required Label IrqLabel { get; init; }
-    public required ComboBox MsiCombo { get; init; }
+    public required ThemedDropDownPicker MsiCombo { get; init; }
     public required TextBox LimitBox { get; init; }
-    public required ComboBox PrioCombo { get; init; }
-    public required ComboBox PolicyCombo { get; init; }
+    public required ThemedDropDownPicker PrioCombo { get; init; }
+    public required ThemedDropDownPicker PolicyCombo { get; init; }
     public required Label PolicyLabel { get; init; }
+    public ThemedDropDownPicker? NdisModeCombo { get; init; }
+    public Label? NdisModeLabel { get; init; }
     public NumericUpDown? RssQueueBox { get; init; }
+    public TextBox? NicItrBox { get; init; }
+    public Label? NicItrStatusLabel { get; init; }
+    public Label? NicItrTimeLabel { get; init; }
+    public Button? NicItrApplyButton { get; init; }
+    public Button? NicItrSaveButton { get; init; }
     public required CheckBox ImodAutoCheck { get; init; }
+    public ThemedDropDownPicker? ImodModeCombo { get; init; }
     public required TextBox ImodBox { get; init; }
     public required Label ImodDefaultLabel { get; init; }
-    public required Label InfoLabel { get; init; }
+    public required Label ImodCurrentLabel { get; init; }
+    public Control? ImodMapLabel { get; init; }
+    public CheckBox? RawMouseThrottleCheck { get; init; }
+    public ThemedDropDownPicker? RawMouseThrottleCombo { get; init; }
+    public Label? RawMouseThrottleStatusLabel { get; init; }
+    public required Control InfoLabel { get; init; }
 
     public ulong AffinityMask { get; set; }
     public int? IrqCount { get; set; }
     public int SuppressCpuEvents { get; set; }
+    public int SuppressImodEvents { get; set; }
     public int? RssBaseCore { get; set; }
+    public NdisRssRuntimeState? NdisRssRuntime { get; set; }
 }
 
 internal sealed record UsbControllerInfo(string ControllerPNPID, string ControllerName);
@@ -127,6 +193,34 @@ internal sealed class HidDeviceInfo
     public List<UsbControllerInfo> UsbControllers { get; init; } = [];
     public int? UsagePage { get; init; }
     public int? UsageId { get; init; }
+}
+
+internal sealed record UsbPollingRateInfo(
+    string VendorProductId,
+    double Hertz,
+    string Speed,
+    int BInterval,
+    string Tag);
+
+internal sealed class UsbEndpointInfo
+{
+    public string HostControllerPath { get; init; } = string.Empty;
+    public string HubPath { get; init; } = string.Empty;
+    public string TopologyPath { get; init; } = string.Empty;
+    public int PortNumber { get; init; }
+    public string Speed { get; init; } = string.Empty;
+    public bool DeviceIsHub { get; init; }
+    public int DeviceAddress { get; init; }
+    public string VendorId { get; init; } = string.Empty;
+    public string ProductId { get; init; } = string.Empty;
+    public int InterfaceNumber { get; init; }
+    public int AlternateSetting { get; init; }
+    public string InterfaceClass { get; init; } = string.Empty;
+    public string InterfaceSubClass { get; init; } = string.Empty;
+    public string InterfaceProtocol { get; init; } = string.Empty;
+    public string Direction { get; init; } = string.Empty;
+    public string TransferType { get; init; } = string.Empty;
+    public int BInterval { get; init; }
 }
 
 internal sealed record WmiPnPDevice(

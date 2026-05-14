@@ -1,0 +1,37 @@
+#pragma once
+
+#define FILE_DEVICE_IMOD 0x00008010
+#define IMOD_IOCTL_INDEX 0x810
+
+#define IOCTL_IMOD_MAP_PHYSICAL \
+    CTL_CODE(FILE_DEVICE_IMOD, IMOD_IOCTL_INDEX, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+#define IOCTL_IMOD_UNMAP_PHYSICAL \
+    CTL_CODE(FILE_DEVICE_IMOD, IMOD_IOCTL_INDEX + 1, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+#define IOCTL_IMOD_READ_PHYSICAL \
+    CTL_CODE(FILE_DEVICE_IMOD, IMOD_IOCTL_INDEX + 2, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+#define IOCTL_IMOD_WRITE_PHYSICAL \
+    CTL_CODE(FILE_DEVICE_IMOD, IMOD_IOCTL_INDEX + 3, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+#pragma pack(push, 1)
+
+struct tagPhysStruct
+{
+    ULONGLONG physMemSizeInBytes;
+    ULONGLONG physAddress;
+    ULONGLONG physicalMemoryHandle;
+    ULONGLONG physMemLin;
+    ULONGLONG physSection;
+};
+
+struct tagPhysAccessStruct
+{
+    ULONGLONG physAddress;
+    ULONG accessSizeInBytes;
+    ULONG reserved;
+    ULONGLONG value;
+};
+
+#pragma pack(pop)

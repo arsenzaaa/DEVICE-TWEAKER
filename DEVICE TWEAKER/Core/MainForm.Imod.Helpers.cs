@@ -32,7 +32,9 @@ public sealed partial class MainForm
 
         foreach (string entry in roles.Split(',', StringSplitOptions.RemoveEmptyEntries))
         {
-            if (string.Equals(entry.Trim(), role, StringComparison.OrdinalIgnoreCase))
+            string trimmed = entry.Trim();
+            if (string.Equals(trimmed, role, StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith(role + " ", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }

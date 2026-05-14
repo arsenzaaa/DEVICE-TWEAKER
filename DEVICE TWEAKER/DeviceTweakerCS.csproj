@@ -29,6 +29,8 @@
     <Product>DEVICE TWEAKER</Product>
     <FileDescription>MADE BY ARSENZA</FileDescription>
     <Copyright>Copyright (c) arsenza</Copyright>
+
+    <BuildImodDriver Condition="'$(BuildImodDriver)' == ''">true</BuildImodDriver>
   </PropertyGroup>
 
   <ItemGroup>
@@ -41,10 +43,25 @@
     </EmbeddedResource>
   </ItemGroup>
 
-  <ItemGroup Condition="Exists('IMOD\\winio.sys')">
-    <EmbeddedResource Include="IMOD\\winio.sys">
-      <LogicalName>DeviceTweakerCS.IMOD.winio.sys</LogicalName>
+  <ItemGroup>
+    <EmbeddedResource Include="IMOD\\DTIMOD.sys">
+      <LogicalName>DeviceTweakerCS.IMOD.DTIMOD.sys</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="IMOD\\DTIMOD.sys.sha256">
+      <LogicalName>DeviceTweakerCS.IMOD.DTIMOD.sys.sha256</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="IMOD\\Loader\\kdu.exe">
+      <LogicalName>DeviceTweakerCS.IMOD.Loader.kdu.exe</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="IMOD\\Loader\\drv64.dll">
+      <LogicalName>DeviceTweakerCS.IMOD.Loader.drv64.dll</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
+
+  <Target Name="BuildImodDriverArtifact"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(BuildImodDriver)' == 'true' and '$(DesignTimeBuild)' != 'true' and '$(OS)' == 'Windows_NT'">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\publish-variants.ps1&quot; -BuildDriverOnly -Configuration &quot;$(Configuration)&quot;" />
+  </Target>
 
 </Project>
