@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{072f189a-cea9-4ca8-a0fa-1257a7524a8e}</ProjectGuid>
+    <RootNamespace>Tanikaze</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>.\output\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>drv64</TargetName>
+    <GenerateManifest>false</GenerateManifest>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>.\output\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>.\output\$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>drv64</TargetName>
+    <GenerateManifest>false</GenerateManifest>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;TANIKAZE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;TANIKAZE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;TANIKAZE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\Shared;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
+      <ModuleDefinitionFile>export.def</ModuleDefinitionFile>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;TANIKAZE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\Shared;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <ExceptionHandling>false</ExceptionHandling>
+      <Optimization>MinSpace</Optimization>
+      <StringPooling>true</StringPooling>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <SetChecksum>true</SetChecksum>
+      <MinimumRequiredVersion>
+      </MinimumRequiredVersion>
+      <ModuleDefinitionFile>export.def</ModuleDefinitionFile>
+      <EntryPointSymbol>
+      </EntryPointSymbol>
+      <NoEntryPoint>true</NoEntryPoint>
+      <AdditionalOptions>/NOCOFFGRPINFO %(AdditionalOptions)</AdditionalOptions>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ResourceCompile Include="resource.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\Shared\consts.h" />
+    <ClInclude Include="..\Shared\kdubase.h" />
+    <ClInclude Include="tanikaze.h" />
+    <ClInclude Include="resource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="data\AsusCertService.bin" />
+    <None Include="data\dbutilcat.bin" />
+    <None Include="data\dbutilinf.bin" />
+    <None Include="data\KMUEXE.bin" />
+    <None Include="data\KMUSIG.bin" />
+    <None Include="data\NeacSafe64Cat.bin" />
+    <None Include="drv\ALSysIO64.bin" />
+    <None Include="drv\AMDRyzenMasterDriver.bin" />
+    <None Include="drv\amsdk.bin" />
+    <None Include="drv\AODDriver215.bin" />
+    <None Include="drv\AppShopDrv103.bin" />
+    <None Include="drv\asio2.bin" />
+    <None Include="drv\AsIO3.bin" />
+    <None Include="drv\AsrDrv106.bin" />
+    <None Include="drv\AsrDrv107.bin" />
+    <None Include="drv\AsrDrv107n.bin" />
+    <None Include="drv\ATSZIO64.bin" />
+    <None Include="drv\AxtuDrv.bin" />
+    <None Include="drv\Cormem.bin" />
+    <None Include="drv\dbk64.bin" />
+    <None Include="drv\DbUtil2_3.bin" />
+    <None Include="drv\dbutildrv2.bin" />
+    <None Include="drv\DirectIo64.bin" />
+    <None Include="drv\DirectIo64_2.bin" />
+    <None Include="drv\echo_driver.bin" />
+    <None Include="drv\eleetx1.bin" />
+    <None Include="drv\ene2.bin" />
+    <None Include="drv\eneio64.bin" />
+    <None Include="drv\enetechio64.bin" />
+    <None Include="drv\etdsupp.bin" />
+    <None Include="drv\gdrv.bin" />
+    <None Include="drv\glckio2.bin" />
+    <None Include="drv\gmerdrv.bin" />
+    <None Include="drv\heavenluo.bin" />
+    <None Include="drv\HW64.bin" />
+    <None Include="drv\HwRwDrv.x64.bin" />
+    <None Include="drv\inpoutx64.bin" />
+    <None Include="drv\ipctype.bin" />
+    <None Include="drv\iQVM64.bin" />
+    <None Include="drv\irec.bin" />
+    <None Include="drv\KExplore.bin" />
+    <None Include="drv\KObjExp.bin" />
+    <None Include="drv\kprocesshacker.bin" />
+    <None Include="drv\KRegExp.bin" />
+    <None Include="drv\LDD.bin" />
+    <None Include="drv\lha.bin" />
+    <None Include="drv\LnvMSRIO.bin" />
+    <None Include="drv\mimidrv.bin" />
+    <None Include="drv\mktoolsx64.bin" />
+    <None Include="drv\msio64.bin" />
+    <None Include="drv\NeacSafe64.bin" />
+    <None Include="drv\nvoclock.bin" />
+    <None Include="drv\pcdsrvc_x64.bin" />
+    <None Include="drv\PdFwKrnl.bin" />
+    <None Include="drv\PhyDMACC.bin" />
+    <None Include="drv\phymemx64.bin" />
+    <None Include="drv\phymem_panda.bin" />
+    <None Include="drv\physmem.bin" />
+    <None Include="drv\pmxdrv64.bin" />
+    <None Include="drv\procexp.bin" />
+    <None Include="drv\procexp1627.bin" />
+    <None Include="drv\procexp1702.bin" />
+    <None Include="drv\RTCore64.bin" />
+    <None Include="drv\rtkio64.bin" />
+    <None Include="drv\rzpnk.bin" />
+    <None Include="drv\SysDrv3S.bin" />
+    <None Include="drv\ThrottleStop.bin" />
+    <None Include="drv\TPwSav.bin" />
+    <None Include="drv\WinHwDrv64.bin" />
+    <None Include="drv\WinRing0x64.bin" />
+    <None Include="drv\wnBios64.bin" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

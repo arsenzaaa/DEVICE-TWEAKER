@@ -23,3 +23,6 @@ IMOD/build/
 IMOD/DTIMOD.sys.bak
 IMOD/IMOD/intermediates/
 IMOD/IMOD/intermidates/
+
+third_party/KDU/Source/**/output/
+third_party/KDU/Source/Hamakaze/Utils/GenAsIo2Unlock.exe
