@@ -1,6 +1,6 @@
-# KDU source snapshot
+# KDU source
 
-This directory contains the KDU source needed to rebuild the loader files used by DEVICE TWEAKER.
+This directory contains only the KDU parts needed to rebuild the loader files used by DEVICE TWEAKER.
 
 Runtime files used by DEVICE TWEAKER:
 - `IMOD/Loader/kdu.exe`
@@ -11,15 +11,13 @@ Source mapping:
 - `Source/Tanikaze/Tanikaze.vcxproj` builds `drv64.dll`.
 - `Source/Utils/GenAsIo2Unlock/GenAsIo2Unlock.vcxproj` builds the helper required by `Hamakaze` post-build.
 - `Source/Shared` contains common KDU headers and code.
-- `Source/Taigei` is kept because it is part of the upstream solution.
 
 Upstream project:
 https://github.com/hfiref0x/KDU
 
-Upstream files preserved here:
-- `UPSTREAM_README.md`
-- `UPSTREAM_CHANGELOG.txt`
-- `UPSTREAM_appveyor.yml`
+Runtime files currently bundled in `IMOD/Loader`:
+- `kdu.exe` version `1.4.5.2512`, SHA256 `B340DAD4DDBE8607F9FDDB79F679375B4FF5080FE1A7EDB6CE015F69D3A0CD4F`
+- `drv64.dll` version `1.4.5.2512`, SHA256 `D032D855A0FF0EF3E3AD6EC8DAFFB8649048F82D3F1EEB89BEE3652EE6F01F80`
 
 ## Build
 
@@ -31,7 +29,7 @@ Requirements:
 Build from the DEVICE TWEAKER project root:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\third_party\KDU\build-kdu.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\IMOD\KDU\build-kdu.ps1
 ```
 
 The script builds:
@@ -42,7 +40,7 @@ The script builds:
 To copy rebuilt binaries into `IMOD/Loader`:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\third_party\KDU\build-kdu.ps1 -CopyToLoader
+powershell -NoProfile -ExecutionPolicy Bypass -File .\IMOD\KDU\build-kdu.ps1 -CopyToLoader
 ```
 
 Do not replace the bundled runtime binaries without testing driver loading on a clean system.
