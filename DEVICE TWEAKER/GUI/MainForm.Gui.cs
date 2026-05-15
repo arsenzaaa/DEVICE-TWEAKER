@@ -40,7 +40,7 @@ public sealed partial class MainForm
 
         const string developerHandle = "@arsenza";
         const string developerUrl = "https://t.me/arsenzaa";
-        string subtitleText = $"beta version 0.0.4 - developed by {developerHandle}";
+        string subtitleText = $"alpha version 0.0.4 - developed by {developerHandle}";
 
         LinkLabel logoSubtitle = new()
         {
