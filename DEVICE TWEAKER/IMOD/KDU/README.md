@@ -15,6 +15,9 @@ Source mapping:
 Upstream project:
 https://github.com/hfiref0x/KDU
 
+License:
+- MIT, see `LICENSE.txt`.
+
 Runtime files currently bundled in `IMOD/Loader`:
 - `kdu.exe` version `1.4.5.2512`, SHA256 `B340DAD4DDBE8607F9FDDB79F679375B4FF5080FE1A7EDB6CE015F69D3A0CD4F`
 - `drv64.dll` version `1.4.5.2512`, SHA256 `D032D855A0FF0EF3E3AD6EC8DAFFB8649048F82D3F1EEB89BEE3652EE6F01F80`
