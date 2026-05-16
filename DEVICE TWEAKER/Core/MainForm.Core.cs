@@ -282,7 +282,7 @@ public sealed partial class MainForm : Form
 
         if (_cpuInfo is not null)
         {
-            WriteLog($"CPU.SUMMARY: logical={_cpuInfo.Topology.Logical} maxVisual={_maxLogical} groups={_cpuGroupCount}");
+            WriteLog($"CPU.SUMMARY: logical={_cpuInfo.Topology.Logical} maxVisual={_maxLogical} groups={_cpuGroupCount} ccd={_cpuInfo.CcdMap.Values.Distinct().Count()} ccx={_cpuInfo.CcxMap.Values.Distinct().Count()}");
             WriteLog("CPU.TOPO: snapshot from CpuInfo");
 
             foreach (CpuLpInfo e in _cpuInfo.Topology.LPs.OrderBy(x => x.LP))
@@ -298,6 +298,7 @@ public sealed partial class MainForm : Form
                 }
 
                 int ccdId = _cpuInfo.CcdMap.TryGetValue(e.LP, out int cid) ? cid : 0;
+                int ccxId = _cpuInfo.CcxMap.TryGetValue(e.LP, out int xid) ? xid : 0;
                 string localText = e.LocalIndex >= 0 ? $" Local={e.LocalIndex}" : string.Empty;
                 string idText = e.CpuSetId >= 0 ? $" Id={e.CpuSetId}" : string.Empty;
                 string typeText = IsEfficiencyCore(e) ? "E" : isSecondaryThread ? "P/HT" : "P";
@@ -306,7 +307,7 @@ public sealed partial class MainForm : Form
                         ? $" CPPC=R{rating}/#{rank} Preferred={(rank == 1 ? 1 : 0)}"
                         : $" CPPC=#{rank} Preferred={(rank == 1 ? 1 : 0)}"
                     : " CPPC=unavailable Preferred=0";
-                WriteLog($"CPU.ENTRY: G{e.Group} L{e.LP}{localText}{idText} Core={e.Core} Type={typeText} CCD={ccdId} SMT={isSecondaryThread} EffClass={e.EffClass}{cppcText}");
+                WriteLog($"CPU.ENTRY: G{e.Group} L{e.LP}{localText}{idText} Core={e.Core} Type={typeText} CCD={ccdId} CCX={ccxId} SMT={isSecondaryThread} EffClass={e.EffClass}{cppcText}");
             }
 
             Dictionary<int, List<int>> ccdGroups = new();
@@ -325,6 +326,24 @@ public sealed partial class MainForm : Form
             {
                 List<int> lps = ccdGroups[ccdId].OrderBy(x => x).ToList();
                 WriteLog($"CCD.MAP: CCD{ccdId} -> LPs=[{string.Join(',', lps)}]");
+            }
+
+            Dictionary<int, List<int>> ccxGroups = new();
+            foreach (KeyValuePair<int, int> kvp in _cpuInfo.CcxMap)
+            {
+                if (!ccxGroups.TryGetValue(kvp.Value, out List<int>? list))
+                {
+                    list = [];
+                    ccxGroups[kvp.Value] = list;
+                }
+
+                list.Add(kvp.Key);
+            }
+
+            foreach (int ccxId in ccxGroups.Keys.OrderBy(x => x))
+            {
+                List<int> lps = ccxGroups[ccxId].OrderBy(x => x).ToList();
+                WriteLog($"CCX.MAP: CCX{ccxId} -> LPs=[{string.Join(',', lps)}]");
             }
         }
 
