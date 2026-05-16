@@ -33,6 +33,7 @@ public sealed partial class MainForm
         public required List<int> Lps { get; init; }
         public required bool IsECore { get; init; }
         public required int Ccd { get; init; }
+        public required int Ccx { get; init; }
         public required int Rating { get; init; }
         public required int Rank { get; init; }
 
@@ -107,6 +108,7 @@ public sealed partial class MainForm
                 .DefaultIfEmpty(int.MaxValue)
                 .Min();
             int ccd = _cpuInfo.CcdMap.TryGetValue(primary.LP, out int ccdValue) ? ccdValue : 0;
+            int ccx = _cpuInfo.CcxMap.TryGetValue(primary.LP, out int ccxValue) ? ccxValue : 0;
 
             units.Add(new AutoCpuUnit
             {
@@ -115,6 +117,7 @@ public sealed partial class MainForm
                 Lps = members.Select(lp => lp.LP).ToList(),
                 IsECore = IsEfficiencyCore(primary),
                 Ccd = ccd,
+                Ccx = ccx,
                 Rating = rating,
                 Rank = rank,
             });
@@ -158,12 +161,13 @@ public sealed partial class MainForm
             {
                 string smt = unit.HasSmt ? $"/smt=[{string.Join('+', unit.Lps)}]" : string.Empty;
                 string type = unit.IsECore ? "E" : "P";
+                string ccx = HasVisibleCcxSplit() ? $"/ccx={unit.Ccx}" : string.Empty;
                 if (_cppcEnabled && unit.Rank != int.MaxValue)
                 {
-                    return $"{unit.PrimaryLp}:{type}:R{unit.Rating}/#{unit.Rank}{smt}";
+                    return $"{unit.PrimaryLp}:{type}:R{unit.Rating}/#{unit.Rank}/ccd={unit.Ccd}{ccx}{smt}";
                 }
 
-                return $"{unit.PrimaryLp}:{type}{smt}";
+                return $"{unit.PrimaryLp}:{type}/ccd={unit.Ccd}{ccx}{smt}";
             }));
     }
 
@@ -568,6 +572,16 @@ public sealed partial class MainForm
         {
             WriteLog($"AUTO.CPPC: primaryP=[{FormatAutoCpuCandidates(primaryP)}] primaryE=[{FormatAutoCpuCandidates(primaryE)}] allP=[{FormatAutoCpuCandidates(allP)}] allE=[{FormatAutoCpuCandidates(allE)}]");
         }
+        if (HasVisibleCcxSplit() && _cpuInfo is not null)
+        {
+            string ccxText = string.Join(
+                " | ",
+                _cpuInfo.CcxMap
+                    .GroupBy(kvp => kvp.Value)
+                    .OrderBy(g => g.Key)
+                    .Select(g => $"CCX{g.Key}=[{string.Join(',', g.Select(kvp => kvp.Key).OrderBy(x => x))}]"));
+            WriteLog($"AUTO.CCX: enabled {ccxText}");
+        }
 
         HashSet<int> primaryPSet = primaryP.ToHashSet();
         HashSet<int> primaryESet = primaryE.ToHashSet();
@@ -807,7 +821,56 @@ public sealed partial class MainForm
         int spacingSkips = Math.Max(0, spacingEligibleUnits - Math.Min(spacingEligibleUnits, requiredPreferredUnitCount));
         WriteLog($"AUTO.PLAN.UNITS: required={requiredPreferredUnitCount} available={preferredUnits.Count} nonCore0={nonCore0PreferredUnits} avoidCore0={avoidCore0WhenPossible} spacingEligible={spacingEligibleUnits} spacing={spacingSkips}");
 
-        List<AutoCpuUnit> GetCandidateUnits(IEnumerable<AutoCpuUnit> units, bool allowCore0, bool preferWeak = false)
+        List<AutoCpuUnit> ApplyCcxPreference(List<AutoCpuUnit> ordered, int? preferCcx, int? avoidCcx)
+        {
+            if (!HasVisibleCcxSplit() || ordered.Count <= 1)
+            {
+                return ordered;
+            }
+
+            if (preferCcx.HasValue && ordered.Any(unit => unit.Ccx == preferCcx.Value))
+            {
+                return ordered
+                    .Where(unit => unit.Ccx == preferCcx.Value)
+                    .Concat(ordered.Where(unit => unit.Ccx != preferCcx.Value))
+                    .ToList();
+            }
+
+            if (avoidCcx.HasValue && ordered.Any(unit => unit.Ccx != avoidCcx.Value))
+            {
+                return ordered
+                    .Where(unit => unit.Ccx != avoidCcx.Value)
+                    .Concat(ordered.Where(unit => unit.Ccx == avoidCcx.Value))
+                    .ToList();
+            }
+
+            return ordered;
+        }
+
+        int? GetInputAnchorCcx()
+        {
+            if (!HasVisibleCcxSplit())
+            {
+                return null;
+            }
+
+            foreach (int unitId in inputShareUnitIds)
+            {
+                if (unitById.TryGetValue(unitId, out AutoCpuUnit? unit))
+                {
+                    return unit.Ccx;
+                }
+            }
+
+            return null;
+        }
+
+        List<AutoCpuUnit> GetCandidateUnits(
+            IEnumerable<AutoCpuUnit> units,
+            bool allowCore0,
+            bool preferWeak = false,
+            int? preferCcx = null,
+            int? avoidCcx = null)
         {
             List<AutoCpuUnit> ordered = units
                 .Where(unit => !reservedUnitIds.Contains(unit.Id))
@@ -819,17 +882,16 @@ public sealed partial class MainForm
 
             if (!allowCore0)
             {
-                return ordered.Where(unit => !unit.HasCore0).ToList();
+                return ApplyCcxPreference(ordered.Where(unit => !unit.HasCore0).ToList(), preferCcx, avoidCcx);
             }
 
             if (!avoidCore0WhenPossible)
             {
-                return ordered;
+                return ApplyCcxPreference(ordered, preferCcx, avoidCcx);
             }
 
-            return ordered
-                .Where(unit => !unit.HasCore0)
-                .Concat(ordered.Where(unit => unit.HasCore0))
+            return ApplyCcxPreference(ordered.Where(unit => !unit.HasCore0).ToList(), preferCcx, avoidCcx)
+                .Concat(ApplyCcxPreference(ordered.Where(unit => unit.HasCore0).ToList(), preferCcx, avoidCcx))
                 .ToList();
         }
 
@@ -837,13 +899,18 @@ public sealed partial class MainForm
         {
             reservedUnitIds.Add(unit.Id);
             consumedCores.Add(unit.PrimaryLp);
-            WriteLog($"AUTO.PLAN.UNIT.RESERVE: LP={unit.PrimaryLp} unit={unit.Id} ccd={unit.Ccd} type={(unit.IsECore ? "E" : "P")} reason={reason}");
+            WriteLog($"AUTO.PLAN.UNIT.RESERVE: LP={unit.PrimaryLp} unit={unit.Id} ccd={unit.Ccd} ccx={unit.Ccx} type={(unit.IsECore ? "E" : "P")} reason={reason}");
         }
 
-        AutoCpuUnit? TakeDedicatedUnit(bool allowCore0, bool preferWeak = false, bool useAudioE = false)
+        AutoCpuUnit? TakeDedicatedUnit(
+            bool allowCore0,
+            bool preferWeak = false,
+            bool useAudioE = false,
+            int? preferCcx = null,
+            int? avoidCcx = null)
         {
             List<AutoCpuUnit> source = useAudioE ? audioEUnits : preferredUnits;
-            AutoCpuUnit? unit = GetCandidateUnits(source, allowCore0, preferWeak).FirstOrDefault();
+            AutoCpuUnit? unit = GetCandidateUnits(source, allowCore0, preferWeak, preferCcx, avoidCcx).FirstOrDefault();
             if (unit is not null)
             {
                 ReserveUnit(unit, preferWeak ? "dedicated-weak" : "dedicated");
@@ -971,14 +1038,15 @@ public sealed partial class MainForm
 
         foreach (AutoAffinityPlanSlot slot in planSlots.Where(s => s.Role is AutoAffinityRole.InputMouse or AutoAffinityRole.InputController))
         {
-            AutoCpuUnit? unit = TakeDedicatedUnit(allowCore0: true);
+            int? inputCcx = GetInputAnchorCcx();
+            AutoCpuUnit? unit = TakeDedicatedUnit(allowCore0: true, preferCcx: inputCcx);
             if (unit is null)
             {
                 WriteLog($"AUTO.PLAN.SKIP: role={slot.Role} {slot.Block.Kind} {slot.Block.Device.InstanceId} reason=no-input-unit");
                 continue;
             }
 
-            AssignSlot(slot, [unit], "input-dedicated-unit");
+            AssignSlot(slot, [unit], inputCcx.HasValue && unit.Ccx == inputCcx.Value ? "input-dedicated-unit-ccx-near" : "input-dedicated-unit");
             if (slot.Lps.Count > 0)
             {
                 SkipSpacingUnitIfAvailable("input");
@@ -1003,14 +1071,15 @@ public sealed partial class MainForm
 
         foreach (AutoAffinityPlanSlot slot in planSlots.Where(s => s.Role == AutoAffinityRole.Nic))
         {
-            AutoCpuUnit? unit = TakeDedicatedUnit(allowCore0: true);
+            int? inputCcx = GetInputAnchorCcx();
+            AutoCpuUnit? unit = TakeDedicatedUnit(allowCore0: true, avoidCcx: inputCcx);
             if (unit is null)
             {
                 WriteLog($"AUTO.PLAN.SKIP: role={slot.Role} NET {slot.Block.Device.InstanceId} reason=no-safe-nic-unit");
                 continue;
             }
 
-            AssignSlot(slot, [unit], "nic-dedicated-unit");
+            AssignSlot(slot, [unit], inputCcx.HasValue && unit.Ccx != inputCcx.Value ? "nic-dedicated-unit-ccx-away-from-input" : "nic-dedicated-unit");
             if (slot.Lps.Count > 0)
             {
                 SkipSpacingUnitIfAvailable("nic");
@@ -1019,10 +1088,11 @@ public sealed partial class MainForm
 
         foreach (AutoAffinityPlanSlot slot in planSlots.Where(s => s.Role == AutoAffinityRole.Keyboard))
         {
-            AutoCpuUnit? unit = TakeDedicatedUnit(allowCore0: true);
+            int? inputCcx = GetInputAnchorCcx();
+            AutoCpuUnit? unit = TakeDedicatedUnit(allowCore0: true, preferCcx: inputCcx);
             if (unit is not null)
             {
-                AssignSlot(slot, [unit], "keyboard-dedicated-unit");
+                AssignSlot(slot, [unit], inputCcx.HasValue && unit.Ccx == inputCcx.Value ? "keyboard-dedicated-unit-ccx-near-input" : "keyboard-dedicated-unit");
                 if (slot.Lps.Count > 0)
                 {
                     SkipSpacingUnitIfAvailable("keyboard");
@@ -1051,10 +1121,11 @@ public sealed partial class MainForm
                 continue;
             }
 
-            AutoCpuUnit? weakUnit = TakeDedicatedUnit(allowCore0: true, preferWeak: true);
+            AutoCpuUnit? weakUnit = TakeDedicatedUnit(allowCore0: true, preferWeak: true, avoidCcx: GetInputAnchorCcx());
             if (weakUnit is not null)
             {
-                AssignSlot(slot, [weakUnit], "audio-dedicated-weak-unit");
+                int? inputCcx = GetInputAnchorCcx();
+                AssignSlot(slot, [weakUnit], inputCcx.HasValue && weakUnit.Ccx != inputCcx.Value ? "audio-dedicated-weak-unit-ccx-away-from-input" : "audio-dedicated-weak-unit");
             }
             else
             {

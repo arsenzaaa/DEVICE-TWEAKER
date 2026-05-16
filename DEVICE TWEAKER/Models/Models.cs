@@ -94,6 +94,7 @@ internal sealed class CpuInfo
 {
     public required CpuTopology Topology { get; init; }
     public required Dictionary<int, int> CcdMap { get; init; }
+    public required Dictionary<int, int> CcxMap { get; init; }
 }
 
 internal sealed class DeviceIrqInfo

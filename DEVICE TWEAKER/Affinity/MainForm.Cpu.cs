@@ -49,10 +49,12 @@ public sealed partial class MainForm
         _cpuHeaderText = $"CPU: {cpuVendor.Name}";
 
         Dictionary<int, int> ccdMap = BuildCcdMap(cpuRaw, cpuVendor);
+        Dictionary<int, int> ccxMap = BuildCcxMap(cpuRaw);
         _cpuInfo = new CpuInfo
         {
             Topology = cpuRaw,
             CcdMap = ccdMap,
+            CcxMap = ccxMap,
         };
         UpdateEfficiencyClassMap(cpuRaw);
         LoadCppcRatings(cpuRaw.Logical);
@@ -78,7 +80,9 @@ public sealed partial class MainForm
         _maxLogical = Math.Min(group0Count, MaxAffinityBits);
         _grpHeight = UiScale(120) + (_maxLogical * UiScale(24)) + UiScale(160);
 
-        WriteLog($"CPU.SUMMARY: logical={cpuRaw.Logical} physical={cpuRaw.PhysicalCores} groups={_cpuGroupCount} group0={group0Count} maxAffinity={_maxLogical}");
+        int ccdCount = ccdMap.Values.Distinct().Count();
+        int ccxCount = ccxMap.Values.Distinct().Count();
+        WriteLog($"CPU.SUMMARY: logical={cpuRaw.Logical} physical={cpuRaw.PhysicalCores} groups={_cpuGroupCount} ccd={ccdCount} ccx={ccxCount} group0={group0Count} maxAffinity={_maxLogical}");
         if (_cpuGroupCount > 1)
         {
             WriteLog($"CPU.GROUPS: using group0 for affinity UI (KAFFINITY max {MaxAffinityBits})");
@@ -188,6 +192,22 @@ public sealed partial class MainForm
             .Distinct()
             .Skip(1)
             .Any() == true;
+    }
+
+    private bool HasVisibleCcxSplit()
+    {
+        if (_cpuInfo is null || _cpuInfo.CcxMap.Count == 0)
+        {
+            return false;
+        }
+
+        return _cpuInfo.CcdMap
+            .GroupBy(kvp => kvp.Value)
+            .Any(group => group
+                .Select(kvp => _cpuInfo.CcxMap.TryGetValue(kvp.Key, out int ccx) ? ccx : 0)
+                .Distinct()
+                .Skip(1)
+                .Any());
     }
 
     private static string QueryKernelProcessorPowerEvents(int maxEvents)
@@ -502,6 +522,50 @@ public sealed partial class MainForm
         return map;
     }
 
+    private Dictionary<int, int> BuildCcxMap(CpuTopology cpu)
+    {
+        Dictionary<int, int> map = new();
+
+        List<KeyValuePair<int, List<CpuLpInfo>>> llcGroups = cpu.ByLLC
+            .Where(g => g.Key >= 0)
+            .OrderBy(g => g.Key)
+            .ToList();
+
+        bool perLpLlc = llcGroups.Count == cpu.Logical && llcGroups.All(g => g.Value.Count == 1);
+        if (llcGroups.Count == 0 || perLpLlc)
+        {
+            foreach (CpuLpInfo lp in cpu.LPs.OrderBy(x => x.LP))
+            {
+                map.TryAdd(lp.LP, 0);
+            }
+
+            return map;
+        }
+
+        int ccxIndex = 0;
+        foreach (IGrouping<int, KeyValuePair<int, List<CpuLpInfo>>> group in llcGroups
+            .GroupBy(g => ExtractCpuGroupFromLlcKey(g.Key))
+            .OrderBy(g => g.Key))
+        {
+            foreach (KeyValuePair<int, List<CpuLpInfo>> llcGroup in group.OrderBy(x => x.Key))
+            {
+                foreach (CpuLpInfo lp in llcGroup.Value)
+                {
+                    map.TryAdd(lp.LP, ccxIndex);
+                }
+
+                ccxIndex++;
+            }
+        }
+
+        foreach (CpuLpInfo lp in cpu.LPs.OrderBy(x => x.LP))
+        {
+            map.TryAdd(lp.LP, 0);
+        }
+
+        return map;
+    }
+
     private static int ExtractCpuGroupFromLlcKey(int llcKey)
     {
         return (llcKey >> 16) & 0xFFFF;
@@ -593,6 +657,7 @@ public sealed partial class MainForm
         }
 
         int ccdId = _cpuInfo.CcdMap.TryGetValue(lpIndex, out int cid) ? cid : 0;
+        int ccxId = _cpuInfo.CcxMap.TryGetValue(lpIndex, out int xid) ? xid : 0;
 
         string coreType = "P-Core";
         Color textColor = _cpuTextP;
@@ -608,10 +673,16 @@ public sealed partial class MainForm
         }
 
         bool showCcd = HasDualCcdCpu();
+        bool showCcx = HasVisibleCcxSplit();
         List<string> cpuLabelParts = [coreType];
         if (showCcd)
         {
             cpuLabelParts.Add($"CCD{ccdId}");
+        }
+
+        if (showCcx)
+        {
+            cpuLabelParts.Add($"CCX{ccxId}");
         }
 
         if (_cpuGroupCount > 1)
@@ -641,13 +712,16 @@ public sealed partial class MainForm
         cb.AutoSize = true;
         cb.FlatStyle = FlatStyle.Standard;
         cb.UseVisualStyleBackColor = false;
-        cb.BackColor = showCcd && ccdId == 1 ? Color.FromArgb(70, 30, 30) : _bgGroup;
+        cb.BackColor = showCcx
+            ? _cpuCcxBackColors[Math.Abs(ccxId) % _cpuCcxBackColors.Length]
+            : showCcd && ccdId == 1 ? Color.FromArgb(70, 30, 30) : _bgGroup;
         cb.ForeColor = textColor;
         cb.Padding = new Padding(UiScale(2), 0, 0, 0);
         cb.Margin = Padding.Empty;
         string ccdTooltip = showCcd ? $", CCD {ccdId}" : string.Empty;
+        string ccxTooltip = showCcx ? $", CCX {ccxId}" : string.Empty;
         _copyToolTip?.SetToolTip(
             cb,
-            $"CPU {lpIndex}: {(IsEfficiencyCore(lpInfo) ? "E-core" : isHyper ? "P-core SMT sibling" : "P-core")}{ccdTooltip}, Group {lpInfo.Group}, Core {lpInfo.Core}, Local {lpInfo.LocalIndex}. {cppcTooltip}");
+            $"CPU {lpIndex}: {(IsEfficiencyCore(lpInfo) ? "E-core" : isHyper ? "P-core SMT sibling" : "P-core")}{ccdTooltip}{ccxTooltip}, Group {lpInfo.Group}, Core {lpInfo.Core}, Local {lpInfo.LocalIndex}. {cppcTooltip}");
     }
 }

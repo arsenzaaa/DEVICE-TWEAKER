@@ -28,6 +28,13 @@ public sealed partial class MainForm
     private readonly Color _cpuTextP = Color.FromArgb(255, 230, 120);
     private readonly Color _cpuTextE = Color.FromArgb(120, 200, 255);
     private readonly Color _cpuTextSmt = Color.FromArgb(255, 180, 60);
+    private readonly Color[] _cpuCcxBackColors =
+    [
+        Color.FromArgb(8, 8, 10),
+        Color.FromArgb(22, 22, 30),
+        Color.FromArgb(30, 24, 18),
+        Color.FromArgb(18, 28, 24),
+    ];
 
     private readonly Font _baseFont = new("Consolas", 9);
     private readonly Font _dialogFont = new("Consolas", 10.5f);

@@ -13,6 +13,7 @@ public sealed partial class MainForm
         public HashSet<int> ECoreLps { get; } = new();
         public Dictionary<int, int> CoreMap { get; } = new();
         public Dictionary<int, int>? CcdMap { get; set; }
+        public Dictionary<int, int>? CcxMap { get; set; }
         public Dictionary<int, int> CppcRatings { get; } = new();
         public string CpuName { get; set; } = string.Empty;
     }
@@ -155,7 +156,7 @@ public sealed partial class MainForm
         dialog.ForeColor = _fgMain;
         dialog.Font = _baseFont;
         dialog.Icon = Icon;
-        dialog.ClientSize = new Size(760, 520);
+        dialog.ClientSize = new Size(860, 540);
         using ToolTip adminToolTip = new()
         {
             UseFading = true,
@@ -299,7 +300,7 @@ public sealed partial class MainForm
         int currentLogical = Math.Min(MaxAffinityBits, GetCurrentLogicalCount());
 
         Label cpuPresetLabel = NewDialogLabel("CPU preset:");
-        ComboBox cpuPresetCombo = NewDialogCombo(320);
+        ComboBox cpuPresetCombo = NewDialogCombo(400);
         cpuPresetCombo.Items.AddRange(new object[]
         {
             "Manual / current",
@@ -307,6 +308,8 @@ public sealed partial class MainForm
             "Intel 6P+8E/20T hybrid",
             "Intel 8P+16E/32T hybrid",
             "Intel Core Ultra 9 285K 8P+16E/24T",
+            "AMD Ryzen Zen2 8C/16T 1 CCD / 2 CCX",
+            "AMD Ryzen Zen2 12C/24T 2 CCD / 4 CCX",
             "AMD Ryzen 8C/16T 1 CCD",
             "AMD Ryzen 12C/24T 2 CCD",
             "AMD Ryzen 16C/32T 2 CCD",
@@ -342,6 +345,8 @@ public sealed partial class MainForm
         int[] coreAssign = BuildAssignmentsFromGroupsText(GetCurrentCoreGroupsText(), currentLogical, out coreGroupCount);
         int ccdGroupCount = 1;
         int[] ccdAssign = BuildAssignmentsFromGroupsText(GetCurrentCcdGroupsText(), currentLogical, out ccdGroupCount);
+        int ccxGroupCount = 1;
+        int[] ccxAssign = BuildAssignmentsFromGroupsText(GetCurrentCcxGroupsText(), currentLogical, out ccxGroupCount);
         bool[] eAssign = BuildECoreFlags(GetCurrentECoreText(), currentLogical);
 
         string GetCurrentCppcRatingsText()
@@ -368,13 +373,18 @@ public sealed partial class MainForm
 
         Label coreGroupCountLabel = NewInlineLabel("Core groups:");
         Label ccdGroupCountLabel = NewInlineLabel("CCD groups:");
+        Label ccxGroupCountLabel = NewInlineLabel("CCX groups:");
         NumericUpDown coreGroupCountUpDown = NewNumericUpDown(1, Math.Max(1, currentLogical), coreGroupCount);
         int maxCcdGroupsInit = Math.Min(2, Math.Max(1, currentLogical));
+        int maxCcxGroupsInit = Math.Min(8, Math.Max(1, currentLogical));
         NumericUpDown ccdGroupCountUpDown = NewNumericUpDown(1, maxCcdGroupsInit, ccdGroupCount);
+        NumericUpDown ccxGroupCountUpDown = NewNumericUpDown(1, maxCcxGroupsInit, ccxGroupCount);
         coreGroupCountUpDown.Margin = new Padding(0, 0, 12, 6);
-        ccdGroupCountUpDown.Margin = new Padding(0, 0, 0, 6);
+        ccdGroupCountUpDown.Margin = new Padding(0, 0, 12, 6);
+        ccxGroupCountUpDown.Margin = new Padding(0, 0, 0, 6);
         coreGroupCountLabel.Margin = new Padding(0, 5, 6, 0);
         ccdGroupCountLabel.Margin = new Padding(20, 5, 6, 0);
+        ccxGroupCountLabel.Margin = new Padding(20, 5, 6, 0);
 
         FlowLayoutPanel groupCountPanel = NewRowFlowPanel();
         groupCountPanel.Margin = new Padding(0, 12, 0, 8);
@@ -383,19 +393,22 @@ public sealed partial class MainForm
         groupCountPanel.Controls.Add(coreGroupCountUpDown);
         groupCountPanel.Controls.Add(ccdGroupCountLabel);
         groupCountPanel.Controls.Add(ccdGroupCountUpDown);
+        groupCountPanel.Controls.Add(ccxGroupCountLabel);
+        groupCountPanel.Controls.Add(ccxGroupCountUpDown);
 
         TableLayoutPanel assignmentsTable = new()
         {
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 4,
+            ColumnCount = 5,
             Dock = DockStyle.Top,
             Margin = new Padding(0),
             Padding = new Padding(4, 2, 4, 2),
         };
         assignmentsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 60F));
-        assignmentsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170F));
-        assignmentsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170F));
+        assignmentsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150F));
+        assignmentsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140F));
+        assignmentsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140F));
         assignmentsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 116F));
 
         Panel assignmentsHost = NewBoxPanel();
@@ -458,13 +471,13 @@ public sealed partial class MainForm
         layout.Controls.Add(cppcRatingsLabel, 0, 7);
         layout.Controls.Add(cppcRatingsBox, 1, 7);
         adminToolTip.SetToolTip(cppcRatingsBox, "Optional. Format: 0=120, 1=110, 2=100 or just 120,110,100. Empty = CPPC off in test mode.");
-        adminToolTip.SetToolTip(cpuPresetCombo, "Loads a synthetic topology for AUTO planner testing. You can still edit LP/core/CCD/E-core/CPPC values after loading.");
+        adminToolTip.SetToolTip(cpuPresetCombo, "Loads a synthetic topology for AUTO planner testing. You can still edit LP/core/CCD/CCX/E-core/CPPC values after loading.");
         layout.Controls.Add(groupCountLabel, 0, 8);
         layout.Controls.Add(groupCountPanel, 1, 8);
         layout.Controls.Add(assignmentsLabel, 0, 9);
         layout.Controls.Add(assignmentsHost, 1, 9);
 
-        Label helpLabel = NewHintLabel("How to use: set group counts, then assign each LP to a Core group and a CCD group. Tick E-core where needed.");
+        Label helpLabel = NewHintLabel("How to use: set group counts, then assign each LP to Core/CCD/CCX groups. Tick E-core where needed.");
         helpLabel.Margin = new Padding(0, 10, 0, 4);
         layout.Controls.Add(helpLabel, 0, 10);
         layout.SetColumnSpan(helpLabel, 2);
@@ -1121,6 +1134,78 @@ public sealed partial class MainForm
             }
         }
 
+        void AutoSplitCcxAssignments(int logicalCount, int ccxCount)
+        {
+            if (logicalCount <= 0 || ccxAssign.Length == 0)
+            {
+                return;
+            }
+
+            if (ccxCount <= 1)
+            {
+                for (int i = 0; i < logicalCount && i < ccxAssign.Length; i++)
+                {
+                    ccxAssign[i] = 0;
+                }
+                return;
+            }
+
+            int coreCount = (int)coreGroupCountUpDown.Value;
+            List<List<int>> coreGroups = [];
+            for (int core = 0; core < coreCount; core++)
+            {
+                List<int> lps = [];
+                for (int lp = 0; lp < logicalCount && lp < coreAssign.Length; lp++)
+                {
+                    if (coreAssign[lp] == core)
+                    {
+                        lps.Add(lp);
+                    }
+                }
+
+                if (lps.Count > 0)
+                {
+                    coreGroups.Add(lps);
+                }
+            }
+
+            if (coreGroups.Count == 0)
+            {
+                for (int lp = 0; lp < logicalCount && lp < ccxAssign.Length; lp++)
+                {
+                    ccxAssign[lp] = lp % ccxCount;
+                }
+                return;
+            }
+
+            int totalGroups = coreGroups.Count;
+            int baseCount = totalGroups / ccxCount;
+            int extra = totalGroups % ccxCount;
+            int groupIndex = 0;
+
+            for (int ccx = 0; ccx < ccxCount; ccx++)
+            {
+                int take = baseCount + (ccx < extra ? 1 : 0);
+                for (int i = 0; i < take; i++)
+                {
+                    if (groupIndex >= totalGroups)
+                    {
+                        break;
+                    }
+
+                    foreach (int lp in coreGroups[groupIndex])
+                    {
+                        if (lp >= 0 && lp < ccxAssign.Length)
+                        {
+                            ccxAssign[lp] = ccx;
+                        }
+                    }
+
+                    groupIndex++;
+                }
+            }
+        }
+
         void AutoGenerateSmtTopology(bool enabled)
         {
             if (smtAutoGenActive)
@@ -1138,6 +1223,7 @@ public sealed partial class MainForm
                 }
 
                 int ccdCount = Math.Min(2, Math.Max(1, (int)ccdGroupCountUpDown.Value));
+                int ccxCount = Math.Min(8, Math.Max(1, (int)ccxGroupCountUpDown.Value));
                 int logicalCount = (int)logicalUpDown.Value;
                 if (logicalCount <= 0)
                 {
@@ -1146,9 +1232,11 @@ public sealed partial class MainForm
 
                 bool[] coreIsE = new bool[coreCount];
                 int[] coreCcd = new int[coreCount];
+                int[] coreCcx = new int[coreCount];
                 for (int i = 0; i < coreCount; i++)
                 {
                     coreCcd[i] = -1;
+                    coreCcx[i] = -1;
                 }
 
                 int lpMax = Math.Min(logicalCount, coreAssign.Length);
@@ -1175,6 +1263,17 @@ public sealed partial class MainForm
 
                         coreCcd[core] = ccd;
                     }
+
+                    if (coreCcx[core] < 0 && lp < ccxAssign.Length)
+                    {
+                        int ccx = ccxAssign[lp];
+                        if (ccx < 0 || ccx >= ccxCount)
+                        {
+                            ccx = 0;
+                        }
+
+                        coreCcx[core] = ccx;
+                    }
                 }
 
                 for (int core = 0; core < coreCount; core++)
@@ -1182,6 +1281,11 @@ public sealed partial class MainForm
                     if (coreCcd[core] < 0)
                     {
                         coreCcd[core] = core % ccdCount;
+                    }
+
+                    if (coreCcx[core] < 0)
+                    {
+                        coreCcx[core] = core % ccxCount;
                     }
                 }
 
@@ -1207,6 +1311,7 @@ public sealed partial class MainForm
                 int maxLogical = Math.Min(MaxAffinityBits, newLogical);
                 int[] newCoreAssign = new int[maxLogical];
                 int[] newCcdAssign = new int[maxLogical];
+                int[] newCcxAssign = new int[maxLogical];
                 bool[] newEAssign = new bool[maxLogical];
 
                 int index = 0;
@@ -1217,6 +1322,7 @@ public sealed partial class MainForm
                     {
                         newCoreAssign[index] = core;
                         newCcdAssign[index] = coreCcd[core];
+                        newCcxAssign[index] = coreCcx[core];
                         newEAssign[index] = coreIsE[core];
                         index++;
                     }
@@ -1227,6 +1333,7 @@ public sealed partial class MainForm
                     int core = lp % coreCount;
                     newCoreAssign[lp] = core;
                     newCcdAssign[lp] = core % ccdCount;
+                    newCcxAssign[lp] = core % ccxCount;
                     newEAssign[lp] = false;
                 }
 
@@ -1234,12 +1341,15 @@ public sealed partial class MainForm
                 logicalUpDown.Value = maxLogical;
                 coreAssign = newCoreAssign;
                 ccdAssign = newCcdAssign;
+                ccxAssign = newCcxAssign;
                 eAssign = newEAssign;
 
                 int maxGroups = Math.Max(1, maxLogical);
                 int maxCcdGroups = Math.Min(2, maxGroups);
+                int maxCcxGroups = Math.Min(8, maxGroups);
                 coreGroupCountUpDown.Maximum = maxGroups;
                 ccdGroupCountUpDown.Maximum = maxCcdGroups;
+                ccxGroupCountUpDown.Maximum = maxCcxGroups;
                 if (coreGroupCountUpDown.Value > maxGroups)
                 {
                     coreGroupCountUpDown.Value = maxGroups;
@@ -1250,6 +1360,11 @@ public sealed partial class MainForm
                     ccdGroupCountUpDown.Value = maxCcdGroups;
                 }
 
+                if (ccxGroupCountUpDown.Value > maxCcxGroups)
+                {
+                    ccxGroupCountUpDown.Value = maxCcxGroups;
+                }
+
                 suppressAssignmentEvents = false;
 
                 BuildAssignmentRows();
@@ -1257,7 +1372,7 @@ public sealed partial class MainForm
 
                 int eCount = coreIsE.Count(v => v);
                 string note = truncated ? $" (capped to {MaxAffinityBits} LP)" : string.Empty;
-                WriteLog($"TESTCPU.AUTO: SMT={(enabled ? "Enabled" : "Disabled")} logical={maxLogical} cores={coreCount} ccd={ccdCount} eCores={eCount}{note}");
+                WriteLog($"TESTCPU.AUTO: SMT={(enabled ? "Enabled" : "Disabled")} logical={maxLogical} cores={coreCount} ccd={ccdCount} ccx={ccxCount} eCores={eCount}{note}");
             }
             finally
             {
@@ -1279,10 +1394,12 @@ public sealed partial class MainForm
             int logicalCount,
             int physicalCoreCount,
             int ccdCount,
+            int ccxCount,
             bool smtEnabled,
             bool useHyperLabel,
             int[] coreMap,
             int[] ccdMap,
+            int[] ccxMap,
             bool[] eCoreMap,
             Dictionary<int, int> cppcRatings)
         {
@@ -1297,14 +1414,18 @@ public sealed partial class MainForm
                 logicalUpDown.Value = logicalCount;
                 coreGroupCountUpDown.Maximum = Math.Max(1, logicalCount);
                 ccdGroupCountUpDown.Maximum = Math.Min(2, Math.Max(1, logicalCount));
+                ccxGroupCountUpDown.Maximum = Math.Min(8, Math.Max(1, logicalCount));
                 coreGroupCountUpDown.Value = Math.Max(1, Math.Min(physicalCoreCount, (int)coreGroupCountUpDown.Maximum));
                 ccdGroupCountUpDown.Value = Math.Max(1, Math.Min(ccdCount, (int)ccdGroupCountUpDown.Maximum));
+                ccxGroupCountUpDown.Value = Math.Max(1, Math.Min(ccxCount, (int)ccxGroupCountUpDown.Maximum));
 
                 coreAssign = ResizeAssignments(coreMap, logicalCount);
                 ccdAssign = ResizeAssignments(ccdMap, logicalCount);
+                ccxAssign = ResizeAssignments(ccxMap, logicalCount);
                 eAssign = ResizeFlags(eCoreMap, logicalCount);
                 ClampAssignments(coreAssign, (int)coreGroupCountUpDown.Value);
                 ClampAssignments(ccdAssign, (int)ccdGroupCountUpDown.Value);
+                ClampAssignments(ccxAssign, (int)ccxGroupCountUpDown.Value);
             }
             finally
             {
@@ -1316,7 +1437,7 @@ public sealed partial class MainForm
             cppcRatingsBox.Text = FormatPresetCppc(cppcRatings);
             BuildAssignmentRows();
             syncDialogScroll?.Invoke();
-            WriteLog($"TESTCPU.PRESET: loaded name=\"{name}\" logical={logicalCount} physical={physicalCoreCount} ccd={ccdCount} smt={smtEnabled} cppcCount={cppcRatings.Count}");
+            WriteLog($"TESTCPU.PRESET: loaded name=\"{name}\" logical={logicalCount} physical={physicalCoreCount} ccd={ccdCount} ccx={ccxCount} smt={smtEnabled} cppcCount={cppcRatings.Count}");
         }
 
         void LoadIntelHybridPreset(string name, int pCores, int eCores, bool pCoreHt)
@@ -1330,6 +1451,7 @@ public sealed partial class MainForm
             int physicalCoreCount = pCores + eCores;
             int[] coreMap = new int[logicalCount];
             int[] ccdMap = new int[logicalCount];
+            int[] ccxMap = new int[logicalCount];
             bool[] eCoreMap = new bool[logicalCount];
             Dictionary<int, int> cppc = [];
 
@@ -1342,6 +1464,7 @@ public sealed partial class MainForm
                 {
                     coreMap[lp] = core;
                     ccdMap[lp] = 0;
+                    ccxMap[lp] = 0;
                     eCoreMap[lp] = false;
                     cppc[lp] = rating;
                     lp++;
@@ -1353,27 +1476,35 @@ public sealed partial class MainForm
                 int core = pCores + e;
                 coreMap[lp] = core;
                 ccdMap[lp] = 0;
+                ccxMap[lp] = 0;
                 eCoreMap[lp] = true;
                 cppc[lp] = 70 - Math.Min(20, e);
                 lp++;
             }
 
-            LoadSyntheticPreset(name, logicalCount, physicalCoreCount, 1, pCoreHt, true, coreMap, ccdMap, eCoreMap, cppc);
+            LoadSyntheticPreset(name, logicalCount, physicalCoreCount, 1, 1, pCoreHt, true, coreMap, ccdMap, ccxMap, eCoreMap, cppc);
         }
 
-        void LoadAmdPreset(string name, int physicalCores, int ccdCount, bool boostCcdPreferred)
+        void LoadAmdPreset(string name, int physicalCores, int ccdCount, bool boostCcdPreferred, int ccxPerCcd = 1)
         {
             int logicalCount = Math.Min(MaxAffinityBits, physicalCores * 2);
             int[] coreMap = new int[logicalCount];
             int[] ccdMap = new int[logicalCount];
+            int[] ccxMap = new int[logicalCount];
             bool[] eCoreMap = new bool[logicalCount];
             Dictionary<int, int> cppc = [];
 
             int coresPerCcd = Math.Max(1, (int)Math.Ceiling(physicalCores / (double)Math.Max(1, ccdCount)));
+            int safeCcxPerCcd = Math.Max(1, ccxPerCcd);
+            int ccxCount = Math.Max(1, ccdCount * safeCcxPerCcd);
+            int coresPerCcx = Math.Max(1, (int)Math.Ceiling(coresPerCcd / (double)safeCcxPerCcd));
             int lp = 0;
             for (int core = 0; core < physicalCores && lp < logicalCount; core++)
             {
                 int ccd = Math.Min(ccdCount - 1, core / coresPerCcd);
+                int coreInCcd = core - (coresPerCcd * ccd);
+                int ccxInCcd = Math.Min(safeCcxPerCcd - 1, coreInCcd / coresPerCcx);
+                int ccx = (ccd * safeCcxPerCcd) + ccxInCcd;
                 int rating = 0;
                 if (boostCcdPreferred)
                 {
@@ -1386,6 +1517,7 @@ public sealed partial class MainForm
                 {
                     coreMap[lp] = core;
                     ccdMap[lp] = ccd;
+                    ccxMap[lp] = ccx;
                     eCoreMap[lp] = false;
                     if (boostCcdPreferred)
                     {
@@ -1396,7 +1528,7 @@ public sealed partial class MainForm
                 }
             }
 
-            LoadSyntheticPreset(name, logicalCount, physicalCores, ccdCount, true, false, coreMap, ccdMap, eCoreMap, cppc);
+            LoadSyntheticPreset(name, logicalCount, physicalCores, ccdCount, ccxCount, true, false, coreMap, ccdMap, ccxMap, eCoreMap, cppc);
         }
 
         void ApplySelectedCpuPreset()
@@ -1417,6 +1549,12 @@ public sealed partial class MainForm
                     break;
                 case "Intel Core Ultra 9 285K 8P+16E/24T":
                     LoadIntelHybridPreset("Intel Core Ultra 9 285K 8P+16E/24T", pCores: 8, eCores: 16, pCoreHt: false);
+                    break;
+                case "AMD Ryzen Zen2 8C/16T 1 CCD / 2 CCX":
+                    LoadAmdPreset("AMD Ryzen Zen2 8C/16T 1 CCD / 2 CCX", physicalCores: 8, ccdCount: 1, boostCcdPreferred: false, ccxPerCcd: 2);
+                    break;
+                case "AMD Ryzen Zen2 12C/24T 2 CCD / 4 CCX":
+                    LoadAmdPreset("AMD Ryzen Zen2 12C/24T 2 CCD / 4 CCX", physicalCores: 12, ccdCount: 2, boostCcdPreferred: false, ccxPerCcd: 2);
                     break;
                 case "AMD Ryzen 8C/16T 1 CCD":
                     LoadAmdPreset("AMD Ryzen 8C/16T 1 CCD", physicalCores: 8, ccdCount: 1, boostCcdPreferred: false);
@@ -1449,6 +1587,7 @@ public sealed partial class MainForm
             int logicalCount = (int)logicalUpDown.Value;
             int coreCount = (int)coreGroupCountUpDown.Value;
             int ccdCount = (int)ccdGroupCountUpDown.Value;
+            int ccxCount = (int)ccxGroupCountUpDown.Value;
 
             suppressAssignmentEvents = true;
             assignmentsTable.SuspendLayout();
@@ -1460,7 +1599,8 @@ public sealed partial class MainForm
             assignmentsTable.Controls.Add(NewHeaderLabel("LP"), 0, 0);
             assignmentsTable.Controls.Add(NewHeaderLabel("Core group"), 1, 0);
             assignmentsTable.Controls.Add(NewHeaderLabel("CCD group"), 2, 0);
-            assignmentsTable.Controls.Add(NewHeaderLabel("E-core"), 3, 0);
+            assignmentsTable.Controls.Add(NewHeaderLabel("CCX group"), 3, 0);
+            assignmentsTable.Controls.Add(NewHeaderLabel("E-core"), 4, 0);
 
             for (int i = 0; i < logicalCount; i++)
             {
@@ -1512,6 +1652,27 @@ public sealed partial class MainForm
                     }
                 };
 
+                ComboBox ccxCombo = NewDialogCombo(120);
+                ccxCombo.Margin = new Padding(0, 2, 12, 4);
+                ccxCombo.Dock = DockStyle.Top;
+                FillGroupCombo(ccxCombo, ccxCount);
+                int ccxIndex = i < ccxAssign.Length ? ccxAssign[i] : 0;
+                ccxIndex = Math.Clamp(ccxIndex, 0, ccxCount - 1);
+                ccxCombo.SelectedIndex = ccxIndex;
+                ccxCombo.Tag = i;
+                ccxCombo.SelectedIndexChanged += (_, _) =>
+                {
+                    if (suppressAssignmentEvents)
+                    {
+                        return;
+                    }
+
+                    if (ccxCombo.Tag is int lp)
+                    {
+                        ccxAssign[lp] = ccxCombo.SelectedIndex;
+                    }
+                };
+
                 CheckBox eCheck = new()
                 {
                     Text = "E-Core",
@@ -1538,14 +1699,15 @@ public sealed partial class MainForm
                 assignmentsTable.Controls.Add(lpLabel, 0, i + 1);
                 assignmentsTable.Controls.Add(coreCombo, 1, i + 1);
                 assignmentsTable.Controls.Add(ccdCombo, 2, i + 1);
-                assignmentsTable.Controls.Add(eCheck, 3, i + 1);
+                assignmentsTable.Controls.Add(ccxCombo, 3, i + 1);
+                assignmentsTable.Controls.Add(eCheck, 4, i + 1);
             }
 
             assignmentsTable.ResumeLayout();
             suppressAssignmentEvents = false;
         }
 
-        void RefreshAssignmentUi(bool autoSplitCcd)
+        void RefreshAssignmentUi(bool autoSplitCcd, bool autoSplitCcx = false)
         {
             if (suppressAssignmentEvents)
             {
@@ -1556,12 +1718,15 @@ public sealed partial class MainForm
             int logicalCount = (int)logicalUpDown.Value;
             coreAssign = ResizeAssignments(coreAssign, logicalCount);
             ccdAssign = ResizeAssignments(ccdAssign, logicalCount);
+            ccxAssign = ResizeAssignments(ccxAssign, logicalCount);
             eAssign = ResizeFlags(eAssign, logicalCount);
 
             int maxGroups = Math.Max(1, logicalCount);
             coreGroupCountUpDown.Maximum = maxGroups;
             int maxCcdGroups = Math.Min(2, maxGroups);
+            int maxCcxGroups = Math.Min(8, maxGroups);
             ccdGroupCountUpDown.Maximum = maxCcdGroups;
+            ccxGroupCountUpDown.Maximum = maxCcxGroups;
 
             if (coreGroupCountUpDown.Value > maxGroups)
             {
@@ -1573,11 +1738,21 @@ public sealed partial class MainForm
                 ccdGroupCountUpDown.Value = maxCcdGroups;
             }
 
+            if (ccxGroupCountUpDown.Value > maxCcxGroups)
+            {
+                ccxGroupCountUpDown.Value = maxCcxGroups;
+            }
+
             ClampAssignments(coreAssign, (int)coreGroupCountUpDown.Value);
             ClampAssignments(ccdAssign, (int)ccdGroupCountUpDown.Value);
+            ClampAssignments(ccxAssign, (int)ccxGroupCountUpDown.Value);
             if (autoSplitCcd && (int)ccdGroupCountUpDown.Value > 1 && IsSingleGroupAssignment(ccdAssign, logicalCount))
             {
                 AutoSplitCcdAssignments(logicalCount, (int)ccdGroupCountUpDown.Value);
+            }
+            if (autoSplitCcx && (int)ccxGroupCountUpDown.Value > 1 && IsSingleGroupAssignment(ccxAssign, logicalCount))
+            {
+                AutoSplitCcxAssignments(logicalCount, (int)ccxGroupCountUpDown.Value);
             }
             suppressAssignmentEvents = false;
 
@@ -1590,17 +1765,21 @@ public sealed partial class MainForm
             int logicalCount = (int)logicalUpDown.Value;
             coreAssign = BuildAssignmentsFromGroupsText(GetCurrentCoreGroupsText(), logicalCount, out int coreCount);
             ccdAssign = BuildAssignmentsFromGroupsText(GetCurrentCcdGroupsText(), logicalCount, out int ccdCount);
+            ccxAssign = BuildAssignmentsFromGroupsText(GetCurrentCcxGroupsText(), logicalCount, out int ccxCount);
             eAssign = BuildECoreFlags(GetCurrentECoreText(), logicalCount);
 
             suppressAssignmentEvents = true;
             coreGroupCountUpDown.Maximum = Math.Max(1, logicalCount);
             ccdGroupCountUpDown.Maximum = Math.Min(2, Math.Max(1, logicalCount));
+            ccxGroupCountUpDown.Maximum = Math.Min(8, Math.Max(1, logicalCount));
             coreGroupCountUpDown.Value = Math.Max(1, Math.Min(coreCount, (int)coreGroupCountUpDown.Maximum));
             ccdGroupCountUpDown.Value = Math.Max(1, Math.Min(ccdCount, (int)ccdGroupCountUpDown.Maximum));
+            ccxGroupCountUpDown.Value = Math.Max(1, Math.Min(ccxCount, (int)ccxGroupCountUpDown.Maximum));
             suppressAssignmentEvents = false;
 
             ClampAssignments(coreAssign, (int)coreGroupCountUpDown.Value);
             ClampAssignments(ccdAssign, (int)ccdGroupCountUpDown.Value);
+            ClampAssignments(ccxAssign, (int)ccxGroupCountUpDown.Value);
             BuildAssignmentRows();
             syncDialogScroll?.Invoke();
         }
@@ -1673,6 +1852,7 @@ public sealed partial class MainForm
             int logicalCount = (int)logicalUpDown.Value;
             int coreCount = (int)coreGroupCountUpDown.Value;
             int ccdCount = (int)ccdGroupCountUpDown.Value;
+            int ccxCount = (int)ccxGroupCountUpDown.Value;
 
             TestCpuConfig config = new()
             {
@@ -1680,6 +1860,7 @@ public sealed partial class MainForm
                 SmtEnabled = smtStateCombo.SelectedIndex == 0,
                 UseHyperThreadingLabel = useHyperThreadingLabel,
                 CcdMap = new Dictionary<int, int>(),
+                CcxMap = new Dictionary<int, int>(),
                 CpuName = cpuNameTextBox.Text,
             };
 
@@ -1687,6 +1868,7 @@ public sealed partial class MainForm
             {
                 int coreGroup = lp < coreAssign.Length ? coreAssign[lp] : 0;
                 int ccdGroup = lp < ccdAssign.Length ? ccdAssign[lp] : 0;
+                int ccxGroup = lp < ccxAssign.Length ? ccxAssign[lp] : 0;
                 if (coreGroup < 0 || coreGroup >= coreCount)
                 {
                     coreGroup = 0;
@@ -1697,8 +1879,14 @@ public sealed partial class MainForm
                     ccdGroup = 0;
                 }
 
+                if (ccxGroup < 0 || ccxGroup >= ccxCount)
+                {
+                    ccxGroup = 0;
+                }
+
                 config.CoreMap[lp] = coreGroup;
                 config.CcdMap[lp] = ccdGroup;
+                config.CcxMap[lp] = ccxGroup;
                 if (lp < eAssign.Length && eAssign[lp])
                 {
                     config.ECoreLps.Add(lp);
@@ -1716,6 +1904,7 @@ public sealed partial class MainForm
         logicalUpDown.ValueChanged += (_, _) => RefreshAssignmentUi(false);
         coreGroupCountUpDown.ValueChanged += (_, _) => RefreshAssignmentUi(false);
         ccdGroupCountUpDown.ValueChanged += (_, _) => RefreshAssignmentUi(true);
+        ccxGroupCountUpDown.ValueChanged += (_, _) => RefreshAssignmentUi(false, true);
         cpuPresetButton.Click += (_, _) => ApplySelectedCpuPreset();
         cpuPresetCombo.SelectedIndexChanged += (_, _) =>
         {
@@ -2176,7 +2365,11 @@ public sealed partial class MainForm
             int core = config.CoreMap.TryGetValue(lp, out int coreIndex) ? coreIndex : lp;
             int eff = config.ECoreLps.Contains(lp) ? 1 : 0;
             int llc = 0;
-            if (config.CcdMap is not null && config.CcdMap.TryGetValue(lp, out int ccd))
+            if (config.CcxMap is not null && config.CcxMap.TryGetValue(lp, out int ccx))
+            {
+                llc = ccx;
+            }
+            else if (config.CcdMap is not null && config.CcdMap.TryGetValue(lp, out int ccd))
             {
                 llc = ccd;
             }
@@ -2194,11 +2387,13 @@ public sealed partial class MainForm
 
         CpuTopology topo = new(entries.OrderBy(x => x.LP).ToList());
         Dictionary<int, int> ccdMap = config.CcdMap ?? BuildCcdMap(topo);
+        Dictionary<int, int> ccxMap = config.CcxMap ?? BuildCcxMap(topo);
 
         _cpuInfo = new CpuInfo
         {
             Topology = topo,
             CcdMap = ccdMap,
+            CcxMap = ccxMap,
         };
         UpdateEfficiencyClassMap(topo);
         _cppcRatings.Clear();
@@ -2269,7 +2464,8 @@ public sealed partial class MainForm
         string eText = FormatIndexList(config.ECoreLps);
         string coreGroups = GetCurrentCoreGroupsText();
         string ccdGroups = GetCurrentCcdGroupsText();
-        WriteLog($"TESTCPU: enabled logical={topo.Logical} eCores=[{eText}] cores=[{coreGroups}] ccd=[{ccdGroups}]");
+        string ccxGroups = GetCurrentCcxGroupsText();
+        WriteLog($"TESTCPU: enabled logical={topo.Logical} eCores=[{eText}] cores=[{coreGroups}] ccd=[{ccdGroups}] ccx=[{ccxGroups}]");
 
         UpdateCpuHeaderUi();
         _initialDeviceViewportHeightAdjusted = false;
@@ -2357,6 +2553,21 @@ public sealed partial class MainForm
         }
 
         List<List<int>> groups = _cpuInfo.CcdMap
+            .GroupBy(kvp => kvp.Value)
+            .OrderBy(g => g.Key)
+            .Select(g => g.Select(kvp => kvp.Key).OrderBy(x => x).ToList())
+            .ToList();
+        return FormatGroups(groups);
+    }
+
+    private string GetCurrentCcxGroupsText()
+    {
+        if (_cpuInfo is null)
+        {
+            return string.Empty;
+        }
+
+        List<List<int>> groups = _cpuInfo.CcxMap
             .GroupBy(kvp => kvp.Value)
             .OrderBy(g => g.Key)
             .Select(g => g.Select(kvp => kvp.Key).OrderBy(x => x).ToList())
