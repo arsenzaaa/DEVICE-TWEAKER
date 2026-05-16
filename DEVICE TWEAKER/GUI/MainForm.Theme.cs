@@ -48,6 +48,7 @@ public sealed partial class MainForm
         if (disposing)
         {
             DisposeRawPolling();
+            _layoutRefreshTimer?.Dispose();
             _copyToolTip?.Dispose();
             _appIcon?.Dispose();
             _baseFont.Dispose();

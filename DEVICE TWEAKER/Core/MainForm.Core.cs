@@ -47,6 +47,11 @@ public sealed partial class MainForm : Form
     private string? _imodKernelCiBlockDetail;
     private DateTime _imodKernelCiBlockStatusUtc;
     private int _imodReadbackGeneration;
+    private System.Windows.Forms.Timer? _layoutRefreshTimer;
+    private int _lastLayoutViewportWidth;
+    private int _lastLayoutDpi;
+    private bool _expandingMainWindowForLayout;
+    private bool _initialDeviceViewportHeightAdjusted;
 
     public MainForm()
     {
