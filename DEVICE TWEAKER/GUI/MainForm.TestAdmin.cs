@@ -1508,13 +1508,11 @@ public sealed partial class MainForm
                 int coreInCcd = core - (coresPerCcd * ccd);
                 int ccxInCcd = Math.Min(safeCcxPerCcd - 1, coreInCcd / coresPerCcx);
                 int ccx = (ccd * safeCcxPerCcd) + ccxInCcd;
-                int rating = 0;
-                if (boostCcdPreferred)
-                {
-                    rating = ccd == ccdCount - 1
-                        ? 130 - Math.Min(12, core - (coresPerCcd * ccd))
-                        : 100 - Math.Min(10, core);
-                }
+                int rating = boostCcdPreferred
+                    ? ccd == ccdCount - 1
+                        ? 130 - Math.Min(12, coreInCcd)
+                        : 100 - Math.Min(10, core)
+                    : 120 - Math.Min(20, coreInCcd);
 
                 for (int t = 0; t < 2 && lp < logicalCount; t++)
                 {
@@ -1522,10 +1520,7 @@ public sealed partial class MainForm
                     ccdMap[lp] = ccd;
                     ccxMap[lp] = ccx;
                     eCoreMap[lp] = false;
-                    if (boostCcdPreferred)
-                    {
-                        cppc[lp] = rating;
-                    }
+                    cppc[lp] = rating;
 
                     lp++;
                 }
