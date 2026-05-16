@@ -198,15 +198,20 @@ public sealed partial class MainForm
         string backupLine = hasBackup
             ? $"Latest backup:\n{latestBackupPath}"
             : "Latest backup:\nnot found";
-        string message = "Choose restore mode.\n\n"
-            + "RESET TO DEFAULT clears DEVICE TWEAKER changes and ignores backup files.\n"
-            + "RESTORE BACKUP restores the latest saved snapshot; it may already contain applied tweaks.\n\n"
-            + backupLine;
+        string message = hasBackup
+            ? "Choose restore mode.\n\n"
+                + "RESET TO DEFAULT clears DEVICE TWEAKER changes and ignores backup files.\n"
+                + "RESTORE BACKUP restores the latest saved snapshot; it may already contain applied tweaks.\n\n"
+                + backupLine
+            : "Choose restore mode.\n\n"
+                + "RESET TO DEFAULT clears DEVICE TWEAKER changes.\n"
+                + "No backup snapshot was found.\n\n"
+                + backupLine;
         string normalized = NormalizeDialogMessage(message);
 
         int padding = UiScale(20);
-        int maxTextWidth = UiScale(620);
-        int minWidth = UiScale(620);
+        int maxTextWidth = UiScale(hasBackup ? 620 : 500);
+        int minWidth = UiScale(hasBackup ? 620 : 500);
         int buttonWidth = UiScale(160);
         int buttonHeight = UiScale(32);
         int buttonGap = UiScale(14);
@@ -225,7 +230,8 @@ public sealed partial class MainForm
         };
 
         Size textSize = messageLabel.GetPreferredSize(new Size(maxTextWidth, 0));
-        int buttonRowWidth = (buttonWidth * 3) + (buttonGap * 2);
+        int buttonCount = hasBackup ? 3 : 2;
+        int buttonRowWidth = (buttonWidth * buttonCount) + (buttonGap * (buttonCount - 1));
         int clientWidth = Math.Max(minWidth, Math.Max(textSize.Width + (padding * 2), buttonRowWidth + (padding * 2)));
         int labelWidth = clientWidth - (padding * 2);
         messageLabel.MaximumSize = new Size(labelWidth, 0);
@@ -277,12 +283,20 @@ public sealed partial class MainForm
         }
 
         Button resetButton = MakeButton("RESET DEFAULT", RestoreChoice.ResetDefault, rowLeft);
-        Button backupButton = MakeButton("RESTORE BACKUP", RestoreChoice.RestoreBackup, rowLeft + buttonWidth + buttonGap, hasBackup);
-        Button cancelButton = MakeButton("CANCEL", RestoreChoice.Cancel, rowLeft + ((buttonWidth + buttonGap) * 2));
+        Button? backupButton = hasBackup
+            ? MakeButton("RESTORE BACKUP", RestoreChoice.RestoreBackup, rowLeft + buttonWidth + buttonGap)
+            : null;
+        int cancelLeft = hasBackup
+            ? rowLeft + ((buttonWidth + buttonGap) * 2)
+            : rowLeft + buttonWidth + buttonGap;
+        Button cancelButton = MakeButton("CANCEL", RestoreChoice.Cancel, cancelLeft);
 
         dialog.Controls.Add(messageLabel);
         dialog.Controls.Add(resetButton);
-        dialog.Controls.Add(backupButton);
+        if (backupButton is not null)
+        {
+            dialog.Controls.Add(backupButton);
+        }
         dialog.Controls.Add(cancelButton);
 
         dialog.AcceptButton = resetButton;
