@@ -970,6 +970,8 @@ public sealed partial class MainForm : Form
             $"GUI.HEADER: cpuHeader=\"{FlattenLogText(cpuHeader)}\" smt=\"{FlattenLogText(htPrefix)} {FlattenLogText(htStatus)}\" hybridCpu=\"{FlattenLogText(hybridCpuStatus)}\" cppc=\"{FlattenLogText(cppcStatus)}\" dualCcd=\"{FlattenLogText(dualCcdStatus)}\" smtText=\"{FlattenLogText(_smtText)}\"");
         WriteLog(
             $"GUI.STATE: blocks={_blocks.Count} maxLogical={_maxLogical} groupCount={_cpuGroupCount} testCpu={_testCpuActive} testDevicesEnabled={_testDevicesEnabled} testDevicesOnly={_testDevicesOnly} autoDryRun={_testAutoDryRun}");
+        WriteLog(
+            $"GUI.LAYOUT.VIEWPORT: form={FormatGuiBounds(this)} host={FormatGuiBounds(_devicesHost)} panel={FormatGuiBounds(_devicesPanel)} scrollVisible={_devicesScroll.Visible} scrollWidth={_devicesScroll.Width} scrollValue={_devicesScroll.Value} dpi={GetCurrentWindowDpi()}");
 
         for (int i = 0; i < _blocks.Count; i++)
         {
@@ -1027,6 +1029,30 @@ public sealed partial class MainForm : Form
             string infoReg = FlattenLogText(b.InfoLabel.Tag as string);
             WriteLog($"GUI.BLOCK.INFO: idx={i} text=\"{infoText}\" reg=\"{infoReg}\"");
 
+            issueCount += LogGuiBlockLayout(b, i);
+            if (i == 0 && _devicesHost is not null)
+            {
+                int bottomSlack = _devicesHost.ClientSize.Height - b.Group.Bottom;
+                WriteLog($"GUI.LAYOUT.FIRSTFIT: idx=0 blockBottom={b.Group.Bottom} viewportHeight={_devicesHost.ClientSize.Height} bottomSlack={bottomSlack}");
+                if (bottomSlack < UiScale(1))
+                {
+                    WriteLog($"GUI.LAYOUT.ISSUE: idx=0 reason=firstBlockViewport bottomSlack={bottomSlack}");
+                    issueCount++;
+                }
+            }
+
+            if (i > 0)
+            {
+                DeviceBlock prev = _blocks[i - 1];
+                int gap = b.Group.Top - prev.Group.Bottom;
+                WriteLog($"GUI.LAYOUT.GAP: prev={i - 1} idx={i} gap={gap}");
+                if (gap < UiScale(8))
+                {
+                    WriteLog($"GUI.LAYOUT.ISSUE: idx={i} reason=blockGap prev={i - 1} gap={gap}");
+                    issueCount++;
+                }
+            }
+
             issueCount += LogGuiBlockDetails(b, i, signedDriverMap, wmiMapEmpty);
         }
 
@@ -1046,6 +1072,188 @@ public sealed partial class MainForm : Form
 
         WriteLog($"GUI.ISSUE.SUMMARY: count={issueCount}");
         WriteLog($"GUI.SNAPSHOT: end reason={safeReason}");
+    }
+
+    private int LogGuiBlockLayout(DeviceBlock block, int index)
+    {
+        int issues = 0;
+        Control group = block.Group;
+        Control? header = block.HeaderPanel;
+        Control? divider = block.Divider;
+        Control? cpuTitle = block.CpuTitleLabel;
+        Control? cpuPanel = block.CpuPanel;
+        Control? settingsPanel = block.SettingsPanel;
+        Control info = block.InfoLabel;
+
+        int headerAvailable = header?.ClientSize.Width ?? 0;
+        int headerPreferred = GetFlowPreferredWidth(header);
+        bool headerClip = headerAvailable > 0 && headerPreferred > headerAvailable + UiScale(2);
+
+        (int cpuRight, int cpuBottom) = GetVisibleContentBounds(cpuPanel);
+        bool cpuClip = cpuPanel is not null
+            && (cpuRight > cpuPanel.ClientSize.Width + UiScale(2)
+                || cpuBottom > cpuPanel.ClientSize.Height + UiScale(2));
+        int cpuHorizontalSlack = cpuPanel is null ? 0 : cpuPanel.ClientSize.Width - cpuRight;
+        bool cpuTight = cpuPanel is not null && cpuHorizontalSlack >= 0 && cpuHorizontalSlack < UiScale(18);
+        (int minCpuCellWidth, int maxCpuCellWidth) = GetCpuCellWidthRange(block);
+        bool cpuCellMismatch = maxCpuCellWidth > 0 && maxCpuCellWidth - minCpuCellWidth > UiScale(2);
+
+        (int settingsRight, int settingsBottom) = GetVisibleContentBounds(settingsPanel);
+        bool settingsClip = settingsPanel is not null
+            && (settingsRight > settingsPanel.ClientSize.Width + UiScale(2)
+                || settingsBottom > settingsPanel.ClientSize.Height + UiScale(2));
+        int settingsHorizontalSlack = settingsPanel is null ? 0 : settingsPanel.ClientSize.Width - settingsRight;
+        bool settingsTight = settingsPanel is not null && settingsHorizontalSlack >= 0 && settingsHorizontalSlack < UiScale(12);
+
+        (int groupRight, int groupBottom) = GetVisibleContentBounds(group);
+        bool groupClip = groupRight > group.ClientSize.Width + UiScale(2)
+            || groupBottom > group.ClientSize.Height + UiScale(2);
+
+        int infoPreferredHeight = GetPreferredTextHeight(info, Math.Max(1, info.ClientSize.Width));
+        bool infoClip = infoPreferredHeight > info.ClientSize.Height + UiScale(2);
+
+        string cpuScroll = cpuPanel is ScrollableControl scrollable
+            ? $" autoScroll={scrollable.AutoScroll} scrollMin={FormatGuiSize(scrollable.AutoScrollMinSize)}"
+            : string.Empty;
+
+        WriteLog(
+            $"GUI.LAYOUT: idx={index} group={FormatGuiBounds(group)} header={FormatGuiBounds(header)} headerPref={headerPreferred} headerAvail={headerAvailable} headerClip={headerClip} divider={FormatGuiBounds(divider)} cpuTitle={FormatGuiBounds(cpuTitle)} cpuPanel={FormatGuiBounds(cpuPanel)} cpuContent={cpuRight}x{cpuBottom} cpuSlack={cpuHorizontalSlack} cpuCellWidth={minCpuCellWidth}-{maxCpuCellWidth} cpuCellMismatch={cpuCellMismatch} cpuClip={cpuClip} cpuTight={cpuTight}{cpuScroll} settings={FormatGuiBounds(settingsPanel)} settingsContent={settingsRight}x{settingsBottom} settingsSlack={settingsHorizontalSlack} settingsClip={settingsClip} settingsTight={settingsTight} info={FormatGuiBounds(info)} infoPrefH={infoPreferredHeight} infoClip={infoClip} groupContent={groupRight}x{groupBottom} groupClip={groupClip}");
+
+        List<string> reasons = [];
+        if (headerClip)
+        {
+            reasons.Add($"header:{headerPreferred}>{headerAvailable}");
+        }
+
+        if (cpuClip && cpuPanel is not null)
+        {
+            reasons.Add($"cpu:{cpuRight}x{cpuBottom}>{cpuPanel.ClientSize.Width}x{cpuPanel.ClientSize.Height}");
+        }
+        else if (cpuTight)
+        {
+            reasons.Add($"cpuTight:slack={cpuHorizontalSlack}");
+        }
+
+        if (cpuCellMismatch)
+        {
+            reasons.Add($"cpuCellWidth:{minCpuCellWidth}-{maxCpuCellWidth}");
+        }
+
+        if (settingsClip && settingsPanel is not null)
+        {
+            reasons.Add($"settings:{settingsRight}x{settingsBottom}>{settingsPanel.ClientSize.Width}x{settingsPanel.ClientSize.Height}");
+        }
+        else if (settingsTight)
+        {
+            reasons.Add($"settingsTight:slack={settingsHorizontalSlack}");
+        }
+
+        if (infoClip)
+        {
+            reasons.Add($"infoH:{infoPreferredHeight}>{info.ClientSize.Height}");
+        }
+
+        if (groupClip)
+        {
+            reasons.Add($"group:{groupRight}x{groupBottom}>{group.ClientSize.Width}x{group.ClientSize.Height}");
+        }
+
+        if (reasons.Count > 0)
+        {
+            WriteLog($"GUI.LAYOUT.ISSUE: idx={index} reason={string.Join(';', reasons)} title=\"{SanitizeLogValue(BuildDeviceBlockTitle(block.Device))}\"");
+            issues++;
+        }
+
+        return issues;
+    }
+
+    private static string FormatGuiBounds(Control? control)
+    {
+        if (control is null)
+        {
+            return "null";
+        }
+
+        return $"{control.Left},{control.Top},{control.Width}x{control.Height}";
+    }
+
+    private static string FormatGuiSize(Size size)
+    {
+        return $"{size.Width}x{size.Height}";
+    }
+
+    private static int GetFlowPreferredWidth(Control? control)
+    {
+        if (control is null)
+        {
+            return 0;
+        }
+
+        int total = 0;
+        foreach (Control child in control.Controls)
+        {
+            if (!child.Visible)
+            {
+                continue;
+            }
+
+            total += child.PreferredSize.Width + child.Margin.Horizontal;
+        }
+
+        return total;
+    }
+
+    private static (int Right, int Bottom) GetVisibleContentBounds(Control? control)
+    {
+        if (control is null)
+        {
+            return (0, 0);
+        }
+
+        int right = 0;
+        int bottom = 0;
+        foreach (Control child in control.Controls)
+        {
+            if (!child.Visible)
+            {
+                continue;
+            }
+
+            right = Math.Max(right, child.Right + child.Margin.Right);
+            bottom = Math.Max(bottom, child.Bottom + child.Margin.Bottom);
+        }
+
+        return (right, bottom);
+    }
+
+    private static (int Min, int Max) GetCpuCellWidthRange(DeviceBlock block)
+    {
+        int min = int.MaxValue;
+        int max = 0;
+        foreach (CheckBox box in block.CpuBoxes)
+        {
+            if (!box.Visible)
+            {
+                continue;
+            }
+
+            min = Math.Min(min, box.Width);
+            max = Math.Max(max, box.Width);
+        }
+
+        return max == 0 ? (0, 0) : (min, max);
+    }
+
+    private static int GetPreferredTextHeight(Control control, int width)
+    {
+        string text = control.Text ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return control.PreferredSize.Height;
+        }
+
+        Size proposed = new(Math.Max(1, width), int.MaxValue);
+        return TextRenderer.MeasureText(text, control.Font, proposed, TextFormatFlags.WordBreak).Height;
     }
 
     private int LogGuiBlockDetails(DeviceBlock block, int index, Dictionary<string, SignedDriverInfo> signedDriverMap, bool wmiMapEmpty)
