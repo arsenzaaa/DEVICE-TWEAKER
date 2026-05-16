@@ -300,20 +300,25 @@ public sealed partial class MainForm
         int currentLogical = Math.Min(MaxAffinityBits, GetCurrentLogicalCount());
 
         Label cpuPresetLabel = NewDialogLabel("CPU preset:");
-        ComboBox cpuPresetCombo = NewDialogCombo(400);
+        ComboBox cpuPresetCombo = NewDialogCombo(500);
         cpuPresetCombo.Items.AddRange(new object[]
         {
             "Manual / current",
-            "Intel 8P/16T classic",
-            "Intel 6P+8E/20T hybrid",
-            "Intel 8P+16E/32T hybrid",
+            "Intel Core i7-10700K/11700K 8C/16T",
+            "Intel Core i5-13600K/14600K 6P+8E/20T",
+            "Intel Core i9-13900K/14900K 8P+16E/32T",
             "Intel Core Ultra 9 285K 8P+16E/24T",
-            "AMD Ryzen Zen2 8C/16T 1 CCD / 2 CCX",
-            "AMD Ryzen Zen2 12C/24T 2 CCD / 4 CCX",
-            "AMD Ryzen 8C/16T 1 CCD",
-            "AMD Ryzen 12C/24T 2 CCD",
-            "AMD Ryzen 16C/32T 2 CCD",
-            "AMD Ryzen X3D 16C/32T 2 CCD boost-preferred",
+            "AMD Ryzen 5 7500F/7600X 6C/12T",
+            "AMD Ryzen 7 7700X/9700X 8C/16T",
+            "AMD Ryzen 9 7900X/9900X 12C/24T",
+            "AMD Ryzen 9 7950X/9950X 16C/32T",
+            "AMD Ryzen 7 3700X/3800X Zen2 8C/16T 2 CCX",
+            "AMD Ryzen 9 3900X Zen2 12C/24T 4 CCX",
+            "AMD Ryzen 9 3950X Zen2 16C/32T 4 CCX",
+            "AMD Ryzen 7 7800X3D/9800X3D 8C/16T V-Cache",
+            "AMD Ryzen 9 7900X3D/9900X3D 12C/24T V-Cache CCD0",
+            "AMD Ryzen 9 7950X3D/9950X3D 16C/32T V-Cache CCD0",
+            "AMD Ryzen 9 9950X3D2 16C/32T dual V-Cache",
         });
         cpuPresetCombo.SelectedIndex = 0;
         Button cpuPresetButton = NewDialogButton("LOAD");
@@ -529,13 +534,17 @@ public sealed partial class MainForm
             testDevicesLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         }
 
+        _testDevicesEnabled = true;
+        _testAutoDryRun = true;
+
         CheckBox enableTestDevicesCheck = new()
         {
             Text = "Enable test devices",
             AutoSize = true,
+            AutoCheck = false,
             BackColor = _bgForm,
             ForeColor = _fgMain,
-            Checked = _testDevicesEnabled,
+            Checked = true,
             Margin = new Padding(0, 0, 16, 0),
         };
 
@@ -554,9 +563,10 @@ public sealed partial class MainForm
         {
             Text = "Auto-optimization dry-run (no registry writes)",
             AutoSize = true,
+            AutoCheck = false,
             BackColor = _bgForm,
             ForeColor = _fgMain,
-            Checked = _testAutoDryRun,
+            Checked = true,
             Margin = new Padding(0, 0, 0, 0),
         };
 
@@ -794,17 +804,11 @@ public sealed partial class MainForm
             }
 
             suppressTestDeviceToggle = true;
-            _testDevicesEnabled = enableTestDevicesCheck.Checked;
-            if (!_testDevicesEnabled)
-            {
-                _testDevicesOnly = false;
-                testDevicesOnlyCheck.Checked = false;
-            }
-            else if (!dryRunAutoCheck.Checked)
-            {
-                dryRunAutoCheck.Checked = true;
-            }
-            testDevicesOnlyCheck.Enabled = _testDevicesEnabled;
+            _testDevicesEnabled = true;
+            _testAutoDryRun = true;
+            enableTestDevicesCheck.Checked = true;
+            dryRunAutoCheck.Checked = true;
+            testDevicesOnlyCheck.Enabled = true;
             suppressTestDeviceToggle = false;
 
             WriteLog($"TEST.DEVICES: enabled={_testDevicesEnabled}");
@@ -827,6 +831,8 @@ public sealed partial class MainForm
                     enableTestDevicesCheck.Checked = true;
                     _testDevicesEnabled = true;
                 }
+                _testAutoDryRun = true;
+                dryRunAutoCheck.Checked = true;
                 _testDevicesOnly = true;
             }
             else
@@ -842,7 +848,8 @@ public sealed partial class MainForm
 
         dryRunAutoCheck.CheckedChanged += (_, _) =>
         {
-            _testAutoDryRun = dryRunAutoCheck.Checked;
+            _testAutoDryRun = true;
+            dryRunAutoCheck.Checked = true;
             WriteLog($"TEST.AUTO.DRYRUN: {(_testAutoDryRun ? "enabled" : "disabled")}");
         };
 
@@ -1488,7 +1495,7 @@ public sealed partial class MainForm
             LoadSyntheticPreset(name, logicalCount, physicalCoreCount, 1, 1, pCoreHt, true, coreMap, ccdMap, ccxMap, eCoreMap, cppc);
         }
 
-        void LoadAmdPreset(string name, int physicalCores, int ccdCount, bool boostCcdPreferred, int ccxPerCcd = 1)
+        void LoadAmdPreset(string name, int physicalCores, int ccdCount, string cppcProfile, int ccxPerCcd = 1)
         {
             int logicalCount = Math.Min(MaxAffinityBits, physicalCores * 2);
             int[] coreMap = new int[logicalCount];
@@ -1507,12 +1514,18 @@ public sealed partial class MainForm
                 int ccd = Math.Min(ccdCount - 1, core / coresPerCcd);
                 int coreInCcd = core - (coresPerCcd * ccd);
                 int ccxInCcd = Math.Min(safeCcxPerCcd - 1, coreInCcd / coresPerCcx);
+                int coreInCcx = coreInCcd - (coresPerCcx * ccxInCcd);
                 int ccx = (ccd * safeCcxPerCcd) + ccxInCcd;
-                int rating = boostCcdPreferred
-                    ? ccd == ccdCount - 1
-                        ? 130 - Math.Min(12, coreInCcd)
-                        : 100 - Math.Min(10, core)
-                    : 120 - Math.Min(20, coreInCcd);
+                int rating = cppcProfile switch
+                {
+                    "x3d-cache" => ccd == 0
+                        ? 140 - Math.Min(12, coreInCcd)
+                        : 112 - Math.Min(12, coreInCcd),
+                    "x3d-dual-cache" => 136 - Math.Min(16, coreInCcd) - Math.Min(2, ccd),
+                    "zen2" => 122 - Math.Min(10, coreInCcx) - Math.Min(4, ccxInCcd * 2) - Math.Min(4, ccd * 2),
+                    "standard" => 128 - Math.Min(16, coreInCcd) - Math.Min(4, ccd),
+                    _ => 120 - Math.Min(20, coreInCcd),
+                };
 
                 for (int t = 0; t < 2 && lp < logicalCount; t++)
                 {
@@ -1536,35 +1549,50 @@ public sealed partial class MainForm
             {
                 case "Manual / current":
                     return;
-                case "Intel 8P/16T classic":
-                    LoadIntelHybridPreset("Intel 8P/16T classic", pCores: 8, eCores: 0, pCoreHt: true);
+                case "Intel Core i7-10700K/11700K 8C/16T":
+                    LoadIntelHybridPreset("Intel Core i7-10700K/11700K 8C/16T", pCores: 8, eCores: 0, pCoreHt: true);
                     break;
-                case "Intel 6P+8E/20T hybrid":
-                    LoadIntelHybridPreset("Intel 6P+8E/20T hybrid", pCores: 6, eCores: 8, pCoreHt: true);
+                case "Intel Core i5-13600K/14600K 6P+8E/20T":
+                    LoadIntelHybridPreset("Intel Core i5-13600K/14600K 6P+8E/20T", pCores: 6, eCores: 8, pCoreHt: true);
                     break;
-                case "Intel 8P+16E/32T hybrid":
-                    LoadIntelHybridPreset("Intel 8P+16E/32T hybrid", pCores: 8, eCores: 16, pCoreHt: true);
+                case "Intel Core i9-13900K/14900K 8P+16E/32T":
+                    LoadIntelHybridPreset("Intel Core i9-13900K/14900K 8P+16E/32T", pCores: 8, eCores: 16, pCoreHt: true);
                     break;
                 case "Intel Core Ultra 9 285K 8P+16E/24T":
                     LoadIntelHybridPreset("Intel Core Ultra 9 285K 8P+16E/24T", pCores: 8, eCores: 16, pCoreHt: false);
                     break;
-                case "AMD Ryzen Zen2 8C/16T 1 CCD / 2 CCX":
-                    LoadAmdPreset("AMD Ryzen Zen2 8C/16T 1 CCD / 2 CCX", physicalCores: 8, ccdCount: 1, boostCcdPreferred: false, ccxPerCcd: 2);
+                case "AMD Ryzen 5 7500F/7600X 6C/12T":
+                    LoadAmdPreset("AMD Ryzen 5 7500F/7600X 6C/12T", physicalCores: 6, ccdCount: 1, cppcProfile: "standard");
                     break;
-                case "AMD Ryzen Zen2 12C/24T 2 CCD / 4 CCX":
-                    LoadAmdPreset("AMD Ryzen Zen2 12C/24T 2 CCD / 4 CCX", physicalCores: 12, ccdCount: 2, boostCcdPreferred: false, ccxPerCcd: 2);
+                case "AMD Ryzen 7 7700X/9700X 8C/16T":
+                    LoadAmdPreset("AMD Ryzen 7 7700X/9700X 8C/16T", physicalCores: 8, ccdCount: 1, cppcProfile: "standard");
                     break;
-                case "AMD Ryzen 8C/16T 1 CCD":
-                    LoadAmdPreset("AMD Ryzen 8C/16T 1 CCD", physicalCores: 8, ccdCount: 1, boostCcdPreferred: false);
+                case "AMD Ryzen 9 7900X/9900X 12C/24T":
+                    LoadAmdPreset("AMD Ryzen 9 7900X/9900X 12C/24T", physicalCores: 12, ccdCount: 2, cppcProfile: "standard");
                     break;
-                case "AMD Ryzen 12C/24T 2 CCD":
-                    LoadAmdPreset("AMD Ryzen 12C/24T 2 CCD", physicalCores: 12, ccdCount: 2, boostCcdPreferred: false);
+                case "AMD Ryzen 9 7950X/9950X 16C/32T":
+                    LoadAmdPreset("AMD Ryzen 9 7950X/9950X 16C/32T", physicalCores: 16, ccdCount: 2, cppcProfile: "standard");
                     break;
-                case "AMD Ryzen 16C/32T 2 CCD":
-                    LoadAmdPreset("AMD Ryzen 16C/32T 2 CCD", physicalCores: 16, ccdCount: 2, boostCcdPreferred: false);
+                case "AMD Ryzen 7 3700X/3800X Zen2 8C/16T 2 CCX":
+                    LoadAmdPreset("AMD Ryzen 7 3700X/3800X Zen2 8C/16T 2 CCX", physicalCores: 8, ccdCount: 1, cppcProfile: "zen2", ccxPerCcd: 2);
                     break;
-                case "AMD Ryzen X3D 16C/32T 2 CCD boost-preferred":
-                    LoadAmdPreset("AMD Ryzen X3D 16C/32T 2 CCD boost-preferred", physicalCores: 16, ccdCount: 2, boostCcdPreferred: true);
+                case "AMD Ryzen 9 3900X Zen2 12C/24T 4 CCX":
+                    LoadAmdPreset("AMD Ryzen 9 3900X Zen2 12C/24T 4 CCX", physicalCores: 12, ccdCount: 2, cppcProfile: "zen2", ccxPerCcd: 2);
+                    break;
+                case "AMD Ryzen 9 3950X Zen2 16C/32T 4 CCX":
+                    LoadAmdPreset("AMD Ryzen 9 3950X Zen2 16C/32T 4 CCX", physicalCores: 16, ccdCount: 2, cppcProfile: "zen2", ccxPerCcd: 2);
+                    break;
+                case "AMD Ryzen 7 7800X3D/9800X3D 8C/16T V-Cache":
+                    LoadAmdPreset("AMD Ryzen 7 7800X3D/9800X3D 8C/16T V-Cache", physicalCores: 8, ccdCount: 1, cppcProfile: "x3d-cache");
+                    break;
+                case "AMD Ryzen 9 7900X3D/9900X3D 12C/24T V-Cache CCD0":
+                    LoadAmdPreset("AMD Ryzen 9 7900X3D/9900X3D 12C/24T V-Cache CCD0", physicalCores: 12, ccdCount: 2, cppcProfile: "x3d-cache");
+                    break;
+                case "AMD Ryzen 9 7950X3D/9950X3D 16C/32T V-Cache CCD0":
+                    LoadAmdPreset("AMD Ryzen 9 7950X3D/9950X3D 16C/32T V-Cache CCD0", physicalCores: 16, ccdCount: 2, cppcProfile: "x3d-cache");
+                    break;
+                case "AMD Ryzen 9 9950X3D2 16C/32T dual V-Cache":
+                    LoadAmdPreset("AMD Ryzen 9 9950X3D2 16C/32T dual V-Cache", physicalCores: 16, ccdCount: 2, cppcProfile: "x3d-dual-cache");
                     break;
             }
         }
@@ -1940,6 +1968,10 @@ public sealed partial class MainForm
             }
 
             TestCpuConfig config = BuildConfigFromAssignments(cppcRatings);
+            _testDevicesEnabled = true;
+            _testAutoDryRun = true;
+            enableTestDevicesCheck.Checked = true;
+            dryRunAutoCheck.Checked = true;
             ApplyTestCpuConfig(config);
             statusLabel.Text = "Test CPU mode: ACTIVE";
             statusLabel.ForeColor = _statusActive;

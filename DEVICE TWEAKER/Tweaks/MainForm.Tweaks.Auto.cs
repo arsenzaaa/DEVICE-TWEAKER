@@ -209,8 +209,81 @@ public sealed partial class MainForm
                     return $"{lp}:R{rating}/#{rank}";
                 }
 
-                return lp.ToString();
-            }));
+            return lp.ToString();
+        }));
+    }
+
+    private int SelectAutoTargetCcd(IReadOnlyList<int> ccdIds, IEnumerable<int> primaryP, IEnumerable<int> primaryE, out string reason)
+    {
+        reason = "default";
+        if (_cpuInfo is null || ccdIds.Count == 0)
+        {
+            return 0;
+        }
+
+        List<int> candidateLps = primaryP
+            .Concat(primaryE)
+            .Where(lp => lp >= 0 && lp < _maxLogical)
+            .Distinct()
+            .ToList();
+
+        if (candidateLps.Count == 0)
+        {
+            candidateLps = _cpuInfo.CcdMap.Keys
+                .Where(lp => lp >= 0 && lp < _maxLogical)
+                .Distinct()
+                .ToList();
+        }
+
+        if (_cppcEnabled)
+        {
+            var scored = ccdIds
+                .Select(ccd =>
+                {
+                    List<int> lps = candidateLps
+                        .Where(lp => _cpuInfo.CcdMap.TryGetValue(lp, out int value) && value == ccd)
+                        .ToList();
+
+                    int bestRank = lps
+                        .Select(lp => _cppcRanks.TryGetValue(lp, out int rank) ? rank : int.MaxValue)
+                        .DefaultIfEmpty(int.MaxValue)
+                        .Min();
+                    int bestRating = lps
+                        .Select(lp => _cppcRatings.TryGetValue(lp, out int rating) ? rating : int.MinValue)
+                        .DefaultIfEmpty(int.MinValue)
+                        .Max();
+                    double averageTopRating = lps
+                        .Select(lp => _cppcRatings.TryGetValue(lp, out int rating) ? rating : int.MinValue)
+                        .Where(rating => rating != int.MinValue)
+                        .OrderByDescending(rating => rating)
+                        .Take(4)
+                        .DefaultIfEmpty(int.MinValue)
+                        .Average();
+
+                    return new
+                    {
+                        Ccd = ccd,
+                        BestRank = bestRank,
+                        BestRating = bestRating,
+                        AverageTopRating = averageTopRating,
+                    };
+                })
+                .OrderBy(item => item.BestRank)
+                .ThenByDescending(item => item.BestRating)
+                .ThenByDescending(item => item.AverageTopRating)
+                .ThenBy(item => item.Ccd)
+                .FirstOrDefault();
+
+            if (scored is not null && (scored.BestRank != int.MaxValue || scored.BestRating != int.MinValue))
+            {
+                reason = $"cppc rank={scored.BestRank} rating={scored.BestRating}";
+                return scored.Ccd;
+            }
+        }
+
+        int fallback = ccdIds.OrderBy(x => x).First();
+        reason = "default-lowest-ccd";
+        return fallback;
     }
 
     private static int GetAutoAssignmentPriority(DeviceKind kind)
@@ -512,13 +585,13 @@ public sealed partial class MainForm
             ccdIdsUnique = _cpuInfo.CcdMap.Values.Distinct().OrderBy(x => x).ToList();
             if (ccdIdsUnique.Count >= 2)
             {
-                int targetCcd = ccdIdsUnique[^1];
+                int targetCcd = SelectAutoTargetCcd(ccdIdsUnique, primaryP, primaryE, out string targetCcdReason);
                 targetCcdLps = _cpuInfo.CcdMap.Where(kvp => kvp.Value == targetCcd).Select(kvp => kvp.Key).OrderBy(x => x).ToList();
                 primaryP = primaryP.Where(lp => targetCcdLps.Contains(lp)).ToList();
                 primaryE = primaryE.Where(lp => targetCcdLps.Contains(lp)).ToList();
 
                 WriteLog(
-                    $"AUTO: CCD map ids=[{string.Join(',', ccdIdsUnique)}] targetCCD={targetCcd} targetLPs=[{string.Join(',', targetCcdLps)}] filteredP=[{string.Join(',', primaryP)}] filteredE=[{string.Join(',', primaryE)}]");
+                    $"AUTO: CCD map ids=[{string.Join(',', ccdIdsUnique)}] targetCCD={targetCcd} reason=\"{targetCcdReason}\" targetLPs=[{string.Join(',', targetCcdLps)}] filteredP=[{string.Join(',', primaryP)}] filteredE=[{string.Join(',', primaryE)}]");
 
                 if (primaryP.Count + primaryE.Count == 0 && targetCcdLps.Count > 0)
                 {
