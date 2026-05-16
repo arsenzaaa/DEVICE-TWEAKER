@@ -379,12 +379,15 @@ public sealed partial class MainForm
         int maxCcxGroupsInit = Math.Min(8, Math.Max(1, currentLogical));
         NumericUpDown ccdGroupCountUpDown = NewNumericUpDown(1, maxCcdGroupsInit, ccdGroupCount);
         NumericUpDown ccxGroupCountUpDown = NewNumericUpDown(1, maxCcxGroupsInit, ccxGroupCount);
-        coreGroupCountUpDown.Margin = new Padding(0, 0, 12, 6);
-        ccdGroupCountUpDown.Margin = new Padding(0, 0, 12, 6);
+        coreGroupCountUpDown.Size = new Size(88, 24);
+        ccdGroupCountUpDown.Size = new Size(88, 24);
+        ccxGroupCountUpDown.Size = new Size(88, 24);
+        coreGroupCountUpDown.Margin = new Padding(0, 0, 10, 6);
+        ccdGroupCountUpDown.Margin = new Padding(0, 0, 10, 6);
         ccxGroupCountUpDown.Margin = new Padding(0, 0, 0, 6);
         coreGroupCountLabel.Margin = new Padding(0, 5, 6, 0);
-        ccdGroupCountLabel.Margin = new Padding(20, 5, 6, 0);
-        ccxGroupCountLabel.Margin = new Padding(20, 5, 6, 0);
+        ccdGroupCountLabel.Margin = new Padding(16, 5, 6, 0);
+        ccxGroupCountLabel.Margin = new Padding(16, 5, 6, 0);
 
         FlowLayoutPanel groupCountPanel = NewRowFlowPanel();
         groupCountPanel.Margin = new Padding(0, 12, 0, 8);
