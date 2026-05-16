@@ -218,7 +218,7 @@ public sealed partial class MainForm
         int cpuPanelTop = cpuLabel.Bottom + UiScale(6);
         int cpuPanelHeight = UiScale(150);
         int settingsMinimumWidth = Math.Min(UiScale(420), Math.Max(UiScale(320), grp.Width - UiScale(48)));
-        int settingsSideMinimumWidth = UiScale(560);
+        int settingsSideMinimumWidth = UiScale(600);
         int cpuPanelMinimumWidth = UiScale(308);
         int settingsSideGap = UiScale(40);
         int cpuPanelFullMaximumWidth = Math.Max(
@@ -331,9 +331,14 @@ public sealed partial class MainForm
         {
             List<(int Lp, CheckBox Control, int Ccd, int Eff)> ordered = columns[i];
             int maxWidth = columnWidths[i];
+            int cellWidth = Math.Max(minColumnWidth, maxWidth - UiScale(4));
+            int cellHeight = Math.Max(UiScale(18), checkSpacing - UiScale(2));
             int y = UiScale(4);
             foreach ((int _, CheckBox control, int _, int _) in ordered)
             {
+                control.AutoSize = false;
+                control.Size = new Size(cellWidth, cellHeight);
+                control.TextAlign = ContentAlignment.MiddleLeft;
                 control.Location = new Point(runningX, y);
                 y += checkSpacing;
             }
@@ -342,6 +347,7 @@ public sealed partial class MainForm
         }
 
         int requiredWidth = columns.Count == 0 ? cpuPanel.Width : runningX - columnGap + startX + UiScale(18);
+        int cpuPanelHorizontalSlack = UiScale(30);
         int sideSettingsX = 0;
         int sideSettingsWidth = 0;
         int settingsX = UiScale(18);
@@ -350,10 +356,10 @@ public sealed partial class MainForm
 
         void UpdateResponsivePlacement()
         {
-            settingsSideMinimumWidth = Math.Min(UiScale(560), Math.Max(UiScale(420), grp.Width - UiScale(48)));
+            settingsSideMinimumWidth = Math.Min(UiScale(600), Math.Max(UiScale(440), grp.Width - UiScale(48)));
             settingsMinimumWidth = Math.Min(UiScale(420), Math.Max(UiScale(320), grp.Width - UiScale(48)));
             cpuPanelFullMaximumWidth = Math.Max(cpuPanelMinimumWidth, grp.Width - cpuPanel.Left - UiScale(24));
-            int desiredSideCpuPanelWidth = Math.Max(cpuPanelMinimumWidth, requiredWidth + UiScale(8));
+            int desiredSideCpuPanelWidth = Math.Max(cpuPanelMinimumWidth, requiredWidth + cpuPanelHorizontalSlack);
             int desiredSideGroupWidth = cpuPanel.Left + desiredSideCpuPanelWidth + settingsSideGap + settingsSideMinimumWidth + UiScale(24);
             if (allowWindowAutoExpand && grp.Width < desiredSideGroupWidth)
             {
@@ -368,7 +374,7 @@ public sealed partial class MainForm
             cpuPanelMaximumWidth = cpuPanelSideMaximumWidth;
             int targetCpuPanelWidth = Math.Min(
                 cpuPanelMaximumWidth,
-                Math.Max(cpuPanelMinimumWidth, requiredWidth + UiScale(8)));
+                Math.Max(cpuPanelMinimumWidth, requiredWidth + cpuPanelHorizontalSlack));
             if (cpuPanel.Width != targetCpuPanelWidth)
             {
                 cpuPanel.Width = targetCpuPanelWidth;
@@ -378,7 +384,7 @@ public sealed partial class MainForm
                 && requiredWidth > cpuPanelFullMaximumWidth)
             {
                 cpuPanel.AutoScroll = true;
-                cpuPanel.AutoScrollMinSize = new Size(requiredWidth + startX, cpuPanel.Height);
+                cpuPanel.AutoScrollMinSize = new Size(requiredWidth + cpuPanelHorizontalSlack, cpuPanel.Height);
             }
             else
             {
@@ -1344,6 +1350,11 @@ public sealed partial class MainForm
             Device = device,
             Kind = device.Kind,
             Group = grp,
+            HeaderPanel = headerPanel,
+            Divider = divider,
+            CpuTitleLabel = cpuLabel,
+            CpuPanel = cpuPanel,
+            SettingsPanel = settingsPanel,
             TitleLabel = headerLabel,
             CpuBoxes = cpuBoxes,
             AffinityLabel = lblMask,
@@ -1514,6 +1525,14 @@ public sealed partial class MainForm
 
             b.Group.Width = width;
             RelayoutDeviceBlockChrome(b);
+            if (firstPlaced && _devicesHost is not null)
+            {
+                int maxFirstY = _devicesHost.ClientSize.Height - b.Group.Height - UiScale(2);
+                if (maxFirstY < y)
+                {
+                    y = Math.Max(UiScale(6), maxFirstY);
+                }
+            }
 
             int currentHeight = b.InfoLabel.Height > 0 ? b.InfoLabel.Height : UiScale(60);
             int infoWidth = Math.Max(UiScale(140), b.Group.Width - b.InfoLabel.Left - UiScale(24));
