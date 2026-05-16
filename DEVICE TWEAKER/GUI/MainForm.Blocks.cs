@@ -49,7 +49,7 @@ public sealed partial class MainForm
             return 0;
         }
 
-        return _devicesScroll.Width + UiScale(8);
+        return _devicesScroll.Width + UiScale(2);
     }
 
     private int GetDevicesViewportWidth()
@@ -217,11 +217,17 @@ public sealed partial class MainForm
 
         int cpuPanelTop = cpuLabel.Bottom + UiScale(6);
         int cpuPanelHeight = UiScale(150);
-        int settingsMinimumWidth = UiScale(420);
+        int settingsMinimumWidth = Math.Min(UiScale(420), Math.Max(UiScale(320), grp.Width - UiScale(48)));
+        int settingsSideMinimumWidth = UiScale(560);
         int cpuPanelMinimumWidth = UiScale(308);
-        int cpuPanelMaximumWidth = Math.Max(
+        int settingsSideGap = UiScale(40);
+        int cpuPanelFullMaximumWidth = Math.Max(
             cpuPanelMinimumWidth,
-            grp.Width - UiScale(16) - UiScale(40) - settingsMinimumWidth - UiScale(16));
+            grp.Width - UiScale(16) - UiScale(24));
+        int cpuPanelSideMaximumWidth = Math.Max(
+            cpuPanelMinimumWidth,
+            grp.Width - UiScale(16) - settingsSideGap - settingsMinimumWidth - UiScale(24));
+        int cpuPanelMaximumWidth = cpuPanelSideMaximumWidth;
         int cpuPanelWidth = cpuPanelMinimumWidth;
         Panel cpuPanel = new()
         {
@@ -336,25 +342,57 @@ public sealed partial class MainForm
         }
 
         int requiredWidth = columns.Count == 0 ? cpuPanel.Width : runningX - columnGap + startX + UiScale(18);
-        if (requiredWidth > cpuPanel.ClientSize.Width && cpuPanel.Width < cpuPanelMaximumWidth)
+        int sideSettingsX = 0;
+        int sideSettingsWidth = 0;
+        int settingsX = UiScale(18);
+        int availableSettingsWidth = Math.Max(UiScale(260), grp.Width - settingsX - UiScale(24));
+        bool allowWindowAutoExpand = true;
+
+        void UpdateResponsivePlacement()
         {
-            int expandedWidth = Math.Min(cpuPanelMaximumWidth, requiredWidth + UiScale(8));
-            if (expandedWidth > cpuPanel.Width)
+            settingsSideMinimumWidth = Math.Min(UiScale(560), Math.Max(UiScale(420), grp.Width - UiScale(48)));
+            settingsMinimumWidth = Math.Min(UiScale(420), Math.Max(UiScale(320), grp.Width - UiScale(48)));
+            cpuPanelFullMaximumWidth = Math.Max(cpuPanelMinimumWidth, grp.Width - cpuPanel.Left - UiScale(24));
+            int desiredSideCpuPanelWidth = Math.Max(cpuPanelMinimumWidth, requiredWidth + UiScale(8));
+            int desiredSideGroupWidth = cpuPanel.Left + desiredSideCpuPanelWidth + settingsSideGap + settingsSideMinimumWidth + UiScale(24);
+            if (allowWindowAutoExpand && grp.Width < desiredSideGroupWidth)
             {
-                cpuPanel.Width = expandedWidth;
+                TryExpandWindowForSideSettings(desiredSideGroupWidth);
             }
+
+            cpuPanelFullMaximumWidth = Math.Max(cpuPanelMinimumWidth, grp.Width - cpuPanel.Left - UiScale(24));
+            cpuPanelSideMaximumWidth = Math.Max(
+                cpuPanelMinimumWidth,
+                grp.Width - cpuPanel.Left - settingsSideGap - settingsSideMinimumWidth - UiScale(24));
+
+            cpuPanelMaximumWidth = cpuPanelSideMaximumWidth;
+            int targetCpuPanelWidth = Math.Min(
+                cpuPanelMaximumWidth,
+                Math.Max(cpuPanelMinimumWidth, requiredWidth + UiScale(8)));
+            if (cpuPanel.Width != targetCpuPanelWidth)
+            {
+                cpuPanel.Width = targetCpuPanelWidth;
+            }
+
+            if (requiredWidth > cpuPanel.ClientSize.Width + UiScale(2)
+                && requiredWidth > cpuPanelFullMaximumWidth)
+            {
+                cpuPanel.AutoScroll = true;
+                cpuPanel.AutoScrollMinSize = new Size(requiredWidth + startX, cpuPanel.Height);
+            }
+            else
+            {
+                cpuPanel.AutoScroll = false;
+                cpuPanel.AutoScrollMinSize = Size.Empty;
+            }
+
+            sideSettingsX = cpuPanel.Right + settingsSideGap;
+            sideSettingsWidth = grp.Width - sideSettingsX - UiScale(24);
+            settingsX = sideSettingsX;
+            availableSettingsWidth = Math.Max(UiScale(260), grp.Width - settingsX - UiScale(24));
         }
 
-        if (requiredWidth > cpuPanel.ClientSize.Width)
-        {
-            cpuPanel.AutoScroll = true;
-            cpuPanel.AutoScrollMinSize = new Size(requiredWidth + startX, cpuPanel.Height);
-        }
-        else
-        {
-            cpuPanel.AutoScroll = false;
-            cpuPanel.AutoScrollMinSize = Size.Empty;
-        }
+        UpdateResponsivePlacement();
 
         int desiredHeight = Math.Max((maxColumnCount * checkSpacing) + UiScale(18), UiScale(150));
         if (cpuPanel.Height != desiredHeight)
@@ -383,12 +421,27 @@ public sealed partial class MainForm
             Location = new Point(UiScale(18), maskY + UiScale(20)),
         };
 
-        int settingsX = cpuPanel.Right + UiScale(40);
         int valueX = UiScale(132);
         int rowGap = UiScale(12);
         int rowTop = 0;
         int labelOffset = UiScale(4);
-        int availableSettingsWidth = Math.Max(UiScale(480), grp.Width - settingsX - UiScale(24));
+
+        bool TryExpandWindowForSideSettings(int desiredGroupWidth)
+        {
+            int desiredViewportWidth = desiredGroupWidth + UiScale(36);
+            if (!TryExpandMainWindowForViewportWidth(desiredViewportWidth))
+            {
+                return false;
+            }
+
+            int expandedGroupWidth = Math.Max(grp.Width, GetDevicesViewportWidth() - UiScale(36));
+            if (expandedGroupWidth > grp.Width)
+            {
+                grp.Width = expandedGroupWidth;
+            }
+
+            return grp.Width >= desiredGroupWidth - UiScale(2);
+        }
 
         Panel settingsPanel = new()
         {
@@ -570,14 +623,16 @@ public sealed partial class MainForm
         int nicSaveButtonWidth = UiScale(58);
         int nicButtonGap = UiScale(6);
         int nicInlineGap = UiScale(8);
-        int nicInputMinWidth = nicItrProfile is { MaxQueues: > 1 } ? UiScale(260) : UiScale(130);
+        int nicInputAvailableWidth = Math.Max(UiScale(100), availableSettingsWidth - valueX - UiScale(8));
+        int nicInputMinBase = nicItrProfile is { MaxQueues: > 1 } ? UiScale(260) : UiScale(130);
+        int nicInputMinWidth = Math.Min(nicInputMinBase, nicInputAvailableWidth);
         int nicInputDesiredWidth = nicItrProfile is { MaxQueues: > 1 } ? UiScale(330) : UiScale(160);
         int nicInlineMaxWidth = availableSettingsWidth - valueX - nicInlineGap - nicSetButtonWidth - nicButtonGap - nicSaveButtonWidth - UiScale(8);
         bool nicButtonsInline = nicInlineMaxWidth >= nicInputMinWidth;
         int nicInputWidth = nicButtonsInline
             ? Math.Min(nicInputDesiredWidth, Math.Max(nicInputMinWidth, nicInlineMaxWidth))
-            : Math.Min(nicInputDesiredWidth, Math.Max(nicInputMinWidth, availableSettingsWidth - valueX - UiScale(8)));
-        int nicStatusWidth = Math.Max(UiScale(260), availableSettingsWidth - valueX - UiScale(8));
+            : Math.Min(nicInputDesiredWidth, Math.Max(nicInputMinWidth, nicInputAvailableWidth));
+        int nicStatusWidth = Math.Max(UiScale(120), nicInputAvailableWidth);
         int nicDetailRows = nicItrProfile is { MaxQueues: > 1 and <= 4 } ? nicItrProfile.MaxQueues : 2;
         int nicDetailHeight = Math.Max(UiScale(42), UiScale((nicDetailRows * 17) + 8));
         Label lblNicItr = new()
@@ -1031,7 +1086,7 @@ public sealed partial class MainForm
         Button btnImodApply = new()
         {
             Text = "SET",
-            Size = UiScale(58, 24),
+            Size = UiScale(54, 24),
             FlatStyle = FlatStyle.Flat,
             Font = _blockFont,
             UseVisualStyleBackColor = false,
@@ -1055,7 +1110,7 @@ public sealed partial class MainForm
         Button btnImodDelete = new()
         {
             Text = "DELETE",
-            Size = UiScale(82, 24),
+            Size = UiScale(76, 24),
             FlatStyle = FlatStyle.Flat,
             Font = _blockFont,
             UseVisualStyleBackColor = false,
@@ -1112,20 +1167,22 @@ public sealed partial class MainForm
             int checkY = rowTop + labelOffset + Math.Max(0, (imodLabelSize.Height - imodCheckSize) / 2);
             chkImod.Location = new Point(0, checkY);
             lblImod.Location = new Point(imodCheckSize + imodCheckGap, rowTop + labelOffset);
-            int buttonGap = UiScale(8);
-            int inlineGap = UiScale(10);
+            int buttonGap = UiScale(6);
+            int inlineGap = UiScale(8);
             int buttonTotalWidth = btnImodApply.Width + btnImodDelete.Width + buttonGap;
             int inlineInputWidth = availableSettingsWidth - valueX - buttonTotalWidth - inlineGap;
             bool useInlineImodButtons = inlineInputWidth >= UiScale(180);
             int imodInputWidth = useInlineImodButtons
                 ? Math.Min(UiScale(300), inlineInputWidth)
-                : Math.Min(UiScale(300), Math.Max(UiScale(220), availableSettingsWidth - valueX - UiScale(8)));
+                : Math.Min(UiScale(300), Math.Max(UiScale(120), availableSettingsWidth - valueX - UiScale(8)));
             txtImod.Width = imodInputWidth;
             txtImod.Location = new Point(valueX, rowTop);
             lblImodHelp.Visible = false;
             lblImodHelp.Location = new Point(txtImod.Left, txtImod.Bottom + UiScale(4));
             lblImodHelp.Size = new Size(UiScale(180), UiScale(18));
-            int imodButtonTop = useInlineImodButtons ? txtImod.Top : txtImod.Bottom + UiScale(6);
+            int imodButtonTop = useInlineImodButtons
+                ? txtImod.Top + Math.Max(0, (txtImod.Height - btnImodApply.Height) / 2)
+                : txtImod.Bottom + UiScale(6);
             int imodButtonLeft = useInlineImodButtons ? txtImod.Right + inlineGap : 0;
             btnImodApply.Location = new Point(imodButtonLeft, imodButtonTop);
             btnImodDelete.Location = new Point(btnImodApply.Right + buttonGap, imodButtonTop);
@@ -1135,7 +1192,7 @@ public sealed partial class MainForm
                 imodDeviceEditorPanel.Location = new Point(valueX, statusTop - UiScale(1));
                 int editorRows = imodDeviceEditorRoles.Count > 2 ? 2 : 1;
                 imodDeviceEditorPanel.Size = new Size(
-                    Math.Max(UiScale(340), availableSettingsWidth - valueX - UiScale(8)),
+                    Math.Max(UiScale(80), availableSettingsWidth - valueX - UiScale(8)),
                     UiScale(editorRows * 26));
                 statusTop = imodDeviceEditorPanel.Bottom + UiScale(3);
             }
@@ -1146,14 +1203,14 @@ public sealed partial class MainForm
             int defaultStatusWidth = UiScale(120);
             int statusGap = UiScale(14);
             int currentStatusWidth = Math.Max(
-                UiScale(180),
-                Math.Min(UiScale(260), availableSettingsWidth - defaultStatusWidth - statusGap));
+                UiScale(90),
+                Math.Min(UiScale(260), availableSettingsWidth - imodDetailsX - defaultStatusWidth - statusGap));
             lblImodCurrent.Size = new Size(currentStatusWidth, UiScale(18));
             lblImodDefault.Location = new Point(lblImodCurrent.Right + UiScale(14), imodStatusTop);
             lblImodDefault.Size = new Size(defaultStatusWidth, UiScale(18));
             int imodMapRows = imodDeviceEditorRoles.Contains("Gamepad", StringComparer.OrdinalIgnoreCase) ? 7 : 6;
             lblImodMap.Location = new Point(imodDetailsX, lblImodCurrent.Bottom + UiScale(14));
-            lblImodMap.Size = new Size(Math.Max(UiScale(260), availableSettingsWidth - imodDetailsX), UiScale(imodMapRows * 14));
+            lblImodMap.Size = new Size(Math.Max(UiScale(120), availableSettingsWidth - imodDetailsX), UiScale(imodMapRows * 14));
             settingsPanel.Controls.AddRange([lblImodMode, cmbImodMode, lblImodModeHint, chkImod, lblImod, txtImod, btnImodApply, btnImodDelete, imodDeviceEditorPanel, lblImodCurrent, lblImodDefault, lblImodMap]);
             _copyToolTip.SetToolTip(txtImod, $"Supported IMOD input:\n0xC8\n0xC8, 0xFA0\n{imodRoleTemplate}");
             _copyToolTip.SetToolTip(cmbImodMode, "XHCI writes one value to all interrupters on this USB host controller. Devices maps detected devices to their interrupter. Interrupters writes values by index.");
@@ -1192,8 +1249,11 @@ public sealed partial class MainForm
             settingsContentBottom = Math.Max(settingsContentBottom, child.Bottom);
         }
 
+        UpdateResponsivePlacement();
+
+        int settingsMinWidth = Math.Min(UiScale(420), availableSettingsWidth);
         Size settingsSize = new(
-            Math.Max(settingsContentRight + UiScale(8), UiScale(420)),
+            Math.Min(Math.Max(settingsContentRight + UiScale(8), settingsMinWidth), availableSettingsWidth),
             Math.Max(settingsContentBottom + UiScale(8), UiScale(24)));
         settingsPanel.Size = settingsSize;
 
@@ -1227,6 +1287,8 @@ public sealed partial class MainForm
 
         void RelayoutDeviceBlockChrome()
         {
+            UpdateResponsivePlacement();
+
             int visibleSettingsRight = 0;
             int visibleSettingsBottom = 0;
             foreach (Control child in settingsPanel.Controls)
@@ -1240,8 +1302,12 @@ public sealed partial class MainForm
                 visibleSettingsBottom = Math.Max(visibleSettingsBottom, child.Bottom);
             }
 
+            UpdateResponsivePlacement();
+
+            int currentAvailableSettingsWidth = Math.Max(UiScale(260), grp.Width - settingsX - UiScale(24));
+            int currentSettingsMinWidth = Math.Min(UiScale(420), currentAvailableSettingsWidth);
             Size currentSettingsSize = new(
-                Math.Max(visibleSettingsRight + UiScale(8), UiScale(420)),
+                Math.Min(Math.Max(visibleSettingsRight + UiScale(8), currentSettingsMinWidth), currentAvailableSettingsWidth),
                 Math.Max(visibleSettingsBottom + UiScale(8), UiScale(24)));
             settingsPanel.Size = currentSettingsSize;
 
@@ -1305,6 +1371,7 @@ public sealed partial class MainForm
             RawMouseThrottleCombo = showRawMouseThrottle ? cmbRawMouseThrottle : null,
             RawMouseThrottleStatusLabel = showRawMouseThrottle ? lblRawMouseThrottleStatus : null,
             InfoLabel = lblInfo,
+            RelayoutAction = RelayoutDeviceBlockChrome,
             AffinityMask = 0,
             IrqCount = null,
         };
@@ -1398,6 +1465,7 @@ public sealed partial class MainForm
             RelayoutDeviceBlockChrome();
         }
 
+        allowWindowAutoExpand = false;
         _devicesPanel.Controls.Add(grp);
         _blocks.Add(block);
     }
@@ -1438,13 +1506,15 @@ public sealed partial class MainForm
 
         foreach (DeviceBlock b in _blocks)
         {
-            int width = GetDevicesViewportWidth() - (paddingX * 2);
+            int width = GetDevicesViewportWidth() - paddingX - UiScale(12);
             if (width < UiScale(360))
             {
                 width = UiScale(360);
             }
 
             b.Group.Width = width;
+            RelayoutDeviceBlockChrome(b);
+
             int currentHeight = b.InfoLabel.Height > 0 ? b.InfoLabel.Height : UiScale(60);
             int infoWidth = Math.Max(UiScale(140), b.Group.Width - b.InfoLabel.Left - UiScale(24));
             b.InfoLabel.Size = new Size(infoWidth, currentHeight);
@@ -1474,7 +1544,7 @@ public sealed partial class MainForm
 
         if (reserved is not null && !reservedInserted)
         {
-            int width = GetDevicesViewportWidth() - (paddingX * 2);
+            int width = GetDevicesViewportWidth() - paddingX - UiScale(12);
             if (width < UiScale(360))
             {
                 width = UiScale(360);
@@ -1549,6 +1619,7 @@ public sealed partial class MainForm
             _devicesPanel.ResumeLayout();
         }
 
+        AdjustInitialDeviceViewportHeight();
         _devicesPanel.Invalidate(true);
         _devicesHost.Invalidate(true);
 

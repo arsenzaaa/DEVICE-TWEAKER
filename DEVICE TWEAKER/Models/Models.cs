@@ -173,6 +173,7 @@ internal sealed class DeviceBlock
     public ThemedDropDownPicker? RawMouseThrottleCombo { get; init; }
     public Label? RawMouseThrottleStatusLabel { get; init; }
     public required Control InfoLabel { get; init; }
+    public Action? RelayoutAction { get; set; }
 
     public ulong AffinityMask { get; set; }
     public int? IrqCount { get; set; }

@@ -156,6 +156,17 @@ public sealed partial class MainForm
         dialog.Font = _baseFont;
         dialog.Icon = Icon;
         dialog.ClientSize = new Size(760, 520);
+        using ToolTip adminToolTip = new()
+        {
+            UseFading = true,
+            UseAnimation = true,
+            IsBalloon = false,
+            ShowAlways = false,
+            InitialDelay = 700,
+            ReshowDelay = 120,
+            AutoPopDelay = 8000,
+            Active = false,
+        };
 
         TableLayoutPanel layout = new()
         {
@@ -164,7 +175,7 @@ public sealed partial class MainForm
             Dock = DockStyle.Top,
             ColumnCount = 2,
             RowCount = 16,
-            Padding = new Padding(20),
+            Padding = new Padding(20, 26, 20, 20),
             BackColor = _bgForm,
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190F));
@@ -446,8 +457,8 @@ public sealed partial class MainForm
         layout.Controls.Add(htStateCombo, 1, 6);
         layout.Controls.Add(cppcRatingsLabel, 0, 7);
         layout.Controls.Add(cppcRatingsBox, 1, 7);
-        _copyToolTip.SetToolTip(cppcRatingsBox, "Optional. Format: 0=120, 1=110, 2=100 or just 120,110,100. Empty = CPPC off in test mode.");
-        _copyToolTip.SetToolTip(cpuPresetCombo, "Loads a synthetic topology for AUTO planner testing. You can still edit LP/core/CCD/E-core/CPPC values after loading.");
+        adminToolTip.SetToolTip(cppcRatingsBox, "Optional. Format: 0=120, 1=110, 2=100 or just 120,110,100. Empty = CPPC off in test mode.");
+        adminToolTip.SetToolTip(cpuPresetCombo, "Loads a synthetic topology for AUTO planner testing. You can still edit LP/core/CCD/E-core/CPPC values after loading.");
         layout.Controls.Add(groupCountLabel, 0, 8);
         layout.Controls.Add(groupCountPanel, 1, 8);
         layout.Controls.Add(assignmentsLabel, 0, 9);
@@ -558,7 +569,7 @@ public sealed partial class MainForm
 
         Label testPnpIdLabel = NewDialogLabel("PNP ID:");
         TextBox testPnpIdBox = NewDialogTextBox(360);
-        _copyToolTip.SetToolTip(testPnpIdBox, @"Optional fake hardware ID. Example: PCI\VEN_10EC&DEV_8125\TEST for NIC ITR profile preview.");
+        adminToolTip.SetToolTip(testPnpIdBox, @"Optional fake hardware ID. Example: PCI\VEN_10EC&DEV_8125\TEST for NIC ITR profile preview.");
         testDevicesLayout.Controls.Add(testPnpIdLabel, 0, 4);
         testDevicesLayout.Controls.Add(testPnpIdBox, 1, 4);
 
@@ -781,6 +792,7 @@ public sealed partial class MainForm
             suppressTestDeviceToggle = false;
 
             WriteLog($"TEST.DEVICES: enabled={_testDevicesEnabled}");
+            _initialDeviceViewportHeightAdjusted = false;
             RefreshBlocks();
         };
 
@@ -808,6 +820,7 @@ public sealed partial class MainForm
             suppressTestDeviceToggle = false;
 
             WriteLog($"TEST.DEVICES: only={_testDevicesOnly}");
+            _initialDeviceViewportHeightAdjusted = false;
             RefreshBlocks();
         };
 
@@ -874,6 +887,7 @@ public sealed partial class MainForm
 
             if (_testDevicesEnabled || shouldRefresh)
             {
+                _initialDeviceViewportHeightAdjusted = false;
                 RefreshBlocks();
             }
         };
@@ -893,6 +907,7 @@ public sealed partial class MainForm
             RefreshTestDeviceList();
             if (_testDevicesEnabled)
             {
+                _initialDeviceViewportHeightAdjusted = false;
                 RefreshBlocks();
             }
         };
@@ -910,6 +925,7 @@ public sealed partial class MainForm
             RefreshTestDeviceList();
             if (_testDevicesEnabled)
             {
+                _initialDeviceViewportHeightAdjusted = false;
                 RefreshBlocks();
             }
         };
@@ -1767,7 +1783,7 @@ public sealed partial class MainForm
         buttons.Controls.Add(resetButton, 1, 0);
         buttons.Controls.Add(closeButton, 2, 0);
 
-        const int dialogScrollWidth = 14;
+        const int dialogScrollWidth = 13;
         Panel contentHost = new()
         {
             Dock = DockStyle.Fill,
@@ -1792,7 +1808,7 @@ public sealed partial class MainForm
             TrackColor = _bgForm,
             RailColor = _bgForm,
             ThumbColor = _accent,
-            ThumbWidth = 10,
+            ThumbWidth = 9,
             RailWidth = 0,
             ThumbCornerRadius = 7,
             Visible = false,
@@ -1902,6 +1918,11 @@ public sealed partial class MainForm
         {
             ApplyTitleBarTheme(dialog);
             SyncDialogScrollBar();
+            dialog.BeginInvoke(new Action(() =>
+            {
+                adminToolTip.Hide(dialog);
+                adminToolTip.Active = true;
+            }));
         };
 
         dialog.PerformLayout();
@@ -2251,6 +2272,7 @@ public sealed partial class MainForm
         WriteLog($"TESTCPU: enabled logical={topo.Logical} eCores=[{eText}] cores=[{coreGroups}] ccd=[{ccdGroups}]");
 
         UpdateCpuHeaderUi();
+        _initialDeviceViewportHeightAdjusted = false;
         RefreshBlocks();
     }
 
@@ -2260,6 +2282,7 @@ public sealed partial class MainForm
         {
             InitializeCpu();
             UpdateCpuHeaderUi();
+            _initialDeviceViewportHeightAdjusted = false;
             RefreshBlocks();
             return;
         }
@@ -2267,6 +2290,7 @@ public sealed partial class MainForm
         _testCpuActive = false;
         InitializeCpu();
         UpdateCpuHeaderUi();
+        _initialDeviceViewportHeightAdjusted = false;
         RefreshBlocks();
         WriteLog("TESTCPU: disabled (restored real CPU)");
     }

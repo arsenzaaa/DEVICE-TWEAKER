@@ -8,18 +8,20 @@ public sealed partial class MainForm
     {
         UpdateUiScale();
         Text = "DEVICE TWEAKER";
-        Size formSize = UiScale(1120, 840);
+        Size formSize = UiScale(1120, 875);
         Size = formSize;
         StartPosition = FormStartPosition.CenterScreen;
+        AutoScaleMode = AutoScaleMode.None;
         BackColor = _bgForm;
         ForeColor = _fgMain;
         Font = _baseFont;
         KeyPreview = true;
 
-        FormBorderStyle = FormBorderStyle.FixedSingle;
-        MaximizeBox = false;
-        MinimumSize = formSize;
-        MaximumSize = formSize;
+        FormBorderStyle = FormBorderStyle.Sizable;
+        MaximizeBox = true;
+        MinimumSize = UiScale(1120, 840);
+        MaximumSize = Size.Empty;
+        SizeGripStyle = SizeGripStyle.Show;
 
         Panel brandPanel = new()
         {
@@ -309,7 +311,7 @@ public sealed partial class MainForm
             Margin = Padding.Empty,
         };
 
-        int scrollWidth = UiScale(14);
+        int scrollWidth = UiScale(12);
         _devicesPanel = new BufferedPanel
         {
             Dock = DockStyle.None,
@@ -327,7 +329,7 @@ public sealed partial class MainForm
             TrackColor = _bgForm,
             RailColor = _bgForm,
             ThumbColor = _accent,
-            ThumbWidth = UiScale(10),
+            ThumbWidth = UiScale(9),
             RailWidth = 0,
             ThumbCornerRadius = UiScale(7),
             Visible = false,
@@ -373,6 +375,15 @@ public sealed partial class MainForm
             UseAnimation = true,
             IsBalloon = false,
             ShowAlways = true,
+        };
+        _layoutRefreshTimer = new System.Windows.Forms.Timer
+        {
+            Interval = 220,
+        };
+        _layoutRefreshTimer.Tick += (_, _) =>
+        {
+            _layoutRefreshTimer.Stop();
+            RebuildDeviceBlocksForLayout();
         };
 
         btnScan.Click += (_, _) =>
@@ -495,9 +506,158 @@ public sealed partial class MainForm
             RestoreLatestDeviceTweakerBackup();
         };
 
-        Resize += (_, _) => LayoutBlocks();
+        _lastLayoutViewportWidth = _devicesHost.ClientSize.Width;
+        _lastLayoutDpi = GetCurrentWindowDpi();
+        Resize += (_, _) =>
+        {
+            LayoutBlocks();
+        };
+        ResizeEnd += (_, _) => LayoutBlocks();
+        DpiChanged += (_, _) =>
+        {
+            UpdateUiScale();
+            _initialDeviceViewportHeightAdjusted = false;
+            QueueDeviceLayoutRebuild(force: true);
+        };
         MouseWheel += (_, e) => HandleDevicesMouseWheel(e);
         KeyDown += OnMainFormKeyDown;
+    }
+
+    private int GetCurrentWindowDpi()
+    {
+        try
+        {
+            if (IsHandleCreated)
+            {
+                return NativeUser32.GetDpiForWindow(Handle);
+            }
+
+            return NativeUser32.GetDpiForSystem();
+        }
+        catch
+        {
+            return 96;
+        }
+    }
+
+    private void QueueDeviceLayoutRebuild(bool force)
+    {
+        if (_layoutRefreshTimer is null || _devicesHost is null || IsDisposed)
+        {
+            return;
+        }
+
+        int viewportWidth = _devicesHost.ClientSize.Width;
+        int dpi = GetCurrentWindowDpi();
+        if (!force
+            && Math.Abs(viewportWidth - _lastLayoutViewportWidth) < UiScale(24)
+            && dpi == _lastLayoutDpi)
+        {
+            return;
+        }
+
+        _lastLayoutViewportWidth = viewportWidth;
+        _lastLayoutDpi = dpi;
+        _layoutRefreshTimer.Stop();
+        _layoutRefreshTimer.Start();
+    }
+
+    private void RebuildDeviceBlocksForLayout()
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        UpdateUiScale();
+        if (_blocks.Count == 0)
+        {
+            LayoutBlocks();
+            return;
+        }
+
+        RefreshBlocks(includeImodReadback: false);
+    }
+
+    private bool TryExpandMainWindowForViewportWidth(int desiredViewportWidth)
+    {
+        if (IsDisposed || !IsHandleCreated || WindowState != FormWindowState.Normal || _expandingMainWindowForLayout)
+        {
+            return false;
+        }
+
+        int currentViewportWidth = GetDevicesViewportWidth();
+        int delta = desiredViewportWidth - currentViewportWidth;
+        if (delta <= UiScale(2))
+        {
+            return true;
+        }
+
+        Rectangle workingArea = Screen.FromControl(this).WorkingArea;
+        int maxWidthToRight = Math.Max(Width, workingArea.Right - Left);
+        int nextWidth = Math.Min(maxWidthToRight, Width + delta);
+        if (nextWidth <= Width + UiScale(2))
+        {
+            return false;
+        }
+
+        _expandingMainWindowForLayout = true;
+        try
+        {
+            Width = nextWidth;
+            UpdateDevicesScrollLayout();
+            UpdateDevicesHostLayout();
+        }
+        finally
+        {
+            _expandingMainWindowForLayout = false;
+        }
+
+        return GetDevicesViewportWidth() >= desiredViewportWidth - UiScale(2);
+    }
+
+    private void AdjustInitialDeviceViewportHeight()
+    {
+        if (_initialDeviceViewportHeightAdjusted
+            || IsDisposed
+            || !IsHandleCreated
+            || WindowState != FormWindowState.Normal
+            || _devicesHost is null
+            || _blocks.Count == 0)
+        {
+            return;
+        }
+
+        Control firstBlock = _blocks[0].Group;
+        int desiredViewportHeight = firstBlock.Bottom + UiScale(10);
+        if (_blocks.Count > 1)
+        {
+            desiredViewportHeight = Math.Min(desiredViewportHeight, _blocks[1].Group.Top - UiScale(2));
+        }
+
+        desiredViewportHeight = Math.Max(firstBlock.Bottom + UiScale(2), desiredViewportHeight);
+
+        int delta = desiredViewportHeight - _devicesHost.ClientSize.Height;
+        if (Math.Abs(delta) <= UiScale(3))
+        {
+            _initialDeviceViewportHeightAdjusted = true;
+            return;
+        }
+
+        Rectangle workingArea = Screen.FromControl(this).WorkingArea;
+        int maxHeight = Math.Max(Height, workingArea.Bottom - Top);
+        int nextHeight = Math.Max(MinimumSize.Height, Math.Min(Height + delta, maxHeight));
+        if (Math.Abs(nextHeight - Height) <= UiScale(2))
+        {
+            _initialDeviceViewportHeightAdjusted = true;
+            return;
+        }
+
+        _initialDeviceViewportHeightAdjusted = true;
+        Height = nextHeight;
+        UpdateDevicesScrollLayout();
+        UpdateDevicesHostLayout();
+        LayoutBlocks();
     }
 
     private void ApplyDarkScrollBarTheme(Control control)

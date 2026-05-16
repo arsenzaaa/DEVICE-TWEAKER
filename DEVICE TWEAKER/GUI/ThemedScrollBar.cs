@@ -98,11 +98,11 @@ internal sealed class ThemedScrollBar : Control
         }
 
         using SolidBrush thumbBrush = new(ThumbColor);
-        int radius = Math.Min(ThumbCornerRadius, Math.Min(thumb.Width, thumb.Height) / 2);
-        if (radius > 0)
+        int cornerDiameter = Math.Min(ThumbCornerRadius * 2, Math.Min(thumb.Width, thumb.Height));
+        if (cornerDiameter > 1)
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using GraphicsPath path = CreateRoundedRect(thumb, radius);
+            using GraphicsPath path = CreateRoundedRect(thumb, cornerDiameter);
             e.Graphics.FillPath(thumbBrush, path);
         }
         else
@@ -236,17 +236,17 @@ internal sealed class ThemedScrollBar : Control
         return width;
     }
 
-    private static GraphicsPath CreateRoundedRect(Rectangle rect, int radius)
+    private static GraphicsPath CreateRoundedRect(Rectangle rect, int cornerDiameter)
     {
         GraphicsPath path = new();
-        if (radius <= 0)
+        if (cornerDiameter <= 1)
         {
             path.AddRectangle(rect);
             path.CloseFigure();
             return path;
         }
 
-        int diameter = radius * 2;
+        int diameter = Math.Min(cornerDiameter, Math.Min(rect.Width, rect.Height));
         int right = rect.Right - diameter;
         int bottom = rect.Bottom - diameter;
 

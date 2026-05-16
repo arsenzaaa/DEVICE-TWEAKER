@@ -723,11 +723,23 @@ public sealed partial class MainForm
             return;
         }
 
+        if (block.RelayoutAction is not null)
+        {
+            block.RelayoutAction();
+            return;
+        }
+
         Panel? settingsPanel = block.ImodCurrentLabel.Parent as Panel;
         Control? cpuPanel = block.CpuBoxes.Count > 0 ? block.CpuBoxes[0].Parent : null;
         if (settingsPanel is null || cpuPanel is null)
         {
             return;
+        }
+
+        int maxCpuPanelWidth = Math.Max(UiScale(220), block.Group.Width - cpuPanel.Left - UiScale(24));
+        if (cpuPanel.Width > maxCpuPanelWidth)
+        {
+            cpuPanel.Width = maxCpuPanelWidth;
         }
 
         int visibleSettingsRight = 0;
@@ -743,14 +755,24 @@ public sealed partial class MainForm
             visibleSettingsBottom = Math.Max(visibleSettingsBottom, child.Bottom);
         }
 
+        bool stackedSettings = settingsPanel.Left <= UiScale(24);
+        if (!stackedSettings && block.Group.Width - settingsPanel.Left - UiScale(24) < UiScale(320))
+        {
+            stackedSettings = true;
+            settingsPanel.Left = UiScale(18);
+        }
+
+        int availableSettingsWidth = Math.Max(UiScale(120), block.Group.Width - settingsPanel.Left - UiScale(24));
+        int settingsMinWidth = Math.Min(UiScale(420), availableSettingsWidth);
         Size currentSettingsSize = new(
-            Math.Max(visibleSettingsRight + UiScale(8), UiScale(420)),
+            Math.Min(Math.Max(visibleSettingsRight + UiScale(8), settingsMinWidth), availableSettingsWidth),
             Math.Max(visibleSettingsBottom + UiScale(8), UiScale(24)));
         settingsPanel.Size = currentSettingsSize;
 
-        settingsPanel.Location = new Point(
-            settingsPanel.Left,
-            cpuPanel.Top + Math.Max(0, (cpuPanel.Height - currentSettingsSize.Height) / 2));
+        int settingsTop = stackedSettings
+            ? block.IrqLabel.Bottom + UiScale(18)
+            : cpuPanel.Top + Math.Max(0, (cpuPanel.Height - currentSettingsSize.Height) / 2);
+        settingsPanel.Location = new Point(settingsPanel.Left, settingsTop);
 
         int infoY = Math.Max(block.IrqLabel.Bottom + UiScale(14), cpuPanel.Bottom + UiScale(18));
         infoY = Math.Max(infoY, settingsPanel.Bottom + UiScale(10));
