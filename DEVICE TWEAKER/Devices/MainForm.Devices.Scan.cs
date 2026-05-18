@@ -832,6 +832,14 @@ public sealed partial class MainForm
                 continue;
             }
 
+            string normalizedInstanceId = NormalizeInstanceId(d.InstanceId);
+            if (_testHiddenDeviceIds.Contains(normalizedInstanceId))
+            {
+                string hiddenName = _testHiddenDeviceLabels.TryGetValue(normalizedInstanceId, out string? label) ? label : d.Name ?? d.InstanceId;
+                WriteLog($"SCAN.TEST.HIDE: skipped hidden real device {d.InstanceId} name=\"{hiddenName}\"");
+                continue;
+            }
+
             string name = !string.IsNullOrWhiteSpace(d.Name) ? d.Name : d.InstanceId;
             string service = d.Service ?? string.Empty;
             if (string.IsNullOrWhiteSpace(service))

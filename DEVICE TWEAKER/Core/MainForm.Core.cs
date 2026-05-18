@@ -22,6 +22,8 @@ public sealed partial class MainForm : Form
     private int _suppressReservedCpuEvents;
     private bool _testCpuActive;
     private readonly List<DeviceInfo> _testDevices = [];
+    private readonly HashSet<string> _testHiddenDeviceIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _testHiddenDeviceLabels = new(StringComparer.OrdinalIgnoreCase);
     private bool _testDevicesEnabled;
     private bool _testDevicesOnly;
     private bool _testAutoDryRun;
@@ -969,7 +971,7 @@ public sealed partial class MainForm : Form
         WriteLog(
             $"GUI.HEADER: cpuHeader=\"{FlattenLogText(cpuHeader)}\" smt=\"{FlattenLogText(htPrefix)} {FlattenLogText(htStatus)}\" hybridCpu=\"{FlattenLogText(hybridCpuStatus)}\" cppc=\"{FlattenLogText(cppcStatus)}\" dualCcd=\"{FlattenLogText(dualCcdStatus)}\" smtText=\"{FlattenLogText(_smtText)}\"");
         WriteLog(
-            $"GUI.STATE: blocks={_blocks.Count} maxLogical={_maxLogical} groupCount={_cpuGroupCount} testCpu={_testCpuActive} testDevicesEnabled={_testDevicesEnabled} testDevicesOnly={_testDevicesOnly} autoDryRun={_testAutoDryRun}");
+            $"GUI.STATE: blocks={_blocks.Count} maxLogical={_maxLogical} groupCount={_cpuGroupCount} testCpu={_testCpuActive} testDevicesEnabled={_testDevicesEnabled} testDevicesOnly={_testDevicesOnly} hiddenRealDevices={_testHiddenDeviceIds.Count} autoDryRun={_testAutoDryRun}");
         WriteLog(
             $"GUI.LAYOUT.VIEWPORT: form={FormatGuiBounds(this)} host={FormatGuiBounds(_devicesHost)} panel={FormatGuiBounds(_devicesPanel)} scrollVisible={_devicesScroll.Visible} scrollWidth={_devicesScroll.Width} scrollValue={_devicesScroll.Value} dpi={GetCurrentWindowDpi()}");
 
