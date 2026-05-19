@@ -172,6 +172,7 @@ public sealed partial class MainForm
             _suppressReservedCpuEvents--;
         }
 
+        UpdateReservedCpuValueLabel(tag);
         WriteLog("RESERVED.RESET: cleared ReservedCpuSets via Reset-AllTweaks");
     }
 
@@ -195,6 +196,7 @@ public sealed partial class MainForm
             _suppressReservedCpuEvents--;
         }
 
+        UpdateReservedCpuValueLabel(tag);
         WriteLog("RESERVED.DRYRUN: cleared ReservedCpuSets (UI only)");
     }
 
@@ -236,7 +238,52 @@ public sealed partial class MainForm
         }
 
         WriteLog($"RESERVED.UPDATE: requested set=[{string.Join(',', setBits)}] count={bits.Length}");
+        UpdateReservedCpuValueLabel(tag);
         SetReservedCpuSets(bits);
+    }
+
+    private static byte[] BuildReservedCpuSetBytes(IReadOnlyList<int> setBits)
+    {
+        int maxIndex = setBits.Count > 0 ? setBits.Max() : -1;
+        int byteCount = maxIndex >= 0 ? (maxIndex / 8) + 1 : 0;
+        byte[] bytes = new byte[byteCount];
+        foreach (int id in setBits)
+        {
+            if (id < 0)
+            {
+                continue;
+            }
+
+            int byteIndex = id / 8;
+            int bitIndex = id % 8;
+            if (byteIndex >= 0 && byteIndex < bytes.Length)
+            {
+                bytes[byteIndex] = (byte)(bytes[byteIndex] | (1 << bitIndex));
+            }
+        }
+
+        return bytes;
+    }
+
+    private void UpdateReservedCpuValueLabel(ReservedCpuPanelTag tag)
+    {
+        List<int> setBits = tag.Meta
+            .Where(entry => entry.Control.Checked)
+            .Select(entry => entry.Index)
+            .OrderBy(index => index)
+            .ToList();
+
+        if (setBits.Count == 0)
+        {
+            tag.ValueLabel.Text = "Value: ReservedCpuSets = not set";
+            tag.ValueLabel.Tag = "ReservedCpuSets = not set";
+            return;
+        }
+
+        byte[] bytes = BuildReservedCpuSetBytes(setBits);
+        string hex = bytes.Length == 0 ? "empty" : string.Join(" ", bytes.Select(b => b.ToString("X2")));
+        tag.ValueLabel.Text = $"Value: ReservedCpuSets = [{hex}] | CPUs: {string.Join(", ", setBits)}";
+        tag.ValueLabel.Tag = tag.ValueLabel.Text;
     }
 
     private Panel? NewReservedCpuSetsPanel()
@@ -254,21 +301,14 @@ public sealed partial class MainForm
 
         bool[] reservedBits = GetReservedCpuSets(logicalCount);
 
-        Panel grp = new()
+        Panel grp = new DeviceCardPanel
         {
             BackColor = _bgGroup,
             ForeColor = _fgMain,
+            BorderColor = _border,
             Margin = new Padding(0),
             Padding = new Padding(UiScale(12), UiScale(16), UiScale(12), UiScale(16)),
             TabStop = false,
-        };
-        grp.Paint += (_, e) =>
-        {
-            Rectangle rect = grp.ClientRectangle;
-            rect.Width -= 1;
-            rect.Height -= 1;
-            using Pen pen = new(_border);
-            e.Graphics.DrawRectangle(pen, rect);
         };
 
         Label title = new()
@@ -309,21 +349,36 @@ public sealed partial class MainForm
             }
         };
 
-        Panel inner = new()
+        Label valueLabel = new()
+        {
+            Text = "Value: ReservedCpuSets = not set",
+            Tag = "ReservedCpuSets = not set",
+            AutoSize = true,
+            AutoEllipsis = true,
+            Font = _baseFont,
+            ForeColor = _fgMain,
+            Margin = new Padding(0, UiScale(2), 0, 0),
+            Cursor = Cursors.Hand,
+        };
+        valueLabel.MouseEnter += (_, _) => valueLabel.ForeColor = _accent;
+        valueLabel.MouseLeave += (_, _) => valueLabel.ForeColor = _fgMain;
+        valueLabel.Click += (_, _) =>
+        {
+            if (valueLabel.Tag is string txt && !string.IsNullOrWhiteSpace(txt))
+            {
+                Clipboard.SetText(txt);
+                ShowCopiedToolTip(valueLabel);
+            }
+        };
+
+        Panel inner = new DeviceCardPanel
         {
             BackColor = _bgForm,
             ForeColor = _fgMain,
+            BorderColor = _border,
             AutoScroll = false,
             Margin = new Padding(0, UiScale(8), 0, 0),
             Padding = new Padding(UiScale(8), UiScale(6), UiScale(8), UiScale(6)),
-        };
-        inner.Paint += (_, e) =>
-        {
-            Rectangle rect = inner.ClientRectangle;
-            rect.Width -= 1;
-            rect.Height -= 1;
-            using Pen pen = new(_border);
-            e.Graphics.DrawRectangle(pen, rect);
         };
 
         List<ReservedCpuEntry> meta = [];
@@ -375,6 +430,7 @@ public sealed partial class MainForm
         grp.Controls.Add(desc);
         grp.Controls.Add(inner);
         grp.Controls.Add(pathLabel);
+        grp.Controls.Add(valueLabel);
         grp.Tag = new ReservedCpuPanelTag
         {
             InnerPanel = inner,
@@ -382,7 +438,9 @@ public sealed partial class MainForm
             Description = desc,
             Meta = meta,
             PathLabel = pathLabel,
+            ValueLabel = valueLabel,
         };
+        UpdateReservedCpuValueLabel((ReservedCpuPanelTag)grp.Tag);
 
         return grp;
     }
@@ -401,6 +459,7 @@ public sealed partial class MainForm
         Panel inner = data.InnerPanel;
         List<ReservedCpuEntry> meta = data.Meta;
         Label path = data.PathLabel;
+        Label value = data.ValueLabel;
 
         int availWidth = panel.Width - panel.Padding.Left - panel.Padding.Right;
         int y = panel.Padding.Top;
@@ -468,7 +527,11 @@ public sealed partial class MainForm
 
         path.MaximumSize = new Size(availWidth, 0);
         path.Location = new Point(panel.Padding.Left + UiScale(4), y);
-        y = path.Bottom + panel.Padding.Bottom;
+        y = path.Bottom + UiScale(4);
+
+        value.MaximumSize = new Size(availWidth, 0);
+        value.Location = new Point(panel.Padding.Left + UiScale(4), y);
+        y = value.Bottom + panel.Padding.Bottom;
 
         panel.Height = Math.Max(y, panel.Padding.Vertical + UiScale(40));
     }

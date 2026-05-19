@@ -308,6 +308,7 @@ public sealed partial class MainForm
             "Intel Core i5-13600K/14600K 6P+8E/20T",
             "Intel Core i9-13900K/14900K 8P+16E/32T",
             "Intel Core Ultra 9 285K 8P+16E/24T",
+            "Intel Core Ultra 9 285HX 8P+16E/24T",
             "AMD Ryzen 5 7500F/7600X 6C/12T",
             "AMD Ryzen 7 7700X/9700X 8C/16T",
             "AMD Ryzen 9 7900X/9900X 12C/24T",
@@ -318,6 +319,7 @@ public sealed partial class MainForm
             "AMD Ryzen 7 7800X3D/9800X3D 8C/16T V-Cache",
             "AMD Ryzen 9 7900X3D/9900X3D 12C/24T V-Cache CCD0",
             "AMD Ryzen 9 7950X3D/9950X3D 16C/32T V-Cache CCD0",
+            "AMD Ryzen 9 9955HX3D 16C/32T V-Cache CCD0",
             "AMD Ryzen 9 9950X3D2 16C/32T dual V-Cache",
         });
         cpuPresetCombo.SelectedIndex = 0;
@@ -339,9 +341,10 @@ public sealed partial class MainForm
         const string SystemPresetRyzen9950X3D2 = "Full PC | X870E | Ryzen 9 9950X3D2 | RTX 5090 | Realtek 5G";
         const string SystemPresetRyzen3900X = "Full PC | X570 | Ryzen 9 3900X | RTX 3080 | Realtek 2.5G";
         const string SystemPresetRyzen9950X = "Full PC | X670E | Ryzen 9 9950X | RTX 4090 | Intel X550 10G";
-        const string SystemPresetIntel285KIgpu = "Full PC | Z890 | Core Ultra 9 285K | Intel iGPU | BE200 Wi-Fi";
+        const string SystemPresetLaptopIntel285HX = "Laptop | Core Ultra 9 285HX | RTX 5080 Laptop | BE200 Wi-Fi";
+        const string SystemPresetLaptopRyzen9955HX3D = "Laptop | Ryzen 9 9955HX3D | RTX 5090 Laptop | Wi-Fi 7";
 
-        Label systemPresetLabel = NewDialogLabel("Full PC preset:");
+        Label systemPresetLabel = NewDialogLabel("System preset:");
         ComboBox systemPresetCombo = NewDialogCombo(460);
         systemPresetCombo.Items.AddRange(new object[]
         {
@@ -357,7 +360,8 @@ public sealed partial class MainForm
             SystemPresetRyzen9950X3D2,
             SystemPresetRyzen3900X,
             SystemPresetRyzen9950X,
-            SystemPresetIntel285KIgpu,
+            SystemPresetLaptopIntel285HX,
+            SystemPresetLaptopRyzen9955HX3D,
         });
         systemPresetCombo.SelectedIndex = 0;
         Button loadSystemPresetButton = NewDialogButton("LOAD FULL");
@@ -568,14 +572,14 @@ public sealed partial class MainForm
         };
         testDevicesLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140F));
         testDevicesLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        testDevicesLayout.RowCount = 18;
+        testDevicesLayout.RowCount = 20;
         for (int i = 0; i < testDevicesLayout.RowCount; i++)
         {
             testDevicesLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         }
 
         _testDevicesEnabled = true;
-        _testAutoDryRun = false;
+        _testAutoDryRun = true;
 
         CheckBox enableTestDevicesCheck = new()
         {
@@ -722,6 +726,20 @@ public sealed partial class MainForm
         testDevicesLayout.Controls.Add(testStorageLabel, 0, 9);
         testDevicesLayout.Controls.Add(testStorageBox, 1, 9);
 
+        Label testIrqCountLabel = NewDialogLabel("IRQ count:");
+        TextBox testIrqCountBox = NewDialogTextBox(120);
+        testIrqCountBox.Text = "Auto";
+        adminToolTip.SetToolTip(testIrqCountBox, "Optional fake IRQ count shown in device blocks. Empty/Auto = role-based default.");
+        testDevicesLayout.Controls.Add(testIrqCountLabel, 0, 10);
+        testDevicesLayout.Controls.Add(testIrqCountBox, 1, 10);
+
+        Label testMsiStatusLabel = NewDialogLabel("MSI status:");
+        ComboBox testMsiStatusCombo = NewDialogCombo(160);
+        testMsiStatusCombo.Items.AddRange(new object[] { "Auto", "Enabled", "Disabled" });
+        testMsiStatusCombo.SelectedIndex = 0;
+        testDevicesLayout.Controls.Add(testMsiStatusLabel, 0, 11);
+        testDevicesLayout.Controls.Add(testMsiStatusCombo, 1, 11);
+
         CheckBox testWifiCheck = new()
         {
             Text = "WiFi",
@@ -769,18 +787,27 @@ public sealed partial class MainForm
         testDeviceOptionsPanel.Controls.Add(testIntegratedGpuCheck);
 
         Label testDeviceOptionsLabel = NewDialogLabel("Options:");
-        testDevicesLayout.Controls.Add(testDeviceOptionsLabel, 0, 10);
-        testDevicesLayout.Controls.Add(testDeviceOptionsPanel, 1, 10);
+        testDevicesLayout.Controls.Add(testDeviceOptionsLabel, 0, 12);
+        testDevicesLayout.Controls.Add(testDeviceOptionsPanel, 1, 12);
 
         Button addTestDeviceButton = NewDialogButton("ADD FAKE DEVICE");
         addTestDeviceButton.Size = new Size(180, 30);
-        addTestDeviceButton.Anchor = AnchorStyles.Left;
-        addTestDeviceButton.Margin = new Padding(0, 4, 0, 10);
-        testDevicesLayout.Controls.Add(addTestDeviceButton, 0, 11);
-        testDevicesLayout.SetColumnSpan(addTestDeviceButton, 2);
+        addTestDeviceButton.Margin = new Padding(0, 4, 12, 10);
+
+        Button updateTestDeviceButton = NewDialogButton("UPDATE SELECTED");
+        updateTestDeviceButton.Size = new Size(180, 30);
+        updateTestDeviceButton.Margin = new Padding(0, 4, 0, 10);
+        updateTestDeviceButton.Enabled = false;
+
+        FlowLayoutPanel addDeviceButtonsPanel = NewRowFlowPanel();
+        addDeviceButtonsPanel.WrapContents = true;
+        addDeviceButtonsPanel.Controls.Add(addTestDeviceButton);
+        addDeviceButtonsPanel.Controls.Add(updateTestDeviceButton);
+        testDevicesLayout.Controls.Add(addDeviceButtonsPanel, 0, 13);
+        testDevicesLayout.SetColumnSpan(addDeviceButtonsPanel, 2);
 
         Label testListLabel = NewHeaderLabel($"Current test devices: {_testDevices.Count}");
-        testDevicesLayout.Controls.Add(testListLabel, 0, 12);
+        testDevicesLayout.Controls.Add(testListLabel, 0, 14);
         testDevicesLayout.SetColumnSpan(testListLabel, 2);
 
         ListBox testDeviceListBox = new()
@@ -794,7 +821,7 @@ public sealed partial class MainForm
             SelectionMode = SelectionMode.One,
             Margin = new Padding(0, 0, 0, 6),
         };
-        testDevicesLayout.Controls.Add(testDeviceListBox, 0, 13);
+        testDevicesLayout.Controls.Add(testDeviceListBox, 0, 15);
         testDevicesLayout.SetColumnSpan(testDeviceListBox, 2);
 
         Button removeTestDeviceButton = NewDialogButton("REMOVE SELECTED");
@@ -810,12 +837,12 @@ public sealed partial class MainForm
         testDeviceButtonsPanel.Margin = new Padding(0, 0, 0, 6);
         testDeviceButtonsPanel.Controls.Add(removeTestDeviceButton);
         testDeviceButtonsPanel.Controls.Add(clearTestDeviceButton);
-        testDevicesLayout.Controls.Add(testDeviceButtonsPanel, 0, 14);
+        testDevicesLayout.Controls.Add(testDeviceButtonsPanel, 0, 16);
         testDevicesLayout.SetColumnSpan(testDeviceButtonsPanel, 2);
 
         Label realVisibilityLabel = NewHeaderLabel("Real device visibility");
         realVisibilityLabel.Margin = new Padding(0, 12, 12, 4);
-        testDevicesLayout.Controls.Add(realVisibilityLabel, 0, 15);
+        testDevicesLayout.Controls.Add(realVisibilityLabel, 0, 17);
         testDevicesLayout.SetColumnSpan(realVisibilityLabel, 2);
 
         ListBox realDeviceListBox = new()
@@ -884,11 +911,11 @@ public sealed partial class MainForm
         realVisibilityPanel.Controls.Add(hideButtonsPanel, 0, 2);
         realVisibilityPanel.Controls.Add(unhideButtonsPanel, 1, 2);
 
-        testDevicesLayout.Controls.Add(realVisibilityPanel, 0, 16);
+        testDevicesLayout.Controls.Add(realVisibilityPanel, 0, 18);
         testDevicesLayout.SetColumnSpan(realVisibilityPanel, 2);
 
         Label testHintLabel = NewHintLabel(@"Tip: full PC presets are above. This section is for adding/removing individual fake devices and temporarily hiding real devices.");
-        testDevicesLayout.Controls.Add(testHintLabel, 0, 17);
+        testDevicesLayout.Controls.Add(testHintLabel, 0, 19);
         testDevicesLayout.SetColumnSpan(testHintLabel, 2);
 
         testDevicesPanel.Controls.Add(testDevicesLayout);
@@ -896,11 +923,15 @@ public sealed partial class MainForm
         layout.SetColumnSpan(testDevicesPanel, 2);
 
         bool suppressTestDeviceToggle = false;
+        bool suppressTestDeviceSelection = false;
         List<DeviceInfo> realVisibleDevices = [];
         List<string> hiddenDeviceKeys = [];
 
-        void RefreshTestDeviceList()
+        void RefreshTestDeviceList(int selectIndex = -1)
         {
+            int previousIndex = testDeviceListBox.SelectedIndex;
+            int targetIndex = selectIndex >= 0 ? selectIndex : previousIndex;
+            suppressTestDeviceSelection = true;
             testDeviceListBox.BeginUpdate();
             testDeviceListBox.Items.Clear();
             foreach (DeviceInfo device in _testDevices)
@@ -908,6 +939,20 @@ public sealed partial class MainForm
                 testDeviceListBox.Items.Add(FormatTestDeviceLabel(device));
             }
             testDeviceListBox.EndUpdate();
+            if (targetIndex >= 0 && targetIndex < _testDevices.Count)
+            {
+                testDeviceListBox.SelectedIndex = targetIndex;
+            }
+            else
+            {
+                testDeviceListBox.ClearSelected();
+            }
+            suppressTestDeviceSelection = false;
+            updateTestDeviceButton.Enabled = testDeviceListBox.SelectedIndex >= 0;
+            if (selectIndex >= 0 && testDeviceListBox.SelectedIndex >= 0 && testDeviceListBox.SelectedIndex < _testDevices.Count)
+            {
+                LoadTestDeviceToFields(_testDevices[testDeviceListBox.SelectedIndex]);
+            }
             testListLabel.Text = $"Current test devices: {_testDevices.Count}";
         }
 
@@ -963,6 +1008,46 @@ public sealed partial class MainForm
             _initialDeviceViewportHeightAdjusted = false;
             RefreshBlocks();
             RefreshRealDeviceVisibilityLists();
+        }
+
+        void ResetAdminPanelToRealState()
+        {
+            _testCpuActive = false;
+            _testCpuName = string.Empty;
+            _testDevices.Clear();
+            _testHiddenDeviceIds.Clear();
+            _testHiddenDeviceLabels.Clear();
+            _testDevicesEnabled = false;
+            _testDevicesOnly = false;
+            _testAutoDryRun = false;
+            _testDeviceSequence = 0;
+
+            suppressTestDeviceToggle = true;
+            enableTestDevicesCheck.Checked = false;
+            testDevicesOnlyCheck.Checked = false;
+            testDevicesOnlyCheck.Enabled = false;
+            dryRunAutoCheck.Checked = false;
+            suppressTestDeviceToggle = false;
+
+            systemPresetCombo.SelectedIndex = 0;
+            cpuPresetCombo.SelectedIndex = 0;
+            testDevicePresetCombo.SelectedIndex = 0;
+            SetTestDeviceFields(DeviceKind.USB, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
+            RefreshTestDeviceList();
+
+            statusLabel.Text = "Test CPU mode: OFF";
+            statusLabel.ForeColor = _statusInactive;
+            InitializeCpu();
+            logicalUpDown.Value = Math.Min(MaxAffinityBits, GetCurrentLogicalCount());
+            LoadAssignmentsFromCurrentCpu();
+            SyncSmtStateFromCurrent();
+            cppcRatingsBox.Text = GetCurrentCppcRatingsText();
+            UpdateCpuHeaderUi();
+
+            _initialDeviceViewportHeightAdjusted = false;
+            RefreshBlocks();
+            RefreshRealDeviceVisibilityLists();
+            WriteLog("TEST.RESET.REAL: full admin test state cleared");
         }
 
         void UpdateTestDeviceFieldState()
@@ -1034,7 +1119,9 @@ public sealed partial class MainForm
             bool wifi = false,
             bool usbIsXhci = true,
             bool usbHasDevices = true,
-            bool integratedGpu = false)
+            bool integratedGpu = false,
+            int? testIrqCount = null,
+            string testMsiStatus = "Auto")
         {
             testKindCombo.SelectedItem = kind;
             testNameBox.Text = name;
@@ -1042,11 +1129,34 @@ public sealed partial class MainForm
             testUsbRolesBox.Text = usbRoles;
             testAudioBox.Text = audioEndpoints;
             testStorageBox.Text = storageTag;
+            testIrqCountBox.Text = testIrqCount.HasValue ? testIrqCount.Value.ToString(CultureInfo.InvariantCulture) : "Auto";
+            testMsiStatusCombo.SelectedItem = string.IsNullOrWhiteSpace(testMsiStatus) ? "Auto" : testMsiStatus;
+            if (testMsiStatusCombo.SelectedItem is null)
+            {
+                testMsiStatusCombo.SelectedItem = "Auto";
+            }
             testWifiCheck.Checked = wifi;
             testXhciCheck.Checked = kind == DeviceKind.USB && usbIsXhci;
             testHasDevicesCheck.Checked = kind == DeviceKind.USB && usbHasDevices;
             testIntegratedGpuCheck.Checked = kind == DeviceKind.GPU && integratedGpu;
             UpdateTestDeviceFieldState();
+        }
+
+        void LoadTestDeviceToFields(DeviceInfo device)
+        {
+            SetTestDeviceFields(
+                device.Kind,
+                device.Name,
+                device.InstanceId,
+                device.UsbRoles,
+                device.AudioEndpoints,
+                device.StorageTag,
+                device.Wifi,
+                device.UsbIsXhci,
+                device.UsbHasDevices,
+                device.IsIntegratedGpu,
+                device.TestIrqCount,
+                device.TestMsiStatus);
         }
 
         void AddSystemPresetDevice(
@@ -1059,9 +1169,11 @@ public sealed partial class MainForm
             bool wifi = false,
             bool usbIsXhci = true,
             bool usbHasDevices = true,
-            bool integratedGpu = false)
+            bool integratedGpu = false,
+            int? testIrqCount = null,
+            string testMsiStatus = "Auto")
         {
-            DeviceInfo testDevice = CreateTestDevice(kind, name, pnpId, usbRoles, audioEndpoints, storageTag, wifi, usbIsXhci, usbHasDevices, integratedGpu);
+            DeviceInfo testDevice = CreateTestDevice(kind, name, pnpId, usbRoles, audioEndpoints, storageTag, wifi, usbIsXhci, usbHasDevices, integratedGpu, testIrqCount, testMsiStatus);
             _testDevices.Add(testDevice);
             WriteLog($"TEST.SYSTEM.DEV: {testDevice.InstanceId} Kind={kind} Name=\"{testDevice.Name}\"");
         }
@@ -1096,6 +1208,7 @@ public sealed partial class MainForm
             suppressTestDeviceToggle = true;
             _testDevicesEnabled = true;
             _testDevicesOnly = true;
+            _testAutoDryRun = true;
             enableTestDevicesCheck.Checked = true;
             testDevicesOnlyCheck.Checked = true;
             testDevicesOnlyCheck.Enabled = true;
@@ -1132,15 +1245,16 @@ public sealed partial class MainForm
                 SystemPresetIntel14900K => "Intel Core i9-13900K/14900K 8P+16E/32T",
                 SystemPresetIntel14600K => "Intel Core i5-13600K/14600K 6P+8E/20T",
                 SystemPresetIntel285K5090 => "Intel Core Ultra 9 285K 8P+16E/24T",
+                SystemPresetLaptopIntel285HX => "Intel Core Ultra 9 285HX 8P+16E/24T",
                 SystemPresetRyzen7800X3D => "AMD Ryzen 7 7800X3D/9800X3D 8C/16T V-Cache",
                 SystemPresetRyzen9800X3D5090 => "AMD Ryzen 7 7800X3D/9800X3D 8C/16T V-Cache",
                 SystemPresetRyzen9800X3DRx => "AMD Ryzen 7 7800X3D/9800X3D 8C/16T V-Cache",
                 SystemPresetRyzen9950X3DNetCx => "AMD Ryzen 9 7950X3D/9950X3D 16C/32T V-Cache CCD0",
                 SystemPresetRyzen9950X3DNdis => "AMD Ryzen 9 7950X3D/9950X3D 16C/32T V-Cache CCD0",
                 SystemPresetRyzen9950X3D2 => "AMD Ryzen 9 9950X3D2 16C/32T dual V-Cache",
+                SystemPresetLaptopRyzen9955HX3D => "AMD Ryzen 9 9955HX3D 16C/32T V-Cache CCD0",
                 SystemPresetRyzen3900X => "AMD Ryzen 9 3900X Zen2 12C/24T 4 CCX",
                 SystemPresetRyzen9950X => "AMD Ryzen 9 7950X/9950X 16C/32T",
-                SystemPresetIntel285KIgpu => "Intel Core Ultra 9 285K 8P+16E/24T",
                 _ => string.Empty,
             };
 
@@ -1149,15 +1263,16 @@ public sealed partial class MainForm
                 SystemPresetIntel14900K => "Intel Core i9-14900K",
                 SystemPresetIntel14600K => "Intel Core i5-14600K",
                 SystemPresetIntel285K5090 => "Intel Core Ultra 9 285K",
+                SystemPresetLaptopIntel285HX => "Intel Core Ultra 9 285HX",
                 SystemPresetRyzen7800X3D => "AMD Ryzen 7 7800X3D",
                 SystemPresetRyzen9800X3D5090 => "AMD Ryzen 7 9800X3D",
                 SystemPresetRyzen9800X3DRx => "AMD Ryzen 7 9800X3D",
                 SystemPresetRyzen9950X3DNetCx => "AMD Ryzen 9 9950X3D",
                 SystemPresetRyzen9950X3DNdis => "AMD Ryzen 9 9950X3D",
                 SystemPresetRyzen9950X3D2 => "AMD Ryzen 9 9950X3D2",
+                SystemPresetLaptopRyzen9955HX3D => "AMD Ryzen 9 9955HX3D",
                 SystemPresetRyzen3900X => "AMD Ryzen 9 3900X",
                 SystemPresetRyzen9950X => "AMD Ryzen 9 9950X",
-                SystemPresetIntel285KIgpu => "Intel Core Ultra 9 285K",
                 _ => string.Empty,
             };
 
@@ -1289,13 +1404,24 @@ public sealed partial class MainForm
                     AddSystemPresetDevice(DeviceKind.NET_NDIS, "Intel Ethernet Controller X550-T2", @"PCI\VEN_8086&DEV_1563\SYS_X550_T2");
                     AddSystemStorage("Crucial T705 PCIe 5.0 NVMe Controller", @"PCI\VEN_C0A9&DEV_540A\SYS_X670E_T705");
                     break;
-                case SystemPresetIntel285KIgpu:
-                    AddSystemPresetDevice(DeviceKind.USB, "Intel(R) USB 3.20 eXtensible Host Controller - 1.20", @"PCI\VEN_8086&DEV_A71E\SYS_CORE_ULTRA_IGPU_XHCI", "Mouse 1K, Keyboard 8K, Audio, Microphone, Gamepad");
-                    AddSystemAudio("Realtek ALC4080 USB Audio", @"USB\VID_0BDA&PID_402E\SYS_Z890_IGPU_ALC4080", "Speakers, Microphone");
-                    AddSystemPresetDevice(DeviceKind.GPU, "Intel Arc Graphics iGPU", @"PCI\VEN_8086&DEV_7D55\SYS_INTEL_ARC_IGPU", integratedGpu: true);
-                    AddIntelDisplayAudio("SYS_INTEL_IGPU_AUDIO");
-                    AddSystemPresetDevice(DeviceKind.NET_NDIS, "Intel(R) Wi-Fi 7 BE200 320MHz", @"PCI\VEN_8086&DEV_272B\SYS_BE200_WIFI", wifi: true);
-                    AddSystemStorage("Standard NVM Express Controller", @"PCI\VEN_144D&DEV_A808\SYS_Z890_IGPU_NVME");
+                case SystemPresetLaptopIntel285HX:
+                    AddSystemPresetDevice(DeviceKind.USB, "Intel(R) USB 3.20 eXtensible Host Controller - 1.20", @"PCI\VEN_8086&DEV_A73E\SYS_INTEL_285HX_XHCI_INPUT", "Mouse 1K, Keyboard 8K, Gamepad");
+                    AddSystemPresetDevice(DeviceKind.USB, "Intel(R) USB 3.10 eXtensible Host Controller - 1.20", @"PCI\VEN_8086&DEV_A73D\SYS_INTEL_285HX_XHCI_AUDIO", "Audio, Microphone");
+                    AddSystemAudio("Realtek ALC287 High Definition Audio", @"HDAUDIO\FUNC_01&VEN_10EC&DEV_0287\SYS_285HX_ALC287", "Speakers, Microphone");
+                    AddSystemPresetDevice(DeviceKind.GPU, "NVIDIA GeForce RTX 5080 Laptop GPU", @"PCI\VEN_10DE&DEV_2C02\SYS_RTX5080_LAPTOP");
+                    AddNvidiaDisplayAudio("SYS_RTX5080_LAPTOP_AUDIO");
+                    AddIntelDisplayAudio("SYS_285HX_DISPLAY_AUDIO");
+                    AddSystemPresetDevice(DeviceKind.NET_NDIS, "Intel(R) Wi-Fi 7 BE200 320MHz", @"PCI\VEN_8086&DEV_272B\SYS_285HX_BE200_WIFI", wifi: true);
+                    AddSystemStorage("Samsung PM9E1 NVMe Controller", @"PCI\VEN_144D&DEV_A80D\SYS_285HX_PM9E1");
+                    break;
+                case SystemPresetLaptopRyzen9955HX3D:
+                    AddSystemPresetDevice(DeviceKind.USB, "AMD USB 3.20 eXtensible Host Controller - 1.10", @"PCI\VEN_1022&DEV_43F7\SYS_9955HX3D_XHCI_INPUT", "Mouse 1K, Keyboard 8K, Gamepad");
+                    AddSystemPresetDevice(DeviceKind.USB, "AMD USB 3.10 eXtensible Host Controller - 1.20", @"PCI\VEN_1022&DEV_43F7\SYS_9955HX3D_XHCI_AUDIO", "Audio, Microphone");
+                    AddSystemAudio("Realtek ALC3306 High Definition Audio", @"HDAUDIO\FUNC_01&VEN_10EC&DEV_0330\SYS_9955HX3D_ALC3306", "Speakers, Microphone");
+                    AddSystemPresetDevice(DeviceKind.GPU, "NVIDIA GeForce RTX 5090 Laptop GPU", @"PCI\VEN_10DE&DEV_2B85\SYS_RTX5090_LAPTOP");
+                    AddNvidiaDisplayAudio("SYS_RTX5090_LAPTOP_AUDIO");
+                    AddSystemPresetDevice(DeviceKind.NET_NDIS, "Qualcomm FastConnect 7800 Wi-Fi 7 Adapter", @"PCI\VEN_17CB&DEV_1107\SYS_9955HX3D_WIFI7", wifi: true);
+                    AddSystemStorage("WD Black SN8100 NVMe Controller", @"PCI\VEN_15B7&DEV_5041\SYS_9955HX3D_SN8100");
                     break;
             }
 
@@ -1439,8 +1565,9 @@ public sealed partial class MainForm
             }
         }
 
-        bool AddTestDeviceFromFields()
+        bool TryCreateTestDeviceFromFields(string fallbackPnpId, out DeviceInfo testDevice)
         {
+            testDevice = null!;
             if (testKindCombo.SelectedItem is not DeviceKind kind)
             {
                 return false;
@@ -1451,6 +1578,20 @@ public sealed partial class MainForm
             string usbRoles = testUsbRolesBox.Text?.Trim() ?? string.Empty;
             string audioEndpoints = testAudioBox.Text?.Trim() ?? string.Empty;
             string storageTag = testStorageBox.Text?.Trim() ?? string.Empty;
+            string irqText = testIrqCountBox.Text?.Trim() ?? string.Empty;
+            int? testIrqCount = null;
+            if (!string.IsNullOrWhiteSpace(irqText) && !irqText.Equals("Auto", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!int.TryParse(irqText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedIrqCount) || parsedIrqCount < 0 || parsedIrqCount > 64)
+                {
+                    ShowThemedInfo("IRQ count must be Auto or a number from 0 to 64.");
+                    return false;
+                }
+
+                testIrqCount = parsedIrqCount;
+            }
+
+            string testMsiStatus = testMsiStatusCombo.SelectedItem?.ToString() ?? "Auto";
 
             if (kind == DeviceKind.USB && string.IsNullOrWhiteSpace(usbRoles))
             {
@@ -1467,11 +1608,26 @@ public sealed partial class MainForm
                 storageTag = "SSD";
             }
 
-            DeviceInfo testDevice = CreateTestDevice(kind, name, pnpIdOverride, usbRoles, audioEndpoints, storageTag, testWifiCheck.Checked, testXhciCheck.Checked, testHasDevicesCheck.Checked, testIntegratedGpuCheck.Checked);
-            _testDevices.Add(testDevice);
-            WriteLog($"TEST.DEV.ADD: {testDevice.InstanceId} Kind={kind} Name=\"{testDevice.Name}\"");
+            if (string.IsNullOrWhiteSpace(pnpIdOverride) && !string.IsNullOrWhiteSpace(fallbackPnpId))
+            {
+                pnpIdOverride = fallbackPnpId;
+            }
 
-            RefreshTestDeviceList();
+            testDevice = CreateTestDevice(kind, name, pnpIdOverride, usbRoles, audioEndpoints, storageTag, testWifiCheck.Checked, testXhciCheck.Checked, testHasDevicesCheck.Checked, testIntegratedGpuCheck.Checked, testIrqCount, testMsiStatus);
+            return true;
+        }
+
+        bool AddTestDeviceFromFields()
+        {
+            if (!TryCreateTestDeviceFromFields(string.Empty, out DeviceInfo testDevice))
+            {
+                return false;
+            }
+
+            _testDevices.Add(testDevice);
+            WriteLog($"TEST.DEV.ADD: {testDevice.InstanceId} Kind={testDevice.Kind} Name=\"{testDevice.Name}\"");
+
+            RefreshTestDeviceList(_testDevices.Count - 1);
             bool shouldRefresh = false;
             if (!_testDevicesEnabled)
             {
@@ -1484,6 +1640,32 @@ public sealed partial class MainForm
             }
 
             if (_testDevicesEnabled || shouldRefresh)
+            {
+                _initialDeviceViewportHeightAdjusted = false;
+                RefreshBlocks();
+            }
+
+            return true;
+        }
+
+        bool UpdateSelectedTestDeviceFromFields()
+        {
+            int index = testDeviceListBox.SelectedIndex;
+            if (index < 0 || index >= _testDevices.Count)
+            {
+                return false;
+            }
+
+            DeviceInfo previous = _testDevices[index];
+            if (!TryCreateTestDeviceFromFields(previous.InstanceId, out DeviceInfo updated))
+            {
+                return false;
+            }
+
+            _testDevices[index] = updated;
+            WriteLog($"TEST.DEV.UPDATE: old={previous.InstanceId} new={updated.InstanceId} Kind={updated.Kind} Name=\"{updated.Name}\"");
+            RefreshTestDeviceList(index);
+            if (_testDevicesEnabled)
             {
                 _initialDeviceViewportHeightAdjusted = false;
                 RefreshBlocks();
@@ -1574,6 +1756,22 @@ public sealed partial class MainForm
         };
 
         addTestDeviceButton.Click += (_, _) => AddTestDeviceFromFields();
+        updateTestDeviceButton.Click += (_, _) => UpdateSelectedTestDeviceFromFields();
+        testDeviceListBox.SelectedIndexChanged += (_, _) =>
+        {
+            updateTestDeviceButton.Enabled = testDeviceListBox.SelectedIndex >= 0;
+            if (suppressTestDeviceSelection)
+            {
+                return;
+            }
+
+            int index = testDeviceListBox.SelectedIndex;
+            if (index >= 0 && index < _testDevices.Count)
+            {
+                LoadTestDeviceToFields(_testDevices[index]);
+            }
+        };
+        testDeviceListBox.DoubleClick += (_, _) => UpdateSelectedTestDeviceFromFields();
 
         hideRealDeviceButton.Click += (_, _) =>
         {
@@ -1639,7 +1837,7 @@ public sealed partial class MainForm
             _testDevices.RemoveAt(index);
             WriteLog($"TEST.DEV.REMOVE: {removed.InstanceId} Kind={removed.Kind} Name=\"{removed.Name}\"");
 
-            RefreshTestDeviceList();
+            RefreshTestDeviceList(Math.Min(index, _testDevices.Count - 1));
             if (_testDevicesEnabled)
             {
                 _initialDeviceViewportHeightAdjusted = false;
@@ -2279,6 +2477,9 @@ public sealed partial class MainForm
                 case "Intel Core Ultra 9 285K 8P+16E/24T":
                     LoadIntelHybridPreset("Intel Core Ultra 9 285K 8P+16E/24T", pCores: 8, eCores: 16, pCoreHt: false, performanceRatings: true);
                     break;
+                case "Intel Core Ultra 9 285HX 8P+16E/24T":
+                    LoadIntelHybridPreset("Intel Core Ultra 9 285HX 8P+16E/24T", pCores: 8, eCores: 16, pCoreHt: false, performanceRatings: true);
+                    break;
                 case "AMD Ryzen 5 7500F/7600X 6C/12T":
                     LoadAmdPreset("AMD Ryzen 5 7500F/7600X 6C/12T", physicalCores: 6, ccdCount: 1, cppcProfile: "standard");
                     break;
@@ -2308,6 +2509,9 @@ public sealed partial class MainForm
                     break;
                 case "AMD Ryzen 9 7950X3D/9950X3D 16C/32T V-Cache CCD0":
                     LoadAmdPreset("AMD Ryzen 9 7950X3D/9950X3D 16C/32T V-Cache CCD0", physicalCores: 16, ccdCount: 2, cppcProfile: "x3d-cache");
+                    break;
+                case "AMD Ryzen 9 9955HX3D 16C/32T V-Cache CCD0":
+                    LoadAmdPreset("AMD Ryzen 9 9955HX3D 16C/32T V-Cache CCD0", physicalCores: 16, ccdCount: 2, cppcProfile: "x3d-cache");
                     break;
                 case "AMD Ryzen 9 9950X3D2 16C/32T dual V-Cache":
                     LoadAmdPreset("AMD Ryzen 9 9950X3D2 16C/32T dual V-Cache", physicalCores: 16, ccdCount: 2, cppcProfile: "x3d-dual-cache");
@@ -2700,13 +2904,7 @@ public sealed partial class MainForm
         resetButton.Margin = new Padding(6, 0, 6, 0);
         resetButton.Click += (_, _) =>
         {
-            DisableTestCpuMode();
-            statusLabel.Text = "Test CPU mode: OFF";
-            statusLabel.ForeColor = _statusInactive;
-            logicalUpDown.Value = Math.Min(MaxAffinityBits, GetCurrentLogicalCount());
-            LoadAssignmentsFromCurrentCpu();
-            SyncSmtStateFromCurrent();
-            cppcRatingsBox.Text = GetCurrentCppcRatingsText();
+            ResetAdminPanelToRealState();
         };
 
         Button closeButton = NewDialogButton("CLOSE");
@@ -3020,7 +3218,9 @@ public sealed partial class MainForm
         bool wifi,
         bool usbIsXhci,
         bool usbHasDevices,
-        bool integratedGpu)
+        bool integratedGpu,
+        int? testIrqCount = null,
+        string testMsiStatus = "Auto")
     {
         _testDeviceSequence++;
         int seq = _testDeviceSequence;
@@ -3059,6 +3259,8 @@ public sealed partial class MainForm
             UsbIsXhci = isUsb && usbIsXhci,
             UsbHasDevices = isUsb && usbHasDevices,
             IsTestDevice = true,
+            TestIrqCount = testIrqCount,
+            TestMsiStatus = string.IsNullOrWhiteSpace(testMsiStatus) ? "Auto" : testMsiStatus,
         };
     }
 
@@ -3084,6 +3286,12 @@ public sealed partial class MainForm
         else if ((device.Kind == DeviceKind.NET_NDIS || device.Kind == DeviceKind.NET_CX) && device.Wifi)
         {
             label += " [WiFi]";
+        }
+
+        if (device.TestIrqCount.HasValue || !device.TestMsiStatus.Equals("Auto", StringComparison.OrdinalIgnoreCase))
+        {
+            string irq = device.TestIrqCount.HasValue ? device.TestIrqCount.Value.ToString(CultureInfo.InvariantCulture) : "Auto";
+            label += $" [IRQ {irq}, MSI {device.TestMsiStatus}]";
         }
 
         return label;

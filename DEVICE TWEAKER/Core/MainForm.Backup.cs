@@ -17,11 +17,36 @@ public sealed partial class MainForm
         Roaming,
     }
 
+    private enum AutoBackupChoice
+    {
+        Skip,
+        Local,
+        Roaming,
+    }
+
     private enum RestoreChoice
     {
         Cancel,
         ResetDefault,
         RestoreBackup,
+        DeleteBackup,
+        DeleteAllBackups,
+    }
+
+    private sealed class BackupSnapshotInfo
+    {
+        public required string Path { get; init; }
+        public required string Location { get; init; }
+        public required DateTime LastWriteUtc { get; init; }
+        public string Reason { get; init; } = string.Empty;
+        public DateTime? CreatedAt { get; init; }
+
+        public override string ToString()
+        {
+            DateTime stamp = CreatedAt ?? LastWriteUtc.ToLocalTime();
+            string reason = string.IsNullOrWhiteSpace(Reason) ? "backup" : Reason;
+            return $"{stamp:yyyy-MM-dd HH:mm:ss} [{Location}] {reason}";
+        }
     }
 
     private sealed class DeviceTweakerBackup
@@ -95,6 +120,7 @@ public sealed partial class MainForm
             JsonSerializerOptions options = new() { WriteIndented = true };
             File.WriteAllText(path, JsonSerializer.Serialize(backup, options), Encoding.UTF8);
             WriteLog($"BACKUP: saved location={location} path={path} values={backup.RegistryValues.Count} reason={reason}");
+            PruneDeviceTweakerBackups(directory, keepLatest: 10);
 
             if (showDialog)
             {
@@ -249,8 +275,8 @@ public sealed partial class MainForm
     {
         try
         {
-            string? path = GetLatestBackupPath();
-            RestoreChoice choice = ShowRestoreChoiceDialog(path);
+            List<BackupSnapshotInfo> backups = GetBackupSnapshots();
+            RestoreChoice choice = ShowRestoreChoiceDialog(backups, out string? path);
             if (choice == RestoreChoice.Cancel)
             {
                 WriteLog("BACKUP.RESTORE: canceled by user");
@@ -262,6 +288,24 @@ public sealed partial class MainForm
                 WriteLog("BACKUP.RESTORE: reset-default requested");
                 ResetAllTweaks();
                 RefreshBlocks();
+                return;
+            }
+
+            if (choice == RestoreChoice.DeleteBackup)
+            {
+                int deleted = string.IsNullOrWhiteSpace(path)
+                    ? 0
+                    : DeleteDeviceTweakerBackups(backups.Where(b => string.Equals(b.Path, path, StringComparison.OrdinalIgnoreCase)).ToList());
+                WriteLog($"BACKUP.RESTORE: deleted selected backup count={deleted} path={path}");
+                ShowThemedInfo($"Backup files deleted: {deleted}");
+                return;
+            }
+
+            if (choice == RestoreChoice.DeleteAllBackups)
+            {
+                int deleted = DeleteDeviceTweakerBackups(backups);
+                WriteLog($"BACKUP.RESTORE: deleted all backups count={deleted}");
+                ShowThemedInfo($"Backup files deleted: {deleted}");
                 return;
             }
 
@@ -284,15 +328,41 @@ public sealed partial class MainForm
         }
     }
 
-    private string? GetLatestBackupPath()
+    private List<BackupSnapshotInfo> GetBackupSnapshots()
     {
-        return EnumerateBackupDirectories()
-            .Where(Directory.Exists)
-            .SelectMany(directory => Directory.EnumerateFiles(directory, $"{BackupFilePrefix}*.json"))
-            .Select(path => new FileInfo(path))
-            .OrderByDescending(file => file.LastWriteTimeUtc)
-            .FirstOrDefault()
-            ?.FullName;
+        List<BackupSnapshotInfo> backups = [];
+        foreach (string directory in EnumerateBackupDirectories())
+        {
+            try
+            {
+                if (!Directory.Exists(directory))
+                {
+                    WriteLog($"BACKUP.SCAN: directory={directory} exists=false count=0");
+                    continue;
+                }
+
+                int before = backups.Count;
+                foreach (string path in Directory.EnumerateFiles(directory, $"{BackupFilePrefix}*.json"))
+                {
+                    BackupSnapshotInfo? info = CreateBackupSnapshotInfo(path, directory);
+                    if (info is not null)
+                    {
+                        backups.Add(info);
+                    }
+                }
+
+                WriteLog($"BACKUP.SCAN: directory={directory} exists=true count={backups.Count - before}");
+            }
+            catch (Exception ex)
+            {
+                WriteLog($"BACKUP.SCAN: directory={directory} failed={ex.Message}");
+            }
+        }
+
+        return backups
+            .OrderByDescending(info => info.CreatedAt ?? info.LastWriteUtc.ToLocalTime())
+            .ThenByDescending(info => info.LastWriteUtc)
+            .ToList();
     }
 
     private IEnumerable<string> EnumerateBackupDirectories()
@@ -308,16 +378,100 @@ public sealed partial class MainForm
         }
     }
 
-    private BackupLocation PromptBackupLocationForAuto()
+    private BackupSnapshotInfo? CreateBackupSnapshotInfo(string path, string directory)
     {
-        bool local = ShowThemedConfirm(
-            "Where should DEVICE TWEAKER save the pre-auto backup?\n\nEXE FOLDER = portable backup next to the app.\nAPPDATA = user profile backup that survives app folder cleanup.",
-            "AUTO BACKUP",
-            "EXE FOLDER",
-            "APPDATA");
-        BackupLocation location = local ? BackupLocation.Local : BackupLocation.Roaming;
-        WriteLog($"BACKUP.PROMPT.AUTO: location={location}");
-        return location;
+        try
+        {
+            FileInfo file = new(path);
+            DeviceTweakerBackup? backup = null;
+            try
+            {
+                string json = File.ReadAllText(path, Encoding.UTF8);
+                backup = JsonSerializer.Deserialize<DeviceTweakerBackup>(json);
+            }
+            catch
+            {
+            }
+
+            string location = string.Equals(directory, GetBackupDirectory(BackupLocation.Roaming), StringComparison.OrdinalIgnoreCase)
+                ? "APPDATA"
+                : "EXE";
+
+            return new BackupSnapshotInfo
+            {
+                Path = path,
+                Location = location,
+                LastWriteUtc = file.LastWriteTimeUtc,
+                CreatedAt = backup?.CreatedAt,
+                Reason = backup?.Reason ?? string.Empty,
+            };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private int DeleteDeviceTweakerBackups(IReadOnlyList<BackupSnapshotInfo> backups)
+    {
+        int deleted = 0;
+        foreach (BackupSnapshotInfo backup in backups)
+        {
+            try
+            {
+                if (File.Exists(backup.Path))
+                {
+                    File.Delete(backup.Path);
+                    deleted++;
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteLog($"BACKUP.DELETE: failed path={backup.Path}: {ex.Message}");
+            }
+        }
+
+        return deleted;
+    }
+
+    private void PruneDeviceTweakerBackups(string directory, int keepLatest)
+    {
+        try
+        {
+            if (!Directory.Exists(directory))
+            {
+                return;
+            }
+
+            List<FileInfo> files = Directory.EnumerateFiles(directory, $"{BackupFilePrefix}*.json")
+                .Select(path => new FileInfo(path))
+                .OrderByDescending(file => file.LastWriteTimeUtc)
+                .ToList();
+
+            foreach (FileInfo file in files.Skip(Math.Max(1, keepLatest)))
+            {
+                try
+                {
+                    file.Delete();
+                    WriteLog($"BACKUP.PRUNE: deleted old backup path={file.FullName}");
+                }
+                catch (Exception ex)
+                {
+                    WriteLog($"BACKUP.PRUNE: failed path={file.FullName}: {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"BACKUP.PRUNE: failed directory={directory}: {ex.Message}");
+        }
+    }
+
+    private AutoBackupChoice PromptBackupLocationForAuto()
+    {
+        AutoBackupChoice choice = ShowAutoBackupChoiceDialog();
+        WriteLog($"BACKUP.PROMPT.AUTO: choice={choice}");
+        return choice;
     }
 
     private void RestoreDeviceTweakerBackup(string path)

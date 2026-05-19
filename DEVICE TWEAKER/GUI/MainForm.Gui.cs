@@ -224,11 +224,17 @@ public sealed partial class MainForm
         Button btnScan = NewTopButton("REFRESH");
         Button btnApply = NewTopButton("APPLY");
         Button btnAuto = NewTopButton("AUTO-OPTIMIZATION");
-        Button btnIrq = NewTopButton("CALCULATE IRQ COUNTS");
         Button btnReset = NewTopButton("RESET ALL");
         Button btnRestore = NewTopButton("RESTORE");
+        int buttonGap = UiScale(8);
+        int buttonRowGap = UiScale(8);
+        btnApply.Margin = Padding.Empty;
+        btnAuto.Margin = new Padding(buttonGap, 0, 0, 0);
+        btnScan.Margin = new Padding(buttonGap, 0, 0, 0);
+        btnReset.Margin = Padding.Empty;
+        btnRestore.Margin = new Padding(buttonGap, 0, 0, 0);
 
-        foreach (Button b in new[] { btnScan, btnApply, btnAuto, btnIrq, btnReset, btnRestore })
+        foreach (Button b in new[] { btnScan, btnApply, btnAuto, btnReset, btnRestore })
         {
             SetTopButtonBaseStyle(b);
             b.MouseEnter += (_, _) => SetTopButtonHoverStyle(b);
@@ -289,9 +295,22 @@ public sealed partial class MainForm
         buttonsGrid.Controls.Add(btnApply, 0, 0);
         buttonsGrid.Controls.Add(btnAuto, 1, 0);
         buttonsGrid.Controls.Add(btnScan, 2, 0);
-        buttonsGrid.Controls.Add(btnReset, 0, 1);
-        buttonsGrid.Controls.Add(btnIrq, 1, 1);
-        buttonsGrid.Controls.Add(btnRestore, 2, 1);
+
+        FlowLayoutPanel bottomButtons = new()
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            BackColor = _bgPanel,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, buttonRowGap, 0, 0),
+            Padding = Padding.Empty,
+            WrapContents = false,
+            Anchor = AnchorStyles.None,
+        };
+        bottomButtons.Controls.Add(btnReset);
+        bottomButtons.Controls.Add(btnRestore);
+        buttonsGrid.Controls.Add(bottomButtons, 0, 1);
+        buttonsGrid.SetColumnSpan(bottomButtons, 3);
 
         buttonsHost.Controls.Add(buttonsGrid, 1, 0);
         buttonPanel.Controls.Add(buttonsHost);
@@ -426,7 +445,7 @@ public sealed partial class MainForm
             if (hasUsbImodTarget)
             {
                 optimizeUsbImod = ShowThemedConfirm(
-                    "USB IMOD tuning is available for detected XHCI controller(s).\n\nApply it during auto-optimization?",
+                    "USB IMOD tuning is available for detected XHCI controller(s).\n\nDTIMOD driver access can be blocked by Windows Defender or anti-cheats.\n\nApply it during auto-optimization?",
                     "USB IMOD TUNING",
                     "APPLY",
                     "SKIP");
@@ -439,8 +458,16 @@ public sealed partial class MainForm
 
             if (!_testAutoDryRun)
             {
-                BackupLocation backupLocation = PromptBackupLocationForAuto();
-                CreateDeviceTweakerBackup("pre-auto", showDialog: false, backupLocation);
+                AutoBackupChoice backupChoice = PromptBackupLocationForAuto();
+                if (backupChoice == AutoBackupChoice.Local || backupChoice == AutoBackupChoice.Roaming)
+                {
+                    BackupLocation backupLocation = backupChoice == AutoBackupChoice.Local ? BackupLocation.Local : BackupLocation.Roaming;
+                    CreateDeviceTweakerBackup("pre-auto", showDialog: false, backupLocation);
+                }
+                else
+                {
+                    WriteLog("BACKUP.PROMPT.AUTO: skipped by user");
+                }
             }
 
             InvokeAutoOptimization(optimizeUsbImod);
@@ -488,11 +515,6 @@ public sealed partial class MainForm
 
             WriteLog("UI: AUTO-OPTIMIZATION done -> triggering REFRESH");
             RefreshBlocks();
-        };
-        btnIrq.Click += (_, _) =>
-        {
-            WriteLog("UI: CALCULATE IRQ COUNTS button clicked");
-            CalculateIrqCounts();
         };
         btnReset.Click += (_, _) =>
         {
@@ -854,21 +876,23 @@ public sealed partial class MainForm
         return new Button
         {
             Text = text,
-            Size = UiScale(186, 36),
+            Size = UiScale(178, 36),
             Margin = new Padding(UiScale(8), UiScale(4), UiScale(8), UiScale(4)),
             FlatStyle = FlatStyle.Flat,
             Font = _buttonFont,
             UseVisualStyleBackColor = false,
             Cursor = Cursors.Hand,
+            TabStop = false,
         };
     }
 
     private void SetTopButtonBaseStyle(Button btn)
     {
+        bool isPrimary = string.Equals(btn.Text, "AUTO-OPTIMIZATION", StringComparison.OrdinalIgnoreCase);
         btn.FlatAppearance.BorderSize = 1;
         btn.BackColor = _bgForm;
         btn.ForeColor = _fgMain;
-        btn.FlatAppearance.BorderColor = _accent;
+        btn.FlatAppearance.BorderColor = isPrimary ? _accent : Color.FromArgb(150, 150, 158);
     }
 
     private void SetTopButtonHoverStyle(Button btn)

@@ -468,7 +468,12 @@ public sealed partial class MainForm
             block.PolicyLabel.Visible = false;
             block.PolicyCombo.Visible = false;
 
-            int? baseCore = isTestDevice ? 0 : GetNdisBaseCore(block.Device.InstanceId);
+            bool skipTestWifiAffinity = isTestDevice && block.Device.Wifi;
+            int? baseCore = skipTestWifiAffinity
+                ? null
+                : isTestDevice
+                    ? 0
+                    : GetNdisBaseCore(block.Device.InstanceId);
             int? registryQueues = isTestDevice ? 1 : GetNdisRssQueues(block.Device.InstanceId);
             int queues = registryQueues ?? 1;
             queues = ClampRssQueueCount(queues);
@@ -480,13 +485,15 @@ public sealed partial class MainForm
                 : ReadAffinityPolicyState(prioAffPath);
             bool hasRss = baseCore.HasValue;
             bool hasIrqPolicy = irqPolicy == 4 && irqMask != 0;
-            NdisAffinityMode ndisMode = hasRss && hasIrqPolicy
-                ? NdisAffinityMode.Both
-                : hasIrqPolicy
-                    ? NdisAffinityMode.IrqPolicy
-                    : hasRss || block.NdisRssRuntime.RssFound
-                        ? NdisAffinityMode.Rss
-                        : NdisAffinityMode.IrqPolicy;
+            NdisAffinityMode ndisMode = skipTestWifiAffinity
+                ? NdisAffinityMode.IrqPolicy
+                : hasRss && hasIrqPolicy
+                    ? NdisAffinityMode.Both
+                    : hasIrqPolicy
+                        ? NdisAffinityMode.IrqPolicy
+                        : hasRss || block.NdisRssRuntime.RssFound
+                            ? NdisAffinityMode.Rss
+                            : NdisAffinityMode.IrqPolicy;
             SetNdisModeCombo(block, ndisMode);
 
             block.SuppressCpuEvents++;
@@ -503,7 +510,11 @@ public sealed partial class MainForm
             }
 
             block.RssBaseCore = baseCore;
-            if (baseCore is >= 0 && baseCore < _maxLogical)
+            if (skipTestWifiAffinity)
+            {
+                block.AffinityMask = 0;
+            }
+            else if (baseCore is >= 0 && baseCore < _maxLogical)
             {
                 ApplyNdisSelection(block, baseCore.Value, queues);
             }
@@ -989,7 +1000,46 @@ public sealed partial class MainForm
     {
         if (block.Device.IsTestDevice)
         {
-            WriteLog($"RESET.SKIP: {block.Device.InstanceId} kind={block.Kind} reason=TEST_DEVICE");
+            block.SuppressCpuEvents++;
+            try
+            {
+                foreach (CheckBox cb in block.CpuBoxes)
+                {
+                    cb.Checked = false;
+                }
+            }
+            finally
+            {
+                block.SuppressCpuEvents--;
+            }
+
+            block.AffinityMask = 0;
+            block.AffinityLabel.Text = "Affinity Mask: 0x0";
+            block.PrioCombo.SelectedItem = "Undefined";
+            if (block.Kind == DeviceKind.NET_NDIS)
+            {
+                block.RssBaseCore = null;
+                if (block.RssQueueBox is not null)
+                {
+                    block.SuppressCpuEvents++;
+                    try
+                    {
+                        block.RssQueueBox.Value = 1;
+                    }
+                    finally
+                    {
+                        block.SuppressCpuEvents--;
+                    }
+                }
+            }
+            else
+            {
+                block.PolicyCombo.SelectedItem = "MachineDefault";
+            }
+
+            block.IrqCount = null;
+            block.IrqLabel.Text = "IRQ Count: reading...";
+            WriteLog($"RESET.TEST: {block.Device.InstanceId} kind={block.Kind} -> cleared preview priority/affinity");
             return;
         }
 
