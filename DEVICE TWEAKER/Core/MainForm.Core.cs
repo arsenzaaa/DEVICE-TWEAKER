@@ -54,6 +54,7 @@ public sealed partial class MainForm : Form
     private int _lastLayoutDpi;
     private bool _expandingMainWindowForLayout;
     private bool _initialDeviceViewportHeightAdjusted;
+    private int _irqRefreshGeneration;
 
     public MainForm()
     {
@@ -1065,7 +1066,10 @@ public sealed partial class MainForm : Form
                 .Select(m => m.Index)
                 .OrderBy(x => x)
                 .ToList();
-            WriteLog($"GUI.RESERVED: count={tag.Meta.Count} set=[{FormatIndexList(reserved)}]");
+            string valueText = tag.ValueLabel.Text;
+            byte[] bytes = BuildReservedCpuSetBytes(reserved);
+            string bytesText = bytes.Length == 0 ? "none" : string.Join(" ", bytes.Select(b => b.ToString("X2")));
+            WriteLog($"GUI.RESERVED: count={tag.Meta.Count} set=[{FormatIndexList(reserved)}] bytes=[{bytesText}] value=\"{SanitizeLogValue(valueText)}\"");
         }
         else
         {

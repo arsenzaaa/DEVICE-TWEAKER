@@ -421,7 +421,7 @@ public sealed partial class MainForm
 
         Label lblIrq = new()
         {
-            Text = "IRQ Count: [Click CALCULATE IRQ COUNTS]",
+            Text = "IRQ Count: reading...",
             AutoSize = true,
             ForeColor = _mutedText,
             Location = new Point(UiScale(18), maskY + UiScale(20)),
@@ -1646,6 +1646,7 @@ public sealed partial class MainForm
         {
             RefreshImodCurrentValues(reason: "refresh-blocks");
         }
+        CalculateIrqCounts("refresh-blocks");
         LogGuiSnapshot("refresh");
     }
 
@@ -1738,19 +1739,53 @@ public sealed partial class MainForm
         return false;
     }
 
+    private static DeviceIrqInfo CreateTestIrqInfo(DeviceBlock block)
+    {
+        DeviceIrqInfo info = new() { Source = "TEST" };
+        int count = block.Device.TestIrqCount ?? block.Kind switch
+        {
+            DeviceKind.GPU => block.Device.IsIntegratedGpu ? 1 : 2,
+            DeviceKind.NET_NDIS or DeviceKind.NET_CX => Math.Max(1, block.RssQueueBox?.Value is decimal queues ? (int)queues : 1),
+            DeviceKind.USB => string.IsNullOrWhiteSpace(block.Device.UsbRoles) ? 1 : Math.Min(8, Math.Max(1, block.Device.UsbRoles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length)),
+            DeviceKind.AUDIO => string.IsNullOrWhiteSpace(block.Device.AudioEndpoints) ? 1 : Math.Min(4, Math.Max(1, block.Device.AudioEndpoints.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length)),
+            DeviceKind.STOR => 1,
+            _ => 1,
+        };
+        count = Math.Clamp(count, 0, 64);
+        bool msiEnabled = !block.Device.TestMsiStatus.Equals("Disabled", StringComparison.OrdinalIgnoreCase);
+
+        for (int i = 0; i < count; i++)
+        {
+            info.AddIrq(msiEnabled ? 1000 + i : i);
+        }
+
+        if (count == 0)
+        {
+            info.MsiStatus = block.Device.TestMsiStatus.Equals("Enabled", StringComparison.OrdinalIgnoreCase) ? "Enabled" : "Disabled";
+        }
+        else if (!block.Device.TestMsiStatus.Equals("Auto", StringComparison.OrdinalIgnoreCase))
+        {
+            info.MsiStatus = block.Device.TestMsiStatus;
+        }
+
+        return info;
+    }
+
     private static bool IsKnownMsiStatus(string status)
     {
         return status.Equals("Enabled", StringComparison.OrdinalIgnoreCase)
             || status.Equals("Disabled", StringComparison.OrdinalIgnoreCase);
     }
 
-    private async void CalculateIrqCounts()
+    private async void CalculateIrqCounts(string reason = "refresh")
     {
+        int generation = ++_irqRefreshGeneration;
         foreach (DeviceBlock b in _blocks)
         {
             b.IrqLabel.Text = "IRQ Count: reading...";
         }
 
+        WriteLog($"IRQ.REFRESH: reason={reason} blocks={_blocks.Count}");
         Dictionary<string, DeviceIrqInfo> irqCounts;
         try
         {
@@ -1759,11 +1794,21 @@ public sealed partial class MainForm
         catch (Exception ex)
         {
             WriteLog($"IRQ.MAP: failed to read active IRQ data: {ex.Message}");
-            ShowThemedInfo($"IRQ count read failed.\n{ex.Message}");
+            if (IsDisposed || generation != _irqRefreshGeneration)
+            {
+                return;
+            }
+
+            foreach (DeviceBlock b in _blocks)
+            {
+                string regMsiStatus = ReadMsiStatusFromRegistry(b);
+                b.IrqCount = null;
+                b.IrqLabel.Text = $"IRQ Count: unavailable (MSI: {regMsiStatus})";
+            }
             return;
         }
 
-        if (IsDisposed)
+        if (IsDisposed || generation != _irqRefreshGeneration)
         {
             return;
         }
@@ -1771,7 +1816,14 @@ public sealed partial class MainForm
         foreach (DeviceBlock b in _blocks)
         {
             string shortPnp = GetShortPnpId(b.Device.InstanceId);
-            if (TryFindIrqInfo(b, irqCounts, out DeviceIrqInfo? info, out string matchedKey) && info is not null)
+            if (b.Device.IsTestDevice)
+            {
+                DeviceIrqInfo info = CreateTestIrqInfo(b);
+                b.IrqCount = info.Count;
+                b.IrqLabel.Text = $"IRQ Count: {info.Count} (MSI: {info.MsiStatus})";
+                WriteLog($"IRQ.MAP.TEST: {b.Device.InstanceId} ({shortPnp}) -> count={info.Count} activeMsi={info.MsiStatus} irqs=[{FormatIrqNumbers(info.IrqNumbers)}] source={info.Source}");
+            }
+            else if (TryFindIrqInfo(b, irqCounts, out DeviceIrqInfo? info, out string matchedKey) && info is not null)
             {
                 string regMsiStatus = ReadMsiStatusFromRegistry(b);
                 b.IrqCount = info.Count;
@@ -1797,6 +1849,6 @@ public sealed partial class MainForm
             }
         }
 
-        LogGuiSnapshot("irq-counts");
+        LogGuiSnapshot("irq-refresh");
     }
 }

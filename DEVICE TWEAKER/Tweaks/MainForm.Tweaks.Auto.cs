@@ -523,7 +523,8 @@ public sealed partial class MainForm
 
         foreach (DeviceBlock block in _blocks.Where(block => wifiIds.Contains(block.Device.InstanceId)))
         {
-            WriteLog($"AUTO.RESULT.SKIPPED: WiFi | {FormatAutoResultKind(block.Kind)} | \"{FormatAutoResultDeviceName(block)}\" -> affinity preserved, MSI/prio only");
+            string wifiAction = block.Device.IsTestDevice ? "test affinity cleared, MSI/prio only" : "affinity preserved, MSI/prio only";
+            WriteLog($"AUTO.RESULT.SKIPPED: WiFi | {FormatAutoResultKind(block.Kind)} | \"{FormatAutoResultDeviceName(block)}\" -> {wifiAction}");
         }
 
         foreach (DeviceBlock block in _blocks.Where(block => msiOnlyGpuIds.Contains(block.Device.InstanceId)))
@@ -769,20 +770,40 @@ public sealed partial class MainForm
             string beforePolicy = block.PolicyCombo.SelectedItem?.ToString() ?? "(none)";
             WriteLog($"AUTO.RESET: {block.Device.InstanceId} Kind={block.Kind} maskBefore=0x{beforeMask:X} policyBefore={beforePolicy}");
 
-            if (isWifi)
-            {
-                block.MsiCombo.SelectedItem = "Enabled";
-                block.PrioCombo.SelectedItem = "High";
-                WriteLog($"AUTO.WIFI.SKIP: {block.Device.InstanceId} -> MSI=Enabled Prio=High (affinity/limit preserved)");
-                continue;
-            }
-
             if (isMsiOnlyGpu)
             {
                 string msiBefore = block.MsiCombo.SelectedItem?.ToString() ?? "(none)";
                 block.MsiCombo.SelectedItem = "Enabled";
                 string msiAfter = block.MsiCombo.SelectedItem?.ToString() ?? "(none)";
                 WriteLog($"AUTO.SKIP.GPU: {block.Device.InstanceId} integrated=1 msiBefore={msiBefore} msiAfter={msiAfter} reason=integratedGpuAutoSkip");
+                continue;
+            }
+
+            if (isWifi)
+            {
+                if (block.Device.IsTestDevice)
+                {
+                    block.SuppressCpuEvents++;
+                    try
+                    {
+                        foreach (CheckBox cb in block.CpuBoxes)
+                        {
+                            cb.Checked = false;
+                        }
+                    }
+                    finally
+                    {
+                        block.SuppressCpuEvents--;
+                    }
+
+                    block.AffinityMask = 0;
+                    block.RssBaseCore = null;
+                }
+
+                block.MsiCombo.SelectedItem = "Enabled";
+                block.PrioCombo.SelectedItem = "High";
+                string affinityState = block.Device.IsTestDevice ? "test affinity cleared" : "affinity/limit preserved";
+                WriteLog($"AUTO.WIFI.SKIP: {block.Device.InstanceId} -> MSI=Enabled Prio=High ({affinityState})");
                 continue;
             }
 
@@ -1011,6 +1032,64 @@ public sealed partial class MainForm
             return selected;
         }
 
+        List<AutoCpuUnit> TakeGpuDedicatedUnits(int count, bool allowCore0)
+        {
+            if (count != 2)
+            {
+                return TakeDedicatedUnits(count, allowCore0);
+            }
+
+            List<AutoCpuUnit> candidates = GetCandidateUnits(preferredUnits, allowCore0)
+                .OrderBy(unit => unit.Id)
+                .ToList();
+            if (candidates.Count < count)
+            {
+                return [];
+            }
+
+            List<(AutoCpuUnit First, AutoCpuUnit Second)> pairs = [];
+            for (int i = 0; i < candidates.Count - 1; i++)
+            {
+                AutoCpuUnit first = candidates[i];
+                AutoCpuUnit second = candidates[i + 1];
+                if (Math.Abs(first.Id - second.Id) != 1)
+                {
+                    continue;
+                }
+
+                pairs.Add((first, second));
+            }
+
+            if (pairs.Count == 0)
+            {
+                return TakeDedicatedUnits(count, allowCore0);
+            }
+
+            (AutoCpuUnit First, AutoCpuUnit Second) selectedPair = _cppcEnabled
+                ? pairs
+                    .OrderBy(pair => pair.First.Ccd == pair.Second.Ccd ? 0 : 1)
+                    .ThenBy(pair => !HasVisibleCcxSplit() || pair.First.Ccx == pair.Second.Ccx ? 0 : 1)
+                    .ThenBy(pair => Math.Min(pair.First.Rank, pair.Second.Rank))
+                    .ThenBy(pair => (long)pair.First.Rank + pair.Second.Rank)
+                    .ThenByDescending(pair => (long)pair.First.Rating + pair.Second.Rating)
+                    .ThenByDescending(pair => Math.Max(pair.First.PrimaryLp, pair.Second.PrimaryLp))
+                    .First()
+                : pairs
+                    .OrderBy(pair => pair.First.Ccd == pair.Second.Ccd ? 0 : 1)
+                    .ThenBy(pair => !HasVisibleCcxSplit() || pair.First.Ccx == pair.Second.Ccx ? 0 : 1)
+                    .ThenByDescending(pair => Math.Max(pair.First.PrimaryLp, pair.Second.PrimaryLp))
+                    .ThenByDescending(pair => Math.Min(pair.First.PrimaryLp, pair.Second.PrimaryLp))
+                    .First();
+
+            List<AutoCpuUnit> selected = [selectedPair.First, selectedPair.Second];
+            foreach (AutoCpuUnit unit in selected)
+            {
+                ReserveUnit(unit, "dedicated-gpu-pair");
+            }
+
+            return selected;
+        }
+
         AutoCpuUnit? FindInputShareUnit()
         {
             foreach (int unitId in inputShareUnitIds)
@@ -1128,14 +1207,14 @@ public sealed partial class MainForm
 
         foreach (AutoAffinityPlanSlot slot in planSlots.Where(s => s.Role == AutoAffinityRole.Gpu))
         {
-            List<AutoCpuUnit> units = TakeDedicatedUnits(slot.Need, allowCore0: true);
+            List<AutoCpuUnit> units = TakeGpuDedicatedUnits(slot.Need, allowCore0: true);
             if (units.Count < slot.Need)
             {
                 WriteLog($"AUTO.PLAN.SKIP: role={slot.Role} {slot.Block.Kind} {slot.Block.Device.InstanceId} reason=no-gpu-physical-pair");
                 continue;
             }
 
-            AssignSlot(slot, units, "gpu-dedicated-physical-pair");
+            AssignSlot(slot, units, "gpu-dedicated-high-physical-pair");
             if (slot.Lps.Count > 0)
             {
                 SkipSpacingUnitIfAvailable("gpu");
@@ -1404,7 +1483,10 @@ public sealed partial class MainForm
             try
             {
                 ResetBlockSettings(b);
-                LoadBlockSettings(b);
+                if (!b.Device.IsTestDevice)
+                {
+                    LoadBlockSettings(b);
+                }
             }
             catch (Exception ex)
             {
@@ -1415,6 +1497,7 @@ public sealed partial class MainForm
         ResetReservedCpuSets();
         ResetImodIntervalsToDefault("reset-all");
 
+        CalculateIrqCounts("reset-all");
         LogGuiSnapshot("reset-all");
         ShowThemedInfo(
             "All Device Tweaker changes have been cleared.\nPlease reboot your PC to fully revert device behavior.");

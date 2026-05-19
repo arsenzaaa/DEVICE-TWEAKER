@@ -140,6 +140,8 @@ internal sealed class DeviceInfo
     public bool UsbIsXhci { get; init; }
     public bool UsbHasDevices { get; init; }
     public bool IsTestDevice { get; init; }
+    public int? TestIrqCount { get; init; }
+    public string TestMsiStatus { get; init; } = "Auto";
 }
 
 internal sealed class DeviceBlock
@@ -258,4 +260,5 @@ internal sealed class ReservedCpuPanelTag
     public required Label Description { get; init; }
     public required List<ReservedCpuEntry> Meta { get; init; }
     public required Label PathLabel { get; init; }
+    public required Label ValueLabel { get; init; }
 }
