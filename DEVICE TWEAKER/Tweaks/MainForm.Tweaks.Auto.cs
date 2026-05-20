@@ -579,6 +579,8 @@ public sealed partial class MainForm
 
         List<int> primaryP = cpuSets.Value.P.Where(lp => lp >= 0 && lp < _maxLogical).ToList();
         List<int> primaryE = cpuSets.Value.E.Where(lp => lp >= 0 && lp < _maxLogical).ToList();
+        List<int> performanceP = primaryP.ToList();
+        List<int> performanceE = primaryE.ToList();
         List<int> targetCcdLps = [];
         List<int> ccdIdsUnique = [];
         if (_cpuInfo is not null && _cpuInfo.CcdMap.Count > 0)
@@ -588,16 +590,16 @@ public sealed partial class MainForm
             {
                 int targetCcd = SelectAutoTargetCcd(ccdIdsUnique, primaryP, primaryE, out string targetCcdReason);
                 targetCcdLps = _cpuInfo.CcdMap.Where(kvp => kvp.Value == targetCcd).Select(kvp => kvp.Key).OrderBy(x => x).ToList();
-                primaryP = primaryP.Where(lp => targetCcdLps.Contains(lp)).ToList();
-                primaryE = primaryE.Where(lp => targetCcdLps.Contains(lp)).ToList();
+                performanceP = primaryP.Where(lp => targetCcdLps.Contains(lp)).ToList();
+                performanceE = primaryE.Where(lp => targetCcdLps.Contains(lp)).ToList();
 
                 WriteLog(
-                    $"AUTO: CCD map ids=[{string.Join(',', ccdIdsUnique)}] targetCCD={targetCcd} reason=\"{targetCcdReason}\" targetLPs=[{string.Join(',', targetCcdLps)}] filteredP=[{string.Join(',', primaryP)}] filteredE=[{string.Join(',', primaryE)}]");
+                    $"AUTO: CCD map ids=[{string.Join(',', ccdIdsUnique)}] targetCCD={targetCcd} reason=\"{targetCcdReason}\" targetLPs=[{string.Join(',', targetCcdLps)}] performanceP=[{string.Join(',', performanceP)}] performanceE=[{string.Join(',', performanceE)}]");
 
-                if (primaryP.Count + primaryE.Count == 0 && targetCcdLps.Count > 0)
+                if (performanceP.Count + performanceE.Count == 0 && targetCcdLps.Count > 0)
                 {
-                    primaryP = targetCcdLps.OrderBy(x => x).ToList();
-                    WriteLog($"AUTO: CCD fallback -> using all target CCD LPs as primary P: [{string.Join(',', primaryP)}]");
+                    performanceP = targetCcdLps.OrderBy(x => x).ToList();
+                    WriteLog($"AUTO: CCD fallback -> using all target CCD LPs as performance P: [{string.Join(',', performanceP)}]");
                 }
             }
         }
@@ -607,13 +609,13 @@ public sealed partial class MainForm
         if (_cpuInfo is not null)
         {
             allP = _cpuInfo.Topology.LPs
-                .Where(lp => !IsEfficiencyCore(lp) && (targetCcdLps.Count == 0 || targetCcdLps.Contains(lp.LP)))
+                .Where(lp => !IsEfficiencyCore(lp))
                 .Select(lp => lp.LP)
                 .OrderBy(x => x)
                 .ToList();
 
             allE = _cpuInfo.Topology.LPs
-                .Where(lp => IsEfficiencyCore(lp) && (targetCcdLps.Count == 0 || targetCcdLps.Contains(lp.LP)))
+                .Where(lp => IsEfficiencyCore(lp))
                 .Select(lp => lp.LP)
                 .OrderBy(x => x)
                 .ToList();
@@ -632,19 +634,31 @@ public sealed partial class MainForm
 
         primaryP = SortAutoCpuCandidates(primaryP, preferStrongest: true);
         primaryE = SortAutoCpuCandidates(primaryE, preferStrongest: false);
+        if (performanceP.Count == 0 && targetCcdLps.Count == 0)
+        {
+            performanceP = primaryP.ToList();
+        }
+
+        if (performanceE.Count == 0 && targetCcdLps.Count == 0)
+        {
+            performanceE = primaryE.ToList();
+        }
+
+        performanceP = SortAutoCpuCandidates(performanceP, preferStrongest: true);
+        performanceE = SortAutoCpuCandidates(performanceE, preferStrongest: false);
         allP = SortAutoCpuCandidates(allP, preferStrongest: true);
         allE = SortAutoCpuCandidates(allE, preferStrongest: false);
 
-        int pCount = primaryP.Count;
+        int pCount = performanceP.Count;
         if (pCount <= 0)
         {
             return;
         }
 
-        WriteLog($"AUTO: CPU primary P=[{string.Join(',', primaryP)}] E=[{string.Join(',', primaryE)}]");
+        WriteLog($"AUTO: CPU primary P=[{string.Join(',', primaryP)}] E=[{string.Join(',', primaryE)}] performanceP=[{string.Join(',', performanceP)}] performanceE=[{string.Join(',', performanceE)}]");
         if (_cppcEnabled)
         {
-            WriteLog($"AUTO.CPPC: primaryP=[{FormatAutoCpuCandidates(primaryP)}] primaryE=[{FormatAutoCpuCandidates(primaryE)}] allP=[{FormatAutoCpuCandidates(allP)}] allE=[{FormatAutoCpuCandidates(allE)}]");
+            WriteLog($"AUTO.CPPC: primaryP=[{FormatAutoCpuCandidates(primaryP)}] primaryE=[{FormatAutoCpuCandidates(primaryE)}] performanceP=[{FormatAutoCpuCandidates(performanceP)}] performanceE=[{FormatAutoCpuCandidates(performanceE)}] allP=[{FormatAutoCpuCandidates(allP)}] allE=[{FormatAutoCpuCandidates(allE)}]");
         }
         if (HasVisibleCcxSplit() && _cpuInfo is not null)
         {
@@ -657,9 +671,9 @@ public sealed partial class MainForm
             WriteLog($"AUTO.CCX: enabled {ccxText}");
         }
 
-        HashSet<int> primaryPSet = primaryP.ToHashSet();
-        HashSet<int> primaryESet = primaryE.ToHashSet();
-        List<AutoCpuUnit> allCpuUnits = BuildAutoCpuUnits(targetCcdLps);
+        HashSet<int> primaryPSet = performanceP.ToHashSet();
+        HashSet<int> primaryESet = performanceE.ToHashSet();
+        List<AutoCpuUnit> allCpuUnits = BuildAutoCpuUnits(null);
         List<AutoCpuUnit> primaryPUnits = SortAutoCpuUnits(
             allCpuUnits.Where(unit => !unit.IsECore && primaryPSet.Contains(unit.PrimaryLp)),
             preferStrongest: true);
@@ -679,9 +693,27 @@ public sealed partial class MainForm
 
         bool usingP = primaryPUnits.Count > 0;
         List<AutoCpuUnit> preferredUnits = usingP ? primaryPUnits : primaryEUnits;
-        List<AutoCpuUnit> audioEUnits = usingP
-            ? primaryEUnits.Where(unit => !unit.HasCore0).ToList()
+        HashSet<int> preferredUnitIds = preferredUnits.Select(unit => unit.Id).ToHashSet();
+        List<AutoCpuUnit> nonTargetBackgroundUnits = targetCcdLps.Count > 0
+            ? SortAutoCpuUnits(
+                allCpuUnits.Where(unit => !targetCcdLps.Contains(unit.PrimaryLp) && !unit.HasCore0),
+                preferStrongest: false)
             : [];
+        List<AutoCpuUnit> eBackgroundUnits = SortAutoCpuUnits(
+            allCpuUnits.Where(unit => unit.IsECore && !unit.HasCore0),
+            preferStrongest: false);
+        List<AutoCpuUnit> spareBackgroundUnits = SortAutoCpuUnits(
+            allCpuUnits.Where(unit => !preferredUnitIds.Contains(unit.Id) && !unit.HasCore0),
+            preferStrongest: false);
+        List<AutoCpuUnit> fallbackBackgroundUnits = SortAutoCpuUnits(
+            allCpuUnits.Where(unit => !unit.HasCore0),
+            preferStrongest: false);
+        List<AutoCpuUnit> backgroundUnits = nonTargetBackgroundUnits
+            .Concat(eBackgroundUnits)
+            .Concat(spareBackgroundUnits)
+            .Concat(fallbackBackgroundUnits)
+            .DistinctBy(unit => unit.Id)
+            .ToList();
         Dictionary<int, AutoCpuUnit> unitById = allCpuUnits
             .GroupBy(unit => unit.Id)
             .ToDictionary(group => group.Key, group => group.First());
@@ -736,7 +768,7 @@ public sealed partial class MainForm
         int netCount = netNdisBlocks.Count + netCxBlocks.Count;
         bool hasWiFiOnly = wifiIds.Count > 0 && netCount == 0;
         WriteLog(
-            $"AUTO.SUMMARY: GPU={gpuBlocks.Count} GPUi={integratedGpuBlocks.Count} NET={netCount} USB={usbBlocks.Count} AUDIO={audioBlocks.Count} STOR={storCount} WIFI={wifiIds.Count} WiFiOnly={hasWiFiOnly} targetCCD=[{string.Join(',', targetCcdLps)}] primaryP=[{string.Join(',', primaryP)}] primaryE=[{string.Join(',', primaryE)}]");
+            $"AUTO.SUMMARY: GPU={gpuBlocks.Count} GPUi={integratedGpuBlocks.Count} NET={netCount} USB={usbBlocks.Count} AUDIO={audioBlocks.Count} STOR={storCount} WIFI={wifiIds.Count} WiFiOnly={hasWiFiOnly} targetCCD=[{string.Join(',', targetCcdLps)}] primaryP=[{string.Join(',', primaryP)}] primaryE=[{string.Join(',', primaryE)}] performanceP=[{string.Join(',', performanceP)}] performanceE=[{string.Join(',', performanceE)}]");
         if (hasWiFiOnly)
         {
             WriteLog("AUTO.WIFI-ONLY: no wired NET adapters found; skipping NET affinity.");
@@ -899,7 +931,7 @@ public sealed partial class MainForm
             .ThenBy(x => x.OriginalIndex)
             .ToList();
 
-        WriteLog($"AUTO.PLAN.CPU: using={(usingP ? "P" : "E")} preferredUnits=[{FormatAutoCpuUnits(preferredUnits)}] audioE=[{FormatAutoCpuUnits(audioEUnits)}]");
+        WriteLog($"AUTO.PLAN.CPU: using={(usingP ? "P" : "E")} preferredUnits=[{FormatAutoCpuUnits(preferredUnits)}] backgroundUnits=[{FormatAutoCpuUnits(backgroundUnits)}] nonTargetBackground=[{FormatAutoCpuUnits(nonTargetBackgroundUnits)}] eBackground=[{FormatAutoCpuUnits(eBackgroundUnits)}]");
         WriteLog($"AUTO.PLAN.SLOTS: [{string.Join(" | ", planSlots.Select(s => $"{s.Role}:{s.Block.Kind}:{s.Block.Device.InstanceId}"))}]");
 
         int inputPreferredNeed = planSlots.Count(s => s.Role is AutoAffinityRole.InputMouse or AutoAffinityRole.InputController);
@@ -907,7 +939,7 @@ public sealed partial class MainForm
         int nicPreferredNeed = planSlots.Count(s => s.Role == AutoAffinityRole.Nic);
         int keyboardPreferredNeed = planSlots.Count(s => s.Role == AutoAffinityRole.Keyboard);
         int audioSlots = planSlots.Count(s => s.Role == AutoAffinityRole.Audio);
-        int audioPreferredNeed = Math.Max(0, audioSlots - audioEUnits.Count);
+        int audioPreferredNeed = Math.Max(0, audioSlots - backgroundUnits.Count);
         int requiredPreferredUnitCount = inputPreferredNeed + gpuPreferredNeed + nicPreferredNeed + keyboardPreferredNeed + audioPreferredNeed;
         int nonCore0PreferredUnits = preferredUnits.Count(unit => !unit.HasCore0);
         bool avoidCore0WhenPossible = nonCore0PreferredUnits >= Math.Min(requiredPreferredUnitCount, preferredUnits.Count);
@@ -999,15 +1031,16 @@ public sealed partial class MainForm
         AutoCpuUnit? TakeDedicatedUnit(
             bool allowCore0,
             bool preferWeak = false,
-            bool useAudioE = false,
+            bool useBackground = false,
             int? preferCcx = null,
-            int? avoidCcx = null)
+            int? avoidCcx = null,
+            string? reserveReason = null)
         {
-            List<AutoCpuUnit> source = useAudioE ? audioEUnits : preferredUnits;
+            List<AutoCpuUnit> source = useBackground ? backgroundUnits : preferredUnits;
             AutoCpuUnit? unit = GetCandidateUnits(source, allowCore0, preferWeak, preferCcx, avoidCcx).FirstOrDefault();
             if (unit is not null)
             {
-                ReserveUnit(unit, preferWeak ? "dedicated-weak" : "dedicated");
+                ReserveUnit(unit, reserveReason ?? (useBackground ? "dedicated-background" : preferWeak ? "dedicated-weak" : "dedicated"));
             }
 
             return unit;
@@ -1115,6 +1148,18 @@ public sealed partial class MainForm
             }
 
             return unit.PrimaryLp;
+        }
+
+        string FormatBackgroundUnitReason(string roleName, AutoCpuUnit unit)
+        {
+            if (targetCcdLps.Count == 0)
+            {
+                return $"{roleName}-background-weak-unit";
+            }
+
+            return targetCcdLps.Contains(unit.PrimaryLp)
+                ? $"{roleName}-background-weak-fallback"
+                : $"{roleName}-background-non-target-unit";
         }
 
         void AssignSlot(AutoAffinityPlanSlot slot, IEnumerable<AutoCpuUnit> units, string reason, bool preferSiblingForShared = false)
@@ -1266,10 +1311,14 @@ public sealed partial class MainForm
 
         foreach (AutoAffinityPlanSlot slot in planSlots.Where(s => s.Role == AutoAffinityRole.Audio))
         {
-            AutoCpuUnit? eUnit = TakeDedicatedUnit(allowCore0: false, useAudioE: true);
-            if (eUnit is not null)
+            AutoCpuUnit? backgroundUnit = TakeDedicatedUnit(
+                allowCore0: false,
+                useBackground: true,
+                avoidCcx: GetInputAnchorCcx(),
+                reserveReason: "dedicated-background-audio");
+            if (backgroundUnit is not null)
             {
-                AssignSlot(slot, [eUnit], "audio-e-unit");
+                AssignSlot(slot, [backgroundUnit], FormatBackgroundUnitReason("audio", backgroundUnit));
                 continue;
             }
 
@@ -1287,14 +1336,25 @@ public sealed partial class MainForm
 
         foreach (AutoAffinityPlanSlot slot in planSlots.Where(s => s.Role is AutoAffinityRole.OtherUsb or AutoAffinityRole.Other))
         {
-            AutoCpuUnit? unit = TakeDedicatedUnit(allowCore0: false, preferWeak: true);
+            AutoCpuUnit? unit = TakeDedicatedUnit(
+                allowCore0: false,
+                useBackground: true,
+                reserveReason: "dedicated-background-other");
             if (unit is not null)
             {
-                AssignSlot(slot, [unit], "other-dedicated-if-free-unit");
+                AssignSlot(slot, [unit], FormatBackgroundUnitReason("other", unit));
             }
             else
             {
-                WriteLog($"AUTO.PLAN.SKIP: role={slot.Role} {slot.Block.Kind} {slot.Block.Device.InstanceId} reason=no-other-unit");
+                AutoCpuUnit? weakUnit = TakeDedicatedUnit(allowCore0: false, preferWeak: true);
+                if (weakUnit is not null)
+                {
+                    AssignSlot(slot, [weakUnit], "other-dedicated-weak-unit");
+                }
+                else
+                {
+                    WriteLog($"AUTO.PLAN.SKIP: role={slot.Role} {slot.Block.Kind} {slot.Block.Device.InstanceId} reason=no-other-unit");
+                }
             }
         }
 
@@ -1452,8 +1512,8 @@ public sealed partial class MainForm
         WriteAutoOptimizationResultSummary(
             optimizeUsbImod,
             usingP,
-            primaryP,
-            primaryE,
+            performanceP,
+            performanceE,
             targetCcdLps,
             usbBlocks,
             gpuBlocks,
