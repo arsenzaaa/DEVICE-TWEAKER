@@ -1323,7 +1323,9 @@ public sealed partial class MainForm
             int currentInfoY = Math.Max(lblIrq.Bottom + UiScale(14), cpuPanel.Bottom + UiScale(18));
             currentInfoY = Math.Max(currentInfoY, settingsPanel.Bottom + UiScale(10));
             lblInfo.Location = new Point(lblInfo.Left, currentInfoY);
-            lblInfo.Size = new Size(grp.Width - UiScale(40), lblInfo.Height);
+            int currentInfoWidth = Math.Max(UiScale(140), grp.Width - lblInfo.Left - UiScale(24));
+            int currentInfoHeight = Math.Max(UiScale(70), GetPreferredTextHeight(lblInfo, currentInfoWidth) + UiScale(2));
+            lblInfo.Size = new Size(currentInfoWidth, currentInfoHeight);
 
             grp.Height = Math.Max(
                 Math.Max(cpuPanel.Bottom + UiScale(110), settingsPanel.Bottom + UiScale(20)),
