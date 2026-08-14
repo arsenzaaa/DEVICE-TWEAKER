@@ -117,7 +117,8 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
         e.Graphics.FillRectangle(buttonBrush, arrowRect);
 
         string text = SelectedItem?.ToString() ?? string.Empty;
-        Rectangle textRect = new(bounds.Left + 6, bounds.Top + 1, Math.Max(0, bounds.Width - arrowWidth - 10), bounds.Height - 2);
+        // TextRenderer clips glyph overhang unless NoPadding is set — without it "Enabled" becomes "nabled".
+        Rectangle textRect = new(bounds.Left + 8, bounds.Top + 1, Math.Max(0, bounds.Width - arrowWidth - 12), bounds.Height - 2);
         Color textColor = Enabled ? ForeColor : Color.FromArgb(120, 120, 125);
         TextRenderer.DrawText(
             e.Graphics,
@@ -126,7 +127,11 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
             textRect,
             textColor,
             BackColor,
-            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+            TextFormatFlags.Left
+            | TextFormatFlags.VerticalCenter
+            | TextFormatFlags.NoPrefix
+            | TextFormatFlags.NoPadding
+            | TextFormatFlags.EndEllipsis);
 
         int centerX = arrowRect.Left + arrowRect.Width / 2;
         int centerY = arrowRect.Top + arrowRect.Height / 2 + 1;
@@ -155,6 +160,22 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
+        if (_popup is { Visible: true } popup)
+        {
+            if (e.KeyCode == Keys.Escape)
+            {
+                ClosePopup();
+                e.Handled = true;
+                return;
+            }
+
+            if (popup.Content.HandleOwnerKey(e.KeyCode))
+            {
+                e.Handled = true;
+                return;
+            }
+        }
+
         if (e.KeyCode is Keys.Enter or Keys.Space or Keys.F4)
         {
             TogglePopup();
@@ -220,13 +241,34 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
         int visibleItems = Math.Min(Math.Max(1, MaxDropDownItems), Items.Count);
         int rowHeight = Math.Max(ItemHeight, 18);
         int contentHeight = visibleItems * rowHeight;
-        int popupWidth = Math.Max(Width, DropDownWidth > 0 ? DropDownWidth : Width);
+        int requestedWidth = Math.Max(Width, DropDownWidth > 0 ? DropDownWidth : Width);
+        Rectangle work = Screen.FromControl(this).WorkingArea;
+        Rectangle ownerBounds = FindForm() is Form owner
+            ? owner.RectangleToScreen(owner.ClientRectangle)
+            : work;
+        int popupWidth = Math.Min(requestedWidth, Math.Max(Width, Math.Min(work.Right, ownerBounds.Right) - ownerBounds.Left));
         DropDownList list = new(this, popupWidth - 2, contentHeight, rowHeight, visibleItems);
         DropDownForm popup = new(this, list, BackColor, BorderColor)
         {
             Size = new Size(popupWidth, contentHeight + 2),
-            Location = PointToScreen(new Point(0, Height - 1)),
         };
+
+        Point below = PointToScreen(new Point(0, Height - 1));
+        Point above = PointToScreen(new Point(0, -popup.Height + 1));
+        bool fitsBelow = below.Y + popup.Height <= work.Bottom;
+        bool fitsAbove = above.Y >= work.Top;
+        if (fitsBelow || !fitsAbove)
+        {
+            popup.Location = new Point(
+                Math.Min(Math.Max(ownerBounds.Left, below.X), Math.Max(ownerBounds.Left, Math.Min(work.Right, ownerBounds.Right) - popup.Width)),
+                below.Y);
+        }
+        else
+        {
+            popup.Location = new Point(
+                Math.Min(Math.Max(ownerBounds.Left, above.X), Math.Max(ownerBounds.Left, Math.Min(work.Right, ownerBounds.Right) - popup.Width)),
+                above.Y);
+        }
 
         _popup = popup;
         popup.FormClosed += (_, _) =>
@@ -277,12 +319,14 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
         private readonly Color _border;
 
         protected override bool ShowWithoutActivation => true;
+        public DropDownList Content { get; }
 
         public DropDownForm(ThemedDropDownPicker owner, DropDownList content, Color background, Color border)
         {
             _owner = owner;
             _background = background;
             _border = border;
+            Content = content;
 
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
@@ -350,6 +394,7 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
 
     private sealed class DropDownList : Control
     {
+        private const int ScrollBarWidth = 10;
         private readonly ThemedDropDownPicker _owner;
         private readonly int _itemHeight;
         private readonly int _visibleItems;
@@ -392,7 +437,8 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
             for (int row = 0; row < rows; row++)
             {
                 int index = _firstIndex + row;
-                Rectangle itemRect = new(0, row * _itemHeight, Width, _itemHeight);
+                int listWidth = HasOverflow ? Width - ScrollBarWidth : Width;
+                Rectangle itemRect = new(0, row * _itemHeight, listWidth, _itemHeight);
                 bool selected = index == _hotIndex;
                 Color background = selected ? _owner.SelectedBackColor : _owner.BackColor;
                 Color foreground = selected ? _owner.SelectedForeColor : _owner.ForeColor;
@@ -415,18 +461,36 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
                     textRect,
                     foreground,
                     background,
-                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+                    TextFormatFlags.Left
+                    | TextFormatFlags.VerticalCenter
+                    | TextFormatFlags.NoPrefix
+                    | TextFormatFlags.NoPadding);
             }
+
+            DrawScrollBar(e.Graphics);
         }
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
+            if (HasOverflow && e.X >= Width - ScrollBarWidth)
+            {
+                base.OnMouseMove(e);
+                return;
+            }
+
             SetHotIndex(IndexFromPoint(e.Location));
             base.OnMouseMove(e);
         }
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
+            if (HasOverflow && e.X >= Width - ScrollBarWidth)
+            {
+                ScrollToPoint(e.Y);
+                base.OnMouseDown(e);
+                return;
+            }
+
             int index = IndexFromPoint(e.Location);
             if (index >= 0)
             {
@@ -435,6 +499,14 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
             }
 
             base.OnMouseDown(e);
+        }
+
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            int rows = Math.Max(1, Math.Abs(e.Delta) / SystemInformation.MouseWheelScrollDelta)
+                * Math.Max(1, SystemInformation.MouseWheelScrollLines);
+            ScrollByRows(e.Delta > 0 ? -rows : rows);
+            base.OnMouseWheel(e);
         }
 
         protected override void WndProc(ref Message m)
@@ -450,7 +522,8 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
 
         private int IndexFromPoint(Point point)
         {
-            if (point.X < 0 || point.X >= Width || point.Y < 0 || point.Y >= Height)
+            int listWidth = HasOverflow ? Width - ScrollBarWidth : Width;
+            if (point.X < 0 || point.X >= listWidth || point.Y < 0 || point.Y >= Height)
             {
                 return -1;
             }
@@ -484,6 +557,95 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
 
             InvalidateItem(previousIndex);
             InvalidateItem(_hotIndex);
+        }
+
+        public bool HandleOwnerKey(Keys key)
+        {
+            switch (key)
+            {
+                case Keys.Up:
+                    SetHotIndex(Math.Max(0, _hotIndex - 1));
+                    return true;
+                case Keys.Down:
+                    SetHotIndex(Math.Min(_owner.Items.Count - 1, _hotIndex + 1));
+                    return true;
+                case Keys.PageUp:
+                    SetHotIndex(Math.Max(0, _hotIndex - _visibleItems));
+                    return true;
+                case Keys.PageDown:
+                    SetHotIndex(Math.Min(_owner.Items.Count - 1, _hotIndex + _visibleItems));
+                    return true;
+                case Keys.Home:
+                    SetHotIndex(0);
+                    return true;
+                case Keys.End:
+                    SetHotIndex(_owner.Items.Count - 1);
+                    return true;
+                case Keys.Enter:
+                    _owner.CommitSelection(_hotIndex);
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private bool HasOverflow => _owner.Items.Count > _visibleItems;
+
+        private void ScrollByRows(int rows)
+        {
+            if (!HasOverflow || rows == 0)
+            {
+                return;
+            }
+
+            int maxFirst = Math.Max(0, _owner.Items.Count - _visibleItems);
+            int nextFirst = Math.Clamp(_firstIndex + rows, 0, maxFirst);
+            if (nextFirst == _firstIndex)
+            {
+                return;
+            }
+
+            _firstIndex = nextFirst;
+            _hotIndex = Math.Clamp(_hotIndex, _firstIndex, _firstIndex + _visibleItems - 1);
+            Invalidate();
+        }
+
+        private void ScrollToPoint(int y)
+        {
+            int maxFirst = Math.Max(0, _owner.Items.Count - _visibleItems);
+            if (maxFirst == 0)
+            {
+                return;
+            }
+
+            int thumbHeight = Math.Max(18, Height * _visibleItems / _owner.Items.Count);
+            int travel = Math.Max(1, Height - thumbHeight);
+            int nextFirst = (int)Math.Round(Math.Clamp(y - (thumbHeight / 2), 0, travel) * (maxFirst / (double)travel));
+            if (nextFirst != _firstIndex)
+            {
+                _firstIndex = nextFirst;
+                _hotIndex = Math.Clamp(_hotIndex, _firstIndex, _firstIndex + _visibleItems - 1);
+                Invalidate();
+            }
+        }
+
+        private void DrawScrollBar(Graphics graphics)
+        {
+            if (!HasOverflow)
+            {
+                return;
+            }
+
+            Rectangle track = new(Width - ScrollBarWidth, 0, ScrollBarWidth, Height);
+            using SolidBrush trackBrush = new(_owner.ButtonColor);
+            graphics.FillRectangle(trackBrush, track);
+
+            int thumbHeight = Math.Max(18, Height * _visibleItems / _owner.Items.Count);
+            int maxFirst = Math.Max(1, _owner.Items.Count - _visibleItems);
+            int thumbY = (Height - thumbHeight) * _firstIndex / maxFirst;
+            Rectangle thumb = new(track.Left + 2, thumbY + 2, Math.Max(3, track.Width - 4), Math.Max(4, thumbHeight - 4));
+            using SolidBrush thumbBrush = new(_owner.BorderColor);
+            graphics.FillRectangle(thumbBrush, thumb);
         }
 
         private void InvalidateItem(int index)

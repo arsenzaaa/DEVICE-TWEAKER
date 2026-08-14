@@ -12,16 +12,16 @@ public sealed partial class MainForm
     private const string ImodDriverName = "DTIMOD.sys";
     private const string ImodScriptMarkerStart = "$imodSettingsBegin = $true";
     private const string ImodScriptMarkerEnd = "$imodSettingsEnd = $true";
-    private const string ImodScriptVersionMarker = "$imodScriptVersion = 26";
+    private const string ImodScriptVersionMarker = "$imodScriptVersion = 27";
     private const string ImodScriptConfigToken = "{{IMOD_CONFIG_BLOCK}}";
-    private const bool ImodStartupScriptLoggingEnabled = false;
-    private const bool ImodStartupScriptVerboseLoggingEnabled = false;
+    private const bool ImodStartupScriptLoggingEnabled = true;
+    private const bool ImodStartupScriptVerboseLoggingEnabled = true;
     private static readonly string ImodScriptTemplate = """
     param(
         [switch]$verbose
     )
     
-    $imodScriptVersion = 26
+    $imodScriptVersion = 27
     
     {{IMOD_CONFIG_BLOCK}}
     
@@ -506,7 +506,16 @@ public sealed partial class MainForm
     if (-not $scriptRoot) {
         $scriptRoot = $env:TEMP
     }
-    $ImodLogPath = Join-Path $scriptRoot 'ApplyIMOD.log'
+    if ([string]::IsNullOrWhiteSpace($ImodLogDirectory)) {
+        $ImodLogDirectory = $scriptRoot
+    }
+    try {
+        New-Item -ItemType Directory -Path $ImodLogDirectory -Force | Out-Null
+    } catch {
+        $ImodLogDirectory = $scriptRoot
+    }
+    $imodLogStamp = Get-Date -Format 'yyyyMMdd'
+    $ImodLogPath = Join-Path $ImodLogDirectory ("ApplyIMOD_{0}.log" -f $imodLogStamp)
     Write-ImodLog "startup context: version=$imodScriptVersion pid=$PID root=$scriptRoot driver=$ImodDriverPath kdu=$ImodKduPath db=$ImodKduDbPath" -verboseOnly
     $usbEntryCount = if ($userDefinedData) { $userDefinedData.Count } else { 0 }
     $nicEntryCount = if ($nicItrData) { @($nicItrData).Count } else { 0 }
@@ -2555,15 +2564,15 @@ public sealed partial class MainForm
         scriptPath = File.Exists(startupPath) ? startupPath : null;
     }
 
-    private void RemoveImodPersistenceFiles()
+    private void RemoveImodPersistenceFiles(OperationReport? report = null)
     {
-        DeleteFileIfExists(GetImodStartupPath(), "IMOD.CONFIG");
-        DeleteFileIfExists(Path.Combine(GetScriptRoot(), "dtimod.sys"), "IMOD.DRIVER.LEGACY");
-        DeleteFileIfExists(Path.Combine(GetScriptRoot(), ImodDriverName), "IMOD.DRIVER.LEGACY");
+        DeleteFileIfExists(GetImodStartupPath(), "IMOD.CONFIG", report);
+        DeleteFileIfExists(Path.Combine(GetScriptRoot(), "dtimod.sys"), "IMOD.DRIVER.LEGACY", report);
+        DeleteFileIfExists(Path.Combine(GetScriptRoot(), ImodDriverName), "IMOD.DRIVER.LEGACY", report);
         WriteLog($"IMOD.DRIVER: keep staged system driver {GetImodDriverSystemPath()}");
     }
 
-    private void DeleteFileIfExists(string? path, string label)
+    private void DeleteFileIfExists(string? path, string label, OperationReport? report = null)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -2581,6 +2590,7 @@ public sealed partial class MainForm
         catch (Exception ex)
         {
             WriteLog($"{label}: failed to delete {path}: {ex.Message}");
+            report?.AddError(label, $"failed to delete {path}: {ex.Message}");
         }
     }
 
@@ -3357,6 +3367,7 @@ public sealed partial class MainForm
         sb.AppendLine($"$ImodDriverPath = {FormatPowerShellString(GetImodDriverSystemPathForScript())}");
         sb.AppendLine($"$ImodKduPath = {FormatPowerShellString(kduPath)}");
         sb.AppendLine($"$ImodKduDbPath = {FormatPowerShellString(kduDbPath)}");
+        sb.AppendLine($"$ImodLogDirectory = {FormatPowerShellString(AppDiagnostics.LogDirectory)}");
         sb.AppendLine($"$ImodStartupLogEnabled = {FormatPowerShellBool(ImodStartupScriptLoggingEnabled)}");
         sb.AppendLine($"$ImodStartupVerboseLogEnabled = {FormatPowerShellBool(ImodStartupScriptVerboseLoggingEnabled)}");
         sb.AppendLine($"$globalInterval = {FormatImodValue(config.GlobalInterval)}");

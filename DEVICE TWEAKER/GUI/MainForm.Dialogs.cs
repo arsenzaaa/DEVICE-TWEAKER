@@ -1,10 +1,56 @@
-﻿namespace DeviceTweakerCS;
+
+namespace DeviceTweakerCS;
 
 public sealed partial class MainForm
 {
+    private void StyleThemedDialogSurface(Form dialog)
+    {
+        dialog.BackColor = _bgForm;
+        dialog.ForeColor = _fgMain;
+    }
+
+    private DialogResult ShowDialogDimmed(Form dialog)
+    {
+        Form? dimmer = null;
+        bool ownDimmer = false;
+        try
+        {
+            if (_dialogDimDepth == 0
+                && IsHandleCreated
+                && Visible
+                && WindowState != FormWindowState.Minimized)
+            {
+                dimmer = new Form
+                {
+                    FormBorderStyle = FormBorderStyle.None,
+                    ShowInTaskbar = false,
+                    StartPosition = FormStartPosition.Manual,
+                    BackColor = Color.Black,
+                    Opacity = 0.52,
+                    Bounds = Bounds,
+                    Owner = this,
+                };
+                dimmer.Show(this);
+                ownDimmer = true;
+            }
+
+            _dialogDimDepth++;
+            return dialog.ShowDialog(this);
+        }
+        finally
+        {
+            _dialogDimDepth = Math.Max(0, _dialogDimDepth - 1);
+            if (ownDimmer && dimmer is not null)
+            {
+                dimmer.Close();
+                dimmer.Dispose();
+            }
+        }
+    }
+
     private void ShowThemedInfo(string message, string title)
     {
-        using Form dialog = new();
+        using Form dialog = new ThemedDialogForm();
         dialog.Text = title;
         dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
         dialog.StartPosition = FormStartPosition.CenterParent;
@@ -12,8 +58,7 @@ public sealed partial class MainForm
         dialog.MinimizeBox = false;
         dialog.ShowInTaskbar = false;
         dialog.AutoScaleMode = AutoScaleMode.None;
-        dialog.BackColor = _bgForm;
-        dialog.ForeColor = _fgMain;
+        StyleThemedDialogSurface(dialog);
         dialog.Font = _dialogFont;
         dialog.Icon = Icon;
 
@@ -34,9 +79,9 @@ public sealed partial class MainForm
             ForeColor = _fgMain,
             BackColor = _bgForm,
             UseMnemonic = false,
-            TextAlign = ContentAlignment.MiddleCenter,
+            TextAlign = ContentAlignment.TopCenter,
             Font = _dialogFont,
-            UseCompatibleTextRendering = true,
+            UseCompatibleTextRendering = false,
         };
 
         Size textSize = messageLabel.GetPreferredSize(new Size(maxTextWidth, 0));
@@ -70,9 +115,9 @@ public sealed partial class MainForm
         dialog.Controls.Add(okButton);
 
         dialog.AcceptButton = okButton;
-        dialog.Shown += (_, _) => ApplyTitleBarTheme(dialog);
+        WireThemedTitleBar(dialog);
 
-        dialog.ShowDialog(this);
+        ShowDialogDimmed(dialog);
     }
 
     private void ShowThemedInfo(string message)
@@ -80,9 +125,38 @@ public sealed partial class MainForm
         ShowThemedInfo(message, "DEVICE TWEAKER");
     }
 
+    private void ShowOperationResult(
+        OperationReport report,
+        string successMessage,
+        string partialMessage,
+        string successTitle = "DEVICE TWEAKER")
+    {
+        if (report.Succeeded)
+        {
+            ShowThemedInfo(successMessage, successTitle);
+            return;
+        }
+
+        const int maxShownErrors = 8;
+        List<string> lines = report.Errors
+            .Take(maxShownErrors)
+            .Select((error, index) => $"{index + 1}. {error}")
+            .ToList();
+        if (report.Errors.Count > maxShownErrors)
+        {
+            lines.Add($"...and {report.Errors.Count - maxShownErrors} more error(s). See the log for details.");
+        }
+
+        string message = partialMessage
+            + "\n\n"
+            + string.Join("\n", lines)
+            + "\n\nReview the errors before rebooting or applying more changes.";
+        ShowThemedInfo(message, "DEVICE TWEAKER — ATTENTION");
+    }
+
     private bool ShowThemedConfirm(string message, string title, string yesText = "YES", string noText = "NO")
     {
-        using Form dialog = new();
+        using Form dialog = new ThemedDialogForm();
         dialog.Text = title;
         dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
         dialog.StartPosition = FormStartPosition.CenterParent;
@@ -90,8 +164,7 @@ public sealed partial class MainForm
         dialog.MinimizeBox = false;
         dialog.ShowInTaskbar = false;
         dialog.AutoScaleMode = AutoScaleMode.None;
-        dialog.BackColor = _bgForm;
-        dialog.ForeColor = _fgMain;
+        StyleThemedDialogSurface(dialog);
         dialog.Font = _dialogFont;
         dialog.Icon = Icon;
 
@@ -114,7 +187,7 @@ public sealed partial class MainForm
             UseMnemonic = false,
             TextAlign = ContentAlignment.MiddleCenter,
             Font = _dialogFont,
-            UseCompatibleTextRendering = true,
+            UseCompatibleTextRendering = false,
         };
 
         Size textSize = messageLabel.GetPreferredSize(new Size(maxTextWidth, 0));
@@ -169,9 +242,9 @@ public sealed partial class MainForm
 
         dialog.AcceptButton = yesButton;
         dialog.CancelButton = noButton;
-        dialog.Shown += (_, _) => ApplyTitleBarTheme(dialog);
+        WireThemedTitleBar(dialog);
 
-        return dialog.ShowDialog(this) == DialogResult.Yes;
+        return ShowDialogDimmed(dialog) == DialogResult.Yes;
     }
 
     private bool ShowThemedConfirm(string message)
@@ -183,7 +256,7 @@ public sealed partial class MainForm
     {
         selectedBackupPath = null;
         string? selectedPath = null;
-        using Form dialog = new();
+        using Form dialog = new ThemedDialogForm();
         dialog.Text = "RESTORE";
         dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
         dialog.StartPosition = FormStartPosition.CenterParent;
@@ -191,8 +264,7 @@ public sealed partial class MainForm
         dialog.MinimizeBox = false;
         dialog.ShowInTaskbar = false;
         dialog.AutoScaleMode = AutoScaleMode.None;
-        dialog.BackColor = _bgForm;
-        dialog.ForeColor = _fgMain;
+        StyleThemedDialogSurface(dialog);
         dialog.Font = _dialogFont;
         dialog.Icon = Icon;
 
@@ -224,7 +296,7 @@ public sealed partial class MainForm
             UseMnemonic = false,
             TextAlign = ContentAlignment.MiddleCenter,
             Font = _dialogFont,
-            UseCompatibleTextRendering = true,
+            UseCompatibleTextRendering = false,
         };
 
         Size textSize = messageLabel.GetPreferredSize(new Size(maxTextWidth, 0));
@@ -346,16 +418,16 @@ public sealed partial class MainForm
 
         dialog.AcceptButton = resetButton;
         dialog.CancelButton = cancelButton;
-        dialog.Shown += (_, _) => ApplyTitleBarTheme(dialog);
+        WireThemedTitleBar(dialog);
 
-        RestoreChoice result = dialog.ShowDialog(this) == DialogResult.OK ? choice : RestoreChoice.Cancel;
+        RestoreChoice result = ShowDialogDimmed(dialog) == DialogResult.OK ? choice : RestoreChoice.Cancel;
         selectedBackupPath = selectedPath;
         return result;
     }
 
     private AutoBackupChoice ShowAutoBackupChoiceDialog()
     {
-        using Form dialog = new();
+        using Form dialog = new ThemedDialogForm();
         dialog.Text = "AUTO BACKUP";
         dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
         dialog.StartPosition = FormStartPosition.CenterParent;
@@ -363,16 +435,16 @@ public sealed partial class MainForm
         dialog.MinimizeBox = false;
         dialog.ShowInTaskbar = false;
         dialog.AutoScaleMode = AutoScaleMode.None;
-        dialog.BackColor = _bgForm;
-        dialog.ForeColor = _fgMain;
+        StyleThemedDialogSurface(dialog);
         dialog.Font = _dialogFont;
         dialog.Icon = Icon;
 
         string message = NormalizeDialogMessage(
             "Where should DEVICE TWEAKER save the pre-auto backup?\n\n"
-            + "EXE FOLDER = portable backup next to the app.\n"
+            +             "EXE FOLDER = portable backup next to the app.\n"
             + "APPDATA = user profile backup that survives app folder cleanup.\n"
-            + "SKIP = run auto-optimization without creating a backup.");
+            + "SKIP = run AUTO-OPTIMIZATION without creating a backup.\n"
+            + "Close (X) = cancel AUTO-OPTIMIZATION.");
 
         int padding = UiScale(20);
         int maxTextWidth = UiScale(620);
@@ -390,7 +462,7 @@ public sealed partial class MainForm
             UseMnemonic = false,
             TextAlign = ContentAlignment.MiddleCenter,
             Font = _dialogFont,
-            UseCompatibleTextRendering = true,
+            UseCompatibleTextRendering = false,
         };
 
         Size textSize = messageLabel.GetPreferredSize(new Size(maxTextWidth, 0));
@@ -440,10 +512,12 @@ public sealed partial class MainForm
         dialog.Controls.Add(appDataButton);
         dialog.Controls.Add(skipButton);
         dialog.AcceptButton = exeButton;
-        dialog.CancelButton = skipButton;
-        dialog.Shown += (_, _) => ApplyTitleBarTheme(dialog);
+        // Do not bind CancelButton to SKIP — Esc/X must cancel AUTO, not skip backup.
+        dialog.CancelButton = null;
+        WireThemedTitleBar(dialog);
 
-        return dialog.ShowDialog(this) == DialogResult.OK ? choice : AutoBackupChoice.Skip;
+        DialogResult result = ShowDialogDimmed(dialog);
+        return result == DialogResult.OK ? choice : AutoBackupChoice.Cancel;
     }
 
     private static string NormalizeDialogMessage(string message)
@@ -457,6 +531,12 @@ public sealed partial class MainForm
         return normalized.Replace("\n", Environment.NewLine);
     }
 
+    private void WireThemedTitleBar(Form form)
+    {
+        form.HandleCreated += (_, _) => ApplyTitleBarTheme(form);
+        form.Shown += (_, _) => ApplyTitleBarTheme(form);
+    }
+
     private void ApplyTitleBarTheme(Form form)
     {
         try
@@ -466,14 +546,29 @@ public sealed partial class MainForm
                 return;
             }
 
-            int bg = ColorToColorRef(_bgForm);
-            _ = DwmSetWindowAttribute(form.Handle, DwmwaCaptionColor, ref bg, sizeof(int));
+            int bgResult = 0;
+            int fgResult = 0;
+            if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000))
+            {
+                int bg = ColorToColorRef(_bgForm);
+                bgResult = DwmSetWindowAttribute(form.Handle, DwmwaCaptionColor, ref bg, sizeof(int));
 
-            int fg = ColorToColorRef(_fgMain);
-            _ = DwmSetWindowAttribute(form.Handle, DwmwaTextColor, ref fg, sizeof(int));
+                int fg = ColorToColorRef(_fgMain);
+                fgResult = DwmSetWindowAttribute(form.Handle, DwmwaTextColor, ref fg, sizeof(int));
+            }
+
+            int darkMode = 1;
+            int darkResult = DwmSetWindowAttribute(form.Handle, DwmwaUseImmersiveDarkMode, ref darkMode, sizeof(int));
+            if (bgResult != 0 || fgResult != 0 || darkResult != 0)
+            {
+                WriteLog(
+                    $"UI.TITLEBAR.WARN: form=\"{form.Text}\" captionResult=0x{bgResult:X8} " +
+                    $"textResult=0x{fgResult:X8} darkResult=0x{darkResult:X8}");
+            }
         }
-        catch
+        catch (Exception ex)
         {
+            WriteLog($"UI.TITLEBAR.ERROR: form=\"{form.Text}\" error=\"{FlattenLogText(ex.ToString())}\"");
         }
     }
 }

@@ -27,3 +27,10 @@ DEVICE TWEAKER/**/*.lastbuildstate
 *.suo
 *.userosscache
 *.sln.docstates
+
+# Local-only / QA leftovers
+DEVICE TWEAKER/_compare/
+DEVICE TWEAKER/_handoff*/
+DEVICE TWEAKER/bin/SmokeSafe/
+DEVICE TWEAKER/DEVICE TWEAKER — копия/
+DEVICE TWEAKER/**/Backups/

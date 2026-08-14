@@ -1,4 +1,5 @@
-﻿namespace DeviceTweakerCS;
+﻿using System.Diagnostics.CodeAnalysis;
+namespace DeviceTweakerCS;
 
 static class Program
 {
@@ -23,6 +24,21 @@ static class Program
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+        Application.ThreadException += (_, e) => LogFatal("UI", e.Exception);
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            if (e.ExceptionObject is Exception ex)
+            {
+                LogFatal("Domain", ex);
+            }
+        };
+
         Application.Run(new MainForm());
+    }
+
+    private static void LogFatal(string source, Exception ex)
+    {
+        AppDiagnostics.WriteFatal(source, ex);
     }
 }

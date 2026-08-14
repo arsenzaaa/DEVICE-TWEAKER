@@ -8,6 +8,7 @@ param(
     [switch]$SkipImodDriverBuild,
     [switch]$BuildDriverOnly,
     [switch]$TrustImodDriverCert,
+    [switch]$SkipReleasePackage,
     [string]$MsBuildPath,
     [string]$ImodDriverCertThumbprint = "9CE4C30CD75905786774B1DDFAC126329ACAEA8D",
     [string]$ImodDriverCertSubject = "MADE BY ARSENZA",
@@ -494,6 +495,18 @@ function Rename-PublishedExe {
     Write-Host "Renamed EXE: $TargetName"
 }
 
+function Get-ProjectInformationalVersion {
+    [xml]$projectXml = Get-Content -LiteralPath $projectPath -Raw
+    $versionNode = $projectXml.Project.PropertyGroup.InformationalVersion |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Select-Object -First 1
+    if ([string]::IsNullOrWhiteSpace($versionNode)) {
+        throw "InformationalVersion was not found in $projectPath"
+    }
+
+    return [string]$versionNode
+}
+
 function Invoke-PublishFlavor {
     param(
         [string]$Label,
@@ -501,7 +514,8 @@ function Invoke-PublishFlavor {
         [bool]$PublishSingleFile,
         [bool]$IncludeNativeLibrariesForSelfExtract,
         [string]$OutputDir,
-        [string]$TargetExeName
+        [string]$TargetExeName,
+        [string]$RollForward = ""
     )
 
     if ($Clean -and (Test-Path -LiteralPath $OutputDir)) {
@@ -519,23 +533,94 @@ function Invoke-PublishFlavor {
     $singleFileText = $PublishSingleFile.ToString().ToLowerInvariant()
     $nativeExtractText = $IncludeNativeLibrariesForSelfExtract.ToString().ToLowerInvariant()
 
-    dotnet publish $projectPath `
-        -c $Configuration `
-        -r $Runtime `
-        -p:SelfContained=$selfContainedText `
-        -p:PublishSingleFile=$singleFileText `
-        -p:IncludeNativeLibrariesForSelfExtract=$nativeExtractText `
-        -p:DebugType=None `
-        -p:DebugSymbols=false `
-        -p:BuildImodDriver=false `
-        -p:UseAppHost=true `
-        -o $OutputDir
+    $publishArgs = @(
+        "publish", $projectPath,
+        "-c", $Configuration,
+        "-r", $Runtime,
+        "-p:SelfContained=$selfContainedText",
+        "-p:PublishSingleFile=$singleFileText",
+        "-p:IncludeNativeLibrariesForSelfExtract=$nativeExtractText",
+        "-p:DebugType=None",
+        "-p:DebugSymbols=false",
+        "-p:BuildImodDriver=false",
+        "-p:UseAppHost=true",
+        "-o", $OutputDir
+    )
+
+    # Framework-dependent builds may run on newer Desktop runtimes when .NET 8 is absent.
+    if (-not $SelfContained -and -not [string]::IsNullOrWhiteSpace($RollForward)) {
+        $publishArgs += "-p:RollForward=$RollForward"
+        Write-Host "RollForward: $RollForward"
+    }
+
+    & dotnet @publishArgs
 
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet publish failed for flavor '$Label' (exit code $LASTEXITCODE)"
     }
 
     Rename-PublishedExe -OutputDir $OutputDir -TargetName $TargetExeName
+}
+
+function New-ReleasePackage {
+    param(
+        [string]$Version,
+        [string]$SelfContainedExe,
+        [string]$FrameworkDependentExe,
+        [string]$DriverPath,
+        [string]$ReleaseNotesPath,
+        [string]$ThirdPartyNoticesPath
+    )
+
+    $packageRoot = Join-Path $PSScriptRoot "bin\ReleasePackages"
+    $packageDir = Join-Path $packageRoot "v$Version"
+
+    # Fresh package directory only. Never ship local run logs.
+    if (Test-Path -LiteralPath $packageDir) {
+        Get-ChildItem -LiteralPath $packageDir -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension -in ".exe", ".sys" } |
+            ForEach-Object {
+                Stop-PublishedProcessIfRunning -TargetExePath $_.FullName
+            }
+        Remove-Item -LiteralPath $packageDir -Recurse -Force
+    }
+
+    New-Item -ItemType Directory -Path $packageDir -Force | Out-Null
+
+    $targets = @(
+        @{ Source = $FrameworkDependentExe; Name = "DEVICE.TWEAKER.exe" },
+        @{ Source = $SelfContainedExe; Name = "DEVICE.TWEAKER.NET.FRAMEWORK.exe" },
+        @{ Source = $DriverPath; Name = "DTIMOD.sys" },
+        @{ Source = $ReleaseNotesPath; Name = "RELEASE_NOTES.md" },
+        @{ Source = $ThirdPartyNoticesPath; Name = "THIRD_PARTY_NOTICES.md" }
+    )
+
+    foreach ($target in $targets) {
+        if (-not (Test-Path -LiteralPath $target.Source)) {
+            throw "Release package source missing: $($target.Source)"
+        }
+
+        Copy-Item -LiteralPath $target.Source -Destination (Join-Path $packageDir $target.Name) -Force
+    }
+
+    $sumNames = @(
+        "DEVICE.TWEAKER.exe",
+        "DEVICE.TWEAKER.NET.FRAMEWORK.exe",
+        "DTIMOD.sys",
+        "RELEASE_NOTES.md",
+        "THIRD_PARTY_NOTICES.md"
+    )
+    $sumsPath = Join-Path $packageDir "SHA256SUMS.txt"
+    $sumLines = foreach ($name in $sumNames) {
+        $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $packageDir $name)).Hash.ToUpperInvariant()
+        "$hash  $name"
+    }
+    Set-Content -LiteralPath $sumsPath -Value $sumLines -Encoding ascii
+
+    Write-Host ""
+    Write-Host "Release package: $packageDir"
+    Get-ChildItem -LiteralPath $packageDir | ForEach-Object { Write-Host ("  {0,-40} {1}" -f $_.Name, $_.Length) }
+    Get-Content -LiteralPath $sumsPath | ForEach-Object { Write-Host $_ }
 }
 
 if ($BuildDriverOnly) {
@@ -564,14 +649,35 @@ if ($LASTEXITCODE -ne 0) {
 switch ($Flavor) {
     "both" {
         Invoke-PublishFlavor -Label "self-contained (runtime included)" -SelfContained $true -PublishSingleFile $true -IncludeNativeLibrariesForSelfExtract $true -OutputDir $withNetOut -TargetExeName "$selfContainedDisplayName.exe"
-        Invoke-PublishFlavor -Label "framework-dependent (requires .NET runtime)" -SelfContained $false -PublishSingleFile $true -IncludeNativeLibrariesForSelfExtract $false -OutputDir $withoutNetOut -TargetExeName "$frameworkDependentDisplayName.exe"
+        Invoke-PublishFlavor -Label "framework-dependent (requires .NET runtime)" -SelfContained $false -PublishSingleFile $true -IncludeNativeLibrariesForSelfExtract $false -OutputDir $withoutNetOut -TargetExeName "$frameworkDependentDisplayName.exe" -RollForward "Major"
     }
     "with-net" {
         Invoke-PublishFlavor -Label "self-contained (runtime included)" -SelfContained $true -PublishSingleFile $true -IncludeNativeLibrariesForSelfExtract $true -OutputDir $withNetOut -TargetExeName "$selfContainedDisplayName.exe"
     }
     "without-net" {
-        Invoke-PublishFlavor -Label "framework-dependent (requires .NET runtime)" -SelfContained $false -PublishSingleFile $true -IncludeNativeLibrariesForSelfExtract $false -OutputDir $withoutNetOut -TargetExeName "$frameworkDependentDisplayName.exe"
+        Invoke-PublishFlavor -Label "framework-dependent (requires .NET runtime)" -SelfContained $false -PublishSingleFile $true -IncludeNativeLibrariesForSelfExtract $false -OutputDir $withoutNetOut -TargetExeName "$frameworkDependentDisplayName.exe" -RollForward "Major"
     }
+}
+
+if (-not $SkipReleasePackage -and $Configuration -eq "Release" -and $Flavor -eq "both") {
+    $version = Get-ProjectInformationalVersion
+    $releaseNotesSource = Join-Path $PSScriptRoot "RELEASE_NOTES_v$version.md"
+    if (-not (Test-Path -LiteralPath $releaseNotesSource)) {
+        throw ("Release notes were not found for version {0}: {1}" -f $version, $releaseNotesSource)
+    }
+
+    $thirdPartySource = Join-Path $PSScriptRoot "THIRD_PARTY_NOTICES.md"
+    if (-not (Test-Path -LiteralPath $thirdPartySource)) {
+        throw "Third-party notices were not found: $thirdPartySource"
+    }
+
+    New-ReleasePackage `
+        -Version $version `
+        -SelfContainedExe (Join-Path $withNetOut "$selfContainedDisplayName.exe") `
+        -FrameworkDependentExe (Join-Path $withoutNetOut "$frameworkDependentDisplayName.exe") `
+        -DriverPath $driverOutPath `
+        -ReleaseNotesPath $releaseNotesSource `
+        -ThirdPartyNoticesPath $thirdPartySource
 }
 
 Write-Host ""

@@ -36,17 +36,21 @@ public sealed partial class MainForm
         Color.FromArgb(18, 28, 24),
     ];
 
-    private readonly Font _baseFont = new("Consolas", 9);
-    private readonly Font _dialogFont = new("Consolas", 10.5f);
-    private readonly Font _titleFont = new("Consolas", 11, FontStyle.Bold);
-    private readonly Font _blockTitleFont = new("Consolas", 10, FontStyle.Bold);
-    private readonly Font _brandFont = new("Consolas", 27, FontStyle.Bold);
-    private readonly Font _headerFont = new("Consolas", 9.5f);
-    private readonly Font _htFont = new("Consolas", 13, FontStyle.Bold);
-    private readonly Font _buttonFont = new("Consolas", 11, FontStyle.Bold);
-    private readonly Font _blockFont = new("Consolas", 8.5f);
+    // OLED/high-DPI typography roles. Avoid 10 pt for persistent technical text:
+    // thin monochrome strokes become visibly smaller than adjacent UI chrome.
+    private readonly Font _baseFont = new("Consolas", 10.5f);
+    private readonly Font _subtitleFont = new("Consolas", 11);
+    private readonly Font _dialogFont = new("Consolas", 11.5f);
+    private readonly Font _titleFont = new("Consolas", 12, FontStyle.Bold);
+    private readonly Font _blockTitleFont = new("Consolas", 11, FontStyle.Bold);
+    private readonly Font _technicalFont = new("Consolas", 11);
+    private readonly Font _brandFont = new("Consolas", 28, FontStyle.Bold);
+    private readonly Font _headerFont = new("Consolas", 10.5f);
+    private readonly Font _htFont = new("Consolas", 14, FontStyle.Bold);
+    private readonly Font _buttonFont = new("Consolas", 12, FontStyle.Bold);
+    private readonly Font _blockFont = new("Consolas", 10.5f);
 
-    private ToolTip _copyToolTip = null!;
+    private ThemedToolTip _copyToolTip = null!;
     private Icon? _appIcon;
     private bool _darkModeInitialized;
 
@@ -59,9 +63,11 @@ public sealed partial class MainForm
             _copyToolTip?.Dispose();
             _appIcon?.Dispose();
             _baseFont.Dispose();
+            _subtitleFont.Dispose();
             _dialogFont.Dispose();
             _titleFont.Dispose();
             _blockTitleFont.Dispose();
+            _technicalFont.Dispose();
             _brandFont.Dispose();
             _headerFont.Dispose();
             _htFont.Dispose();

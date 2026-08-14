@@ -15,10 +15,19 @@ internal sealed class ImodMapTextBox : RichTextBox
         HideSelection = true;
         Multiline = true;
         ReadOnly = true;
-        ScrollBars = RichTextBoxScrollBars.None;
+        ScrollBars = RichTextBoxScrollBars.Vertical;
         ShortcutsEnabled = true;
-        WordWrap = true;
+        // Line breaks are authored by FormatVisibleImodInterrupterLines;
+        // WordWrap would split mid-token (e.g. "intr3=" / "0xC8/50us").
+        WordWrap = false;
         ZoomFactor = 1.0f;
+    }
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        WordWrap = false;
+        ScrollBars = RichTextBoxScrollBars.Vertical;
     }
 
     protected override void OnTextChanged(EventArgs e)
@@ -48,6 +57,9 @@ internal sealed class ImodMapTextBox : RichTextBox
         {
             string text = Text;
             SelectAll();
+            // Keep every generated line on the control's explicit font even
+            // after the RichEdit character format has been recolored/reused.
+            SelectionFont = Font;
             SelectionColor = ForeColor;
 
             int lineStart = 0;

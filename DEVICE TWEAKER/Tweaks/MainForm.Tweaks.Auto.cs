@@ -209,8 +209,8 @@ public sealed partial class MainForm
                     return $"{lp}:R{rating}/#{rank}";
                 }
 
-            return lp.ToString();
-        }));
+                return lp.ToString();
+            }));
     }
 
     private int SelectAutoTargetCcd(IReadOnlyList<int> ccdIds, IEnumerable<int> primaryP, IEnumerable<int> primaryE, out string reason)
@@ -545,11 +545,12 @@ public sealed partial class MainForm
         WriteLog($"AUTO.RESULT.FINAL: assigned={assigned} skippedOrPreserved={skipped} usedLPs=[{string.Join(',', assignedLps)}] reservedSpacingLPs=[{string.Join(',', reservedLps)}] inputShareLPs=[{string.Join(',', inputShareCores.Distinct().OrderBy(lp => lp))}]");
     }
 
-    private void InvokeAutoOptimization(bool optimizeUsbImod)
+    private bool InvokeAutoOptimization(bool optimizeUsbImod, OperationReport? report = null)
     {
         if (_blocks.Count == 0)
         {
-            return;
+            report?.AddError("AUTO-OPTIMIZATION", "no devices to optimize");
+            return false;
         }
 
         WriteLog("AUTO: Invoke-AutoOptimization start");
@@ -559,7 +560,7 @@ public sealed partial class MainForm
         }
         else
         {
-            ApplyAutoRawMouseThrottle();
+            ApplyAutoRawMouseThrottle(report);
         }
 
         if (_testAutoDryRun)
@@ -568,13 +569,15 @@ public sealed partial class MainForm
         }
         else
         {
-            ResetReservedCpuSets();
+            ResetReservedCpuSets(report);
         }
 
         (List<int> P, List<int> E)? cpuSets = GetAutoCpuSets();
         if (cpuSets is null)
         {
-            return;
+            report?.AddError("AUTO-OPTIMIZATION", "CPU map unavailable; affinity plan was not built");
+            WriteLog("AUTO: aborted (CPU sets unavailable)");
+            return false;
         }
 
         List<int> primaryP = cpuSets.Value.P.Where(lp => lp >= 0 && lp < _maxLogical).ToList();
@@ -652,7 +655,9 @@ public sealed partial class MainForm
         int pCount = performanceP.Count;
         if (pCount <= 0)
         {
-            return;
+            report?.AddError("AUTO-OPTIMIZATION", "no performance P-cores available for affinity plan");
+            WriteLog("AUTO: aborted (performance P count is 0)");
+            return false;
         }
 
         WriteLog($"AUTO: CPU primary P=[{string.Join(',', primaryP)}] E=[{string.Join(',', primaryE)}] performanceP=[{string.Join(',', performanceP)}] performanceE=[{string.Join(',', performanceE)}]");
@@ -875,6 +880,22 @@ public sealed partial class MainForm
                 }
             }
 
+            if (block.PowerSavingCheck is not null && !isWifi)
+            {
+                block.PowerSavingCheck.Checked = false;
+                if (block.Kind == DeviceKind.USB)
+                {
+                    block.Device.UsbSelectiveSuspend = "off";
+                }
+                else
+                {
+                    block.Device.NicPowerSaving = "off";
+                }
+
+                UpdateBlockInfoText(block);
+                WriteLog($"AUTO.POWER: {block.Device.InstanceId} -> Power Saving=Disabled");
+            }
+
             RecalcAffinityMask(block);
 
             ulong afterMask = block.AffinityMask;
@@ -1072,20 +1093,30 @@ public sealed partial class MainForm
                 return TakeDedicatedUnits(count, allowCore0);
             }
 
-            List<AutoCpuUnit> candidates = GetCandidateUnits(preferredUnits, allowCore0)
+            List<AutoCpuUnit> topologyOrder = preferredUnits
+                .Where(unit => !unit.IsECore)
                 .OrderBy(unit => unit.Id)
+                .ThenBy(unit => unit.PrimaryLp)
                 .ToList();
-            if (candidates.Count < count)
+            Dictionary<int, int> topologyIndexByUnit = topologyOrder
+                .Select((unit, index) => (unit.Id, index))
+                .ToDictionary(item => item.Id, item => item.index);
+
+            HashSet<int> candidateUnitIds = GetCandidateUnits(preferredUnits, allowCore0)
+                .Where(unit => !unit.IsECore)
+                .Select(unit => unit.Id)
+                .ToHashSet();
+            if (candidateUnitIds.Count < count)
             {
                 return [];
             }
 
             List<(AutoCpuUnit First, AutoCpuUnit Second)> pairs = [];
-            for (int i = 0; i < candidates.Count - 1; i++)
+            for (int i = 0; i < topologyOrder.Count - 1; i++)
             {
-                AutoCpuUnit first = candidates[i];
-                AutoCpuUnit second = candidates[i + 1];
-                if (Math.Abs(first.Id - second.Id) != 1)
+                AutoCpuUnit first = topologyOrder[i];
+                AutoCpuUnit second = topologyOrder[i + 1];
+                if (!candidateUnitIds.Contains(first.Id) || !candidateUnitIds.Contains(second.Id))
                 {
                     continue;
                 }
@@ -1095,17 +1126,49 @@ public sealed partial class MainForm
 
             if (pairs.Count == 0)
             {
-                return TakeDedicatedUnits(count, allowCore0);
+                List<AutoCpuUnit> candidates = GetCandidateUnits(preferredUnits, allowCore0)
+                    .Where(unit => !unit.IsECore)
+                    .OrderBy(unit => topologyIndexByUnit.TryGetValue(unit.Id, out int index) ? index : int.MaxValue)
+                    .ThenBy(unit => unit.PrimaryLp)
+                    .ToList();
+                WriteLog($"AUTO.PLAN.GPU.PAIRS: none-adjacent fallbackCandidates=[{FormatAutoCpuUnits(candidates)}]");
+                return [];
             }
+
+            List<(AutoCpuUnit First, AutoCpuUnit Second)> nonCore0Pairs = pairs
+                .Where(pair => !pair.First.HasCore0 && !pair.Second.HasCore0)
+                .ToList();
+            if (nonCore0Pairs.Count > 0)
+            {
+                pairs = nonCore0Pairs;
+            }
+
+            string FormatGpuPair((AutoCpuUnit First, AutoCpuUnit Second) pair)
+            {
+                ulong mask = 0;
+                foreach (int lp in new[] { pair.First.PrimaryLp, pair.Second.PrimaryLp })
+                {
+                    if (lp >= 0 && lp < 64)
+                    {
+                        mask |= 1UL << lp;
+                    }
+                }
+
+                string ccx = HasVisibleCcxSplit() ? $"/ccx={pair.First.Ccx},{pair.Second.Ccx}" : string.Empty;
+                return $"[{pair.First.PrimaryLp},{pair.Second.PrimaryLp}]/mask=0x{mask:X}/ccd={pair.First.Ccd},{pair.Second.Ccd}{ccx}/rank={pair.First.Rank},{pair.Second.Rank}/rating={pair.First.Rating},{pair.Second.Rating}";
+            }
+
+            WriteLog($"AUTO.PLAN.GPU.PAIRS: candidates={pairs.Count} [{string.Join("; ", pairs.Select(FormatGpuPair))}]");
 
             (AutoCpuUnit First, AutoCpuUnit Second) selectedPair = _cppcEnabled
                 ? pairs
                     .OrderBy(pair => pair.First.Ccd == pair.Second.Ccd ? 0 : 1)
                     .ThenBy(pair => !HasVisibleCcxSplit() || pair.First.Ccx == pair.Second.Ccx ? 0 : 1)
-                    .ThenBy(pair => Math.Min(pair.First.Rank, pair.Second.Rank))
-                    .ThenBy(pair => (long)pair.First.Rank + pair.Second.Rank)
-                    .ThenByDescending(pair => (long)pair.First.Rating + pair.Second.Rating)
+                    .ThenByDescending(pair => Math.Min(pair.First.Rank, pair.Second.Rank))
+                    .ThenByDescending(pair => (long)pair.First.Rank + pair.Second.Rank)
+                    .ThenBy(pair => (long)pair.First.Rating + pair.Second.Rating)
                     .ThenByDescending(pair => Math.Max(pair.First.PrimaryLp, pair.Second.PrimaryLp))
+                    .ThenByDescending(pair => Math.Min(pair.First.PrimaryLp, pair.Second.PrimaryLp))
                     .First()
                 : pairs
                     .OrderBy(pair => pair.First.Ccd == pair.Second.Ccd ? 0 : 1)
@@ -1114,6 +1177,7 @@ public sealed partial class MainForm
                     .ThenByDescending(pair => Math.Min(pair.First.PrimaryLp, pair.Second.PrimaryLp))
                     .First();
 
+            WriteLog($"AUTO.PLAN.GPU.SELECT: {FormatGpuPair(selectedPair)} reason=irq-safe-tail-physical-pair");
             List<AutoCpuUnit> selected = [selectedPair.First, selectedPair.Second];
             foreach (AutoCpuUnit unit in selected)
             {
@@ -1259,7 +1323,7 @@ public sealed partial class MainForm
                 continue;
             }
 
-            AssignSlot(slot, units, "gpu-dedicated-high-physical-pair");
+            AssignSlot(slot, units, "gpu-dedicated-irq-safe-physical-pair");
             if (slot.Lps.Count > 0)
             {
                 SkipSpacingUnitIfAvailable("gpu");
@@ -1528,21 +1592,182 @@ public sealed partial class MainForm
             consumedCores,
             inputShareCores);
         WriteLog("AUTO: Invoke-AutoOptimization done");
+        return true;
     }
 
-    private void ResetAllTweaks()
+    private void ResetAllTweaks(OperationReport? report = null)
     {
+        report ??= new OperationReport();
         WriteLog("RESET: full reset requested");
+        bool ownsBusy = _devicesBusyDepth > 0;
+        int blockCount = Math.Max(1, _blocks.Count);
+        if (ownsBusy)
+        {
+            // prepare + blocks + reserved + imod + suspend/finalize
+            SetDevicesBusyWork(1 + blockCount + 3, 0);
+            TickDevicesBusy("Preparing RESET ALL...", 1);
+        }
+        else
+        {
+            SetDevicesBusyStage("Preparing RESET ALL...");
+        }
+
         if (_blocks.Count == 0)
         {
             RefreshBlocks();
+            blockCount = Math.Max(1, _blocks.Count);
+            if (ownsBusy)
+            {
+                SetDevicesBusyWork(1 + blockCount + 3, Math.Min(1, _devicesBusyDone));
+            }
         }
 
+        if (_testAutoDryRun)
+        {
+            WriteLog("RESET: dry-run -> ReservedCpuSets/IMOD persistence/registry left untouched");
+            if (ownsBusy)
+            {
+                SetDevicesBusyWork(1 + blockCount + 1, Math.Min(_devicesBusyDone, 1 + blockCount + 1));
+            }
+
+            int dryIndex = 0;
+            foreach (DeviceBlock b in _blocks)
+            {
+                dryIndex++;
+                if (ownsBusy)
+                {
+                    TickDevicesBusy($"Dry-run reset ({dryIndex}/{blockCount})...", 1);
+                }
+                else
+                {
+                    SetDevicesBusyStage($"Dry-run reset ({dryIndex}/{blockCount})...");
+                }
+
+                try
+                {
+                    if (b.Device.IsTestDevice)
+                    {
+                        ResetBlockSettings(b, report);
+                    }
+                    else
+                    {
+                        // UI-only clear without LoadBlockSettings (would re-read live registry into UI)
+                        b.SuppressCpuEvents++;
+                        try
+                        {
+                            foreach (CheckBox cb in b.CpuBoxes)
+                            {
+                                cb.Checked = false;
+                            }
+                        }
+                        finally
+                        {
+                            b.SuppressCpuEvents--;
+                        }
+
+                        b.AffinityMask = 0;
+                        b.AffinityLabel.Text = "Affinity Mask: 0x0";
+                        b.PrioCombo.SelectedItem = "Undefined";
+                        if (b.Kind == DeviceKind.NET_NDIS)
+                        {
+                            b.RssBaseCore = null;
+                            if (b.RssQueueBox is not null)
+                            {
+                                b.SuppressCpuEvents++;
+                                try
+                                {
+                                    b.RssQueueBox.Value = 1;
+                                }
+                                finally
+                                {
+                                    b.SuppressCpuEvents--;
+                                }
+                            }
+                        }
+                        else if (b.PolicyCombo.Enabled)
+                        {
+                            b.PolicyCombo.SelectedItem = "MachineDefault";
+                        }
+
+                        if (b.PowerSavingCheck is not null)
+                        {
+                            b.PowerSavingCheck.Checked = true;
+                            if (b.Kind == DeviceKind.USB)
+                            {
+                                b.Device.UsbSelectiveSuspend = "on";
+                            }
+                            else if (!b.Device.Wifi)
+                            {
+                                b.Device.NicPowerSaving = "on";
+                            }
+
+                            UpdateBlockInfoText(b);
+                        }
+                    }
+
+                    if (IsUsbImodTarget(b.Device))
+                    {
+                        b.ImodBox.Text = FormatImodValue(ImodDefaultInterval);
+                        b.ImodAutoCheck.Checked = false;
+                        if (b.Device.IsTestDevice)
+                        {
+                            RefreshTestImodPreview(b, "reset-all-dry-run");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteLog($"RESET.ERROR: {b.Device.InstanceId} -> {ex.Message}");
+                    report.AddError($"{b.Device.Name} — reset", ex.Message);
+                }
+            }
+
+            if (ownsBusy)
+            {
+                TickDevicesBusy("Updating IRQ counts...", 1);
+            }
+            else
+            {
+                SetDevicesBusyStage("Updating IRQ counts...");
+            }
+
+            ResetReservedCpuSetsPreview();
+            CalculateIrqCounts("reset-all");
+            LogGuiSnapshot("reset-all-dry-run");
+            if (ownsBusy)
+            {
+                _devicesBusyDone = _devicesBusyTotal;
+                UpdateDevicesBusy("Ready", 100);
+            }
+
+            WriteLog($"RESET.DONE: mode=dry-run blocks={_blocks.Count} errors={report.Errors.Count}");
+            CloseDevicesBusyOverlay();
+            ShowOperationResult(
+                report,
+                successMessage:
+                    "Dry-run reset complete (UI only).\n" +
+                    "No registry / IMOD startup files were changed.\n" +
+                    "Uncheck AUTO-OPTIMIZATION dry-run in TEST ADMIN for a real RESET ALL.",
+                partialMessage: "Dry-run RESET finished with errors.");
+            return;
+        }
+
+        int resetIndex = 0;
         foreach (DeviceBlock b in _blocks)
         {
+            resetIndex++;
+            if (ownsBusy)
+            {
+                TickDevicesBusy($"Resetting device settings ({resetIndex}/{blockCount})...", 1);
+            }
+            else
+            {
+                SetDevicesBusyStage($"Resetting device settings ({resetIndex}/{blockCount})...");
+            }
+
             try
             {
-                ResetBlockSettings(b);
+                ResetBlockSettings(b, report);
                 if (!b.Device.IsTestDevice)
                 {
                     LoadBlockSettings(b);
@@ -1551,19 +1776,96 @@ public sealed partial class MainForm
             catch (Exception ex)
             {
                 WriteLog($"RESET.ERROR: {b.Device.InstanceId} -> {ex.Message}");
+                report.AddError($"{b.Device.Name} — reset", ex.Message);
             }
         }
 
-        ResetReservedCpuSets();
-        ResetImodIntervalsToDefault("reset-all");
+        try
+        {
+            if (ownsBusy)
+            {
+                TickDevicesBusy("Resetting reserved CPU sets...", 1);
+            }
+            else
+            {
+                SetDevicesBusyStage("Resetting reserved CPU sets...");
+            }
+
+            ResetReservedCpuSets(report);
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"RESET.ERROR: ReservedCpuSets -> {ex.Message}");
+            report.AddError("Reserved CPU sets", ex.Message);
+        }
+
+        try
+        {
+            if (ownsBusy)
+            {
+                TickDevicesBusy("Resetting IMOD defaults...", 1);
+            }
+            else
+            {
+                SetDevicesBusyStage("Resetting IMOD defaults...");
+            }
+
+            ResetImodIntervalsToDefault("reset-all", report);
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"RESET.ERROR: IMOD defaults -> {ex.Message}");
+            report.AddError("IMOD reset", ex.Message);
+        }
+
+        try
+        {
+            bool anyRealUsb = _blocks.Any(b =>
+                b.Kind == DeviceKind.USB
+                && !b.Device.IsTestDevice
+                && b.PowerSavingCheck is not null);
+            if (anyRealUsb)
+            {
+                UsbSelectiveSuspendPolicy.SetPowerPlanEnabled(true);
+                WriteLog("RESET.SUSPEND.PLAN: USB selective suspend power plan restored to Enabled");
+            }
+            else
+            {
+                WriteLog("RESET.SUSPEND.PLAN: skipped (no real USB blocks)");
+            }
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"RESET.ERROR: USB selective suspend power plan -> {ex.Message}");
+            report.AddError("USB Selective Suspend power plan", ex.Message);
+        }
+
+        if (ownsBusy)
+        {
+            TickDevicesBusy("Updating IRQ counts...", 1);
+        }
+        else
+        {
+            SetDevicesBusyStage("Updating IRQ counts...");
+        }
 
         CalculateIrqCounts("reset-all");
         LogGuiSnapshot("reset-all");
-        ShowThemedInfo(
-            "All Device Tweaker changes have been cleared.\nPlease reboot your PC to fully revert device behavior.");
+        if (ownsBusy)
+        {
+            _devicesBusyDone = _devicesBusyTotal;
+            UpdateDevicesBusy("Ready", 100);
+        }
+
+        WriteLog($"RESET.DONE: mode=apply blocks={_blocks.Count} errors={report.Errors.Count}");
+        CloseDevicesBusyOverlay();
+        ShowOperationResult(
+            report,
+            successMessage: "All DEVICE TWEAKER changes have been cleared.\nPlease reboot your PC to fully revert device behavior.",
+            partialMessage: "RESET ALL finished with errors. Some settings may still be active.");
     }
 
-    private void ResetImodIntervalsToDefault(string reason = "reset-imod")
+    private void ResetImodIntervalsToDefault(string reason = "reset-imod", OperationReport? report = null)
     {
         string defaultText = FormatImodValue(ImodDefaultInterval);
         bool hasUsb = false;
@@ -1582,17 +1884,51 @@ public sealed partial class MainForm
 
         if (hasUsb)
         {
-            _ = ApplyImodSettings(out string? note);
-            if (!string.IsNullOrWhiteSpace(note))
+            if (_testAutoDryRun)
             {
-                WriteLog($"RESET.IMOD.USB: {note}");
+                WriteLog($"RESET.IMOD.USB: dry-run -> skipped ApplyImodSettings/RemoveImodPersistenceFiles reason={reason}");
+            }
+            else
+            {
+                // RESET/DELETE must not pull DTIMOD via KDU. Hardware write only if
+                // the driver was already loaded explicitly (CHECK / prior IMOD apply).
+                if (IsImodDriverAlreadyAvailable())
+                {
+                    ImodApplyOutcome outcome = ApplyImodSettings(out string? note);
+                    if (!string.IsNullOrWhiteSpace(note))
+                    {
+                        WriteLog($"RESET.IMOD.USB: {note}");
+                    }
+
+                    if (outcome == ImodApplyOutcome.Failed)
+                    {
+                        report?.AddError("IMOD reset", note ?? "apply failed");
+                    }
+                    else if (!string.IsNullOrWhiteSpace(note)
+                        && (note.Contains("failure", StringComparison.OrdinalIgnoreCase)
+                            || note.Contains("failed", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        report?.AddError("IMOD reset", note);
+                    }
+                }
+                else
+                {
+                    WriteLog(
+                        $"RESET.IMOD.USB: skipped hardware apply reason=driver-not-loaded " +
+                        $"(press CHECK first); cleared UI defaults and persistence only reason={reason}");
+                }
+
+                RemoveImodPersistenceFiles(report);
+                RefreshImodCurrentValues(reason: reason);
             }
         }
-
-        RemoveImodPersistenceFiles();
-        if (hasUsb)
+        else if (!_testAutoDryRun)
         {
-            RefreshImodCurrentValues(reason: reason);
+            RemoveImodPersistenceFiles(report);
+        }
+        else
+        {
+            WriteLog($"RESET.IMOD: dry-run -> skipped RemoveImodPersistenceFiles reason={reason}");
         }
     }
 }

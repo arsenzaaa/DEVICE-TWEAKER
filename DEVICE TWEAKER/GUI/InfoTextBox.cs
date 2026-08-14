@@ -15,6 +15,11 @@ internal sealed class InfoTextBox : RichTextBox
         "NIC ITR:",
         "Type:",
         "Audio endpoints:",
+        "Path:",
+        "Topology:",
+        "Controller capability:",
+        "Power Saving:",
+        "USB selective suspend:",
         "Raw input throttle:",
     ];
 
@@ -64,6 +69,10 @@ internal sealed class InfoTextBox : RichTextBox
         {
             string text = Text;
             SelectAll();
+            // RichEdit can retain the character format from a previous value
+            // assignment. Reset the font for every character before applying
+            // syntax colors so all technical rows stay visually identical.
+            SelectionFont = Font;
             SelectionColor = ForeColor;
 
             int lineStart = 0;

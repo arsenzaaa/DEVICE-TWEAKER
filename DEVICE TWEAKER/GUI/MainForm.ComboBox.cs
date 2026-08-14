@@ -259,13 +259,28 @@ internal sealed class ThemedComboBox : ComboBox
         int visibleItems = Math.Min(Math.Max(1, MaxDropDownItems), Items.Count);
         int popupItemHeight = Math.Max(ItemHeight, 18);
         int contentHeight = popupItemHeight * visibleItems;
-        int popupWidth = Math.Max(Width, DropDownWidth);
+        int requestedWidth = Math.Max(Width, DropDownWidth);
+        Rectangle work = Screen.FromControl(this).WorkingArea;
+        Rectangle ownerBounds = FindForm() is Form owner
+            ? owner.RectangleToScreen(owner.ClientRectangle)
+            : work;
+        int availableOwnerWidth = Math.Max(Width, Math.Min(work.Right, ownerBounds.Right) - ownerBounds.Left);
+        int popupWidth = Math.Min(requestedWidth, availableOwnerWidth);
+        popupWidth = Math.Max(Width, popupWidth);
+        int popupHeight = contentHeight + 2;
+        Point below = PointToScreen(new Point(0, Height - 1));
+        int popupX = Math.Clamp(below.X, ownerBounds.Left, Math.Max(ownerBounds.Left, Math.Min(ownerBounds.Right - popupWidth, work.Right - popupWidth)));
+        int popupY = below.Y;
+        if (popupY + popupHeight > work.Bottom && below.Y - Height - popupHeight >= work.Top)
+        {
+            popupY = below.Y - Height - popupHeight + 1;
+        }
 
         ThemedComboPopupList popupList = new(this, popupWidth - 2, contentHeight, popupItemHeight, visibleItems);
         ThemedComboDropDownForm popup = new(this, popupList, BackColor, BorderColor)
         {
-            Size = new Size(popupWidth, contentHeight + 2),
-            Location = PointToScreen(new Point(0, Height - 1)),
+            Size = new Size(popupWidth, popupHeight),
+            Location = new Point(popupX, popupY),
         };
 
         _popup = popup;

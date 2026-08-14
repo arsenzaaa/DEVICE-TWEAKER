@@ -1,5 +1,7 @@
 bin/
 obj/
+build/
+.vs/
 *.suo
 *.user
 *.VC.db
@@ -15,6 +17,13 @@ obj/
 *.recipe
 *.tlog
 *.lastbuildstate
+*.pfx
+*.p12
+*.snk
+last-crash.txt
+DeviceTweaker_*.log
+logs/
+Backups/
 
 master/
 
@@ -27,3 +36,13 @@ IMOD/IMOD/intermidates/
 
 IMOD/KDU/Source/**/output/
 IMOD/KDU/Source/Hamakaze/Utils/GenAsIo2Unlock.exe
+
+# Local run leftovers next to packaged binaries
+bin/ReleasePackages/**/logs/
+bin/Publish/**/logs/
+bin/SmokeSafe/
+_audit/
+_handoff*/
+_compare/
+DEVICE TWEAKER — копия/
+

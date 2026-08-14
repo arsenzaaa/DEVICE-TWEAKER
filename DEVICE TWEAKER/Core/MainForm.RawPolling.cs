@@ -5,9 +5,12 @@ namespace DeviceTweakerCS;
 
 public sealed partial class MainForm
 {
+    private const int WmNcActivate = 0x0086;
     private const int RawPollingUpdateIntervalMs = 250;
     private const int RawPollingMinSamples = 32;
     private const int RawPollingLiveMinSamples = 12;
+    private const int RawPollingLiveConfirmTicks = 4;
+    private const int RawPollingLiveLogIntervalMs = 15000;
     private const int RawPollingConfirmTicks = 2;
     private const int RawPollingDowngradeConfirmTicks = 8;
 
@@ -25,17 +28,30 @@ public sealed partial class MainForm
         public double LastDisplayedHertz { get; set; }
         public string LastLiveTag { get; set; } = string.Empty;
         public double LastLiveHertz { get; set; }
+        public string LiveCandidateTag { get; set; } = string.Empty;
+        public int LiveCandidateCount { get; set; }
+        public long LastLiveLogTimestamp { get; set; }
     }
 
     private readonly Dictionary<IntPtr, RawPollingState> _rawPollingStates = [];
     private readonly Dictionary<string, Dictionary<string, string>> _rawPollingByController = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Dictionary<string, string>> _rawLivePollingByController = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _usbRoleOverrideByController = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _rawPollingUiSnapshotByController = new(StringComparer.OrdinalIgnoreCase);
     private System.Windows.Forms.Timer? _rawPollingTimer;
     private bool _rawPollingInitialized;
 
     protected override void WndProc(ref Message m)
     {
+        // Windows 10 ignores DWMWA_CAPTION_COLOR for parts of the inactive
+        // caption path and repaints the owner grey while a modal dialog is
+        // active. Keep only the non-client visual state active; WinForms still
+        // disables the owner and all focus/modal semantics remain unchanged.
+        if (m.Msg == WmNcActivate && m.WParam == IntPtr.Zero && WindowState != FormWindowState.Minimized)
+        {
+            m.WParam = new IntPtr(1);
+        }
+
         if (m.Msg == RawInputInterop.WmInput)
         {
             try
@@ -61,6 +77,7 @@ public sealed partial class MainForm
         _rawPollingInitialized = true;
         if (!RawInputInterop.RegisterMouseAndKeyboard(Handle))
         {
+            _rawPollingInitialized = false;
             WriteLog("USBPOLL.RAW: registration failed");
             return;
         }
@@ -179,11 +196,22 @@ public sealed partial class MainForm
             if (TryEstimateLivePollingHz(state.LiveIntervalsMs, out double liveHertz))
             {
                 liveHertz = NormalizeLivePollingHz(liveHertz);
-                state.LastLiveHertz = liveHertz;
                 string liveTag = FormatPollingRateTag(liveHertz);
-                if (!string.Equals(state.LastLiveTag, liveTag, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(state.LiveCandidateTag, liveTag, StringComparison.OrdinalIgnoreCase))
+                {
+                    state.LiveCandidateCount++;
+                }
+                else
+                {
+                    state.LiveCandidateTag = liveTag;
+                    state.LiveCandidateCount = 1;
+                }
+
+                if (state.LiveCandidateCount >= RawPollingLiveConfirmTicks
+                    && !string.Equals(state.LastLiveTag, liveTag, StringComparison.OrdinalIgnoreCase))
                 {
                     state.LastLiveTag = liveTag;
+                    state.LastLiveHertz = liveHertz;
                     if (!_rawLivePollingByController.TryGetValue(state.ControllerId, out Dictionary<string, string>? liveRoles))
                     {
                         liveRoles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -192,7 +220,13 @@ public sealed partial class MainForm
 
                     liveRoles[state.Role] = liveTag;
                     liveChanged = true;
-                    WriteLog($"USBPOLL.RAW.LIVE: {state.Role} {liveTag} hz={liveHertz.ToString("0.##", CultureInfo.InvariantCulture)} controller={state.ControllerId} inst={state.InstanceId} samples={state.LiveIntervalsMs.Count}");
+                    long now = Stopwatch.GetTimestamp();
+                    if (state.LastLiveLogTimestamp == 0
+                        || Stopwatch.GetElapsedTime(state.LastLiveLogTimestamp, now).TotalMilliseconds >= RawPollingLiveLogIntervalMs)
+                    {
+                        state.LastLiveLogTimestamp = now;
+                        WriteLog($"USBPOLL.RAW.LIVE: {state.Role} {liveTag} hz={liveHertz.ToString("0.##", CultureInfo.InvariantCulture)} controller={state.ControllerId} inst={state.InstanceId} samples={state.LiveIntervalsMs.Count}");
+                    }
                 }
             }
 
@@ -425,7 +459,13 @@ public sealed partial class MainForm
                 }
             }
 
-            WriteLog($"USBPOLL.RAW: UI updated controller={controllerKey} roles=\"{roles}\" polling=\"{polling}\" live=\"{livePolling}\"");
+            string uiSnapshot = $"roles=\"{roles}\" polling=\"{polling}\"";
+            if (!_rawPollingUiSnapshotByController.TryGetValue(controllerKey, out string? previousSnapshot)
+                || !string.Equals(previousSnapshot, uiSnapshot, StringComparison.Ordinal))
+            {
+                _rawPollingUiSnapshotByController[controllerKey] = uiSnapshot;
+                WriteLog($"USBPOLL.RAW: UI updated controller={controllerKey} {uiSnapshot} live=\"{livePolling}\"");
+            }
         }
 
         if (imodRoleLabelsChanged)
@@ -477,8 +517,12 @@ public sealed partial class MainForm
             return false;
         }
 
-        return string.Equals(role, "Keyboard", StringComparison.OrdinalIgnoreCase)
-            && candidateHertz < existingHertz;
+        // Raw Input cadence depends on current activity and may temporarily
+        // undersample both a mouse and a keyboard. Never replace a higher rate
+        // derived from the HID endpoint with a lower live observation. The live
+        // value is still shown separately in the details and written to the log.
+        _ = role;
+        return candidateHertz < existingHertz;
     }
 
     private static bool TryExtractPollingRateFromRole(string roleText, out string role, out double hertz)

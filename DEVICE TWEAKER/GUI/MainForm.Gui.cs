@@ -1,4 +1,6 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
+using System.Reflection;
+
 
 namespace DeviceTweakerCS;
 
@@ -42,13 +44,17 @@ public sealed partial class MainForm
 
         const string developerHandle = "@arsenza";
         const string developerUrl = "https://t.me/arsenzaa";
-        string subtitleText = $"alpha version 0.0.4 - developed by {developerHandle}";
+        string informationalVersion = Assembly.GetEntryAssembly()
+            ?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion
+            ?? "0.0.4-alpha.2";
+        string subtitleText = $"alpha version {informationalVersion} - developed by {developerHandle}";
 
         LinkLabel logoSubtitle = new()
         {
             Text = subtitleText,
             AutoSize = true,
-            Font = new Font("Consolas", 10, FontStyle.Regular),
+            Font = _subtitleFont,
             LinkBehavior = LinkBehavior.HoverUnderline,
             LinkColor = _mutedText,
             ActiveLinkColor = _accent,
@@ -102,7 +108,7 @@ public sealed partial class MainForm
         Panel statusPanel = new()
         {
             Dock = DockStyle.Top,
-            Height = UiScale(74),
+            Height = UiScale(86),
             BackColor = _bgPanel,
             Padding = new Padding(UiScale(28), UiScale(2), UiScale(28), UiScale(2)),
         };
@@ -150,6 +156,8 @@ public sealed partial class MainForm
         _cppcStatusLabel = NewCpuFlagStatus();
         _dualCcdPrefixLabel = NewCpuFlagPrefix("Dual-CCD");
         _dualCcdStatusLabel = NewCpuFlagStatus();
+        _sandboxPrefixLabel = NewCpuFlagPrefix("Sandbox");
+        _sandboxStatusLabel = NewCpuFlagStatus();
 
         _cpuHeaderLabel = new Label
         {
@@ -178,6 +186,8 @@ public sealed partial class MainForm
         AddCpuFlag(cpuFlagsPanel, _cppcPrefixLabel, _cppcStatusLabel);
         AddCpuFlagSeparator(cpuFlagsPanel);
         AddCpuFlag(cpuFlagsPanel, _dualCcdPrefixLabel, _dualCcdStatusLabel);
+        AddCpuFlagSeparator(cpuFlagsPanel);
+        AddCpuFlag(cpuFlagsPanel, _sandboxPrefixLabel, _sandboxStatusLabel);
 
         TableLayoutPanel statusLayout = new()
         {
@@ -240,26 +250,6 @@ public sealed partial class MainForm
             b.MouseEnter += (_, _) => SetTopButtonHoverStyle(b);
             b.MouseLeave += (_, _) => SetTopButtonBaseStyle(b);
         }
-
-        _btnLog = NewTopButton("ENABLE LOGGING");
-        UpdateLoggingButtonUi();
-        _btnLog.MouseEnter += (_, _) => SetTopButtonHoverStyle(_btnLog);
-        _btnLog.MouseLeave += (_, _) => UpdateLoggingButtonUi();
-        _btnLog.Click += (_, _) =>
-        {
-            if (_detailedLogEnabled)
-            {
-                DisableDetailedLog();
-            }
-            else
-            {
-                EnableDetailedLog();
-                WriteLog("UI: LOG button turned ON -> triggering REFRESH");
-                RefreshBlocks();
-            }
-
-            UpdateLoggingButtonUi();
-        };
 
         TableLayoutPanel buttonsHost = new()
         {
@@ -367,6 +357,7 @@ public sealed partial class MainForm
 
         _devicesHost.Controls.Add(_devicesPanel);
         _devicesHost.Controls.Add(_devicesScroll);
+        EnsureDevicesBusyOverlay();
         _devicesHost.SizeChanged += (_, _) =>
         {
             UpdateDevicesHostLayout();
@@ -388,12 +379,11 @@ public sealed partial class MainForm
         UpdateDevicesScrollLayout();
         UpdateDevicesHostLayout();
 
-        _copyToolTip = new ToolTip
+        _copyToolTip = new ThemedToolTip(showAlways: true, font: _technicalFont)
         {
-            UseFading = true,
-            UseAnimation = true,
-            IsBalloon = false,
-            ShowAlways = true,
+            AutoPopDelay = 20000,
+            InitialDelay = 400,
+            ReshowDelay = 200,
         };
         _layoutRefreshTimer = new System.Windows.Forms.Timer
         {
@@ -413,29 +403,119 @@ public sealed partial class MainForm
         btnApply.Click += (_, _) =>
         {
             WriteLog("UI: APPLY button clicked");
-            CreateDeviceTweakerBackup("pre-apply", showDialog: false);
-            foreach (DeviceBlock b in _blocks)
+            OperationReport report = new();
+            bool sandboxDryRun = IsSandboxDryRunActive();
+            if (!sandboxDryRun)
             {
-                if (b.Device.Wifi)
+                if (!CreateDeviceTweakerBackup("pre-apply", showDialog: false))
                 {
-                    WriteLog($"APPLY.SKIP: {b.Device.InstanceId} Kind={b.Kind} reason=wifi");
-                    continue;
+                    report.AddError("Automatic backup", "backup could not be created; changes were not applied");
+                    ShowOperationResult(
+                        report,
+                        successMessage: string.Empty,
+                        partialMessage: "APPLY was cancelled because the automatic backup failed.");
+                    return;
+                }
+            }
+            else
+            {
+                WriteLog("APPLY: dry-run -> skipped pre-apply backup");
+            }
+
+            int applyTotal = Math.Max(1, _blocks.Count) + 3;
+            BeginDevicesBusyWork(sandboxDryRun ? "Previewing APPLY..." : "Applying changes...", applyTotal);
+            try
+            {
+                int saved = 0;
+                int saveTotal = Math.Max(1, _blocks.Count);
+                foreach (DeviceBlock b in _blocks)
+                {
+                    saved++;
+                    if (b.Device.Wifi)
+                    {
+                        WriteLog($"APPLY.SKIP: {b.Device.InstanceId} Kind={b.Kind} reason=wifi");
+                        TickDevicesBusy($"Applying device settings ({saved}/{saveTotal})", 1);
+                        continue;
+                    }
+
+                    if (sandboxDryRun && !b.Device.IsTestDevice)
+                    {
+                        WriteLog($"APPLY.DRYRUN: {b.Device.InstanceId} Kind={b.Kind} skipped (real device)");
+                        TickDevicesBusy($"Previewing device settings ({saved}/{saveTotal})", 1);
+                        continue;
+                    }
+
+                    TickDevicesBusy(
+                        sandboxDryRun
+                            ? $"Previewing device settings ({saved}/{saveTotal})"
+                            : $"Applying device settings ({saved}/{saveTotal})",
+                        1);
+                    SaveBlockSettings(b, report: report);
                 }
 
-                SaveBlockSettings(b);
-            }
+                TickDevicesBusy(sandboxDryRun ? "Skipping USB selective suspend..." : "Applying USB selective suspend...", 1);
+                if (sandboxDryRun)
+                {
+                    WriteLog("APPLY.DRYRUN: USB selective suspend skipped");
+                }
+                else
+                {
+                    ApplyUsbSelectiveSuspendPowerPlan(forceDisable: false, report);
+                }
 
-            _ = ApplyImodSettings(out string? imodNote);
-            if (!string.IsNullOrWhiteSpace(imodNote))
+                TickDevicesBusy(sandboxDryRun ? "Skipping USB IMOD..." : "Applying USB IMOD...", 1);
+                if (sandboxDryRun)
+                {
+                    WriteLog("APPLY.DRYRUN: IMOD apply skipped");
+                }
+                else
+                {
+                    ImodApplyOutcome imodOutcome = ApplyImodSettings(out string? imodNote);
+                    if (!string.IsNullOrWhiteSpace(imodNote))
+                    {
+                        WriteLog($"IMOD.NOTE: {imodNote}");
+                    }
+
+                    if (imodOutcome == ImodApplyOutcome.Failed)
+                    {
+                        report.AddError("IMOD", imodNote ?? "apply failed");
+                    }
+                    else if (!string.IsNullOrWhiteSpace(imodNote)
+                        && (imodNote.Contains("failure", StringComparison.OrdinalIgnoreCase)
+                            || imodNote.Contains("failed", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        report.AddError("IMOD", imodNote);
+                    }
+                }
+
+                TickDevicesBusy("Updating IMOD / IRQ display...", 1);
+                WaitForBackgroundUiTasks(
+                    RefreshImodCurrentValuesAsync(showReadingStatus: true, reason: sandboxDryRun ? "apply-dry-run" : "apply"),
+                    CalculateIrqCountsAsync(sandboxDryRun ? "apply-dry-run" : "apply"));
+                LogGuiSnapshot(sandboxDryRun ? "apply-dry-run" : "apply");
+                _devicesBusyDone = _devicesBusyTotal;
+                UpdateDevicesBusy("Ready", 100);
+                WriteLog(
+                    sandboxDryRun
+                        ? $"UI: APPLY dry-run completed blocks={_blocks.Count} errors={report.Errors.Count}"
+                        : $"UI: APPLY completed blocks={_blocks.Count} errors={report.Errors.Count}");
+            }
+            finally
             {
-                WriteLog($"IMOD.NOTE: {imodNote}");
+                EndDevicesBusy();
             }
-            RefreshImodCurrentValues(reason: "apply");
-            string message = "All changes have been applied and saved.";
-            message += "\nPlease reboot your PC to finish applying them.";
 
-            LogGuiSnapshot("apply");
-            ShowThemedInfo(message);
+            if (sandboxDryRun)
+            {
+                ShowThemedInfo("APPLY preview completed.\nSandbox dry-run is ON (no registry changes).");
+            }
+            else
+            {
+                ShowOperationResult(
+                    report,
+                    successMessage: "All changes have been applied and saved.\nPlease reboot your PC to finish applying them.",
+                    partialMessage: "APPLY finished with errors. Some changes may be incomplete.");
+            }
         };
         btnAuto.Click += (_, _) =>
         {
@@ -445,7 +525,7 @@ public sealed partial class MainForm
             if (hasUsbImodTarget)
             {
                 optimizeUsbImod = ShowThemedConfirm(
-                    "USB IMOD tuning is available for detected XHCI controller(s).\n\nDTIMOD driver access can be blocked by Windows Defender or anti-cheats.\n\nApply it during auto-optimization?",
+                    "USB IMOD tuning is available for detected XHCI controller(s).\n\nDTIMOD driver access can be blocked by Windows Defender or anti-cheats.\n\nApply it during AUTO-OPTIMIZATION?",
                     "USB IMOD TUNING",
                     "APPLY",
                     "SKIP");
@@ -456,13 +536,28 @@ public sealed partial class MainForm
                 WriteLog("AUTO.IMOD.PROMPT: skipped (no eligible XHCI controllers)");
             }
 
+            OperationReport report = new();
             if (!_testAutoDryRun)
             {
                 AutoBackupChoice backupChoice = PromptBackupLocationForAuto();
+                if (backupChoice == AutoBackupChoice.Cancel)
+                {
+                    WriteLog("BACKUP.PROMPT.AUTO: cancelled by user");
+                    return;
+                }
+
                 if (backupChoice == AutoBackupChoice.Local || backupChoice == AutoBackupChoice.Roaming)
                 {
                     BackupLocation backupLocation = backupChoice == AutoBackupChoice.Local ? BackupLocation.Local : BackupLocation.Roaming;
-                    CreateDeviceTweakerBackup("pre-auto", showDialog: false, backupLocation);
+                    if (!CreateDeviceTweakerBackup("pre-auto", showDialog: false, backupLocation))
+                    {
+                        report.AddError("Automatic backup", "backup could not be created; changes were not applied");
+                        ShowOperationResult(
+                            report,
+                            successMessage: string.Empty,
+                            partialMessage: "AUTO-OPTIMIZATION was cancelled because the automatic backup failed.");
+                        return;
+                    }
                 }
                 else
                 {
@@ -470,57 +565,148 @@ public sealed partial class MainForm
                 }
             }
 
-            InvokeAutoOptimization(optimizeUsbImod);
-            bool applyImod = optimizeUsbImod && hasUsbImodTarget;
-
-            if (_testAutoDryRun)
+            int saveTotal = Math.Max(1, _blocks.Count);
+            // Work units: plan + each block apply + USB SS + optional IMOD + refresh.
+            int autoUnits = 1 + saveTotal + 1 + 1;
+            string? dryRunInfo = null;
+            bool showAutoResult = true;
+            BeginDevicesBusyWork("Running AUTO-OPTIMIZATION...", autoUnits);
+            try
             {
-                WriteLog("AUTO.DRYRUN: enabled -> skipping registry writes");
+                TickDevicesBusy("Planning AUTO-OPTIMIZATION...", 1);
+                bool planBuilt = InvokeAutoOptimization(optimizeUsbImod, report);
+                bool applyImod = optimizeUsbImod && hasUsbImodTarget;
                 if (applyImod)
                 {
-                    WriteLog("AUTO.DRYRUN: IMOD apply skipped");
+                    SetDevicesBusyWork(_devicesBusyTotal + 1, _devicesBusyDone);
                 }
 
-                ShowThemedInfo("Auto-optimization preview completed.\nDry-run mode is ON (no registry changes).");
+                if (!planBuilt)
+                {
+                    WriteLog("AUTO: plan was not built -> skipping apply/save");
+                    _devicesBusyDone = _devicesBusyTotal;
+                    UpdateDevicesBusy("Ready", 100);
+                    showAutoResult = true;
+                    return;
+                }
+
+                if (_testAutoDryRun)
+                {
+                    WriteLog("AUTO.DRYRUN: enabled -> skipping registry writes");
+                    if (applyImod)
+                    {
+                        WriteLog("AUTO.DRYRUN: IMOD apply skipped");
+                    }
+
+                    _devicesBusyDone = _devicesBusyTotal;
+                    UpdateDevicesBusy("Ready", 100);
+                    dryRunInfo = "AUTO-OPTIMIZATION preview completed.\nSandbox dry-run is ON (no registry changes).";
+                    return;
+                }
+
+                int saved = 0;
+                foreach (DeviceBlock b in _blocks)
+                {
+                    saved++;
+                    if (b.Device.Wifi)
+                    {
+                        WriteLog($"AUTO.APPLY.SKIP: {b.Device.InstanceId} Kind={b.Kind} reason=wifi");
+                        TickDevicesBusy($"Applying device settings ({saved}/{saveTotal})", 1);
+                        continue;
+                    }
+
+                    TickDevicesBusy($"Applying device settings ({saved}/{saveTotal})", 1);
+                    SaveBlockSettings(b, msiOnlyForIntegratedGpu: true, report: report);
+                }
+
+                TickDevicesBusy("Applying USB selective suspend...", 1);
+                ApplyUsbSelectiveSuspendPowerPlan(forceDisable: true, report);
+
+                WriteLog("UI: AUTO-OPTIMIZATION applied and saved");
+                if (applyImod)
+                {
+                    TickDevicesBusy("Applying USB IMOD...", 1);
+                    ImodApplyOutcome imodOutcome = ApplyImodSettings(out string? imodNote);
+                    if (!string.IsNullOrWhiteSpace(imodNote))
+                    {
+                        WriteLog($"IMOD.NOTE: {imodNote}");
+                    }
+
+                    if (imodOutcome == ImodApplyOutcome.Failed)
+                    {
+                        report.AddError("IMOD", imodNote ?? "apply failed");
+                    }
+                    else if (!string.IsNullOrWhiteSpace(imodNote)
+                        && (imodNote.Contains("failure", StringComparison.OrdinalIgnoreCase)
+                            || imodNote.Contains("failed", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        report.AddError("IMOD", imodNote);
+                    }
+                }
+                else
+                {
+                    WriteLog("IMOD skipped (AUTO-OPTIMIZATION): no eligible XHCI controllers");
+                }
+
+                WriteLog($"UI: AUTO-OPTIMIZATION done errors={report.Errors.Count} -> triggering REFRESH");
+                SetDevicesBusyStage("Refreshing devices...");
+                RefreshBlocks();
+                _devicesBusyDone = _devicesBusyTotal;
+                UpdateDevicesBusy("Ready", 100);
+            }
+            finally
+            {
+                EndDevicesBusy();
+            }
+
+            // Dialog only after progress overlay is closed — never over a mid-stage %.
+            if (!showAutoResult)
+            {
                 return;
             }
 
-            foreach (DeviceBlock b in _blocks)
+            if (dryRunInfo is not null)
             {
-                if (b.Device.Wifi)
-                {
-                    WriteLog($"AUTO.APPLY.SKIP: {b.Device.InstanceId} Kind={b.Kind} reason=wifi");
-                    continue;
-                }
-
-                SaveBlockSettings(b, msiOnlyForIntegratedGpu: true);
-            }
-
-            WriteLog("UI: AUTO-OPTIMIZATION applied and saved");
-            if (applyImod)
-            {
-                _ = ApplyImodSettings(out string? imodNote);
-                if (!string.IsNullOrWhiteSpace(imodNote))
-                {
-                    WriteLog($"IMOD.NOTE: {imodNote}");
-                }
+                ShowThemedInfo(dryRunInfo);
             }
             else
             {
-                WriteLog("IMOD skipped (AUTO-OPTIMIZATION): no eligible XHCI controllers");
+                ShowOperationResult(
+                    report,
+                    successMessage: "AUTO-OPTIMIZATION completed and saved.\nPlease reboot your PC to finish applying the changes.",
+                    partialMessage: "AUTO-OPTIMIZATION finished with errors. Some changes may be incomplete.");
             }
-            string autoMessage = "Auto-optimization completed and saved.";
-            autoMessage += "\nPlease reboot your PC to finish applying the changes.";
-            ShowThemedInfo(autoMessage);
-
-            WriteLog("UI: AUTO-OPTIMIZATION done -> triggering REFRESH");
-            RefreshBlocks();
         };
         btnReset.Click += (_, _) =>
         {
             WriteLog("UI: RESET ALL button clicked");
-            CreateDeviceTweakerBackup("pre-reset", showDialog: false);
-            ResetAllTweaks();
+            OperationReport report = new();
+            if (!_testAutoDryRun)
+            {
+                if (!CreateDeviceTweakerBackup("pre-reset", showDialog: false))
+                {
+                    report.AddError("Automatic backup", "backup could not be created; changes were not applied");
+                    ShowOperationResult(
+                        report,
+                        successMessage: string.Empty,
+                        partialMessage: "RESET ALL was cancelled because the automatic backup failed.");
+                    return;
+                }
+            }
+            else
+            {
+                WriteLog("RESET: dry-run -> skipped pre-reset backup");
+            }
+
+            BeginDevicesBusyWork("Running RESET ALL...", Math.Max(4, _blocks.Count + 4));
+            try
+            {
+                ResetAllTweaks(report);
+            }
+            finally
+            {
+                EndDevicesBusy();
+            }
         };
         btnRestore.Click += (_, _) =>
         {
@@ -895,24 +1081,26 @@ public sealed partial class MainForm
         btn.FlatAppearance.BorderColor = isPrimary ? _accent : Color.FromArgb(150, 150, 158);
     }
 
+    /// <summary>Configure padding on a ThemedTextBox host panel.</summary>
+    private void StyleDarkTextBox(ThemedTextBox box, int leftMargin = 6, int rightMargin = 4)
+    {
+        box.ContentLeftPadding = leftMargin;
+        box.ContentRightPadding = rightMargin;
+        box.ApplyContentLayout();
+    }
+
+    /// <summary>Legacy no-op kept for any remaining plain TextBox call sites.</summary>
+    private void StyleDarkTextBox(TextBox box, int leftMargin = 6, int rightMargin = 4)
+    {
+        _ = box;
+        _ = leftMargin;
+        _ = rightMargin;
+    }
+
     private void SetTopButtonHoverStyle(Button btn)
     {
         btn.BackColor = _accent;
         btn.ForeColor = Color.FromArgb(15, 15, 15);
-    }
-
-    private void UpdateLoggingButtonUi()
-    {
-        if (_btnLog is null)
-        {
-            return;
-        }
-
-        _btnLog.Text = _detailedLogEnabled ? "DISABLE LOGGING" : "ENABLE LOGGING";
-        _btnLog.FlatAppearance.BorderSize = 1;
-        _btnLog.BackColor = _detailedLogEnabled ? _bgPanel : _bgForm;
-        _btnLog.ForeColor = _detailedLogEnabled ? _accent : _fgMain;
-        _btnLog.FlatAppearance.BorderColor = _detailedLogEnabled ? _accentDark : _accent;
     }
 
     private void ShowCopiedToolTip(Control target)
@@ -930,7 +1118,7 @@ public sealed partial class MainForm
         }
     }
 
-    private static void OpenUrl(string url)
+    private void OpenUrl(string url)
     {
         try
         {
@@ -941,8 +1129,9 @@ public sealed partial class MainForm
             };
             Process.Start(startInfo);
         }
-        catch
+        catch (Exception ex)
         {
+            WriteLog($"UI.URL.ERROR: url=\"{url}\" error=\"{FlattenLogText(ex.ToString())}\"");
         }
     }
 }

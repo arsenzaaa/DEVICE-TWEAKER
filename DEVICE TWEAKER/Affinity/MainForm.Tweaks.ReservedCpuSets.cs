@@ -1,3 +1,4 @@
+
 using Microsoft.Win32;
 
 namespace DeviceTweakerCS;
@@ -88,11 +89,11 @@ public sealed partial class MainForm
         return reserved;
     }
 
-    private void SetReservedCpuSets(bool[] bits)
+    private bool SetReservedCpuSets(bool[] bits)
     {
         if (bits.Length == 0)
         {
-            return;
+            return true;
         }
 
         string keyPath = @"SYSTEM\CurrentControlSet\Control\Session Manager\Kernel";
@@ -142,14 +143,17 @@ public sealed partial class MainForm
                 string hexStr = string.Join(" ", bytes.Select(b => b.ToString("X2")));
                 WriteLog($"RESERVED.WRITE: path=HKLM\\{keyPath}\\{valueName} set=[{string.Join(',', setBits)}] bytes=[{hexStr}]");
             }
+
+            return true;
         }
         catch (Exception ex)
         {
             WriteLog($"RESERVED.ERROR: failed to write ReservedCpuSets: {ex.Message}");
+            return false;
         }
     }
 
-    private void ResetReservedCpuSets()
+    private void ResetReservedCpuSets(OperationReport? report = null)
     {
         if (_reservedCpuPanel?.Tag is not ReservedCpuPanelTag tag || tag.Meta.Count == 0)
         {
@@ -157,7 +161,10 @@ public sealed partial class MainForm
         }
 
         bool[] empty = new bool[tag.Meta.Count];
-        SetReservedCpuSets(empty);
+        if (!SetReservedCpuSets(empty))
+        {
+            report?.AddError("Reserved CPU sets", "failed to clear ReservedCpuSets in registry");
+        }
 
         _suppressReservedCpuEvents++;
         try
@@ -239,7 +246,16 @@ public sealed partial class MainForm
 
         WriteLog($"RESERVED.UPDATE: requested set=[{string.Join(',', setBits)}] count={bits.Length}");
         UpdateReservedCpuValueLabel(tag);
-        SetReservedCpuSets(bits);
+        if (_testAutoDryRun)
+        {
+            WriteLog("RESERVED.UPDATE.SKIP: test auto dry-run (UI preview only)");
+            return;
+        }
+
+        if (!SetReservedCpuSets(bits))
+        {
+            ShowThemedInfo("Failed to write ReservedCpuSets.\nSee the log for details.");
+        }
     }
 
     private static byte[] BuildReservedCpuSetBytes(IReadOnlyList<int> setBits)
@@ -323,19 +339,22 @@ public sealed partial class MainForm
         {
             Text = @"Reads HKLM:\System\CurrentControlSet\Control\Session Manager\Kernel\ReservedCpuSets",
             AutoSize = false,
-            Font = _baseFont,
+            Font = _technicalFont,
             ForeColor = _mutedText,
         };
 
-        Label pathLabel = new()
+        InfoTextBox pathLabel = new()
         {
             Text = @"Registry: HKLM\System\CurrentControlSet\Control\Session Manager\kernel",
             Tag = @"HKLM\System\CurrentControlSet\Control\Session Manager\kernel",
-            AutoSize = true,
-            AutoEllipsis = true,
-            Font = _baseFont,
+            Font = _technicalFont,
             ForeColor = _fgMain,
-            Margin = new Padding(0, UiScale(6), 0, 0),
+            BackColor = _bgGroup,
+            PrefixColor = _statusPrefix,
+            ValueColor = _fgMain,
+            SeparatorColor = _statusSeparator,
+            WordWrap = true,
+            TabStop = false,
             Cursor = Cursors.Hand,
         };
         pathLabel.MouseEnter += (_, _) => pathLabel.ForeColor = _accent;
@@ -349,15 +368,18 @@ public sealed partial class MainForm
             }
         };
 
-        Label valueLabel = new()
+        InfoTextBox valueLabel = new()
         {
             Text = "Value: ReservedCpuSets = not set",
             Tag = "ReservedCpuSets = not set",
-            AutoSize = true,
-            AutoEllipsis = true,
-            Font = _baseFont,
+            Font = _technicalFont,
             ForeColor = _fgMain,
-            Margin = new Padding(0, UiScale(2), 0, 0),
+            BackColor = _bgGroup,
+            PrefixColor = _statusPrefix,
+            ValueColor = _fgMain,
+            SeparatorColor = _statusSeparator,
+            WordWrap = true,
+            TabStop = false,
             Cursor = Cursors.Hand,
         };
         valueLabel.MouseEnter += (_, _) => valueLabel.ForeColor = _accent;
@@ -458,8 +480,8 @@ public sealed partial class MainForm
         Label desc = data.Description;
         Panel inner = data.InnerPanel;
         List<ReservedCpuEntry> meta = data.Meta;
-        Label path = data.PathLabel;
-        Label value = data.ValueLabel;
+        InfoTextBox path = data.PathLabel;
+        InfoTextBox value = data.ValueLabel;
 
         int availWidth = panel.Width - panel.Padding.Left - panel.Padding.Right;
         int y = panel.Padding.Top;
@@ -525,11 +547,11 @@ public sealed partial class MainForm
             y = inner.Bottom + UiScale(12);
         }
 
-        path.MaximumSize = new Size(availWidth, 0);
+        path.Size = new Size(availWidth, GetPreferredTextHeight(path, availWidth) + UiScale(2));
         path.Location = new Point(panel.Padding.Left + UiScale(4), y);
         y = path.Bottom + UiScale(4);
 
-        value.MaximumSize = new Size(availWidth, 0);
+        value.Size = new Size(availWidth, GetPreferredTextHeight(value, availWidth) + UiScale(2));
         value.Location = new Point(panel.Padding.Left + UiScale(4), y);
         y = value.Bottom + panel.Padding.Bottom;
 

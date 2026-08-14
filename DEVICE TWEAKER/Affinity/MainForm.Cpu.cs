@@ -57,7 +57,7 @@ public sealed partial class MainForm
             CcxMap = ccxMap,
         };
         UpdateEfficiencyClassMap(cpuRaw);
-        LoadCppcRatings(cpuRaw.Logical);
+        LoadCppcRatings(cpuRaw);
 
         _cpuGroupCount = Math.Max(1, cpuRaw.LPs.Select(lp => lp.Group).Distinct().Count());
         _cpuLpByIndex.Clear();
@@ -90,7 +90,7 @@ public sealed partial class MainForm
         WriteLog($"CPU.IDENT: {cpuVendor.Name} | Vendor={cpuVendor.Vendor} | SMT/HT={_smtText}");
     }
 
-    private void LoadCppcRatings(int logicalCount)
+    private void LoadCppcRatings(CpuTopology topology)
     {
         _cppcRatings.Clear();
         _cppcRanks.Clear();
@@ -98,13 +98,17 @@ public sealed partial class MainForm
 
         try
         {
-            string xmlText = QueryKernelProcessorPowerEvents(Math.Max(logicalCount * 4, 16));
+            string xmlText = QueryKernelProcessorPowerEvents(Math.Max(topology.Logical * 4, 16));
             if (string.IsNullOrWhiteSpace(xmlText))
             {
                 WriteLog("CPU.CPPC: no Event ID 55 data");
                 return;
             }
 
+            Dictionary<(int Group, int Number), int> lpByGroupAndNumber = topology.LPs
+                .Where(lp => lp.Group >= 0 && lp.LocalIndex >= 0)
+                .GroupBy(lp => (lp.Group, lp.LocalIndex))
+                .ToDictionary(group => group.Key, group => group.First().LP);
             Dictionary<int, int> collected = [];
             foreach (Match eventMatch in Regex.Matches(xmlText, "<Event\\b.*?</Event>", RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
             {
@@ -115,12 +119,13 @@ public sealed partial class MainForm
                     continue;
                 }
 
-                if (processor >= 0 && processor < logicalCount)
+                int group = TryReadEventDataInt(eventXml, "Group", out int parsedGroup) ? parsedGroup : 0;
+                if (lpByGroupAndNumber.TryGetValue((group, processor), out int globalLp))
                 {
-                    collected.TryAdd(processor, performance);
+                    collected.TryAdd(globalLp, performance);
                 }
 
-                if (collected.Count >= logicalCount)
+                if (collected.Count >= topology.Logical)
                 {
                     break;
                 }
@@ -131,6 +136,23 @@ public sealed partial class MainForm
                 WriteLog("CPU.CPPC: Event ID 55 present but ratings were not parsed");
                 return;
             }
+
+            int[] requiredLps = topology.LPs
+                .Where(lp => lp.Group == 0)
+                .Select(lp => lp.LP)
+                .Distinct()
+                .OrderBy(lp => lp)
+                .ToArray();
+            int[] missingLps = requiredLps.Where(lp => !collected.ContainsKey(lp)).ToArray();
+            if (missingLps.Length > 0)
+            {
+                WriteLog($"CPU.CPPC: disabled, incomplete group0 data parsed={collected.Count} required={requiredLps.Length} missing=[{string.Join(',', missingLps)}]");
+                return;
+            }
+
+            collected = collected
+                .Where(item => requiredLps.Contains(item.Key))
+                .ToDictionary(item => item.Key, item => item.Value);
 
             List<int> uniqueRatings = collected.Values.Distinct().OrderByDescending(v => v).ToList();
             if (uniqueRatings.Count <= 1)
@@ -284,7 +306,10 @@ public sealed partial class MainForm
             return;
         }
 
-        int perfClass = classes.Contains(0) ? 0 : classes[0];
+        // Windows defines larger EfficiencyClass values as faster and less
+        // power-efficient. SMT remains the strongest hybrid hint above, while
+        // this branch also works on hybrid CPUs with HT disabled.
+        int perfClass = classes.Max();
         _effClassP.Add(perfClass);
         foreach (int cls in classes)
         {
@@ -312,7 +337,7 @@ public sealed partial class MainForm
             }
         }
 
-        return effClass > 0;
+        return false;
     }
 
     private bool IsEfficiencyCore(CpuLpInfo lpInfo)
@@ -340,25 +365,45 @@ public sealed partial class MainForm
                 }
 
                 int offset = 0;
-                List<(int Group, int LocalIndex, int Core, int LLC, int NUMA, int EffClass, int CpuSetId)> raw = [];
-                while (offset < len)
+                int recordSize = Marshal.SizeOf<NativeCpuSet.SystemCpuSetInformation>();
+                if (recordSize != 32)
                 {
-                    NativeCpuSet.SystemCpuSetInformation item = Marshal.PtrToStructure<NativeCpuSet.SystemCpuSetInformation>(buf + offset);
-                    if (item.Size < 1)
+                    WriteLog($"CPU.TOPO: invalid managed CpuSet ABI size={recordSize}, expected=32");
+                    return null;
+                }
+
+                List<(int Group, int LocalIndex, int Core, int LLC, int NUMA, int EffClass, int CpuSetId)> raw = [];
+                while (offset <= len - (sizeof(int) * 2))
+                {
+                    IntPtr record = IntPtr.Add(buf, offset);
+                    int size = Marshal.ReadInt32(record);
+                    int type = Marshal.ReadInt32(record, sizeof(int));
+                    if (size < sizeof(int) * 2 || size > len - offset)
                     {
+                        WriteLog($"CPU.TOPO: invalid CpuSet record offset={offset} size={size} remaining={len - offset}");
                         break;
                     }
 
-                    raw.Add((
-                        Group: item.Group,
-                        LocalIndex: item.LogicalProcessorIndex,
-                        Core: item.CoreIndex,
-                        LLC: item.LastLevelCacheIndex,
-                        NUMA: item.NumaNodeIndex,
-                        EffClass: item.EfficiencyClass,
-                        CpuSetId: item.Id));
+                    if (type == 0 && size >= recordSize)
+                    {
+                        NativeCpuSet.SystemCpuSetInformation item = Marshal.PtrToStructure<NativeCpuSet.SystemCpuSetInformation>(record);
+                        raw.Add((
+                            Group: item.Group,
+                            LocalIndex: item.LogicalProcessorIndex,
+                            Core: item.CoreIndex,
+                            LLC: item.LastLevelCacheIndex,
+                            NUMA: item.NumaNodeIndex,
+                            EffClass: item.EfficiencyClass,
+                            CpuSetId: checked((int)item.Id)));
+                    }
 
-                    offset += item.Size;
+                    offset += size;
+                }
+
+                if (raw.Count == 0)
+                {
+                    WriteLog("CPU.TOPO: CpuSet returned no processor records, falling back to GLPI");
+                    return null;
                 }
 
                 List<CpuLpInfo> entries = [];
@@ -650,7 +695,8 @@ public sealed partial class MainForm
         int coreKey = CpuTopology.MakeCoreKey(lpInfo.Group, lpInfo.Core);
         if (_cpuInfo.Topology.ByCore.TryGetValue(coreKey, out List<CpuLpInfo>? coreGroup) && coreGroup.Count > 1)
         {
-            if (coreGroup[0].LP != lpInfo.LP)
+            int primaryLp = coreGroup.Min(x => x.LP);
+            if (lpInfo.LP != primaryLp)
             {
                 isHyper = true;
             }
