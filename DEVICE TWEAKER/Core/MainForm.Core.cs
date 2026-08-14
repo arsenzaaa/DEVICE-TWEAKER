@@ -1,7 +1,6 @@
 using System.Management;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Text;
 using Microsoft.Win32;
 using System.Diagnostics;
 using System.Globalization;
@@ -17,8 +16,12 @@ public sealed partial class MainForm : Form
     private Panel _devicesPanel = null!;
     private ThemedScrollBar _devicesScroll = null!;
     private Panel? _reservedCpuPanel;
+    private Panel? _devicesBusyOverlay;
+    private Label? _devicesBusyLabel;
+    private int _devicesBusyDepth;
+    private int _devicesBusyDone;
+    private int _devicesBusyTotal = 1;
 
-    private Button _btnLog = null!;
     private int _suppressReservedCpuEvents;
     private bool _testCpuActive;
     private readonly List<DeviceInfo> _testDevices = [];
@@ -27,6 +30,7 @@ public sealed partial class MainForm : Form
     private bool _testDevicesEnabled;
     private bool _testDevicesOnly;
     private bool _testAutoDryRun;
+    private int _dialogDimDepth;
     private int _testDeviceSequence;
     private string _testCpuName = string.Empty;
     private Label? _cpuHeaderLabel;
@@ -38,10 +42,12 @@ public sealed partial class MainForm : Form
     private Label? _cppcStatusLabel;
     private Label? _dualCcdPrefixLabel;
     private Label? _dualCcdStatusLabel;
+    private Label? _sandboxPrefixLabel;
+    private Label? _sandboxStatusLabel;
     private FlowLayoutPanel? _cpuFlagsPanel;
 
     private bool _detailedLogEnabled;
-    private string? _detailedLogPath;
+    private Dictionary<string, SignedDriverInfo>? _signedDriverInfoCache;
     private bool _syncingScroll;
     private bool? _lastGpuDriverDetected;
     private bool _pendingGpuDriverWarning;
@@ -67,12 +73,33 @@ public sealed partial class MainForm : Form
         ApplyAppIcon();
     }
 
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        // Apply DWM caption attributes at handle creation, before the first
+        // visible paint. Applying only from OnShown leaves a white caption
+        // flash during startup on Windows 10/11 (especially on Win10).
+        ApplyTitleBarTheme();
+    }
+
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
         ApplyTitleBarTheme();
+        WriteLog(
+            $"UI.SHOWN: bounds={Bounds.X},{Bounds.Y},{Bounds.Width}x{Bounds.Height} " +
+            $"client={ClientSize.Width}x{ClientSize.Height} dpi={GetCurrentWindowDpi()} " +
+            $"screen=\"{Screen.FromControl(this).DeviceName}\" monitors={Screen.AllScreens.Length}");
         InitializeRawPolling();
         BeginInvoke(new Action(() => RefreshBlocks()));
+        if (string.Equals(
+                Environment.GetEnvironmentVariable("DEVICE_TWEAKER_QA_TEST_ADMIN"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            BeginInvoke(new Action(ShowTestAdminDialog));
+        }
+
         if (_pendingGpuDriverWarning)
         {
             _pendingGpuDriverWarning = false;
@@ -80,30 +107,23 @@ public sealed partial class MainForm : Form
         }
     }
 
+    protected override void OnFormClosed(FormClosedEventArgs e)
+    {
+        WriteLog($"LOG.SESSION.END: closeReason={e.CloseReason}");
+        DisableDetailedLog(writeClosingEntry: false);
+        base.OnFormClosed(e);
+    }
+
     private const int DwmwaCaptionColor = 35;
     private const int DwmwaTextColor = 36;
+    private const int DwmwaUseImmersiveDarkMode = 20;
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int attributeValue, int attributeSize);
 
     private void ApplyTitleBarTheme()
     {
-        try
-        {
-            if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 17763))
-            {
-                return;
-            }
-
-            int bg = ColorToColorRef(_bgForm);
-            _ = DwmSetWindowAttribute(Handle, DwmwaCaptionColor, ref bg, sizeof(int));
-
-            int fg = ColorToColorRef(_fgMain);
-            _ = DwmSetWindowAttribute(Handle, DwmwaTextColor, ref fg, sizeof(int));
-        }
-        catch
-        {
-        }
+        ApplyTitleBarTheme(this);
     }
 
     private void ShowMissingGpuDriverWarning()
@@ -177,58 +197,19 @@ public sealed partial class MainForm : Form
         }
     }
 
-    private void InitializeDetailedLogFile()
-    {
-        if (!string.IsNullOrWhiteSpace(_detailedLogPath))
-        {
-            return;
-        }
-
-        string root = GetScriptRoot();
-        string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-        string path = Path.Combine(root, $"DeviceTweaker_{stamp}.log");
-
-        try
-        {
-            File.WriteAllText(path, string.Empty);
-        }
-        catch
-        {
-        }
-
-        _detailedLogPath = path;
-    }
-
     private void WriteLog(string message)
     {
-        if (!_detailedLogEnabled)
+        if (!_detailedLogEnabled || string.IsNullOrWhiteSpace(message))
         {
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(message))
+        if (AppDiagnostics.Write(message))
         {
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_detailedLogPath))
-        {
-            InitializeDetailedLogFile();
-        }
-
-        if (string.IsNullOrWhiteSpace(_detailedLogPath))
-        {
-            return;
-        }
-
-        string line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}";
-        try
-        {
-            File.AppendAllText(_detailedLogPath, line + Environment.NewLine, Encoding.UTF8);
-        }
-        catch
-        {
-        }
+        _detailedLogEnabled = false;
     }
 
     private void EnableDetailedLog()
@@ -238,19 +219,30 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        _detailedLogEnabled = true;
-        InitializeDetailedLogFile();
+        if (!AppDiagnostics.TryEnable(out string? logPath, out string? logError))
+        {
+            _detailedLogEnabled = false;
+            Debug.WriteLine($"DEVICE TWEAKER detailed logging unavailable: {logError}");
+            return;
+        }
 
-        WriteLog("LOG: detailed logging ENABLED");
+        _detailedLogEnabled = true;
+
+        WriteLog($"LOG: detailed logging ENABLED path=\"{logPath}\"");
         WriteLog($"LOG.VERSION: {GetAppVersion()}");
 
         try
         {
             WriteLog(
-                $"BOOT: DotNet={Environment.Version} PID={Environment.ProcessId} Arch={RuntimeInformation.ProcessArchitecture} Dir={GetScriptRoot()}");
+                $"BOOT: DotNet={Environment.Version} PID={Environment.ProcessId} " +
+                $"ProcessArch={RuntimeInformation.ProcessArchitecture} OsArch={RuntimeInformation.OSArchitecture} " +
+                $"Is64BitOS={Environment.Is64BitOperatingSystem} Admin={WindowsSecurity.IsAdministrator()} " +
+                $"Culture={CultureInfo.CurrentCulture.Name} UiCulture={CultureInfo.CurrentUICulture.Name} " +
+                $"Dir=\"{GetScriptRoot()}\" WorkingDir=\"{Environment.CurrentDirectory}\"");
         }
-        catch
+        catch (Exception ex)
         {
+            WriteLog($"OS.ERROR: {FlattenLogText(ex.ToString())}");
         }
 
         try
@@ -887,6 +879,12 @@ public sealed partial class MainForm : Form
 
     private Dictionary<string, SignedDriverInfo> BuildSignedDriverInfoMap(out string? error)
     {
+        if (_signedDriverInfoCache is not null)
+        {
+            error = null;
+            return _signedDriverInfoCache;
+        }
+
         error = null;
         Dictionary<string, SignedDriverInfo> map = new(StringComparer.OrdinalIgnoreCase);
         try
@@ -895,7 +893,7 @@ public sealed partial class MainForm : Form
                 "root\\CIMV2",
                 "SELECT DeviceID, DeviceName, DeviceClass, ClassGuid, Manufacturer, DriverVersion, DriverDate, DriverProviderName, DriverName, InfName, FriendlyName, Description, Location, IsSigned, Signer, HardWareID, CompatID FROM Win32_PnPSignedDriver");
 
-            foreach (ManagementObject mo in searcher.Get())
+            foreach (ManagementBaseObject mo in searcher.Get())
             {
                 string? deviceId = GetWmiString(mo, "DeviceID");
                 if (string.IsNullOrWhiteSpace(deviceId))
@@ -930,7 +928,15 @@ public sealed partial class MainForm : Form
         }
         catch (Exception ex)
         {
-            error = ex.Message;
+            error = ex.ToString();
+        }
+
+        if (error is null && map.Count > 0)
+        {
+            // Driver metadata does not change during a GUI session. Reusing the
+            // first successful snapshot avoids repeated COM/WMI query bursts,
+            // which can intermittently fail in System.Management.
+            _signedDriverInfoCache = map;
         }
 
         return map;
@@ -1037,7 +1043,9 @@ public sealed partial class MainForm : Form
             {
                 int bottomSlack = _devicesHost.ClientSize.Height - b.Group.Bottom;
                 WriteLog($"GUI.LAYOUT.FIRSTFIT: idx=0 blockBottom={b.Group.Bottom} viewportHeight={_devicesHost.ClientSize.Height} bottomSlack={bottomSlack}");
-                if (bottomSlack < UiScale(1))
+                // A scrollable device host is expected to contain blocks taller
+                // than the current viewport; that is not a clipping defect.
+                if (!_devicesScroll.Visible && bottomSlack < UiScale(1))
                 {
                     WriteLog($"GUI.LAYOUT.ISSUE: idx=0 reason=firstBlockViewport bottomSlack={bottomSlack}");
                     issueCount++;
@@ -1103,6 +1111,7 @@ public sealed partial class MainForm : Form
         bool cpuTight = cpuPanel is not null && cpuHorizontalSlack >= 0 && cpuHorizontalSlack < UiScale(18);
         (int minCpuCellWidth, int maxCpuCellWidth) = GetCpuCellWidthRange(block);
         bool cpuCellMismatch = maxCpuCellWidth > 0 && maxCpuCellWidth - minCpuCellWidth > UiScale(2);
+        (int cpuTextClipCount, int cpuTextMaxOverflow) = GetCpuTextClipStats(block);
 
         (int settingsRight, int settingsBottom) = GetVisibleContentBounds(settingsPanel);
         bool settingsClip = settingsPanel is not null
@@ -1123,7 +1132,7 @@ public sealed partial class MainForm : Form
             : string.Empty;
 
         WriteLog(
-            $"GUI.LAYOUT: idx={index} group={FormatGuiBounds(group)} header={FormatGuiBounds(header)} headerPref={headerPreferred} headerAvail={headerAvailable} headerClip={headerClip} divider={FormatGuiBounds(divider)} cpuTitle={FormatGuiBounds(cpuTitle)} cpuPanel={FormatGuiBounds(cpuPanel)} cpuContent={cpuRight}x{cpuBottom} cpuSlack={cpuHorizontalSlack} cpuCellWidth={minCpuCellWidth}-{maxCpuCellWidth} cpuCellMismatch={cpuCellMismatch} cpuClip={cpuClip} cpuTight={cpuTight}{cpuScroll} settings={FormatGuiBounds(settingsPanel)} settingsContent={settingsRight}x{settingsBottom} settingsSlack={settingsHorizontalSlack} settingsClip={settingsClip} settingsTight={settingsTight} info={FormatGuiBounds(info)} infoPrefH={infoPreferredHeight} infoClip={infoClip} groupContent={groupRight}x{groupBottom} groupClip={groupClip}");
+            $"GUI.LAYOUT: idx={index} group={FormatGuiBounds(group)} header={FormatGuiBounds(header)} headerPref={headerPreferred} headerAvail={headerAvailable} headerClip={headerClip} divider={FormatGuiBounds(divider)} cpuTitle={FormatGuiBounds(cpuTitle)} cpuPanel={FormatGuiBounds(cpuPanel)} cpuContent={cpuRight}x{cpuBottom} cpuSlack={cpuHorizontalSlack} cpuCellWidth={minCpuCellWidth}-{maxCpuCellWidth} cpuCellMismatch={cpuCellMismatch} cpuTextClip={cpuTextClipCount} cpuTextOverflow={cpuTextMaxOverflow} cpuClip={cpuClip} cpuTight={cpuTight}{cpuScroll} settings={FormatGuiBounds(settingsPanel)} settingsContent={settingsRight}x{settingsBottom} settingsSlack={settingsHorizontalSlack} settingsClip={settingsClip} settingsTight={settingsTight} info={FormatGuiBounds(info)} infoPrefH={infoPreferredHeight} infoClip={infoClip} groupContent={groupRight}x{groupBottom} groupClip={groupClip}");
 
         List<string> reasons = [];
         if (headerClip)
@@ -1137,12 +1146,17 @@ public sealed partial class MainForm : Form
         }
         else if (cpuTight)
         {
-            reasons.Add($"cpuTight:slack={cpuHorizontalSlack}");
+            WriteLog($"GUI.LAYOUT.NOTE: idx={index} cpuTight slack={cpuHorizontalSlack}");
         }
 
         if (cpuCellMismatch)
         {
             reasons.Add($"cpuCellWidth:{minCpuCellWidth}-{maxCpuCellWidth}");
+        }
+
+        if (cpuTextClipCount > 0)
+        {
+            reasons.Add($"cpuTextClip:{cpuTextClipCount},overflow={cpuTextMaxOverflow}");
         }
 
         if (settingsClip && settingsPanel is not null)
@@ -1151,7 +1165,7 @@ public sealed partial class MainForm : Form
         }
         else if (settingsTight)
         {
-            reasons.Add($"settingsTight:slack={settingsHorizontalSlack}");
+            WriteLog($"GUI.LAYOUT.NOTE: idx={index} settingsTight slack={settingsHorizontalSlack}");
         }
 
         if (infoClip)
@@ -1260,6 +1274,28 @@ public sealed partial class MainForm : Form
 
         Size proposed = new(Math.Max(1, width), int.MaxValue);
         return TextRenderer.MeasureText(text, control.Font, proposed, TextFormatFlags.WordBreak).Height;
+    }
+
+    private static (int Count, int MaxOverflow) GetCpuTextClipStats(DeviceBlock block)
+    {
+        int count = 0;
+        int maxOverflow = 0;
+        foreach (CheckBox box in block.CpuBoxes)
+        {
+            if (!box.Visible)
+            {
+                continue;
+            }
+
+            int overflow = box.GetPreferredSize(Size.Empty).Width - box.ClientSize.Width;
+            if (overflow > 0)
+            {
+                count++;
+                maxOverflow = Math.Max(maxOverflow, overflow);
+            }
+        }
+
+        return (count, maxOverflow);
     }
 
     private int LogGuiBlockDetails(DeviceBlock block, int index, Dictionary<string, SignedDriverInfo> signedDriverMap, bool wmiMapEmpty)
@@ -1646,14 +1682,19 @@ public sealed partial class MainForm : Form
         return issues;
     }
 
-    private void DisableDetailedLog()
+    private void DisableDetailedLog(bool writeClosingEntry = true)
     {
         if (!_detailedLogEnabled)
         {
             return;
         }
 
-        WriteLog("LOG: detailed logging DISABLED");
+        if (writeClosingEntry)
+        {
+            WriteLog("LOG: detailed logging DISABLED");
+        }
+
+        AppDiagnostics.Disable();
         _detailedLogEnabled = false;
     }
 }

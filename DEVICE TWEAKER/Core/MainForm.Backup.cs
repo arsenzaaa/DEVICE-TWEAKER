@@ -22,6 +22,7 @@ public sealed partial class MainForm
         Skip,
         Local,
         Roaming,
+        Cancel,
     }
 
     private enum RestoreChoice
@@ -115,8 +116,12 @@ public sealed partial class MainForm
             Directory.CreateDirectory(directory);
 
             string safeReason = MakeBackupFileReason(reason);
-            string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
+            string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture);
             string path = Path.Combine(directory, $"{BackupFilePrefix}{stamp}_{safeReason}.json");
+            if (File.Exists(path))
+            {
+                path = Path.Combine(directory, $"{BackupFilePrefix}{stamp}_{safeReason}_{Guid.NewGuid().ToString("N")[..8]}.json");
+            }
             JsonSerializerOptions options = new() { WriteIndented = true };
             File.WriteAllText(path, JsonSerializer.Serialize(backup, options), Encoding.UTF8);
             WriteLog($"BACKUP: saved location={location} path={path} values={backup.RegistryValues.Count} reason={reason}");
@@ -185,21 +190,50 @@ public sealed partial class MainForm
                 "DevicePolicy",
                 "AssignmentSetOverride");
 
-            if (block.Kind == DeviceKind.NET_NDIS)
+            if (block.Kind == DeviceKind.USB)
+            {
+                foreach (string instanceId in UsbSelectiveSuspendPolicy.EnumerateBackupInstanceIds(block.Device.InstanceId))
+                {
+                    AddValues(
+                        RegistryHive.LocalMachine,
+                        UsbSelectiveSuspendPolicy.DeviceParametersPath(instanceId),
+                        UsbSelectiveSuspendPolicy.SelectiveSuspendEnabledName,
+                        UsbSelectiveSuspendPolicy.EnhancedPowerManagementEnabledName);
+
+                    string? usbClassKey = DevicePowerPolicy.TryGetClassKeyPath(instanceId);
+                    if (!string.IsNullOrWhiteSpace(usbClassKey))
+                    {
+                        AddValues(
+                            RegistryHive.LocalMachine,
+                            usbClassKey,
+                            DevicePowerPolicy.PnPCapabilitiesName);
+                    }
+                }
+            }
+
+            if (block.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX)
             {
                 string? classKey = GetClassKeyForDevice(block.Device.InstanceId);
                 if (!string.IsNullOrWhiteSpace(classKey))
                 {
+                    if (block.Kind == DeviceKind.NET_NDIS)
+                    {
+                        AddValues(
+                            RegistryHive.LocalMachine,
+                            classKey,
+                            "*RssBaseProcNumber",
+                            "*NumRssQueues",
+                            "*RssBaseProcGroup",
+                            "*MaxRssProcessors",
+                            "*RSSMaxProcGroup",
+                            "*RssMaxProcNumber",
+                            "*NumaNodeId");
+                    }
+
                     AddValues(
                         RegistryHive.LocalMachine,
                         classKey,
-                        "*RssBaseProcNumber",
-                        "*NumRssQueues",
-                        "*RssBaseProcGroup",
-                        "*MaxRssProcessors",
-                        "*RSSMaxProcGroup",
-                        "*RssMaxProcNumber",
-                        "*NumaNodeId");
+                        DevicePowerPolicy.PnPCapabilitiesName);
                 }
             }
         }
@@ -213,6 +247,15 @@ public sealed partial class MainForm
             RegistryHive.LocalMachine,
             @"SYSTEM\CurrentControlSet\Control\Session Manager\Kernel",
             "ReservedCpuSets");
+
+        if (UsbSelectiveSuspendPolicy.TryGetActiveScheme(out Guid usbSsScheme))
+        {
+            AddValues(
+                RegistryHive.LocalMachine,
+                UsbSelectiveSuspendPolicy.PowerPlanSettingPath(usbSsScheme),
+                "ACSettingIndex",
+                "DCSettingIndex");
+        }
 
         string startupScript = GetImodStartupPath();
         backup.ImodScript = new FileBackup
@@ -254,6 +297,7 @@ public sealed partial class MainForm
         {
             backup.Kind = "ReadError";
             backup.Data = ex.Message;
+            backup.Exists = true; // must not look like "absent" - restore deletes Exists=false
             WriteLog($"BACKUP.REG: read failed {backup.Hive}\\{path}\\{name}: {ex.Message}");
         }
 
@@ -318,8 +362,17 @@ public sealed partial class MainForm
 
             WriteLog($"BACKUP.RESTORE: restore-backup requested path={path}");
             RestoreDeviceTweakerBackup(path);
+            BeginDevicesBusyWork("Refreshing devices...", 4);
+            try
+            {
+                RefreshBlocks();
+            }
+            finally
+            {
+                EndDevicesBusy();
+            }
+
             ShowThemedInfo($"Backup restored.\n{path}\n\nPlease reboot your PC to finish applying restored settings.");
-            RefreshBlocks();
         }
         catch (Exception ex)
         {
@@ -389,8 +442,9 @@ public sealed partial class MainForm
                 string json = File.ReadAllText(path, Encoding.UTF8);
                 backup = JsonSerializer.Deserialize<DeviceTweakerBackup>(json);
             }
-            catch
+            catch (Exception ex)
             {
+                WriteLog($"BACKUP.SCAN.WARN: metadata read failed path={path} error=\"{FlattenLogText(ex.ToString())}\"");
             }
 
             string location = string.Equals(directory, GetBackupDirectory(BackupLocation.Roaming), StringComparison.OrdinalIgnoreCase)
@@ -483,33 +537,250 @@ public sealed partial class MainForm
             throw new InvalidOperationException("Backup file is empty or invalid.");
         }
 
-        foreach (RegistryValueBackup value in backup.RegistryValues)
+        if (backup.Version != DeviceTweakerBackupVersion)
         {
-            RestoreRegistryValue(value);
+            throw new InvalidOperationException($"Unsupported backup version: {backup.Version}.");
         }
 
+        HashSet<string> restoreTargets = new(StringComparer.OrdinalIgnoreCase);
+        foreach (RegistryValueBackup value in backup.RegistryValues)
+        {
+            if (!IsManagedBackupRegistryValue(value))
+            {
+                throw new InvalidOperationException(
+                    $"Backup contains an unmanaged registry target: {value.Hive}\\{value.Path}\\{value.Name}");
+            }
+
+            string target = $"{value.Hive.Trim()}|{value.Path.Trim().Trim('\\')}|{value.Name.Trim()}";
+            if (!restoreTargets.Add(target))
+            {
+                throw new InvalidOperationException(
+                    $"Backup contains a duplicate registry target: {value.Hive}\\{value.Path}\\{value.Name}");
+            }
+
+            ValidateRegistryValueBackup(value);
+        }
+
+        if (backup.ImodScript is not null
+            && !string.Equals(
+                Path.GetFullPath(backup.ImodScript.Path),
+                Path.GetFullPath(GetImodStartupPath()),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Backup contains an unmanaged IMOD script path.");
+        }
+
+        List<RegistryValueBackup> rollbackValues = [];
+        FileBackup? rollbackScript = null;
         if (backup.ImodScript is not null)
         {
-            RestoreFileBackup(backup.ImodScript);
-            InvalidateImodCache();
+            string startupPath = GetImodStartupPath();
+            rollbackScript = new FileBackup
+            {
+                Path = startupPath,
+                Exists = File.Exists(startupPath),
+                Text = File.Exists(startupPath) ? File.ReadAllText(startupPath, Encoding.UTF8) : null,
+            };
+        }
+
+        try
+        {
+            foreach (RegistryValueBackup value in backup.RegistryValues)
+            {
+                if (string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (!TryGetBackupHive(value.Hive, out RegistryHive hive))
+                {
+                    throw new InvalidOperationException($"Unsupported registry hive: {value.Hive}.");
+                }
+
+                RegistryValueBackup rollback = CaptureRegistryValue(hive, value.Path, value.Name);
+                if (string.Equals(rollback.Kind, "ReadError", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        $"Cannot capture rollback value: {value.Hive}\\{value.Path}\\{value.Name}. {rollback.Data}");
+                }
+
+                rollbackValues.Add(rollback);
+                RestoreRegistryValue(value);
+            }
+
+            if (backup.ImodScript is not null)
+            {
+                RestoreFileBackup(backup.ImodScript);
+                InvalidateImodCache();
+            }
+        }
+        catch (Exception restoreError)
+        {
+            WriteLog($"BACKUP.RESTORE.ROLLBACK: starting after error=\"{FlattenLogText(restoreError.ToString())}\"");
+            List<string> rollbackErrors = [];
+            foreach (RegistryValueBackup rollback in rollbackValues.AsEnumerable().Reverse())
+            {
+                try
+                {
+                    RestoreRegistryValue(rollback);
+                }
+                catch (Exception ex)
+                {
+                    rollbackErrors.Add($"{rollback.Hive}\\{rollback.Path}\\{rollback.Name}: {ex.Message}");
+                }
+            }
+
+            if (rollbackScript is not null)
+            {
+                try
+                {
+                    RestoreFileBackup(rollbackScript);
+                    InvalidateImodCache();
+                }
+                catch (Exception ex)
+                {
+                    rollbackErrors.Add($"IMOD script: {ex.Message}");
+                }
+            }
+
+            if (rollbackErrors.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Backup restore failed and rollback was incomplete. Restore error: {restoreError.Message}. "
+                    + $"Rollback errors: {string.Join(" | ", rollbackErrors)}",
+                    restoreError);
+            }
+
+            WriteLog("BACKUP.RESTORE.ROLLBACK: completed");
+            throw;
         }
 
         WriteLog($"BACKUP.RESTORE: restored path={path} values={backup.RegistryValues.Count} reason={backup.Reason}");
+        SyncLivePowerManagementAfterRestore();
+    }
+
+    private static void ValidateRegistryValueBackup(RegistryValueBackup value)
+    {
+        if (!value.Exists || string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (!TryParseRegistryValueKind(value.Kind, out RegistryValueKind kind))
+        {
+            throw new InvalidOperationException(
+                $"Backup contains an unsupported registry value kind: {value.Hive}\\{value.Path}\\{value.Name} kind={value.Kind}");
+        }
+
+        try
+        {
+            _ = DecodeRegistryValue(value.Data, kind);
+        }
+        catch (Exception ex) when (ex is FormatException or JsonException or OverflowException)
+        {
+            throw new InvalidOperationException(
+                $"Backup contains invalid registry data: {value.Hive}\\{value.Path}\\{value.Name} kind={value.Kind}",
+                ex);
+        }
+    }
+
+    private static bool IsManagedBackupRegistryValue(RegistryValueBackup value)
+    {
+        string hive = value.Hive.Trim();
+        string path = value.Path.Trim().Trim('\\');
+        string name = value.Name.Trim();
+
+        if (path.Length == 0
+            || name.Length == 0
+            || path.Contains("..", StringComparison.Ordinal)
+            || path.Contains('\0')
+            || name.Contains('\\')
+            || name.Contains('\0'))
+        {
+            return false;
+        }
+
+        if (string.Equals(hive, "HKCU", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Equals(path, @"Control Panel\Mouse", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(name, RawMouseThrottleValueName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (!string.Equals(hive, "HKLM", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (string.Equals(
+                path,
+                @"SYSTEM\CurrentControlSet\Control\Session Manager\Kernel",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Equals(name, "ReservedCpuSets", StringComparison.OrdinalIgnoreCase);
+        }
+
+        const string powerSchemesRoot = @"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes\";
+        string usbSsSuffix =
+            $@"\{UsbSelectiveSuspendPolicy.UsbSettingsSubgroup:D}\{UsbSelectiveSuspendPolicy.UsbSelectiveSuspendSetting:D}";
+        if (path.StartsWith(powerSchemesRoot, StringComparison.OrdinalIgnoreCase)
+            && path.EndsWith(usbSsSuffix, StringComparison.OrdinalIgnoreCase))
+        {
+            return name is "ACSettingIndex" or "DCSettingIndex";
+        }
+
+        const string enumRoot = @"SYSTEM\CurrentControlSet\Enum\";
+        if (path.StartsWith(enumRoot, StringComparison.OrdinalIgnoreCase)
+            && path.EndsWith(@"\Device Parameters", StringComparison.OrdinalIgnoreCase)
+            && !path.Contains(@"\Interrupt Management", StringComparison.OrdinalIgnoreCase))
+        {
+            return name is "SelectiveSuspendEnabled" or "EnhancedPowerManagementEnabled";
+        }
+
+        if (path.StartsWith(enumRoot, StringComparison.OrdinalIgnoreCase)
+            && path.EndsWith(
+                @"\Device Parameters\Interrupt Management\MessageSignaledInterruptProperties",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return name is "MSISupported" or "MessageNumberLimit";
+        }
+
+        if (path.StartsWith(enumRoot, StringComparison.OrdinalIgnoreCase)
+            && path.EndsWith(
+                @"\Device Parameters\Interrupt Management\Affinity Policy",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return name is "DevicePriority" or "DevicePolicy" or "AssignmentSetOverride";
+        }
+
+        const string classRoot = @"SYSTEM\CurrentControlSet\Control\Class\";
+        if (path.StartsWith(classRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            return name is "*RssBaseProcNumber"
+                or "*NumRssQueues"
+                or "*RssBaseProcGroup"
+                or "*MaxRssProcessors"
+                or "*RSSMaxProcGroup"
+                or "*RssMaxProcNumber"
+                or "*NumaNodeId"
+                or "PnPCapabilities";
+        }
+
+        return false;
     }
 
     private void RestoreRegistryValue(RegistryValueBackup value)
     {
         if (!TryGetBackupHive(value.Hive, out RegistryHive hive))
         {
-            return;
+            throw new InvalidOperationException($"Unsupported registry hive for restore: {value.Hive}.");
         }
 
         using RegistryKey baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
         using RegistryKey? key = baseKey.CreateSubKey(value.Path, writable: true);
         if (key is null)
         {
-            WriteLog($"BACKUP.RESTORE.REG: failed to open {value.Hive}\\{value.Path}");
-            return;
+            throw new InvalidOperationException(
+                $"Failed to open registry key for restore: {value.Hive}\\{value.Path}");
         }
 
         if (!value.Exists)
@@ -519,10 +790,16 @@ public sealed partial class MainForm
             return;
         }
 
+        if (string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase))
+        {
+            WriteLog($"BACKUP.RESTORE.REG: skipped {value.Hive}\\{value.Path}\\{value.Name} kind=ReadError");
+            return;
+        }
+
         if (!TryParseRegistryValueKind(value.Kind, out RegistryValueKind kind))
         {
-            WriteLog($"BACKUP.RESTORE.REG: skipped {value.Hive}\\{value.Path}\\{value.Name} kind={value.Kind}");
-            return;
+            throw new InvalidOperationException(
+                $"Unsupported registry value kind for restore: {value.Hive}\\{value.Path}\\{value.Name} kind={value.Kind}");
         }
 
         object data = DecodeRegistryValue(value.Data, kind);
@@ -572,11 +849,18 @@ public sealed partial class MainForm
         };
     }
 
-    private static void RestoreFileBackup(FileBackup backup)
+    private void RestoreFileBackup(FileBackup backup)
     {
         if (string.IsNullOrWhiteSpace(backup.Path))
         {
             return;
+        }
+
+        string expectedPath = Path.GetFullPath(GetImodStartupPath());
+        string actualPath = Path.GetFullPath(backup.Path);
+        if (!string.Equals(actualPath, expectedPath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Refusing to restore an unmanaged file path.");
         }
 
         if (!backup.Exists)

@@ -6,13 +6,30 @@ internal sealed class ThemedCheckBox : CheckBox
 {
     private bool _hovered;
     private bool _pressed;
+    private bool _syncCheckedStateText;
 
     public Color BorderColor { get; set; } = Color.FromArgb(150, 150, 150);
-    public Color BoxBackColor { get; set; } = Color.FromArgb(8, 8, 10);
-    public Color CheckedBackColor { get; set; } = Color.FromArgb(14, 14, 17);
-    public Color HoverBackColor { get; set; } = Color.FromArgb(22, 22, 26);
-    public Color PressedBackColor { get; set; } = Color.FromArgb(32, 32, 38);
+    public Color BoxBackColor { get; set; } = Color.FromArgb(18, 18, 22);
+    public Color CheckedBackColor { get; set; } = Color.FromArgb(28, 28, 34);
+    public Color HoverBackColor { get; set; } = Color.FromArgb(36, 36, 42);
+    public Color PressedBackColor { get; set; } = Color.FromArgb(48, 48, 56);
     public Color CheckColor { get; set; } = Color.FromArgb(240, 240, 240);
+
+    /// <summary>
+    /// When true, <see cref="Control.Text"/> follows Checked: Enabled / Disabled.
+    /// </summary>
+    public bool SyncCheckedStateText
+    {
+        get => _syncCheckedStateText;
+        set
+        {
+            _syncCheckedStateText = value;
+            if (value)
+            {
+                SyncTextFromChecked();
+            }
+        }
+    }
 
     public ThemedCheckBox()
     {
@@ -24,6 +41,20 @@ internal sealed class ThemedCheckBox : CheckBox
             true);
         UseVisualStyleBackColor = false;
         FlatStyle = FlatStyle.Flat;
+    }
+
+    private void SyncTextFromChecked()
+    {
+        if (!_syncCheckedStateText)
+        {
+            return;
+        }
+
+        string next = Checked ? "Enabled" : "Disabled";
+        if (!string.Equals(Text, next, StringComparison.Ordinal))
+        {
+            Text = next;
+        }
     }
 
     protected override void OnMouseEnter(EventArgs e)
@@ -57,6 +88,7 @@ internal sealed class ThemedCheckBox : CheckBox
 
     protected override void OnCheckedChanged(EventArgs e)
     {
+        SyncTextFromChecked();
         Invalidate();
         base.OnCheckedChanged(e);
     }
@@ -71,11 +103,16 @@ internal sealed class ThemedCheckBox : CheckBox
     {
         Graphics g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+        g.CompositingQuality = CompositingQuality.HighQuality;
         g.Clear(BackColor);
 
-        int trackWidth = Math.Max(26, Math.Min(32, Height + 10));
-        int trackHeight = Math.Max(14, Math.Min(16, Height - 4));
-        Rectangle trackRect = new(0, Math.Max(0, (Height - trackHeight) / 2), trackWidth, trackHeight);
+        // Keep 1px inset so anti-aliased stroke/fringe is not clipped by the control edge
+        // (clipping is what makes the pill/knob look stair-stepped).
+        int trackWidth = Math.Max(28, Math.Min(34, Height + 12));
+        int trackHeight = Math.Max(14, Math.Min(18, Height - 2));
+        float trackTop = Math.Max(1f, (Height - trackHeight) / 2f);
+        RectangleF trackRect = new(1f, trackTop, trackWidth - 2f, trackHeight);
 
         Color trackFill = Checked ? CheckedBackColor : BoxBackColor;
         if (_pressed)
@@ -87,25 +124,29 @@ internal sealed class ThemedCheckBox : CheckBox
             trackFill = HoverBackColor;
         }
 
-        using GraphicsPath trackPath = CreateRoundRect(trackRect, trackHeight / 2);
+        float radius = trackRect.Height / 2f;
+        using GraphicsPath trackPath = CreateRoundRect(trackRect, radius);
         using SolidBrush trackBrush = new(trackFill);
         g.FillPath(trackBrush, trackPath);
 
-        using Pen borderPen = new(Enabled ? BorderColor : Color.FromArgb(85, 85, 90));
+        using Pen borderPen = new(Enabled ? BorderColor : Color.FromArgb(85, 85, 90), 1.25f);
+        borderPen.Alignment = PenAlignment.Center;
         g.DrawPath(borderPen, trackPath);
 
-        int knobSize = trackHeight - 6;
-        int knobLeft = Checked
-            ? trackRect.Right - knobSize - 3
-            : trackRect.Left + 3;
-        Rectangle knobRect = new(knobLeft, trackRect.Top + 3, knobSize, knobSize);
+        float knobSize = Math.Max(8f, trackRect.Height - 6f);
+        float knobPad = Math.Max(2f, (trackRect.Height - knobSize) / 2f);
+        float knobLeft = Checked
+            ? trackRect.Right - knobSize - knobPad
+            : trackRect.Left + knobPad;
+        RectangleF knobRect = new(knobLeft, trackRect.Top + knobPad, knobSize, knobSize);
         using SolidBrush knobBrush = new(Enabled ? CheckColor : Color.FromArgb(120, 120, 125));
         g.FillEllipse(knobBrush, knobRect);
 
+        int textLeft = (int)Math.Ceiling(trackRect.Right) + 7;
         Rectangle textRect = new(
-            trackRect.Right + 7,
+            textLeft,
             0,
-            Math.Max(0, Width - trackRect.Right - 7),
+            Math.Max(0, Width - textLeft),
             Height);
         TextRenderer.DrawText(
             g,
@@ -114,12 +155,26 @@ internal sealed class ThemedCheckBox : CheckBox
             textRect,
             Enabled ? ForeColor : Color.FromArgb(120, 120, 125),
             BackColor,
-            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+            TextFormatFlags.Left
+            | TextFormatFlags.VerticalCenter
+            | TextFormatFlags.NoPrefix
+            | TextFormatFlags.NoPadding
+            | TextFormatFlags.EndEllipsis);
     }
 
-    private static GraphicsPath CreateRoundRect(Rectangle rect, int radius)
+    private static GraphicsPath CreateRoundRect(RectangleF rect, float radius)
     {
-        int diameter = Math.Max(1, radius * 2);
+        float diameter = Math.Max(1f, radius * 2f);
+        if (diameter > rect.Width)
+        {
+            diameter = rect.Width;
+        }
+
+        if (diameter > rect.Height)
+        {
+            diameter = rect.Height;
+        }
+
         GraphicsPath path = new();
         path.AddArc(rect.Left, rect.Top, diameter, diameter, 180, 90);
         path.AddArc(rect.Right - diameter, rect.Top, diameter, diameter, 270, 90);

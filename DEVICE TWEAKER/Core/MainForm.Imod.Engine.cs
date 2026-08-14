@@ -308,16 +308,16 @@ public sealed partial class MainForm
                 return true;
             }
 
-        if (!ImodDriverContext.TryInitialize(driverPath, WriteLog, out ImodDriverContext? driverContext, out error))
-        {
-            if (IsImodKernelCiBlockedLoadError(error))
+            if (!ImodDriverContext.TryInitialize(driverPath, WriteLog, out ImodDriverContext? driverContext, out error))
             {
-                string ciState = GetImodKernelCiBlockState();
-                error = $"{error} (kernel CI blocked; {ciState})";
+                if (IsImodKernelCiBlockedLoadError(error))
+                {
+                    string ciState = GetImodKernelCiBlockState();
+                    error = $"{error} (kernel CI blocked; {ciState})";
+                }
+                LogImodDriverLoadDiagnostics(driverPath, error);
+                return false;
             }
-            LogImodDriverLoadDiagnostics(driverPath, error);
-            return false;
-        }
 
             ClearImodKernelCiBlockStatus();
             ImodDriverContext imodDriver = driverContext!;
@@ -474,6 +474,49 @@ public sealed partial class MainForm
         return true;
     }
 
+    private void CheckImodDriverFromBlock(DeviceBlock block)
+    {
+        WriteLog($"UI: CHECK IMOD button clicked device={block.Device.InstanceId}");
+        if (block.Device.IsTestDevice)
+        {
+            RefreshTestImodPreview(block, "test-imod-check");
+            return;
+        }
+
+        if (TryBlockSandboxHardwareWrite("IMOD CHECK"))
+        {
+            return;
+        }
+
+        block.ImodCurrentLabel.Text = "current: loading driver...";
+        block.ImodCurrentLabel.Tag = block.ImodCurrentLabel.Text;
+        block.ImodCurrentLabel.ForeColor = _statusInactive;
+        SetImodDetailsVisibility(block, forceVisible: true);
+
+        if (!TryCheckImodDriver(out string? error))
+        {
+            string status = "current: driver load failed";
+            block.ImodCurrentLabel.Text = status;
+            block.ImodCurrentLabel.Tag = string.IsNullOrWhiteSpace(error) ? status : $"{status}\r\n{error}";
+            block.ImodCurrentLabel.ForeColor = _statusDanger;
+            SetImodStatusTooltip(block.ImodCurrentLabel);
+            if (block.ImodMapLabel is not null)
+            {
+                block.ImodMapLabel.Text = error ?? "DTIMOD.sys load failed";
+                block.ImodMapLabel.Tag = block.ImodMapLabel.Text;
+                block.ImodMapLabel.ForeColor = _statusDanger;
+                SetImodStatusTooltip(block.ImodMapLabel);
+            }
+
+            WriteLog($"IMOD.CHECK: failed device={block.Device.InstanceId} error={error}");
+            ShowThemedInfo($"IMOD driver load failed.\n{error}");
+            return;
+        }
+
+        WriteLog($"IMOD.CHECK: ok device={block.Device.InstanceId}");
+        RefreshImodCurrentValues(reason: "imod-check");
+    }
+
     private void RefreshImodCurrentValues(bool showReadingStatus = true, string reason = "refresh")
     {
         _ = RefreshImodCurrentValuesAsync(showReadingStatus, reason);
@@ -481,6 +524,14 @@ public sealed partial class MainForm
 
     private async Task RefreshImodCurrentValuesAsync(bool showReadingStatus = true, string reason = "refresh")
     {
+        List<DeviceBlock> testBlocks = _blocks
+            .Where(b => IsUsbImodTarget(b.Device) && b.Device.IsTestDevice)
+            .ToList();
+        foreach (DeviceBlock block in testBlocks)
+        {
+            RefreshTestImodPreview(block, reason);
+        }
+
         List<DeviceBlock> targetBlocks = _blocks
             .Where(b => IsUsbImodTarget(b.Device) && !b.Device.IsTestDevice)
             .ToList();
@@ -488,11 +539,11 @@ public sealed partial class MainForm
 
         if (targetBlocks.Count == 0)
         {
-            WriteLog($"IMOD.READBACK.START: reason={reason} targets=0");
+            WriteLog($"IMOD.READBACK.START: reason={reason} targets=0 testTargets={testBlocks.Count}");
             return;
         }
 
-        WriteLog($"IMOD.READBACK.START: reason={reason} targets={targetBlocks.Count} showReading={showReadingStatus}");
+        WriteLog($"IMOD.READBACK.START: reason={reason} targets={targetBlocks.Count} testTargets={testBlocks.Count} showReading={showReadingStatus}");
 
         if (TryGetCachedImodKernelCiBlockStatus(out string blockedStatus, out string blockedDetail))
         {
@@ -557,22 +608,23 @@ public sealed partial class MainForm
         {
             CacheImodKernelCiBlockStatus(readback.error);
             string statusText = FormatImodReadbackStatus(readback.error);
-            string detailText = IsImodAttentionStatus(statusText)
+            string detailText = IsImodAttentionStatus(statusText) || IsImodNeedsCheckStatus(readback.error)
                 ? FormatImodReadbackDetail(readback.error)
                 : "devices: unavailable";
-            bool isBlockedStatus =
-                statusText.Contains("admin required", StringComparison.OrdinalIgnoreCase)
-                || statusText.Contains("driver blocked", StringComparison.OrdinalIgnoreCase)
-                || statusText.Contains("kernel CI blocked", StringComparison.OrdinalIgnoreCase)
-                || statusText.Contains("signature blocked", StringComparison.OrdinalIgnoreCase)
-                || statusText.Contains("driver not loaded", StringComparison.OrdinalIgnoreCase);
+            bool isBlockedStatus = IsImodBlockedStatus(statusText) || IsImodBlockedStatus(detailText);
+            bool needsCheck = IsImodNeedsCheckStatus(statusText) || IsImodNeedsCheckStatus(detailText) || IsImodNeedsCheckStatus(readback.error);
+            bool isAdminRequired = statusText.Contains("admin required", StringComparison.OrdinalIgnoreCase)
+                || detailText.Contains("admin required", StringComparison.OrdinalIgnoreCase);
+            bool showAttention = isBlockedStatus || needsCheck || isAdminRequired;
             foreach (DeviceBlock block in targetBlocks)
             {
                 block.ImodCurrentLabel.Text = statusText;
-                block.ImodCurrentLabel.Tag = isBlockedStatus
+                block.ImodCurrentLabel.Tag = showAttention
                     ? $"{statusText}\r\n{detailText}"
                     : block.ImodCurrentLabel.Text;
-                block.ImodCurrentLabel.ForeColor = isBlockedStatus ? _statusDanger : _statusInactive;
+                block.ImodCurrentLabel.ForeColor = isBlockedStatus
+                    ? _statusDanger
+                    : _statusInactive;
                 SetImodStatusTooltip(block.ImodCurrentLabel);
                 if (block.ImodMapLabel is not null)
                 {
@@ -581,7 +633,7 @@ public sealed partial class MainForm
                     block.ImodMapLabel.ForeColor = isBlockedStatus ? _statusDanger : _mutedText;
                     SetImodStatusTooltip(block.ImodMapLabel);
                 }
-                SetImodDetailsVisibility(block, forceVisible: isBlockedStatus);
+                SetImodDetailsVisibility(block, forceVisible: showAttention);
                 LogImodUiSnapshot(block, reason);
             }
 
@@ -667,6 +719,159 @@ public sealed partial class MainForm
             + $"detail=\"{SanitizeLogValue(detail)}\"");
     }
 
+    private void RefreshTestImodPreview(DeviceBlock block, string reason = "test-preview")
+    {
+        if (!block.Device.IsTestDevice || !IsUsbImodTarget(block.Device))
+        {
+            return;
+        }
+
+        EnsureImodConfigLoaded();
+        uint fallback = (_imodConfigCache?.GlobalInterval ?? ImodDefaultInterval) & 0xFFFF;
+        string text = block.ImodBox.Text?.Trim() ?? string.Empty;
+        if (!TryParseImodInput(text, fallback, out ImodInput parsedInput))
+        {
+            block.ImodCurrentLabel.Text = "current: invalid input";
+            block.ImodCurrentLabel.Tag = block.ImodCurrentLabel.Text;
+            block.ImodCurrentLabel.ForeColor = _statusDanger;
+            if (block.ImodMapLabel is not null)
+            {
+                block.ImodMapLabel.Text = "devices: invalid IMOD input";
+                block.ImodMapLabel.Tag = block.ImodMapLabel.Text;
+                block.ImodMapLabel.ForeColor = _statusDanger;
+                SetImodStatusTooltip(block.ImodMapLabel);
+            }
+
+            SetImodStatusTooltip(block.ImodCurrentLabel);
+            SetImodDetailsVisibility(block, forceVisible: true);
+            LogImodUiSnapshot(block, reason);
+            WriteLog($"IMOD.TEST.PREVIEW: {block.Device.InstanceId} invalid input=\"{SanitizeLogValue(text)}\"");
+            return;
+        }
+
+        List<uint> values = BuildTestImodPreviewValues(block.Device, parsedInput, fallback);
+        Dictionary<uint, List<string>> labelsByInterrupter = BuildTestImodPreviewLabels(block.Device);
+        string mappedDeviceLine = FormatMappedImodDeviceLine(values, labelsByInterrupter, [], FormatUnknownImodDeviceValue(values));
+        string visibleInterruptLines = FormatVisibleImodInterrupterLines(values);
+        string detailText =
+            $"{mappedDeviceLine}\r\n\r\n{visibleInterruptLines}\r\n{FormatDetailedImodInterrupterMap(values, labelsByInterrupter)}\r\n{FormatRawImodInterrupterMap(values)}\r\n{FormatTimeImodInterrupterMap(values)}\r\nsource: test preview only; no driver read/write";
+
+        block.ImodDefaultLabel.Text = $"default: {FormatImodValue(fallback)}";
+        block.ImodDefaultLabel.Tag = FormatImodValue(fallback);
+        block.ImodCurrentLabel.Text = $"current: {FormatImodValueList(values)}";
+        block.ImodCurrentLabel.Tag = $"test preview raw: {FormatImodValueListForLog(values)}";
+        block.ImodCurrentLabel.ForeColor = _statusActive;
+        SetImodStatusTooltip(block.ImodCurrentLabel);
+
+        if (block.ImodMapLabel is not null)
+        {
+            block.ImodMapLabel.Text = $"{mappedDeviceLine}\r\n\r\n{visibleInterruptLines}";
+            block.ImodMapLabel.Tag = detailText;
+            block.ImodMapLabel.ForeColor = _mutedText;
+            SetImodStatusTooltip(block.ImodMapLabel);
+        }
+
+        if (!block.ImodAutoCheck.Checked)
+        {
+            block.SuppressImodEvents++;
+            try
+            {
+                block.ImodAutoCheck.Checked = true;
+            }
+            finally
+            {
+                block.SuppressImodEvents--;
+            }
+        }
+
+        SetImodDetailsVisibility(block, forceVisible: true);
+        LogImodUiSnapshot(block, reason, values, detailText);
+        WriteLog($"IMOD.TEST.PREVIEW: {block.Device.InstanceId} values={FormatImodValueListForLog(values)} reason={reason}");
+    }
+
+    private static List<uint> BuildTestImodPreviewValues(DeviceInfo device, ImodInput input, uint fallback)
+    {
+        const int previewInterrupters = 8;
+        uint normalizedFallback = fallback & 0xFFFF;
+
+        if (input.Intervals is { Count: > 0 } intervals)
+        {
+            List<uint> values = intervals
+                .Take(previewInterrupters)
+                .Select(value => value & 0xFFFF)
+                .ToList();
+            while (values.Count < previewInterrupters)
+            {
+                values.Add(normalizedFallback);
+            }
+
+            return values;
+        }
+
+        if (input.RoleIntervals is { Count: > 0 } roleIntervals)
+        {
+            List<uint> values = Enumerable.Repeat(normalizedFallback, previewInterrupters).ToList();
+            HashSet<string> roles = BuildTestImodPreviewRoles(device);
+            if (roles.Count > 0 && TrySelectAdaptiveRoleInterval(roles, roleIntervals, out _, out uint selectedValue))
+            {
+                values[0] = selectedValue & 0xFFFF;
+            }
+
+            return values;
+        }
+
+        uint interval = (input.Interval ?? normalizedFallback) & 0xFFFF;
+        return Enumerable.Repeat(interval, previewInterrupters).ToList();
+    }
+
+    private static Dictionary<uint, List<string>> BuildTestImodPreviewLabels(DeviceInfo device)
+    {
+        Dictionary<string, List<string>> labelsByRole = new(StringComparer.OrdinalIgnoreCase);
+        AddAdaptiveRoleDisplayLabels(device.UsbRoles, labelsByRole);
+        AddAdaptiveRoleDisplayLabels(device.AudioEndpoints, labelsByRole);
+
+        List<string> labels = [];
+        HashSet<string> emitted = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string role in AdaptiveRolePriority)
+        {
+            if (!labelsByRole.TryGetValue(role, out List<string>? roleLabels))
+            {
+                continue;
+            }
+
+            foreach (string label in roleLabels)
+            {
+                if (emitted.Add(label))
+                {
+                    labels.Add(label);
+                }
+            }
+        }
+
+        foreach (KeyValuePair<string, List<string>> pair in labelsByRole.OrderBy(static kvp => kvp.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            foreach (string label in pair.Value)
+            {
+                if (emitted.Add(label))
+                {
+                    labels.Add(label);
+                }
+            }
+        }
+
+        return labels.Count > 0
+            ? new Dictionary<uint, List<string>> { [0] = labels }
+            : [];
+    }
+
+    private static HashSet<string> BuildTestImodPreviewRoles(DeviceInfo device)
+    {
+        Dictionary<string, List<string>> labelsByRole = new(StringComparer.OrdinalIgnoreCase);
+        AddAdaptiveRoleDisplayLabels(device.UsbRoles, labelsByRole);
+        AddAdaptiveRoleDisplayLabels(device.AudioEndpoints, labelsByRole);
+        return new HashSet<string>(labelsByRole.Keys, StringComparer.OrdinalIgnoreCase);
+    }
+
     private void SetImodStatusTooltip(Control label)
     {
         try
@@ -697,7 +902,33 @@ public sealed partial class MainForm
             || text.Contains("kernel CI blocked", StringComparison.OrdinalIgnoreCase)
             || text.Contains("signature blocked", StringComparison.OrdinalIgnoreCase)
             || text.Contains("driver not loaded", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("press CHECK", StringComparison.OrdinalIgnoreCase)
             || text.Contains("admin required", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsImodBlockedStatus(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        return text.Contains("driver blocked", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("kernel CI blocked", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("signature blocked", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("Defender", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("blocked by Windows", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsImodNeedsCheckStatus(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        return text.Contains("press CHECK", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("driver not loaded", StringComparison.OrdinalIgnoreCase);
     }
 
     private void SetImodDetailsVisibility(DeviceBlock block, bool forceVisible)
@@ -854,6 +1085,12 @@ public sealed partial class MainForm
             return false;
         }
 
+        if (!IsImodDriverAlreadyAvailable())
+        {
+            error = "driver not loaded (press CHECK)";
+            return false;
+        }
+
         bool cleanupDriver = false;
         try
         {
@@ -867,7 +1104,7 @@ public sealed partial class MainForm
                 return true;
             }
 
-        if (!ImodDriverContext.TryInitialize(driverPath, WriteLog, out ImodDriverContext? driverContext, out error))
+            if (!ImodDriverContext.TryInitialize(driverPath, WriteLog, out ImodDriverContext? driverContext, out error))
             {
                 LogImodDriverLoadDiagnostics(driverPath, error);
                 return false;
@@ -1020,6 +1257,12 @@ public sealed partial class MainForm
             return "current: admin required";
         }
 
+        if (error.Contains("press CHECK", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("driver not loaded", StringComparison.OrdinalIgnoreCase))
+        {
+            return "current: press CHECK";
+        }
+
         return "current: unavailable";
     }
 
@@ -1033,6 +1276,18 @@ public sealed partial class MainForm
         if (string.IsNullOrWhiteSpace(error))
         {
             return "devices: unavailable";
+        }
+
+        if (error.Contains("press CHECK", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("driver not loaded", StringComparison.OrdinalIgnoreCase))
+        {
+            return "devices: press CHECK";
+        }
+
+        if (error.Contains("administrator", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("админист", StringComparison.OrdinalIgnoreCase))
+        {
+            return "devices: admin required";
         }
 
         if (!IsImodSignatureRejectedError(error))
@@ -1323,7 +1578,9 @@ public sealed partial class MainForm
 
     private static string FormatVisibleImodInterrupterLines(IReadOnlyList<uint> values)
     {
-        const int chunkSize = 4;
+        // Keep lines short enough for the map box width so WordWrap never splits
+        // mid-token (e.g. "intr3=" on one line and "0xC8/50us" on the next).
+        const int chunkSize = 2;
         const int maxVisible = 8;
 
         if (values.Count == 0)
@@ -2361,9 +2618,42 @@ public sealed partial class MainForm
         }
     }
 
+    private bool TryCheckImodDriver(out string? error)
+    {
+        error = null;
+        if (!IsAdministrator())
+        {
+            error = "administrator privileges required";
+            return false;
+        }
+
+        if (!EnsureImodDriverOnDisk(persistDriver: true, out string driverPath, out error))
+        {
+            return false;
+        }
+
+        if (!ImodDriverContext.TryInitialize(driverPath, WriteLog, out ImodDriverContext? driverContext, out error))
+        {
+            if (IsImodKernelCiBlockedLoadError(error))
+            {
+                string ciState = GetImodKernelCiBlockState();
+                error = $"{error} (kernel CI blocked; {ciState})";
+            }
+
+            LogImodDriverLoadDiagnostics(driverPath, error);
+            return false;
+        }
+
+        using (driverContext)
+        {
+            ClearImodKernelCiBlockStatus();
+            WriteLog($"IMOD.DRIVER.CHECK: ok path={driverPath}");
+            return true;
+        }
+    }
+
     private bool EnsureImodDriverOnDisk(bool persistDriver, out string driverPath, out string? error)
     {
-        _ = persistDriver;
         error = null;
         driverPath = GetImodDriverSystemPath();
 
@@ -2396,6 +2686,32 @@ public sealed partial class MainForm
                 return false;
             }
 
+            if (File.Exists(driverPath))
+            {
+                string existingHash = ComputeFileSha256(driverPath);
+                if (HashEquals(existingHash, expectedHash ?? embeddedHash))
+                {
+                    WriteLog($"IMOD.DRIVER: using existing staged {driverPath} sha256={existingHash}");
+                    return true;
+                }
+
+                if (!persistDriver)
+                {
+                    WriteLog(
+                        $"IMOD.DRIVER: hash mismatch persistDriver=false -> keep existing {driverPath} " +
+                        $"sha256={existingHash} (no replace on refresh/read)");
+                    return true;
+                }
+
+                WriteLog($"IMOD.DRIVER: replacing staged {driverPath} sha256={existingHash} -> {embeddedHash}");
+            }
+            else if (!persistDriver)
+            {
+                error = "DTIMOD.sys is not staged; press CHECK to load the driver";
+                WriteLog($"IMOD.DRIVER: missing {driverPath} persistDriver=false -> skip stage");
+                return false;
+            }
+
             if (!IsImodDriverSystemPath(driverPath))
             {
                 string? driverRoot = Path.GetDirectoryName(driverDir);
@@ -2419,18 +2735,6 @@ public sealed partial class MainForm
             {
                 error = "Windows directory for IMOD driver not found";
                 return false;
-            }
-
-            if (File.Exists(driverPath))
-            {
-                string existingHash = ComputeFileSha256(driverPath);
-                if (HashEquals(existingHash, expectedHash ?? embeddedHash))
-                {
-                    WriteLog($"IMOD.DRIVER: using existing staged {driverPath} sha256={existingHash}");
-                    return true;
-                }
-
-                WriteLog($"IMOD.DRIVER: replacing staged {driverPath} sha256={existingHash} -> {embeddedHash}");
             }
 
             File.WriteAllBytes(driverPath, driverBytes);
@@ -2577,6 +2881,17 @@ public sealed partial class MainForm
 
         error = $"failed to open {ImodDriverDevicePath}: {GetWin32ErrorMessage(lastError)}";
         return false;
+    }
+
+    private static bool IsImodDriverAlreadyAvailable()
+    {
+        if (!TryOpenImodDriverDeviceOnce(out IntPtr handle, out _))
+        {
+            return false;
+        }
+
+        _ = CloseHandle(handle);
+        return true;
     }
 
     private static bool TryOpenImodDriverDeviceOnce(out IntPtr handle, out string? error)
@@ -3739,7 +4054,7 @@ public sealed partial class MainForm
             }
         }
 
-        private static void CleanupDriverArtifacts(string driverPath)
+        private void CleanupDriverArtifacts(string driverPath)
         {
             if (string.IsNullOrWhiteSpace(driverPath))
             {
@@ -3758,8 +4073,9 @@ public sealed partial class MainForm
                     File.Delete(driverPath);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                _log?.Invoke($"IMOD.DRIVER.CLEANUP.ERROR: file=\"{driverPath}\" error=\"{ex.Message}\"");
             }
 
             string? driverDirectory = Path.GetDirectoryName(driverPath);
@@ -3775,8 +4091,9 @@ public sealed partial class MainForm
                     Directory.Delete(driverDirectory, recursive: true);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                _log?.Invoke($"IMOD.DRIVER.CLEANUP.ERROR: directory=\"{driverDirectory}\" error=\"{ex.Message}\"");
             }
 
             string? stagingRoot = Path.GetDirectoryName(driverDirectory);
@@ -3792,8 +4109,9 @@ public sealed partial class MainForm
                     Directory.Delete(stagingRoot, recursive: true);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                _log?.Invoke($"IMOD.DRIVER.CLEANUP.ERROR: stagingRoot=\"{stagingRoot}\" error=\"{ex.Message}\"");
             }
         }
 

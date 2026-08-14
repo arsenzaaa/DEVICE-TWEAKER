@@ -28,8 +28,75 @@ public sealed partial class MainForm
 
     private sealed record RawMouseThrottleState(bool Exists, bool IsValid, int Duration, string RawValue);
 
+    /// <summary>
+    /// RawMouseThrottle* is a Windows 11 input-stack feature from the July 2023
+    /// update (KB5028185 / Moment 3; preview KB5027303). Win10 has no throttle
+    /// path in win32k. Registry writes are inert no-ops for the OS.
+    /// </summary>
+    private static bool SupportsRawMouseThrottleOs()
+    {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22621))
+        {
+            return false;
+        }
+
+        // The feature first shipped in 22621.1928 (KB5027303 preview) and was
+        // then serviced broadly by KB5028185. A build-only check incorrectly
+        // enables the control on an unpatched 22H2 installation.
+        if (Environment.OSVersion.Version.Build > 22621)
+        {
+            return true;
+        }
+
+        try
+        {
+            using RegistryKey? currentVersion = Registry.LocalMachine.OpenSubKey(
+                @"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
+            object? ubrValue = currentVersion?.GetValue("UBR");
+            int ubr = ubrValue is int value
+                ? value
+                : int.TryParse(ubrValue?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed)
+                    ? parsed
+                    : 0;
+            return ubr >= 1928;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string GetRawMouseThrottleToolTip(bool osSupported)
+    {
+        const string whatItDoes =
+            "Windows limits how often background apps receive raw mouse input.\n"
+            + "This reduces the message load created by throttling and coalescing input.\n"
+            + "Mice with a polling rate from 1 to 8 kHz can create a high message load.\n"
+            + "Foreground apps keep the full input rate.\n"
+            + "Background raw input listeners receive a lower message rate.";
+
+        const string how =
+            "The setting writes RawMouseThrottleDuration to HKCU\\Control Panel\\Mouse.\n"
+            + "The accepted DWORD range is from 1 to 20 milliseconds.\n"
+            + "A larger value produces a lower rate for background listeners.\n"
+            + "20 milliseconds is approximately 50 Hz. 8 milliseconds is approximately 125 Hz. 1 millisecond is approximately 1 kHz.";
+
+        const string when =
+            "The setting first appeared in the Windows 11 22H2 preview build 22621.1928 with KB5027303.\n"
+            + "It was included in the July 2023 update KB5028185.";
+
+        if (osSupported)
+        {
+            return whatItDoes + "\n\n" + how + "\n\n" + when;
+        }
+
+        return whatItDoes + "\n\n" + when
+            + "\n\nThis setting is not available on Windows 10 or an older unpatched Windows 11 22H2 build.";
+    }
+
     private bool HasMouseThrottleContext(DeviceInfo device)
     {
+        // Show for USB mice on all OS versions; enable only on Win11+ (see SupportsRawMouseThrottleOs).
         return device.Kind == DeviceKind.USB
             && device.UsbRoles.Split(',', StringSplitOptions.RemoveEmptyEntries)
                 .Any(role => IsUsbRoleText(role, "Mouse"));
@@ -98,17 +165,40 @@ public sealed partial class MainForm
                 block.RawMouseThrottleCombo.Items.AddRange(_rawMouseThrottlePresets);
             }
 
+            bool osSupported = SupportsRawMouseThrottleOs();
+            RawMouseThrottlePreset selected = GetRawMouseThrottlePreset(DefaultRawMouseThrottleDuration);
+            if (!osSupported)
+            {
+                if (!block.RawMouseThrottleCombo.Items.Contains(selected))
+                {
+                    block.RawMouseThrottleCombo.Items.Add(selected);
+                }
+
+                block.RawMouseThrottleCheck.Checked = false;
+                block.RawMouseThrottleCombo.SelectedItem = selected;
+                block.RawMouseThrottleCheck.Enabled = false;
+                block.RawMouseThrottleCombo.Enabled = false;
+                if (block.RawMouseThrottleStatusLabel is not null)
+                {
+                    block.RawMouseThrottleStatusLabel.Text = "current: unavailable (Windows 11 22H2+)";
+                    block.RawMouseThrottleStatusLabel.ForeColor = _statusInactive;
+                }
+
+                return;
+            }
+
             RawMouseThrottleState state = ReadRawMouseThrottleState();
-            RawMouseThrottlePreset selected = GetRawMouseThrottlePreset(
+            selected = GetRawMouseThrottlePreset(
                 state.IsValid ? state.Duration : DefaultRawMouseThrottleDuration);
             if (!block.RawMouseThrottleCombo.Items.Contains(selected))
             {
                 block.RawMouseThrottleCombo.Items.Add(selected);
             }
 
+            block.RawMouseThrottleCheck.Enabled = true;
+            block.RawMouseThrottleCombo.Enabled = true;
             block.RawMouseThrottleCheck.Checked = state.IsValid;
             block.RawMouseThrottleCombo.SelectedItem = selected;
-            block.RawMouseThrottleCombo.Enabled = true;
             UpdateRawMouseThrottleStatusLabel(block, state);
         }
         finally
@@ -120,9 +210,29 @@ public sealed partial class MainForm
     private void HandleRawMouseThrottleChanged(DeviceBlock block)
     {
         if (_rawMouseThrottleUiRefreshing
+            || !SupportsRawMouseThrottleOs()
             || block.RawMouseThrottleCheck is null
             || block.RawMouseThrottleCombo is null)
         {
+            return;
+        }
+
+        if (block.Device.IsTestDevice)
+        {
+            int previewDuration = GetSelectedRawMouseThrottleDuration(block);
+            bool enabled = block.RawMouseThrottleCheck.Checked;
+            WriteLog(
+                $"USBPOLL.THROTTLE.TEST: preview only enabled={enabled} duration={previewDuration} " +
+                $"(no registry write for test device {block.Device.InstanceId})");
+            if (block.RawMouseThrottleStatusLabel is not null)
+            {
+                block.RawMouseThrottleStatusLabel.Text = enabled
+                    ? $"current: preview {GetRawMouseThrottleCapTag(previewDuration)} (DWORD={previewDuration})"
+                    : "current: preview off";
+                block.RawMouseThrottleStatusLabel.ForeColor = _statusActive;
+            }
+
+            UpdateRawMouseThrottleInfoLine(block);
             return;
         }
 
@@ -165,6 +275,11 @@ public sealed partial class MainForm
 
     private void SetRawMouseThrottle(bool enabled, int duration)
     {
+        if (!SupportsRawMouseThrottleOs())
+        {
+            throw new InvalidOperationException("RawMouseThrottleDuration requires Windows 11+.");
+        }
+
         using RegistryKey? mouseKey = Registry.CurrentUser.CreateSubKey(@"Control Panel\Mouse", writable: true);
         if (mouseKey is null)
         {
@@ -183,8 +298,14 @@ public sealed partial class MainForm
         WriteLog($"USBPOLL.THROTTLE.SET: enabled {RawMouseThrottleValueName}={clampedDuration} cap={GetRawMouseThrottleCapTag(clampedDuration)}");
     }
 
-    private void ApplyAutoRawMouseThrottle()
+    private void ApplyAutoRawMouseThrottle(OperationReport? report = null)
     {
+        if (!SupportsRawMouseThrottleOs())
+        {
+            WriteLog("AUTO.THROTTLE: skipped (RawMouseThrottle requires Windows 11+)");
+            return;
+        }
+
         try
         {
             SetRawMouseThrottle(enabled: true, DefaultRawMouseThrottleDuration);
@@ -194,6 +315,7 @@ public sealed partial class MainForm
         catch (Exception ex)
         {
             WriteLog($"AUTO.THROTTLE: failed: {ex.Message}");
+            report?.AddError("Raw mouse throttle", ex.Message);
         }
     }
 

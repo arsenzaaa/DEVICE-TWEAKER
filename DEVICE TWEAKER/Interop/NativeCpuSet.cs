@@ -4,34 +4,26 @@ namespace DeviceTweakerCS;
 
 internal static class NativeCpuSet
 {
-    [StructLayout(LayoutKind.Sequential)]
-    internal struct GroupAffinity
-    {
-        public UIntPtr Mask;
-        public ushort Group;
-
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-        public ushort[] Reserved;
-    }
-
+    // SYSTEM_CPU_SET_INFORMATION_TYPE.CpuSetInformation.
+    // Keep this layout byte-for-byte compatible with winnt.h. The CpuSet
+    // member of the native union is 24 bytes and the complete record is
+    // 32 bytes on both x86 and x64.
     [StructLayout(LayoutKind.Sequential)]
     internal struct SystemCpuSetInformation
     {
-        public int Size;
-        public int Type;
-        public int Id;
-        public short Group;
+        public uint Size;
+        public uint Type;
+        public uint Id;
+        public ushort Group;
         public byte LogicalProcessorIndex;
         public byte CoreIndex;
         public byte LastLevelCacheIndex;
         public byte NumaNodeIndex;
         public byte EfficiencyClass;
-        public byte Parked;
-        public byte Allocated;
-        public byte AllocatedToTargetProcess;
-        public UIntPtr SchedulingClass;
-        public UIntPtr AllocationTag;
-        public GroupAffinity GroupAffinity;
+        public byte AllFlags;
+        public byte SchedulingClass;
+        private readonly byte Reserved;
+        public ulong AllocationTag;
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]
@@ -42,4 +34,3 @@ internal static class NativeCpuSet
         IntPtr process,
         int flags);
 }
-

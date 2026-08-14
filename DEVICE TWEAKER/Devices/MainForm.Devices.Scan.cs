@@ -202,6 +202,32 @@ public sealed partial class MainForm
     private NdisRssRuntimeState GetNdisRssRuntimeState(string instanceId)
     {
         string normalized = NormalizeInstanceId(instanceId);
+        DeviceBlock? testBlock = _blocks.FirstOrDefault(b =>
+            b.Device.IsTestDevice
+            && string.Equals(NormalizeInstanceId(b.Device.InstanceId), normalized, StringComparison.OrdinalIgnoreCase));
+        if (testBlock is not null)
+        {
+            if (testBlock.NdisRssRuntime is NdisRssRuntimeState seeded)
+            {
+                return seeded;
+            }
+
+            return new NdisRssRuntimeState(
+                AdapterFound: true,
+                RssFound: true,
+                Enabled: true,
+                BaseProcessorGroup: 0,
+                BaseProcessorNumber: testBlock.RssBaseCore ?? 0,
+                MaxProcessorGroup: 0,
+                MaxProcessorNumber: Math.Max(0, _maxLogical - 1),
+                MaxProcessors: Math.Max(1, _maxLogical),
+                NumberOfReceiveQueues: ClampRssQueueCount((int)(testBlock.RssQueueBox?.Value ?? 1)),
+                AdapterName: testBlock.Device.Name,
+                InterfaceDescription: testBlock.Device.Name,
+                Profile: "TEST",
+                Error: "test-device");
+        }
+
         if (_ndisRssRuntimeCache.TryGetValue(normalized, out NdisRssRuntimeState? cached))
         {
             return cached;
@@ -374,7 +400,11 @@ public sealed partial class MainForm
         };
     }
 
-    private void SetNdisBaseCore(string instanceId, int baseCore)
+    private void SetNdisBaseCore(
+        string instanceId,
+        int baseCore,
+        OperationReport? report = null,
+        string? deviceName = null)
     {
         if (baseCore < 0)
         {
@@ -387,20 +417,32 @@ public sealed partial class MainForm
             try
             {
                 using RegistryKey? ck = Registry.LocalMachine.CreateSubKey(ckPath);
-                ck?.SetValue("*RssBaseProcNumber", baseCore, RegistryValueKind.DWord);
+                if (ck is null)
+                {
+                    throw new InvalidOperationException("NDIS class key could not be opened for writing");
+                }
+
+                ck.SetValue("*RssBaseProcNumber", baseCore, RegistryValueKind.DWord);
                 WriteLog($"RSS.SET: {instanceId} -> *RssBaseProcNumber={baseCore} (class key)");
             }
-            catch
+            catch (Exception ex)
             {
+                WriteLog($"RSS.SET.ERROR: {instanceId} value=*RssBaseProcNumber error=\"{FlattenLogText(ex.ToString())}\"");
+                report?.AddError($"{deviceName ?? instanceId} — set RSS base CPU", ex.Message);
             }
         }
         else
         {
             WriteLog($"RSS.SET.SKIP: {instanceId} class key not found; *RssBaseProcNumber not written");
+            report?.AddError($"{deviceName ?? instanceId} — set RSS base CPU", "NDIS class key was not found");
         }
     }
 
-    private void SetNdisRssQueues(string instanceId, int queues)
+    private void SetNdisRssQueues(
+        string instanceId,
+        int queues,
+        OperationReport? report = null,
+        string? deviceName = null)
     {
         if (queues < 1)
         {
@@ -413,20 +455,33 @@ public sealed partial class MainForm
             try
             {
                 using RegistryKey? ck = Registry.LocalMachine.CreateSubKey(ckPath);
-                ck?.SetValue("*NumRssQueues", queues, RegistryValueKind.DWord);
+                if (ck is null)
+                {
+                    throw new InvalidOperationException("NDIS class key could not be opened for writing");
+                }
+
+                ck.SetValue("*NumRssQueues", queues, RegistryValueKind.DWord);
                 WriteLog($"RSS.SET: {instanceId} -> *NumRssQueues={queues} (class key)");
             }
-            catch
+            catch (Exception ex)
             {
+                WriteLog($"RSS.SET.ERROR: {instanceId} value=*NumRssQueues error=\"{FlattenLogText(ex.ToString())}\"");
+                report?.AddError($"{deviceName ?? instanceId} — set RSS queue count", ex.Message);
             }
         }
         else
         {
             WriteLog($"RSS.SET.SKIP: {instanceId} class key not found; *NumRssQueues not written");
+            report?.AddError($"{deviceName ?? instanceId} — set RSS queue count", "NDIS class key was not found");
         }
     }
 
-    private void SetNdisRssExtraValues(string instanceId, int baseCore, int queues)
+    private void SetNdisRssExtraValues(
+        string instanceId,
+        int baseCore,
+        int queues,
+        OperationReport? report = null,
+        string? deviceName = null)
     {
         if (baseCore < 0)
         {
@@ -443,6 +498,7 @@ public sealed partial class MainForm
         if (string.IsNullOrWhiteSpace(ckPath))
         {
             WriteLog($"RSS.EXTRA.SET.SKIP: {instanceId} class key not found");
+            report?.AddError($"{deviceName ?? instanceId} — set extended RSS values", "NDIS class key was not found");
             return;
         }
 
@@ -451,6 +507,7 @@ public sealed partial class MainForm
             using RegistryKey? ck = Registry.LocalMachine.CreateSubKey(ckPath);
             if (ck is null)
             {
+                report?.AddError($"{deviceName ?? instanceId} — set extended RSS values", "NDIS class key is unavailable");
                 return;
             }
 
@@ -458,12 +515,17 @@ public sealed partial class MainForm
             ck.SetValue("*MaxRssProcessors", queues, RegistryValueKind.DWord);
             ck.SetValue("*RSSMaxProcGroup", 0, RegistryValueKind.DWord);
             ck.SetValue("*RssMaxProcNumber", maxCore, RegistryValueKind.DWord);
-            ck.SetValue("*NumaNodeId", 0, RegistryValueKind.DWord);
-            WriteLog($"RSS.EXTRA.SET: {instanceId} group=0 maxProcessors={queues} maxProc={maxCore} numa=0");
+            // Do not force NUMA node 0. When the keyword is absent, NDIS can
+            // select the node closest to the adapter according to ACPI. This
+            // preserves the existing group-0 RSS policy without breaking
+            // multi-node systems.
+            ck.DeleteValue("*NumaNodeId", throwOnMissingValue: false);
+            WriteLog($"RSS.EXTRA.SET: {instanceId} group=0 maxProcessors={queues} maxProc={maxCore} numa=automatic");
         }
         catch (Exception ex)
         {
             WriteLog($"RSS.EXTRA.SET: {instanceId} failed: {ex.Message}");
+            report?.AddError($"{deviceName ?? instanceId} — set extended RSS values", ex.Message);
         }
     }
 
@@ -572,7 +634,10 @@ public sealed partial class MainForm
         }
     }
 
-    private void ClearNdisBaseCore(string instanceId)
+    private void ClearNdisBaseCore(
+        string instanceId,
+        OperationReport? report = null,
+        string? deviceName = null)
     {
         string? ckPath = GetClassKeyForDevice(instanceId);
         if (string.IsNullOrWhiteSpace(ckPath))
@@ -584,13 +649,19 @@ public sealed partial class MainForm
         {
             using RegistryKey? ck = Registry.LocalMachine.OpenSubKey(ckPath, writable: true);
             ck?.DeleteValue("*RssBaseProcNumber", throwOnMissingValue: false);
+            WriteLog($"RSS.CLEAR: {instanceId} value=*RssBaseProcNumber keyPresent={ck is not null}");
         }
-        catch
+        catch (Exception ex)
         {
+            WriteLog($"RSS.CLEAR.ERROR: {instanceId} value=*RssBaseProcNumber error=\"{FlattenLogText(ex.ToString())}\"");
+            report?.AddError($"{deviceName ?? instanceId} — clear RSS base CPU", ex.Message);
         }
     }
 
-    private void ClearNdisRssQueues(string instanceId)
+    private void ClearNdisRssQueues(
+        string instanceId,
+        OperationReport? report = null,
+        string? deviceName = null)
     {
         string? ckPath = GetClassKeyForDevice(instanceId);
         if (string.IsNullOrWhiteSpace(ckPath))
@@ -602,13 +673,19 @@ public sealed partial class MainForm
         {
             using RegistryKey? ck = Registry.LocalMachine.OpenSubKey(ckPath, writable: true);
             ck?.DeleteValue("*NumRssQueues", throwOnMissingValue: false);
+            WriteLog($"RSS.CLEAR: {instanceId} value=*NumRssQueues keyPresent={ck is not null}");
         }
-        catch
+        catch (Exception ex)
         {
+            WriteLog($"RSS.CLEAR.ERROR: {instanceId} value=*NumRssQueues error=\"{FlattenLogText(ex.ToString())}\"");
+            report?.AddError($"{deviceName ?? instanceId} — clear RSS queue count", ex.Message);
         }
     }
 
-    private void ClearNdisRssExtraValues(string instanceId)
+    private void ClearNdisRssExtraValues(
+        string instanceId,
+        OperationReport? report = null,
+        string? deviceName = null)
     {
         string? ckPath = GetClassKeyForDevice(instanceId);
         if (string.IsNullOrWhiteSpace(ckPath))
@@ -628,9 +705,13 @@ public sealed partial class MainForm
             {
                 ck.DeleteValue(name, throwOnMissingValue: false);
             }
+
+            WriteLog($"RSS.CLEAR: {instanceId} values=extra-rss keyPresent=true");
         }
-        catch
+        catch (Exception ex)
         {
+            WriteLog($"RSS.CLEAR.ERROR: {instanceId} values=extra-rss error=\"{FlattenLogText(ex.ToString())}\"");
+            report?.AddError($"{deviceName ?? instanceId} — clear extended RSS values", ex.Message);
         }
     }
 
@@ -957,7 +1038,7 @@ public sealed partial class MainForm
                 continue;
             }
 
-            if (kind == DeviceKind.USB && Regex.IsMatch(d.InstanceId, "(?i)\\\\VEN_10DE\\\\"))
+            if (kind == DeviceKind.USB && Regex.IsMatch(d.InstanceId, @"(?i)VEN_10DE(?:&|\\)"))
             {
                 WriteLog($"SCAN: skipped NVIDIA USB controller {d.InstanceId} name=\"{name}\"");
                 continue;
@@ -1062,6 +1143,18 @@ public sealed partial class MainForm
 
             bool isIntegratedGpu = kind == DeviceKind.GPU && IsIntegratedGpuDevice(d.InstanceId, displayName);
 
+            UsbChipPathInfo? usbChipPath = null;
+            string? usbSuspend = null;
+            if (kind == DeviceKind.USB)
+            {
+                usbChipPath = UsbChipPath.Classify(d.InstanceId);
+                usbSuspend = UsbChipPath.TryReadSelectiveSuspendLabel(d.InstanceId);
+                WriteLog(
+                    $"USB.CHIP: {d.InstanceId} {usbChipPath.CompactTag} origin={usbChipPath.Origin} " +
+                    $"platform=\"{usbChipPath.Platform}\" usb=\"{usbChipPath.UsbSpec}\" " +
+                    $"suspend={(usbSuspend ?? "n/a")} vid={usbChipPath.Vid} did={usbChipPath.Did}");
+            }
+
             DeviceInfo devInfo = new()
             {
                 Name = displayName,
@@ -1077,6 +1170,8 @@ public sealed partial class MainForm
                 Wifi = isWifi,
                 UsbIsXhci = usbIsXhci,
                 UsbHasDevices = usbHasDevices,
+                UsbChipPath = usbChipPath,
+                UsbSelectiveSuspend = usbSuspend,
             };
 
             devices.Add(devInfo);

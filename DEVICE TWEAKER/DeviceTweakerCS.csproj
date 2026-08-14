@@ -14,15 +14,17 @@
     <SatelliteResourceLanguages>en;ru</SatelliteResourceLanguages>
     <ApplicationManifest>assets\app.manifest</ApplicationManifest>
     <ApplicationIcon>assets\DEVICE TWEAKER.ico</ApplicationIcon>
+    <!-- Local full-tree backups must not enter the compile graph. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);DEVICE TWEAKER — копия\**;_handoff*\**;_compare\**;bin\SmokeSafe\**</DefaultItemExcludes>
 
     <AssemblyName>DEVICE TWEAKER</AssemblyName>
     <RootNamespace>DeviceTweakerCS</RootNamespace>
     <AssemblyTitle>DEVICE TWEAKER</AssemblyTitle>
 
-    <Version>0.0.4-alpha.1</Version>
+    <Version>0.0.4-alpha.2</Version>
     <AssemblyVersion>0.0.4.0</AssemblyVersion>
-    <FileVersion>0.0.4.0</FileVersion>
-    <InformationalVersion>0.0.4-alpha.1</InformationalVersion>
+    <FileVersion>0.0.4.14</FileVersion>
+    <InformationalVersion>0.0.4-alpha.2</InformationalVersion>
 
     <Company>arsenza</Company>
     <Authors>@arsenza</Authors>

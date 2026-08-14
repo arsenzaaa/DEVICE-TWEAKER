@@ -52,7 +52,7 @@ public sealed partial class MainForm
             return true;
         }
 
-        if (Regex.IsMatch(pnpid, "(?i)\\\\VEN_14C3\\\\"))
+        if (Regex.IsMatch(pnpid, "(?i)VEN_14C3(?:&|\\\\)"))
         {
             return true;
         }

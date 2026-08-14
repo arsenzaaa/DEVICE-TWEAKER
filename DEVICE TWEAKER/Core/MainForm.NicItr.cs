@@ -97,11 +97,12 @@ public sealed partial class MainForm
                 block.NicItrTimeLabel.ForeColor = _mutedText;
             }
 
-            SetNicItrTooltip(block, $"{profile.FamilyName}\ntest preview only; no driver read/write.");
+            SetNicItrTooltip(block, $"{profile.FamilyName}\nTest preview only. No driver read or write.");
             WriteLog($"NIC.ITR.TEST: {block.Device.InstanceId} profile=\"{profile.FamilyName}\" preview={previewText}");
             return;
         }
 
+        int generation = ++block.NicItrOperationGeneration;
         block.NicItrStatusLabel.Text = "current: reading...";
         if (block.NicItrTimeLabel is not null)
         {
@@ -112,45 +113,118 @@ public sealed partial class MainForm
         SetNicItrTooltip(block, $"{profile.FamilyName}\nreading...");
 
         string instanceId = block.Device.InstanceId;
-        (bool ok, List<ulong> values, string? error) result = await Task.Run(() =>
+        try
         {
-            bool ok = TryReadNicItr(instanceId, profile, out List<ulong> values, out string? error);
-            return (ok, values, error);
-        });
+            (bool ok, List<ulong> values, string? error) result = await Task.Run(() =>
+            {
+                bool ok = TryReadNicItr(instanceId, profile, out List<ulong> values, out string? error);
+                return (ok, values, error);
+            });
 
-        if (IsDisposed || block.NicItrBox.IsDisposed || block.NicItrStatusLabel.IsDisposed)
-        {
-            return;
-        }
+            if (IsDisposed
+                || block.NicItrBox.IsDisposed
+                || block.NicItrStatusLabel.IsDisposed
+                || generation != block.NicItrOperationGeneration)
+            {
+                return;
+            }
 
-        if (!result.ok)
-        {
-            block.NicItrStatusLabel.Text = $"current: {FormatNicItrError(result.error)}";
-            block.NicItrStatusLabel.ForeColor = IsNicItrActionableError(result.error) || IsNicItrDriverLoadError(result.error) ? _statusDanger : _mutedText;
+            if (!result.ok)
+            {
+                bool needsCheck = result.error?.Contains("press CHECK", StringComparison.OrdinalIgnoreCase) == true;
+                block.NicItrStatusLabel.Text = $"current: {FormatNicItrError(result.error)}";
+                block.NicItrStatusLabel.ForeColor = needsCheck
+                    ? _statusInactive
+                    : (IsNicItrActionableError(result.error) || IsNicItrDriverLoadError(result.error) ? _statusDanger : _mutedText);
+                if (block.NicItrTimeLabel is not null)
+                {
+                    block.NicItrTimeLabel.Text = "time: unavailable";
+                    block.NicItrTimeLabel.ForeColor = _statusInactive;
+                }
+                SetNicItrTooltip(block, $"{profile.FamilyName}\nread failed: {result.error}");
+                WriteLog($"NIC.ITR.READ: {instanceId} failed: {result.error}");
+                return;
+            }
+
+            string valueText = FormatNicItrValueList(result.values, profile);
+            string summaryText = FormatNicItrQueueSummary(result.values, profile);
+            string detailText = FormatNicItrQueueDetailText(result.values, profile);
+            string timingText = FormatNicItrTimingList(result.values, profile);
+            block.NicItrBox.Text = valueText;
+            block.NicItrStatusLabel.Text = summaryText;
+            block.NicItrStatusLabel.ForeColor = _statusActive;
             if (block.NicItrTimeLabel is not null)
+            {
+                block.NicItrTimeLabel.Text = detailText;
+                block.NicItrTimeLabel.ForeColor = _mutedText;
+            }
+            SetNicItrTooltip(block, $"{profile.FamilyName}\nraw: {valueText}\ntime: {timingText}");
+            WriteLog($"NIC.ITR.READ: {instanceId} profile=\"{profile.FamilyName}\" values={valueText} timing=\"{timingText}\"");
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"NIC.ITR.READ: {instanceId} exception: {ex.Message}");
+            if (IsDisposed
+                || block.NicItrStatusLabel is null
+                || block.NicItrStatusLabel.IsDisposed
+                || generation != block.NicItrOperationGeneration)
+            {
+                return;
+            }
+
+            block.NicItrStatusLabel.Text = "current: read failed";
+            block.NicItrStatusLabel.ForeColor = _statusDanger;
+            if (block.NicItrTimeLabel is not null && !block.NicItrTimeLabel.IsDisposed)
             {
                 block.NicItrTimeLabel.Text = "time: unavailable";
                 block.NicItrTimeLabel.ForeColor = _statusInactive;
             }
-            SetNicItrTooltip(block, $"{profile.FamilyName}\nread failed: {result.error}");
-            WriteLog($"NIC.ITR.READ: {instanceId} failed: {result.error}");
+
+            SetNicItrTooltip(block, $"{profile.FamilyName}\nread failed: {ex.Message}");
+        }
+    }
+
+    private void CheckImodDriverFromNicBlock(DeviceBlock block)
+    {
+        WriteLog($"UI: CHECK NIC ITR button clicked device={block.Device.InstanceId}");
+        if (block.Device.IsTestDevice)
+        {
+            if (block.NicItrStatusLabel is not null)
+            {
+                block.NicItrStatusLabel.Text = "current: driver check skipped (test)";
+                block.NicItrStatusLabel.ForeColor = _statusInactive;
+            }
+
             return;
         }
 
-        string valueText = FormatNicItrValueList(result.values, profile);
-        string summaryText = FormatNicItrQueueSummary(result.values, profile);
-        string detailText = FormatNicItrQueueDetailText(result.values, profile);
-        string timingText = FormatNicItrTimingList(result.values, profile);
-        block.NicItrBox.Text = valueText;
-        block.NicItrStatusLabel.Text = summaryText;
-        block.NicItrStatusLabel.ForeColor = _statusActive;
-        if (block.NicItrTimeLabel is not null)
+        if (TryBlockSandboxHardwareWrite("NIC ITR CHECK"))
         {
-            block.NicItrTimeLabel.Text = detailText;
-            block.NicItrTimeLabel.ForeColor = _mutedText;
+            return;
         }
-        SetNicItrTooltip(block, $"{profile.FamilyName}\nraw: {valueText}\ntime: {timingText}");
-        WriteLog($"NIC.ITR.READ: {instanceId} profile=\"{profile.FamilyName}\" values={valueText} timing=\"{timingText}\"");
+
+        if (block.NicItrStatusLabel is not null)
+        {
+            block.NicItrStatusLabel.Text = "current: loading driver...";
+            block.NicItrStatusLabel.ForeColor = _statusInactive;
+        }
+
+        if (!TryCheckImodDriver(out string? error))
+        {
+            if (block.NicItrStatusLabel is not null)
+            {
+                block.NicItrStatusLabel.Text = "current: driver load failed";
+                block.NicItrStatusLabel.ForeColor = _statusDanger;
+                SetNicItrTooltip(block, error ?? "DTIMOD.sys load failed");
+            }
+
+            WriteLog($"NIC.ITR.CHECK: failed device={block.Device.InstanceId} error={error}");
+            ShowThemedInfo($"IMOD driver load failed.\n{error}");
+            return;
+        }
+
+        WriteLog($"NIC.ITR.CHECK: ok device={block.Device.InstanceId}");
+        RefreshNicItrBlock(block);
     }
 
     private async void ApplyNicItrFromBlock(DeviceBlock block)
@@ -187,7 +261,22 @@ public sealed partial class MainForm
             return;
         }
 
-        CreateDeviceTweakerBackup("pre-nic-itr", showDialog: false);
+        if (TryBlockSandboxHardwareWrite("NIC ITR SET"))
+        {
+            return;
+        }
+
+        if (!CreateDeviceTweakerBackup("pre-nic-itr", showDialog: false))
+        {
+            block.NicItrStatusLabel.Text = "current: backup failed";
+            block.NicItrStatusLabel.ForeColor = _statusDanger;
+            SetNicItrTooltip(block, $"{profile.FamilyName}\nwrite cancelled: automatic backup failed");
+            WriteLog($"NIC.ITR.WRITE: {block.Device.InstanceId} cancelled because automatic backup failed");
+            ShowThemedInfo("NIC ITR apply was cancelled because the automatic backup failed.\nNo registry/hardware changes were made.");
+            return;
+        }
+
+        int generation = ++block.NicItrOperationGeneration;
         block.NicItrStatusLabel.Text = "current: applying...";
         block.NicItrStatusLabel.ForeColor = _statusInactive;
         if (block.NicItrApplyButton is not null)
@@ -196,14 +285,47 @@ public sealed partial class MainForm
         }
 
         string instanceId = block.Device.InstanceId;
-        (bool ok, string? error) result;
         try
         {
-            result = await Task.Run(() =>
+            (bool ok, string? error) result = await Task.Run(() =>
             {
                 bool ok = TryWriteNicItr(instanceId, profile, values, out string? error);
                 return (ok, error);
             });
+
+            if (IsDisposed
+                || block.NicItrBox.IsDisposed
+                || block.NicItrStatusLabel.IsDisposed
+                || generation != block.NicItrOperationGeneration)
+            {
+                return;
+            }
+
+            if (!result.ok)
+            {
+                block.NicItrStatusLabel.Text = $"current: {FormatNicItrError(result.error)}";
+                block.NicItrStatusLabel.ForeColor = IsNicItrActionableError(result.error) || IsNicItrDriverLoadError(result.error) ? _statusDanger : _mutedText;
+                SetNicItrTooltip(block, $"{profile.FamilyName}\nwrite failed: {result.error}");
+                WriteLog($"NIC.ITR.WRITE: {instanceId} failed: {result.error}");
+                return;
+            }
+
+            RefreshNicItrBlock(block);
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"NIC.ITR.WRITE: {instanceId} exception: {ex.Message}");
+            if (IsDisposed
+                || block.NicItrStatusLabel is null
+                || block.NicItrStatusLabel.IsDisposed
+                || generation != block.NicItrOperationGeneration)
+            {
+                return;
+            }
+
+            block.NicItrStatusLabel.Text = "current: write failed";
+            block.NicItrStatusLabel.ForeColor = _statusDanger;
+            SetNicItrTooltip(block, $"{profile.FamilyName}\nwrite failed: {ex.Message}");
         }
         finally
         {
@@ -212,22 +334,6 @@ public sealed partial class MainForm
                 block.NicItrApplyButton.Enabled = true;
             }
         }
-
-        if (IsDisposed || block.NicItrBox.IsDisposed || block.NicItrStatusLabel.IsDisposed)
-        {
-            return;
-        }
-
-        if (!result.ok)
-        {
-            block.NicItrStatusLabel.Text = $"current: {FormatNicItrError(result.error)}";
-            block.NicItrStatusLabel.ForeColor = IsNicItrActionableError(result.error) || IsNicItrDriverLoadError(result.error) ? _statusDanger : _mutedText;
-            SetNicItrTooltip(block, $"{profile.FamilyName}\nwrite failed: {result.error}");
-            WriteLog($"NIC.ITR.WRITE: {instanceId} failed: {result.error}");
-            return;
-        }
-
-        RefreshNicItrBlock(block);
     }
 
     private void SaveNicItrPersistenceFromBlock(DeviceBlock block)
@@ -329,6 +435,12 @@ public sealed partial class MainForm
         bool persistDriver = ShouldPersistSharedImodDriver();
         if (!EnsureImodDriverOnDisk(persistDriver, out string driverPath, out error))
         {
+            return false;
+        }
+
+        if (!IsImodDriverAlreadyAvailable())
+        {
+            error = "driver not loaded (press CHECK)";
             return false;
         }
 
@@ -902,11 +1014,11 @@ public sealed partial class MainForm
             || error.Contains("driver service", StringComparison.OrdinalIgnoreCase)
             || error.Contains("DeviceTweakerImod", StringComparison.OrdinalIgnoreCase)
             || error.Contains("start IMOD driver", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("driver not loaded", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("press CHECK", StringComparison.OrdinalIgnoreCase)
             || error.Contains("digital signature", StringComparison.OrdinalIgnoreCase)
             || error.Contains("подпис", StringComparison.OrdinalIgnoreCase)
-            || error.Contains("цифров", StringComparison.OrdinalIgnoreCase)
-            || error.Contains("цифров", StringComparison.OrdinalIgnoreCase)
-            || error.Contains("подпис", StringComparison.OrdinalIgnoreCase);
+            || error.Contains("цифров", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string FormatNicItrError(string? error)
@@ -918,6 +1030,11 @@ public sealed partial class MainForm
 
         if (IsNicItrDriverLoadError(error))
         {
+            if (error.Contains("press CHECK", StringComparison.OrdinalIgnoreCase))
+            {
+                return "press CHECK";
+            }
+
             return IsImodSignatureRejectedError(error) ? "kernel CI blocked" : "driver not loaded";
         }
 

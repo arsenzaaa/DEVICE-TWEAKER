@@ -22,31 +22,60 @@ internal sealed class HighlightLabel : Label
 
         OnPaintBackground(e);
 
-        TextFormatFlags flags = TextFormatFlags.NoPadding
-            | TextFormatFlags.NoPrefix
+        TextFormatFlags flags = TextFormatFlags.NoPrefix
+            | TextFormatFlags.NoPadding
             | TextFormatFlags.SingleLine
-            | TextFormatFlags.VerticalCenter;
+            | TextFormatFlags.VerticalCenter
+            | TextFormatFlags.PreserveGraphicsClipping
+            | TextFormatFlags.EndEllipsis;
 
-        string before = Text[..index];
-        string highlight = Text.Substring(index, HighlightText.Length);
-        string after = Text[(index + HighlightText.Length)..];
-
-        int x = 0;
-        DrawTextPart(e.Graphics, before, ForeColor, ref x, flags);
-        DrawTextPart(e.Graphics, highlight, HighlightColor, ref x, flags);
-        DrawTextPart(e.Graphics, after, ForeColor, ref x, flags);
-    }
-
-    private void DrawTextPart(Graphics graphics, string text, Color color, ref int x, TextFormatFlags flags)
-    {
-        if (string.IsNullOrEmpty(text))
+        // One draw per region — never overpaint the same glyphs twice.
+        // Double TextRenderer passes with ClearType cause cyan/red fringing
+        // on dark OLED backgrounds (visible on "Mouse scanning" headers).
+        string prefix = Text[..index];
+        int highlightEnd = index + HighlightText.Length;
+        int highlightLeft = string.IsNullOrEmpty(prefix)
+            ? 0
+            : TextRenderer.MeasureText(e.Graphics, prefix, Font, Size.Empty, flags & ~TextFormatFlags.EndEllipsis).Width;
+        int highlightWidth = TextRenderer.MeasureText(
+            e.Graphics,
+            Text.Substring(index, HighlightText.Length),
+            Font,
+            Size.Empty,
+            flags & ~TextFormatFlags.EndEllipsis).Width;
+        if (highlightWidth <= 0)
         {
+            TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ForeColor, flags);
             return;
         }
 
-        Rectangle bounds = new(x, 0, Width - x, Height);
-        TextRenderer.DrawText(graphics, text, Font, bounds, color, BackColor, flags);
-        Size size = TextRenderer.MeasureText(graphics, text, Font, Size.Empty, flags);
-        x += size.Width;
+        Rectangle bounds = ClientRectangle;
+        System.Drawing.Drawing2D.GraphicsState state = e.Graphics.Save();
+        try
+        {
+            if (highlightLeft > 0)
+            {
+                e.Graphics.SetClip(new Rectangle(0, 0, Math.Min(highlightLeft, Width), Height));
+                TextRenderer.DrawText(e.Graphics, Text, Font, bounds, ForeColor, flags);
+            }
+
+            int clipHighlightWidth = Math.Max(0, Math.Min(highlightWidth, Width - highlightLeft));
+            if (clipHighlightWidth > 0)
+            {
+                e.Graphics.SetClip(new Rectangle(highlightLeft, 0, clipHighlightWidth, Height));
+                TextRenderer.DrawText(e.Graphics, Text, Font, bounds, HighlightColor, flags);
+            }
+
+            int right = highlightLeft + highlightWidth;
+            if (right < Width && highlightEnd < Text.Length)
+            {
+                e.Graphics.SetClip(new Rectangle(right, 0, Width - right, Height));
+                TextRenderer.DrawText(e.Graphics, Text, Font, bounds, ForeColor, flags);
+            }
+        }
+        finally
+        {
+            e.Graphics.Restore(state);
+        }
     }
 }

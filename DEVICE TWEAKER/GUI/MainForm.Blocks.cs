@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace DeviceTweakerCS;
 
 public sealed partial class MainForm
@@ -101,11 +103,14 @@ public sealed partial class MainForm
         }
         else if (device.Kind == DeviceKind.USB && !string.IsNullOrWhiteSpace(usbRoles))
         {
-            title = $"{device.Name} [{usbRoles}]";
+            string chip = device.UsbChipPath is { } path ? $" | {path.CompactTag}" : string.Empty;
+            title = $"{device.Name} [{usbRoles}{chip}]";
         }
         else if (device.Kind == DeviceKind.USB)
         {
-            title = $"{device.Name} [No HID roles]";
+            title = device.UsbChipPath is { } path
+                ? $"{device.Name} [No HID roles | {path.CompactTag}]"
+                : $"{device.Name} [No HID roles]";
         }
         else if (device.Kind == DeviceKind.NET_NDIS)
         {
@@ -179,6 +184,10 @@ public sealed partial class MainForm
             HighlightColor = Color.FromArgb(120, 120, 120),
         };
         headerPanel.Controls.Add(headerLabel);
+        if (device.Kind == DeviceKind.USB && device.UsbChipPath is UsbChipPathInfo chipTip)
+        {
+            _copyToolTip.SetToolTip(headerLabel, chipTip.TooltipText);
+        }
 
         Label? headerNote = null;
         if (device.Kind == DeviceKind.STOR)
@@ -218,7 +227,8 @@ public sealed partial class MainForm
         int cpuPanelTop = cpuLabel.Bottom + UiScale(6);
         int cpuPanelHeight = UiScale(150);
         int settingsMinimumWidth = Math.Min(UiScale(420), Math.Max(UiScale(320), grp.Width - UiScale(48)));
-        int settingsSideMinimumWidth = UiScale(600);
+        int desiredSettingsSideWidth = UiScale(600);
+        int settingsSideMinimumWidth = desiredSettingsSideWidth;
         int cpuPanelMinimumWidth = UiScale(308);
         int settingsSideGap = UiScale(40);
         int cpuPanelFullMaximumWidth = Math.Max(
@@ -296,8 +306,11 @@ public sealed partial class MainForm
 
         int columnGap = UiScale(16);
         int startX = UiScale(10);
-        int minColumnWidth = UiScale(120);
-        int checkboxTextSafety = UiScale(30);
+        int minColumnWidth = UiScale(160);
+        // Before its HWND exists WinForms under-reports the preferred width of a
+        // Standard CheckBox. This covers the native glyph, internal margins and
+        // DPI rounding; the post-layout audit verifies the resulting client width.
+        int checkboxTextSafety = UiScale(112);
 
         int runningX = startX;
         int maxColumnCount = 0;
@@ -314,24 +327,46 @@ public sealed partial class MainForm
             {
                 int w = ordered.Max(o =>
                 {
-                    int preferred = o.Control.PreferredSize.Width;
-                    int measured = TextRenderer.MeasureText(o.Control.Text, o.Control.Font).Width + checkboxTextSafety;
-                    return Math.Max(preferred, measured);
+                    // GetPreferredSize for a Standard CheckBox is only reliable
+                    // after the native handle exists. Without this, long labels
+                    // such as CPPC rank plus CCD/CCX are measured too narrowly
+                    // and lose their trailing token when painted.
+                    o.Control.CreateControl();
+                    Size measured = TextRenderer.MeasureText(
+                        o.Control.Text,
+                        o.Control.Font,
+                        new Size(int.MaxValue, int.MaxValue),
+                        TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
+                    int preferred = o.Control.GetPreferredSize(Size.Empty).Width;
+                    return Math.Max(preferred, measured.Width + checkboxTextSafety);
                 });
                 if (w > 0)
                 {
-                    maxWidth = Math.Max(minColumnWidth, w + UiScale(14));
+                    // A standard WinForms CheckBox can discard the entire trailing
+                    // core-type token when its client width is only a few pixels
+                    // below the native preferred width. Two-digit CPU labels expose
+                    // that native rendering behavior, so retain a measured gutter.
+                    maxWidth = Math.Max(minColumnWidth, w + UiScale(12));
                 }
             }
 
             columnWidths.Add(maxWidth);
         }
 
+        if (columnWidths.Count > 1)
+        {
+            int uniformColumnWidth = columnWidths.Max();
+            for (int i = 0; i < columnWidths.Count; i++)
+            {
+                columnWidths[i] = uniformColumnWidth;
+            }
+        }
+
         for (int i = 0; i < columns.Count; i++)
         {
             List<(int Lp, CheckBox Control, int Ccd, int Eff)> ordered = columns[i];
             int maxWidth = columnWidths[i];
-            int cellWidth = Math.Max(minColumnWidth, maxWidth - UiScale(4));
+            int cellWidth = Math.Max(minColumnWidth, maxWidth);
             int cellHeight = Math.Max(UiScale(18), checkSpacing - UiScale(2));
             int y = UiScale(4);
             foreach ((int _, CheckBox control, int _, int _) in ordered)
@@ -356,7 +391,7 @@ public sealed partial class MainForm
 
         void UpdateResponsivePlacement()
         {
-            settingsSideMinimumWidth = Math.Min(UiScale(600), Math.Max(UiScale(440), grp.Width - UiScale(48)));
+            settingsSideMinimumWidth = Math.Min(desiredSettingsSideWidth, Math.Max(UiScale(440), grp.Width - UiScale(48)));
             settingsMinimumWidth = Math.Min(UiScale(420), Math.Max(UiScale(320), grp.Width - UiScale(48)));
             cpuPanelFullMaximumWidth = Math.Max(cpuPanelMinimumWidth, grp.Width - cpuPanel.Left - UiScale(24));
             int desiredSideCpuPanelWidth = Math.Max(cpuPanelMinimumWidth, requiredWidth + cpuPanelHorizontalSlack);
@@ -427,10 +462,13 @@ public sealed partial class MainForm
             Location = new Point(UiScale(18), maskY + UiScale(20)),
         };
 
-        int valueX = UiScale(132);
+        // Longest common left labels: "Mouse Throttle:", "IRQ Priority:", "Power Saving:".
+        int valueX = UiScale(140);
         int rowGap = UiScale(12);
         int rowTop = 0;
         int labelOffset = UiScale(4);
+        bool showPowerSaving = device.Kind == DeviceKind.USB
+            || ((device.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX) && !device.Wifi);
 
         bool TryExpandWindowForSideSettings(int desiredGroupWidth)
         {
@@ -482,16 +520,17 @@ public sealed partial class MainForm
             Location = new Point(0, rowTop + labelOffset),
         };
 
-        TextBox txtLimit = new()
+        ThemedTextBox txtLimit = new()
         {
             Location = new Point(valueX, rowTop),
             Size = UiScale(100, 24),
             BackColor = Color.FromArgb(18, 18, 22),
-            BorderStyle = BorderStyle.FixedSingle,
             ForeColor = _fgMain,
             TextAlign = HorizontalAlignment.Center,
             Text = "0",
+            Font = _blockFont,
         };
+        StyleDarkTextBox(txtLimit, leftMargin: 4, rightMargin: 4);
 
         Label lblLimitHint = new()
         {
@@ -588,7 +627,7 @@ public sealed partial class MainForm
         if (device.Kind == DeviceKind.NET_NDIS)
         {
             settingsPanel.Controls.AddRange([lblNdisMode, cmbNdisMode]);
-            _copyToolTip.SetToolTip(cmbNdisMode, "RSS writes network receive queue CPU placement. IRQ writes interrupt affinity policy. BOTH writes both when the adapter supports RSS.");
+            _copyToolTip.SetToolTip(cmbNdisMode, "RSS assigns receive queues to CPUs. IRQ writes interrupt-affinity policy. BOTH writes both settings when the adapter and driver support RSS.");
             rowTop = cmbNdisMode.Bottom + rowGap;
         }
 
@@ -601,7 +640,7 @@ public sealed partial class MainForm
             Visible = device.Kind == DeviceKind.NET_NDIS,
         };
 
-        NumericUpDown nudRssQueues = new()
+        ThemedNumericUpDown nudRssQueues = new()
         {
             Location = new Point(valueX, rowTop),
             Size = UiScale(70, 26),
@@ -612,13 +651,60 @@ public sealed partial class MainForm
             ForeColor = _fgMain,
             BorderStyle = BorderStyle.FixedSingle,
             Visible = device.Kind == DeviceKind.NET_NDIS,
+            ButtonBackColor = Color.FromArgb(14, 14, 17),
+            ButtonHoverColor = Color.FromArgb(40, 40, 48),
+            ArrowColor = _fgMain,
         };
 
         if (device.Kind == DeviceKind.NET_NDIS)
         {
             settingsPanel.Controls.AddRange([lblRssQueues, nudRssQueues]);
-            _copyToolTip.SetToolTip(nudRssQueues, "Number of RSS receive processors/queues to pin from the selected base CPU.");
+            _copyToolTip.SetToolTip(nudRssQueues, "Number of RSS receive queues to configure. The adapter and driver determine the supported range. The plan starts at the selected base CPU.");
             rowTop = nudRssQueues.Bottom + rowGap;
+        }
+
+        // After interrupt/policy (and NDIS/RSS): Device Manager power-saving toggle.
+        ThemedCheckBox? chkPowerSaving = null;
+        if (showPowerSaving)
+        {
+            Label lblPowerSaving = new()
+            {
+                Text = "Power Saving:",
+                AutoSize = true,
+                Location = new Point(0, rowTop + labelOffset),
+            };
+
+            chkPowerSaving = new ThemedCheckBox
+            {
+                Text = "Enabled",
+                SyncCheckedStateText = true,
+                AutoSize = false,
+                Location = new Point(valueX, rowTop + UiScale(2)),
+                Size = UiScale(118, 22),
+                BackColor = _bgGroup,
+                ForeColor = _fgMain,
+                Cursor = Cursors.Hand,
+                Checked = true,
+                BorderColor = _border,
+                BoxBackColor = _bgGroup,
+                CheckedBackColor = Color.FromArgb(12, 12, 15),
+                HoverBackColor = Color.FromArgb(22, 22, 26),
+                PressedBackColor = Color.FromArgb(34, 34, 40),
+                CheckColor = _fgMain,
+            };
+
+            settingsPanel.Controls.AddRange([lblPowerSaving, chkPowerSaving]);
+            rowTop = Math.Max(lblPowerSaving.Bottom, chkPowerSaving.Bottom) + rowGap;
+
+            string powerTip = device.Kind == DeviceKind.USB
+                ? "Same idea as Device Manager → Power Management → 'Allow the computer to turn off this device to save power'.\n" +
+                  "For USB this disables Selective Suspend on the controller + root hubs and the power-plan USB SS setting.\n" +
+                  "Unchecked = Disabled. Applied with APPLY / AUTO. A reboot may be required."
+                : "Device Manager → Power Management → 'Allow the computer to turn off this device to save power'.\n" +
+                  "Unchecked sets PnPCapabilities bit 0x08 (do-not-turn-off) and clears MSPower_DeviceEnable on the wired NIC.\n" +
+                  "Applied with APPLY / AUTO. A reboot may be required.";
+            _copyToolTip.SetToolTip(lblPowerSaving, powerTip);
+            _copyToolTip.SetToolTip(chkPowerSaving, powerTip);
         }
 
         NicItrProfile? nicItrProfile = device.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX
@@ -650,24 +736,25 @@ public sealed partial class MainForm
             Visible = showNicItr,
         };
 
-        TextBox txtNicItr = new()
+        ThemedTextBox txtNicItr = new()
         {
             Location = new Point(valueX, rowTop),
             Size = new Size(nicInputWidth, UiScale(24)),
             BackColor = Color.FromArgb(18, 18, 22),
-            BorderStyle = BorderStyle.FixedSingle,
             ForeColor = _fgMain,
             TextAlign = HorizontalAlignment.Left,
             Text = "0x0",
             Visible = showNicItr,
+            Font = _blockFont,
         };
+        StyleDarkTextBox(txtNicItr);
 
         Button btnNicItr = new()
         {
             Text = "SET",
             Size = new Size(nicSetButtonWidth, UiScale(24)),
             Location = nicButtonsInline
-                ? new Point(txtNicItr.Right + nicInlineGap, txtNicItr.Top - UiScale(1))
+                ? new Point(txtNicItr.Right + nicInlineGap, txtNicItr.Top)
                 : new Point(valueX, txtNicItr.Bottom + UiScale(6)),
             FlatStyle = FlatStyle.Flat,
             Font = _blockFont,
@@ -694,6 +781,43 @@ public sealed partial class MainForm
         btnNicItrSave.MouseEnter += (_, _) => SetTopButtonHoverStyle(btnNicItrSave);
         btnNicItrSave.MouseLeave += (_, _) => SetTopButtonBaseStyle(btnNicItrSave);
 
+        int nicCheckButtonWidth = UiScale(70);
+        Button btnNicItrCheck = new()
+        {
+            Text = "CHECK",
+            Size = new Size(nicCheckButtonWidth, UiScale(24)),
+            Location = new Point(btnNicItrSave.Right + nicButtonGap, btnNicItr.Top),
+            FlatStyle = FlatStyle.Flat,
+            Font = _blockFont,
+            UseVisualStyleBackColor = false,
+            Cursor = Cursors.Hand,
+            Visible = showNicItr,
+        };
+        SetTopButtonBaseStyle(btnNicItrCheck);
+        btnNicItrCheck.MouseEnter += (_, _) => SetTopButtonHoverStyle(btnNicItrCheck);
+        btnNicItrCheck.MouseLeave += (_, _) => SetTopButtonBaseStyle(btnNicItrCheck);
+
+        // Recalc inline layout to fit SET+SAVE+CHECK on one row when possible.
+        int nicButtonsRowWidth = nicSetButtonWidth + nicButtonGap + nicSaveButtonWidth + nicButtonGap + nicCheckButtonWidth;
+        nicInlineMaxWidth = availableSettingsWidth - valueX - nicInlineGap - nicButtonsRowWidth - UiScale(8);
+        nicButtonsInline = nicInlineMaxWidth >= nicInputMinWidth;
+        nicInputWidth = nicButtonsInline
+            ? Math.Min(nicInputDesiredWidth, Math.Max(nicInputMinWidth, nicInlineMaxWidth))
+            : Math.Min(nicInputDesiredWidth, Math.Max(nicInputMinWidth, nicInputAvailableWidth));
+        txtNicItr.Size = new Size(nicInputWidth, UiScale(24));
+        if (nicButtonsInline)
+        {
+            btnNicItr.Location = new Point(txtNicItr.Right + nicInlineGap, txtNicItr.Top);
+            btnNicItrSave.Location = new Point(btnNicItr.Right + nicButtonGap, btnNicItr.Top);
+            btnNicItrCheck.Location = new Point(btnNicItrSave.Right + nicButtonGap, btnNicItr.Top);
+        }
+        else
+        {
+            btnNicItr.Location = new Point(valueX, txtNicItr.Bottom + UiScale(6));
+            btnNicItrSave.Location = new Point(btnNicItr.Right + nicButtonGap, btnNicItr.Top);
+            btnNicItrCheck.Location = new Point(btnNicItrSave.Right + nicButtonGap, btnNicItr.Top);
+        }
+
         Label lblNicItrStatus = new HighlightLabel()
         {
             Text = "current: reading...",
@@ -702,7 +826,7 @@ public sealed partial class MainForm
             AutoSize = false,
             Size = new Size(nicStatusWidth, UiScale(22)),
             ForeColor = _statusInactive,
-            Location = new Point(valueX, Math.Max(txtNicItr.Bottom, btnNicItr.Bottom) + UiScale(4)),
+            Location = new Point(valueX, Math.Max(txtNicItr.Bottom, btnNicItrCheck.Bottom) + UiScale(4)),
             Visible = showNicItr,
             UseMnemonic = false,
         };
@@ -720,29 +844,33 @@ public sealed partial class MainForm
 
         if (showNicItr)
         {
-            settingsPanel.Controls.AddRange([lblNicItr, txtNicItr, btnNicItr, btnNicItrSave, lblNicItrStatus, lblNicItrTime]);
+            settingsPanel.Controls.AddRange([lblNicItr, txtNicItr, btnNicItr, btnNicItrSave, btnNicItrCheck, lblNicItrStatus, lblNicItrTime]);
             rowTop = lblNicItrTime.Bottom + rowGap;
+            _copyToolTip.SetToolTip(btnNicItrCheck, "Load DTIMOD.sys (IMOD driver) and re-read current NIC ITR values.");
         }
 
         bool showRawMouseThrottle = HasMouseThrottleContext(device);
+        bool rawMouseThrottleInteractive = showRawMouseThrottle && SupportsRawMouseThrottleOs();
         Label lblRawMouseThrottle = new()
         {
             Text = "Mouse Throttle:",
             AutoSize = true,
             Location = new Point(0, rowTop + labelOffset),
-            ForeColor = _fgMain,
+            ForeColor = rawMouseThrottleInteractive ? _fgMain : _mutedText,
             Visible = showRawMouseThrottle,
         };
 
         ThemedCheckBox chkRawMouseThrottle = new()
         {
             Text = "Enabled",
+            SyncCheckedStateText = true,
             AutoSize = false,
             Location = new Point(valueX, rowTop + UiScale(2)),
-            Size = UiScale(104, 22),
+            Size = UiScale(118, 22),
             BackColor = _bgGroup,
-            ForeColor = _fgMain,
-            Cursor = Cursors.Hand,
+            ForeColor = rawMouseThrottleInteractive ? _fgMain : _mutedText,
+            Cursor = rawMouseThrottleInteractive ? Cursors.Hand : Cursors.Default,
+            Enabled = rawMouseThrottleInteractive,
             Visible = showRawMouseThrottle,
             BorderColor = _border,
             BoxBackColor = _bgGroup,
@@ -757,7 +885,7 @@ public sealed partial class MainForm
             Location = new Point(chkRawMouseThrottle.Right + UiScale(10), rowTop),
             Size = UiScale(86, 26),
             BackColor = Color.FromArgb(18, 18, 22),
-            ForeColor = _fgMain,
+            ForeColor = rawMouseThrottleInteractive ? _fgMain : _mutedText,
             Font = _blockFont,
             BorderColor = _border,
             ButtonColor = Color.FromArgb(14, 14, 17),
@@ -765,6 +893,7 @@ public sealed partial class MainForm
             SelectedForeColor = _fgMain,
             ArrowColor = _fgMain,
             ItemHeight = UiScale(18),
+            Enabled = rawMouseThrottleInteractive,
             Visible = showRawMouseThrottle,
         };
         cmbRawMouseThrottle.DropDownWidth = cmbRawMouseThrottle.Width;
@@ -772,7 +901,7 @@ public sealed partial class MainForm
 
         Label lblRawMouseThrottleStatus = new HighlightLabel()
         {
-            Text = "current: off",
+            Text = rawMouseThrottleInteractive ? "current: off" : "current: unavailable (Windows 11 22H2+)",
             HighlightText = "current:",
             HighlightColor = _statusPrefix,
             AutoSize = true,
@@ -785,6 +914,11 @@ public sealed partial class MainForm
         {
             settingsPanel.Controls.AddRange([lblRawMouseThrottle, chkRawMouseThrottle, cmbRawMouseThrottle, lblRawMouseThrottleStatus]);
             rowTop = cmbRawMouseThrottle.Bottom + rowGap;
+            string throttleTip = GetRawMouseThrottleToolTip(rawMouseThrottleInteractive);
+            _copyToolTip.SetToolTip(lblRawMouseThrottle, throttleTip);
+            _copyToolTip.SetToolTip(chkRawMouseThrottle, throttleTip);
+            _copyToolTip.SetToolTip(cmbRawMouseThrottle, throttleTip);
+            _copyToolTip.SetToolTip(lblRawMouseThrottleStatus, throttleTip);
         }
 
         int imodCheckSize = UiScale(14);
@@ -841,15 +975,16 @@ public sealed partial class MainForm
             ForeColor = _statusInactive,
         };
 
-        TextBox txtImod = new()
+        ThemedTextBox txtImod = new()
         {
             Size = UiScale(360, 24),
             BackColor = Color.FromArgb(18, 18, 22),
-            BorderStyle = BorderStyle.FixedSingle,
             ForeColor = _fgMain,
             TextAlign = HorizontalAlignment.Left,
             Text = "0x0",
+            Font = _blockFont,
         };
+        StyleDarkTextBox(txtImod);
 
         Label lblImodDefault = new()
         {
@@ -890,6 +1025,7 @@ public sealed partial class MainForm
         ImodMapTextBox lblImodMap = new()
         {
             Text = "devices: -",
+            Font = _technicalFont,
             BackColor = _bgGroup,
             ForeColor = _mutedText,
             PrefixColor = _statusPrefix,
@@ -919,7 +1055,7 @@ public sealed partial class MainForm
         };
 
         IReadOnlyList<string> imodDeviceEditorRoles = GetImodDeviceEditorRoles(device);
-        Dictionary<string, TextBox> imodDeviceEditorBoxes = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, ThemedTextBox> imodDeviceEditorBoxes = new(StringComparer.OrdinalIgnoreCase);
         bool suppressImodDeviceEditor = false;
         Panel imodDeviceEditorPanel = new()
         {
@@ -948,7 +1084,7 @@ public sealed partial class MainForm
             suppressImodDeviceEditor = true;
             try
             {
-                foreach (KeyValuePair<string, TextBox> pair in imodDeviceEditorBoxes)
+                foreach (KeyValuePair<string, ThemedTextBox> pair in imodDeviceEditorBoxes)
                 {
                     uint value = hasRoleValues && roleValues.TryGetValue(pair.Key, out uint roleValue)
                         ? roleValue
@@ -974,7 +1110,7 @@ public sealed partial class MainForm
             bool valid = true;
             foreach (string role in imodDeviceEditorRoles)
             {
-                if (!imodDeviceEditorBoxes.TryGetValue(role, out TextBox? box))
+                if (!imodDeviceEditorBoxes.TryGetValue(role, out ThemedTextBox? box))
                 {
                     continue;
                 }
@@ -1014,7 +1150,7 @@ public sealed partial class MainForm
             }
         }
 
-        void NormalizeImodDeviceEditorBox(TextBox box)
+        void NormalizeImodDeviceEditorBox(ThemedTextBox box)
         {
             if (TryParseImodInterval(box.Text.Trim(), ImodDefaultInterval, out uint value))
             {
@@ -1039,11 +1175,14 @@ public sealed partial class MainForm
             int editorBoxWidth = UiScale(78);
             int editorColumnGap = UiScale(18);
             int editorRowHeight = UiScale(28);
+            // 1–3 roles: one row. 4 roles: stable 2×2 grid (Mouse|Keyboard / Audio|Gamepad).
+            // Do not center a lone third cell — it shifts when Gamepad appears and looks unfinished.
+            bool twoColumnGrid = imodDeviceEditorRoles.Count >= 4;
             int editorX = 0;
             int editorY = 0;
             for (int i = 0; i < imodDeviceEditorRoles.Count; i++)
             {
-                if (i == 2)
+                if (twoColumnGrid && i == 2)
                 {
                     editorX = 0;
                     editorY += editorRowHeight;
@@ -1059,19 +1198,20 @@ public sealed partial class MainForm
                     ForeColor = _fgMain,
                 };
 
-                TextBox roleBox = new()
+                ThemedTextBox roleBox = new()
                 {
                     Size = new Size(editorBoxWidth, UiScale(24)),
                     Location = new Point(roleLabel.Right + UiScale(4), editorY),
                     BackColor = Color.FromArgb(18, 18, 22),
-                    BorderStyle = BorderStyle.FixedSingle,
                     ForeColor = _fgMain,
                     Text = FormatImodValue(GetImodDeviceEditorDefaultValue(role)),
                     TextAlign = HorizontalAlignment.Left,
+                    Font = _blockFont,
                 };
+                StyleDarkTextBox(roleBox);
                 roleBox.TextChanged += (_, _) => UpdateImodTextFromDeviceEditor();
-                roleBox.Leave += (_, _) => NormalizeImodDeviceEditorBox(roleBox);
-                roleBox.KeyDown += (_, e) =>
+                roleBox.Inner.Leave += (_, _) => NormalizeImodDeviceEditorBox(roleBox);
+                roleBox.Inner.KeyDown += (_, e) =>
                 {
                     if (e.KeyCode == Keys.Enter)
                     {
@@ -1089,6 +1229,7 @@ public sealed partial class MainForm
         txtImod.TextChanged += (_, _) => SyncImodDeviceEditorFromText();
         SyncImodDeviceEditorFromText();
 
+        DeviceBlock? createdBlock = null;
         Button btnImodApply = new()
         {
             Text = "SET",
@@ -1104,13 +1245,64 @@ public sealed partial class MainForm
         btnImodApply.Click += (_, _) =>
         {
             WriteLog("UI: SET IMOD button clicked");
-            CreateDeviceTweakerBackup("pre-imod", showDialog: false);
-            _ = ApplyImodSettings(out string? note);
-            RefreshImodCurrentValues(reason: "imod-set");
-            if (!string.IsNullOrWhiteSpace(note))
+            DeviceBlock? targetBlock = createdBlock;
+            if (targetBlock is not null && targetBlock.Device.IsTestDevice)
             {
-                ShowThemedInfo(note);
+                RefreshTestImodPreview(targetBlock, "test-imod-set");
+                return;
             }
+
+            if (TryBlockSandboxHardwareWrite("IMOD SET"))
+            {
+                return;
+            }
+
+            OperationReport report = new();
+            if (!CreateDeviceTweakerBackup("pre-imod", showDialog: false))
+            {
+                report.AddError("Automatic backup", "backup could not be created; changes were not applied");
+                ShowOperationResult(
+                    report,
+                    successMessage: string.Empty,
+                    partialMessage: "IMOD apply was cancelled because the automatic backup failed.");
+                return;
+            }
+
+            ImodApplyOutcome outcome = ApplyImodSettings(out string? note);
+            if (outcome is ImodApplyOutcome.SkippedNoUsb or ImodApplyOutcome.SkippedNoController)
+            {
+                ShowThemedInfo(string.IsNullOrWhiteSpace(note)
+                    ? "No eligible USB IMOD target for SET."
+                    : note);
+                return;
+            }
+
+            WaitForBackgroundUiTasks(RefreshImodCurrentValuesAsync(showReadingStatus: true, reason: "imod-set"));
+            if (outcome == ImodApplyOutcome.Failed)
+            {
+                report.AddError("IMOD", note ?? "apply failed");
+            }
+            else if (!string.IsNullOrWhiteSpace(note)
+                && (note.Contains("failure", StringComparison.OrdinalIgnoreCase)
+                    || note.Contains("failed", StringComparison.OrdinalIgnoreCase)))
+            {
+                report.AddError("IMOD", note);
+            }
+
+            if (report.Succeeded)
+            {
+                if (!string.IsNullOrWhiteSpace(note))
+                {
+                    ShowThemedInfo(note);
+                }
+
+                return;
+            }
+
+            ShowOperationResult(
+                report,
+                successMessage: note ?? "IMOD applied.",
+                partialMessage: "IMOD finished with errors.");
         };
 
         Button btnImodDelete = new()
@@ -1128,8 +1320,62 @@ public sealed partial class MainForm
         btnImodDelete.Click += (_, _) =>
         {
             WriteLog("UI: DELETE IMOD button clicked");
-            ResetImodIntervalsToDefault("imod-delete");
-            ShowThemedInfo("IMOD reset to defaults.\nStartup script and DTIMOD.sys removed.");
+            DeviceBlock? targetBlock = createdBlock;
+            if (targetBlock is not null && targetBlock.Device.IsTestDevice)
+            {
+                targetBlock.ImodBox.Text = FormatImodValue(ImodDefaultInterval);
+                UpdateImodSelectorsFromText(targetBlock);
+                RefreshTestImodPreview(targetBlock, "test-imod-delete");
+                return;
+            }
+
+            if (TryBlockSandboxHardwareWrite("IMOD DELETE"))
+            {
+                return;
+            }
+
+            OperationReport report = new();
+            try
+            {
+                ResetImodIntervalsToDefault("imod-delete", report);
+            }
+            catch (Exception ex)
+            {
+                WriteLog($"IMOD.DELETE: failed: {ex.Message}");
+                report.AddError("IMOD delete", ex.Message);
+            }
+
+            ShowOperationResult(
+                report,
+                successMessage: "IMOD reset to defaults.\nStartup script removed. Reboot your PC to unload DTIMOD.sys from memory if it was loaded.",
+                partialMessage: "IMOD delete finished with errors. Some persistence files may still remain. If the driver was loaded, reboot to unload DTIMOD.sys from memory.");
+            if (report.Succeeded)
+            {
+                WriteLog("IMOD.DELETE: done; reboot recommended to unload DTIMOD.sys from memory");
+            }
+        };
+
+        Button btnImodCheck = new()
+        {
+            Text = "CHECK",
+            Size = UiScale(70, 24),
+            FlatStyle = FlatStyle.Flat,
+            Font = _blockFont,
+            UseVisualStyleBackColor = false,
+            Cursor = Cursors.Hand,
+        };
+        SetTopButtonBaseStyle(btnImodCheck);
+        btnImodCheck.MouseEnter += (_, _) => SetTopButtonHoverStyle(btnImodCheck);
+        btnImodCheck.MouseLeave += (_, _) => SetTopButtonBaseStyle(btnImodCheck);
+        btnImodCheck.Click += (_, _) =>
+        {
+            DeviceBlock? targetBlock = createdBlock;
+            if (targetBlock is null)
+            {
+                return;
+            }
+
+            CheckImodDriverFromBlock(targetBlock);
         };
 
         void UpdateImodDetailsVisibility()
@@ -1175,32 +1421,35 @@ public sealed partial class MainForm
             lblImod.Location = new Point(imodCheckSize + imodCheckGap, rowTop + labelOffset);
             int buttonGap = UiScale(6);
             int inlineGap = UiScale(8);
-            int buttonTotalWidth = btnImodApply.Width + btnImodDelete.Width + buttonGap;
+            int buttonTotalWidth = btnImodApply.Width + btnImodDelete.Width + buttonGap + btnImodCheck.Width + buttonGap;
             int inlineInputWidth = availableSettingsWidth - valueX - buttonTotalWidth - inlineGap;
-            bool useInlineImodButtons = inlineInputWidth >= UiScale(180);
+            bool useInlineImodButtons = inlineInputWidth >= UiScale(160);
             int imodInputWidth = useInlineImodButtons
-                ? Math.Min(UiScale(300), inlineInputWidth)
-                : Math.Min(UiScale(300), Math.Max(UiScale(120), availableSettingsWidth - valueX - UiScale(8)));
+                ? Math.Min(UiScale(420), inlineInputWidth)
+                : Math.Min(UiScale(420), Math.Max(UiScale(160), availableSettingsWidth - valueX - UiScale(8)));
             txtImod.Width = imodInputWidth;
             txtImod.Location = new Point(valueX, rowTop);
             lblImodHelp.Visible = false;
             lblImodHelp.Location = new Point(txtImod.Left, txtImod.Bottom + UiScale(4));
             lblImodHelp.Size = new Size(UiScale(180), UiScale(18));
             int imodButtonTop = useInlineImodButtons
-                ? txtImod.Top + Math.Max(0, (txtImod.Height - btnImodApply.Height) / 2)
+                ? txtImod.Top
                 : txtImod.Bottom + UiScale(6);
             int imodButtonLeft = useInlineImodButtons ? txtImod.Right + inlineGap : 0;
             btnImodApply.Location = new Point(imodButtonLeft, imodButtonTop);
             btnImodDelete.Location = new Point(btnImodApply.Right + buttonGap, imodButtonTop);
-            int statusTop = Math.Max(txtImod.Bottom, btnImodApply.Bottom) + UiScale(6);
+            btnImodCheck.Location = new Point(btnImodDelete.Right + buttonGap, imodButtonTop);
+
+            int statusTop = Math.Max(txtImod.Bottom, btnImodCheck.Bottom) + UiScale(6);
             if (imodDeviceEditorPanel.Visible)
             {
-                imodDeviceEditorPanel.Location = new Point(valueX, statusTop - UiScale(1));
-                int editorRows = imodDeviceEditorRoles.Count > 2 ? 2 : 1;
+                // Keep a clear gap under SET/DELETE/CHECK so the role editors are not glued to the buttons.
+                imodDeviceEditorPanel.Location = new Point(valueX, statusTop + UiScale(6));
+                int editorRows = imodDeviceEditorRoles.Count >= 4 ? 2 : 1;
                 imodDeviceEditorPanel.Size = new Size(
                     Math.Max(UiScale(80), availableSettingsWidth - valueX - UiScale(8)),
                     UiScale(editorRows * 26));
-                statusTop = imodDeviceEditorPanel.Bottom + UiScale(3);
+                statusTop = imodDeviceEditorPanel.Bottom + UiScale(6);
             }
 
             int imodDetailsX = UiScale(28);
@@ -1214,14 +1463,16 @@ public sealed partial class MainForm
             lblImodCurrent.Size = new Size(currentStatusWidth, UiScale(18));
             lblImodDefault.Location = new Point(lblImodCurrent.Right + UiScale(14), imodStatusTop);
             lblImodDefault.Size = new Size(defaultStatusWidth, UiScale(18));
-            int imodMapRows = imodDeviceEditorRoles.Contains("Gamepad", StringComparer.OrdinalIgnoreCase) ? 7 : 6;
+            int imodMapRows = imodDeviceEditorRoles.Contains("Gamepad", StringComparer.OrdinalIgnoreCase) ? 12 : 11;
             lblImodMap.Location = new Point(imodDetailsX, lblImodCurrent.Bottom + UiScale(14));
-            lblImodMap.Size = new Size(Math.Max(UiScale(120), availableSettingsWidth - imodDetailsX), UiScale(imodMapRows * 14));
-            settingsPanel.Controls.AddRange([lblImodMode, cmbImodMode, lblImodModeHint, chkImod, lblImod, txtImod, btnImodApply, btnImodDelete, imodDeviceEditorPanel, lblImodCurrent, lblImodDefault, lblImodMap]);
+            lblImodMap.Size = new Size(Math.Max(UiScale(120), availableSettingsWidth - imodDetailsX), UiScale(imodMapRows * 16));
+            lblImodMap.WordWrap = false;
+            settingsPanel.Controls.AddRange([lblImodMode, cmbImodMode, lblImodModeHint, chkImod, lblImod, txtImod, btnImodApply, btnImodDelete, btnImodCheck, imodDeviceEditorPanel, lblImodCurrent, lblImodDefault, lblImodMap]);
             _copyToolTip.SetToolTip(txtImod, $"Supported IMOD input:\n0xC8\n0xC8, 0xFA0\n{imodRoleTemplate}");
-            _copyToolTip.SetToolTip(cmbImodMode, "XHCI writes one value to all interrupters on this USB host controller. Devices maps detected devices to their interrupter. Interrupters writes values by index.");
-            _copyToolTip.SetToolTip(lblImodModeHint, "Shows how the selected IMOD mode interprets IMOD Value.");
+            _copyToolTip.SetToolTip(cmbImodMode, "XHCI applies one value to all interrupters on this USB host controller. Device mapping assigns detected devices to their interrupter. Interrupter mode applies values by interrupter index.");
+            _copyToolTip.SetToolTip(lblImodModeHint, "Shows how the selected IMOD mode interprets the IMOD Value field.");
             _copyToolTip.SetToolTip(btnImodApply, "Apply the current IMOD configuration and read back hardware values.");
+            _copyToolTip.SetToolTip(btnImodCheck, "Load DTIMOD.sys (IMOD driver) and re-read current hardware IMOD values.");
             _copyToolTip.SetToolTip(lblImodHelp, "Role mode applies values to the detected interrupter for each USB role.");
             _copyToolTip.SetToolTip(lblImodDefault, "Click to copy the default IMOD interval into the input field.");
             _copyToolTip.SetToolTip(lblImodMap, string.Empty);
@@ -1240,6 +1491,7 @@ public sealed partial class MainForm
             lblImodCurrent.Visible = false;
             btnImodApply.Visible = false;
             btnImodDelete.Visible = false;
+            btnImodCheck.Visible = false;
         }
 
         int settingsContentRight = 0;
@@ -1255,6 +1507,7 @@ public sealed partial class MainForm
             settingsContentBottom = Math.Max(settingsContentBottom, child.Bottom);
         }
 
+        desiredSettingsSideWidth = Math.Max(UiScale(600), settingsContentRight + UiScale(8));
         UpdateResponsivePlacement();
 
         int settingsMinWidth = Math.Min(UiScale(420), availableSettingsWidth);
@@ -1273,6 +1526,9 @@ public sealed partial class MainForm
             Text = "PNP ID: -",
             Location = new Point(UiScale(18), infoY),
             Size = new Size(grp.Width - UiScale(40), UiScale(70)),
+            // Keep the technical information block aligned with the larger
+            // registry/status text used elsewhere in the device card.
+            Font = _technicalFont,
             Cursor = Cursors.Hand,
             BackColor = _bgGroup,
             ForeColor = _mutedText,
@@ -1308,6 +1564,7 @@ public sealed partial class MainForm
                 visibleSettingsBottom = Math.Max(visibleSettingsBottom, child.Bottom);
             }
 
+            desiredSettingsSideWidth = Math.Max(UiScale(600), visibleSettingsRight + UiScale(8));
             UpdateResponsivePlacement();
 
             int currentAvailableSettingsWidth = Math.Max(UiScale(260), grp.Width - settingsX - UiScale(24));
@@ -1332,7 +1589,7 @@ public sealed partial class MainForm
                 lblInfo.Bottom + UiScale(20));
         }
 
-        grp.Controls.AddRange(
+        List<Control> chrome =
         [
             headerPanel,
             divider,
@@ -1342,7 +1599,8 @@ public sealed partial class MainForm
             lblIrq,
             settingsPanel,
             lblInfo,
-        ]);
+        ];
+        grp.Controls.AddRange(chrome.ToArray());
         WireDevicesMouseWheelForwarding(grp);
 
         RelayoutDeviceBlockChrome();
@@ -1362,21 +1620,24 @@ public sealed partial class MainForm
             AffinityLabel = lblMask,
             IrqLabel = lblIrq,
             MsiCombo = cmbMsi,
-            LimitBox = txtLimit,
+            PowerSavingCheck = chkPowerSaving,
+            LimitBox = txtLimit.Inner,
             PrioCombo = cmbPrio,
             PolicyCombo = cmbPolicy,
             PolicyLabel = lblPolicy,
             NdisModeLabel = device.Kind == DeviceKind.NET_NDIS ? lblNdisMode : null,
             NdisModeCombo = device.Kind == DeviceKind.NET_NDIS ? cmbNdisMode : null,
             RssQueueBox = device.Kind == DeviceKind.NET_NDIS ? nudRssQueues : null,
-            NicItrBox = showNicItr ? txtNicItr : null,
+            NicItrBox = showNicItr ? txtNicItr.Inner : null,
             NicItrStatusLabel = showNicItr ? lblNicItrStatus : null,
             NicItrTimeLabel = showNicItr ? lblNicItrTime : null,
             NicItrApplyButton = showNicItr ? btnNicItr : null,
             NicItrSaveButton = showNicItr ? btnNicItrSave : null,
+            NicItrCheckButton = showNicItr ? btnNicItrCheck : null,
             ImodAutoCheck = chkImod,
             ImodModeCombo = showImod ? cmbImodMode : null,
-            ImodBox = txtImod,
+            ImodCheckButton = showImod ? btnImodCheck : null,
+            ImodBox = txtImod.Inner,
             ImodDefaultLabel = lblImodDefault,
             ImodCurrentLabel = lblImodCurrent,
             ImodMapLabel = lblImodMap,
@@ -1388,6 +1649,7 @@ public sealed partial class MainForm
             AffinityMask = 0,
             IrqCount = null,
         };
+        createdBlock = block;
 
         foreach (CheckBox cb in cpuBoxes)
         {
@@ -1443,6 +1705,11 @@ public sealed partial class MainForm
             block.NicItrSaveButton.Click += (_, _) => SaveNicItrPersistenceFromBlock(block);
         }
 
+        if (block.NicItrCheckButton is not null)
+        {
+            block.NicItrCheckButton.Click += (_, _) => CheckImodDriverFromNicBlock(block);
+        }
+
         if (block.NicItrBox is not null)
         {
             block.NicItrBox.TextChanged += (_, _) => UpdateNicItrInputTimeLabel(block);
@@ -1481,6 +1748,14 @@ public sealed partial class MainForm
         allowWindowAutoExpand = false;
         _devicesPanel.Controls.Add(grp);
         _blocks.Add(block);
+        if (showImod && block.Device.IsTestDevice)
+        {
+            RefreshTestImodPreview(block, "test-block-init");
+        }
+        if (showNicItr)
+        {
+            RefreshNicItrBlock(block);
+        }
     }
 
     private void LayoutBlocks()
@@ -1585,71 +1860,333 @@ public sealed partial class MainForm
         SyncDevicesScrollBar();
     }
 
-    private void RefreshBlocks(bool includeImodReadback = true)
+    private void EnsureDevicesBusyOverlay()
     {
-        InvalidateImodCache();
-        _ndisRssRuntimeCache.Clear();
-        Dictionary<string, string> priorImodStatuses = [];
-        foreach (DeviceBlock block in _blocks)
+        if (_devicesBusyOverlay is not null || _devicesHost is null)
         {
-            if (block.ImodCurrentLabel is null || string.IsNullOrWhiteSpace(block.Device.InstanceId))
-            {
-                continue;
-            }
-
-            string statusText = block.ImodCurrentLabel.Text ?? string.Empty;
-            if (statusText.Equals("current: reading...", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            priorImodStatuses[NormalizeInstanceId(block.Device.InstanceId)] = statusText;
+            return;
         }
 
-        _devicesPanel.SuspendLayout();
+        _devicesBusyOverlay = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = _bgForm,
+            Visible = false,
+            TabStop = false,
+        };
+
+        _devicesBusyLabel = new Label
+        {
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleCenter,
+            ForeColor = _fgMain,
+            BackColor = _bgForm,
+            Font = _dialogFont,
+            Text = string.Empty,
+        };
+
+        _devicesBusyOverlay.Controls.Add(_devicesBusyLabel);
+        _devicesHost.Controls.Add(_devicesBusyOverlay);
+        _devicesBusyOverlay.BringToFront();
+    }
+
+    private void BeginDevicesBusy(string stage, int percent)
+    {
+        if (IsDisposed || !IsHandleCreated)
+        {
+            return;
+        }
+
+        EnsureDevicesBusyOverlay();
+        if (_devicesBusyOverlay is null || _devicesBusyLabel is null)
+        {
+            return;
+        }
+
+        _devicesBusyDepth++;
+        percent = Math.Clamp(percent, 0, 100);
+        _devicesBusyLabel.Text = $"{stage}\r\n{percent}%";
+        _devicesBusyOverlay.Visible = true;
+        _devicesBusyOverlay.BringToFront();
+        _devicesBusyOverlay.Refresh();
+        _devicesBusyLabel.Refresh();
+    }
+
+    private void BeginDevicesBusyWork(string stage, int totalUnits)
+    {
+        _devicesBusyDone = 0;
+        _devicesBusyTotal = Math.Max(1, totalUnits);
+        BeginDevicesBusy(stage, 0);
+    }
+
+    private void SetDevicesBusyWork(int totalUnits, int doneUnits)
+    {
+        _devicesBusyTotal = Math.Max(1, totalUnits);
+        _devicesBusyDone = Math.Clamp(doneUnits, 0, _devicesBusyTotal);
+    }
+
+    private int GetDevicesBusyPercent()
+    {
+        if (_devicesBusyTotal <= 0)
+        {
+            return 0;
+        }
+
+        return (int)Math.Clamp(Math.Round(100.0 * _devicesBusyDone / _devicesBusyTotal), 0, 100);
+    }
+
+    private void SetDevicesBusyStage(string stage)
+    {
+        UpdateDevicesBusy(stage, GetDevicesBusyPercent());
+    }
+
+    private void TickDevicesBusy(string stage, int units = 1)
+    {
+        if (units < 0)
+        {
+            units = 0;
+        }
+
+        _devicesBusyDone = Math.Min(_devicesBusyTotal, _devicesBusyDone + units);
+        UpdateDevicesBusy(stage, GetDevicesBusyPercent());
+    }
+
+    private void UpdateDevicesBusy(string stage, int percent)
+    {
+        if (_devicesBusyOverlay is null || _devicesBusyLabel is null)
+        {
+            return;
+        }
+
+        percent = Math.Clamp(percent, 0, 100);
+        _devicesBusyLabel.Text = $"{stage}\r\n{percent}%";
+        if (!_devicesBusyOverlay.Visible)
+        {
+            return;
+        }
+
+        _devicesBusyOverlay.BringToFront();
+        _devicesBusyOverlay.Refresh();
+        _devicesBusyLabel.Refresh();
+    }
+
+    private void EndDevicesBusy()
+    {
+        if (_devicesBusyOverlay is null)
+        {
+            return;
+        }
+
+        if (_devicesBusyDepth > 0)
+        {
+            _devicesBusyDepth--;
+        }
+
+        if (_devicesBusyDepth > 0)
+        {
+            return;
+        }
+
+        _devicesBusyDepth = 0;
+        _devicesBusyDone = 0;
+        _devicesBusyTotal = 1;
+        _devicesBusyOverlay.Visible = false;
+    }
+
+    /// <summary>
+    /// Hide progress overlay before modal results so the user never sees
+    /// "completed" over a mid-stage percent.
+    /// </summary>
+    private void CloseDevicesBusyOverlay()
+    {
+        _devicesBusyDepth = 0;
+        _devicesBusyDone = 0;
+        _devicesBusyTotal = 1;
+        if (_devicesBusyOverlay is not null)
+        {
+            _devicesBusyOverlay.Visible = false;
+        }
+    }
+
+    private void WaitForBackgroundUiTasks(params Task[] tasks)
+    {
+        if (tasks.Length == 0)
+        {
+            return;
+        }
+
+        Task all = Task.WhenAll(tasks);
+        while (!all.IsCompleted)
+        {
+            Application.DoEvents();
+            Thread.Sleep(10);
+        }
+
+        all.GetAwaiter().GetResult();
+    }
+
+    private void RefreshBlocks(bool includeImodReadback = true)
+    {
+        long refreshStarted = Stopwatch.GetTimestamp();
+        WriteLog($"REFRESH.START: includeImodReadback={includeImodReadback} previousBlocks={_blocks.Count}");
+        bool ownsBusy = _devicesBusyDepth == 0;
+        // Temporary budget until device count is known after enumeration.
+        if (ownsBusy)
+        {
+            BeginDevicesBusyWork("Scanning devices...", 8);
+        }
+        else
+        {
+            SetDevicesBusyStage("Scanning devices...");
+        }
+
         try
         {
-            _devicesPanel.Controls.Clear();
-            _devicesPanel.Location = new Point(0, 0);
-            if (_devicesScroll is not null)
+            InvalidateImodCache();
+            _ndisRssRuntimeCache.Clear();
+            Dictionary<string, string> priorImodStatuses = [];
+            foreach (DeviceBlock block in _blocks)
             {
-                _devicesScroll.Value = 0;
-            }
-            _blocks.Clear();
-            _reservedCpuPanel = null;
+                if (block.ImodCurrentLabel is null || string.IsNullOrWhiteSpace(block.Device.InstanceId))
+                {
+                    continue;
+                }
 
-            List<DeviceInfo> devs = GetDeviceList();
-            WarnIfMissingGpuDriver(devs);
-            int index = 0;
-            foreach (DeviceInfo d in devs)
-            {
-                NewDeviceBlock(d, index, priorImodStatuses);
-                index++;
-            }
+                string statusText = block.ImodCurrentLabel.Text ?? string.Empty;
+                if (statusText.Equals("current: reading...", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
 
-            _reservedCpuPanel = NewReservedCpuSetsPanel();
-            if (_reservedCpuPanel is not null)
-            {
-                _devicesPanel.Controls.Add(_reservedCpuPanel);
+                priorImodStatuses[NormalizeInstanceId(block.Device.InstanceId)] = statusText;
             }
 
-            LayoutBlocks();
+            TickDevicesBusy("Clearing device list...", ownsBusy ? 1 : 0);
+            _devicesPanel.SuspendLayout();
+            try
+            {
+                _devicesPanel.Controls.Clear();
+                _devicesPanel.Location = new Point(0, 0);
+                if (_devicesScroll is not null)
+                {
+                    _devicesScroll.Value = 0;
+                }
+                _blocks.Clear();
+                _reservedCpuPanel = null;
+
+                TickDevicesBusy("Enumerating devices...", ownsBusy ? 1 : 0);
+                List<DeviceInfo> devs = GetDeviceList();
+                WarnIfMissingGpuDriver(devs);
+
+                int buildUnits = Math.Max(0, devs.Count);
+                int tailUnits = 2 // reserved CPU + layout
+                    + (includeImodReadback ? 1 : 0)
+                    + 1; // IRQ
+                if (ownsBusy)
+                {
+                    SetDevicesBusyWork(_devicesBusyDone + buildUnits + tailUnits, _devicesBusyDone);
+                }
+
+                int index = 0;
+                int total = Math.Max(1, devs.Count);
+                if (devs.Count == 0 && ownsBusy)
+                {
+                    SetDevicesBusyStage("Building device list (0/0)");
+                }
+
+                foreach (DeviceInfo d in devs)
+                {
+                    if (ownsBusy)
+                    {
+                        TickDevicesBusy($"Building device list ({index + 1}/{total})", 1);
+                    }
+                    else
+                    {
+                        SetDevicesBusyStage($"Building device list ({index + 1}/{total})");
+                    }
+
+                    NewDeviceBlock(d, index, priorImodStatuses);
+                    index++;
+                }
+
+                if (ownsBusy)
+                {
+                    TickDevicesBusy("Building reserved CPU sets...", 1);
+                }
+                else
+                {
+                    SetDevicesBusyStage("Building reserved CPU sets...");
+                }
+
+                _reservedCpuPanel = NewReservedCpuSetsPanel();
+                if (_reservedCpuPanel is not null)
+                {
+                    _devicesPanel.Controls.Add(_reservedCpuPanel);
+                }
+
+                if (ownsBusy)
+                {
+                    TickDevicesBusy("Laying out devices...", 1);
+                }
+                else
+                {
+                    SetDevicesBusyStage("Laying out devices...");
+                }
+
+                LayoutBlocks();
+            }
+            finally
+            {
+                _devicesPanel.ResumeLayout();
+            }
+
+            AdjustInitialDeviceViewportHeight();
+            _devicesPanel.Invalidate(true);
+            _devicesHost.Invalidate(true);
+
+            if (includeImodReadback)
+            {
+                // REFRESH no longer loads DTIMOD; this is UI/cache/preview refresh.
+                if (ownsBusy)
+                {
+                    TickDevicesBusy("Updating IMOD display...", 1);
+                }
+                else
+                {
+                    SetDevicesBusyStage("Updating IMOD display...");
+                }
+
+                WaitForBackgroundUiTasks(RefreshImodCurrentValuesAsync(showReadingStatus: true, reason: "refresh-blocks"));
+            }
+
+            if (ownsBusy)
+            {
+                TickDevicesBusy("Updating IRQ counts...", 1);
+            }
+            else
+            {
+                SetDevicesBusyStage("Updating IRQ counts...");
+            }
+
+            WaitForBackgroundUiTasks(CalculateIrqCountsAsync("refresh-blocks"));
+            LogGuiSnapshot("refresh");
+            if (ownsBusy)
+            {
+                _devicesBusyDone = _devicesBusyTotal;
+                UpdateDevicesBusy("Ready", 100);
+            }
+
+            WriteLog(
+                $"REFRESH.DONE: includeImodReadback={includeImodReadback} blocks={_blocks.Count} " +
+                $"elapsedMs={Stopwatch.GetElapsedTime(refreshStarted).TotalMilliseconds:0}");
         }
         finally
         {
-            _devicesPanel.ResumeLayout();
+            if (ownsBusy)
+            {
+                EndDevicesBusy();
+            }
         }
-
-        AdjustInitialDeviceViewportHeight();
-        _devicesPanel.Invalidate(true);
-        _devicesHost.Invalidate(true);
-
-        if (includeImodReadback)
-        {
-            RefreshImodCurrentValues(reason: "refresh-blocks");
-        }
-        CalculateIrqCounts("refresh-blocks");
-        LogGuiSnapshot("refresh");
     }
 
     private void WarnIfMissingGpuDriver(IReadOnlyList<DeviceInfo> devices)
@@ -1763,7 +2300,10 @@ public sealed partial class MainForm
 
         if (count == 0)
         {
-            info.MsiStatus = block.Device.TestMsiStatus.Equals("Enabled", StringComparison.OrdinalIgnoreCase) ? "Enabled" : "Disabled";
+            // Auto / Enabled both mean MSI is on in test presets; only Disabled stays Disabled.
+            info.MsiStatus = block.Device.TestMsiStatus.Equals("Disabled", StringComparison.OrdinalIgnoreCase)
+                ? "Disabled"
+                : "Enabled";
         }
         else if (!block.Device.TestMsiStatus.Equals("Auto", StringComparison.OrdinalIgnoreCase))
         {
@@ -1779,7 +2319,7 @@ public sealed partial class MainForm
             || status.Equals("Disabled", StringComparison.OrdinalIgnoreCase);
     }
 
-    private async void CalculateIrqCounts(string reason = "refresh")
+    private async Task CalculateIrqCountsAsync(string reason = "refresh")
     {
         int generation = ++_irqRefreshGeneration;
         foreach (DeviceBlock b in _blocks)
@@ -1852,5 +2392,10 @@ public sealed partial class MainForm
         }
 
         LogGuiSnapshot("irq-refresh");
+    }
+
+    private void CalculateIrqCounts(string reason = "refresh")
+    {
+        WaitForBackgroundUiTasks(CalculateIrqCountsAsync(reason));
     }
 }

@@ -139,6 +139,11 @@ internal sealed class DeviceInfo
     public bool Wifi { get; init; }
     public bool UsbIsXhci { get; init; }
     public bool UsbHasDevices { get; init; }
+    public UsbChipPathInfo? UsbChipPath { get; init; }
+    /// <summary>Controller Device Parameters SelectiveSuspendEnabled: "on"/"off", or null if unset.</summary>
+    public string? UsbSelectiveSuspend { get; set; }
+    /// <summary>NIC Device Manager power saving: "on"/"off", or null if unset/not applicable (Wi‑Fi).</summary>
+    public string? NicPowerSaving { get; set; }
     public bool IsTestDevice { get; init; }
     public int? TestIrqCount { get; init; }
     public string TestMsiStatus { get; init; } = "Auto";
@@ -159,6 +164,8 @@ internal sealed class DeviceBlock
     public required Label AffinityLabel { get; init; }
     public required Label IrqLabel { get; init; }
     public required ThemedDropDownPicker MsiCombo { get; init; }
+    /// <summary>Device Manager power saving (USB Selective Suspend / NIC turn-off). Checked = Enabled.</summary>
+    public ThemedCheckBox? PowerSavingCheck { get; init; }
     public required TextBox LimitBox { get; init; }
     public required ThemedDropDownPicker PrioCombo { get; init; }
     public required ThemedDropDownPicker PolicyCombo { get; init; }
@@ -171,8 +178,10 @@ internal sealed class DeviceBlock
     public Label? NicItrTimeLabel { get; init; }
     public Button? NicItrApplyButton { get; init; }
     public Button? NicItrSaveButton { get; init; }
+    public Button? NicItrCheckButton { get; init; }
     public required CheckBox ImodAutoCheck { get; init; }
     public ThemedDropDownPicker? ImodModeCombo { get; init; }
+    public Button? ImodCheckButton { get; init; }
     public required TextBox ImodBox { get; init; }
     public required Label ImodDefaultLabel { get; init; }
     public required Label ImodCurrentLabel { get; init; }
@@ -188,6 +197,7 @@ internal sealed class DeviceBlock
     public int SuppressCpuEvents { get; set; }
     public int SuppressImodEvents { get; set; }
     public int? RssBaseCore { get; set; }
+    public int NicItrOperationGeneration { get; set; }
     public NdisRssRuntimeState? NdisRssRuntime { get; set; }
 }
 
@@ -259,6 +269,6 @@ internal sealed class ReservedCpuPanelTag
     public required Label Title { get; init; }
     public required Label Description { get; init; }
     public required List<ReservedCpuEntry> Meta { get; init; }
-    public required Label PathLabel { get; init; }
-    public required Label ValueLabel { get; init; }
+    public required InfoTextBox PathLabel { get; init; }
+    public required InfoTextBox ValueLabel { get; init; }
 }
