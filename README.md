@@ -1,10 +1,6 @@
 # DEVICE TWEAKER
 
-[![.NET](https://img.shields.io/badge/.NET-8.0--windows-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/8.0)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078D6?logo=windows&logoColor=white)](#требования)
-[![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 [![Telegram](https://img.shields.io/badge/Telegram-arsenzaa-2CA5E0?logo=telegram&logoColor=white)](https://t.me/arsenzaa)
-[![Latest release](https://img.shields.io/badge/release-v0.0.4--alpha.2-orange)](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4-alpha.2)
 
 ![DEVICE TWEAKER](./DEVICE%20TWEAKER/assets/DEVICE%20TWEAKER-wordmark.svg)
 
