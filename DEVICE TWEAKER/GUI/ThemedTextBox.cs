@@ -39,6 +39,32 @@ internal sealed class ThemedTextBox : Panel
         };
         Controls.Add(_edit);
 
+        _edit.TextChanged += (_, _) =>
+        {
+            if (_edit.Focused || _edit.TextLength == 0)
+            {
+                return;
+            }
+
+            // Programmatic refreshes replace long IMOD/ITR strings. A native
+            // single-line TextBox otherwise keeps its caret at the end and the
+            // next paint appears to have eaten the beginning of the value.
+            if (IsHandleCreated && !IsDisposed && !Disposing)
+            {
+                BeginInvoke(new Action(() =>
+                {
+                    if (!IsDisposed && !Disposing)
+                    {
+                        ResetHorizontalView();
+                    }
+                }));
+            }
+            else
+            {
+                ResetHorizontalView();
+            }
+        };
+
         BackColor = Color.FromArgb(18, 18, 22);
         ForeColor = Color.FromArgb(240, 240, 240);
 
@@ -75,6 +101,22 @@ internal sealed class ThemedTextBox : Panel
     {
         PerformLayout();
         Invalidate();
+    }
+
+    /// <summary>
+    /// Return an unfocused single-line editor to its left edge after a responsive
+    /// relayout. WinForms otherwise preserves the old horizontal caret scroll and
+    /// can make the first character appear missing after a language switch.
+    /// </summary>
+    public void ResetHorizontalView()
+    {
+        if (_edit.Focused || _edit.TextLength == 0)
+        {
+            return;
+        }
+
+        _edit.Select(0, 0);
+        _edit.ScrollToCaret();
     }
 
     protected override void OnHandleCreated(EventArgs e)

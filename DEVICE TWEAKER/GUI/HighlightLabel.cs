@@ -13,7 +13,8 @@ internal sealed class HighlightLabel : Label
             return;
         }
 
-        int index = Text.IndexOf(HighlightText, StringComparison.OrdinalIgnoreCase);
+        string localizedHighlight = UiLanguage.Text(HighlightText);
+        int index = Text.IndexOf(localizedHighlight, StringComparison.OrdinalIgnoreCase);
         if (index < 0)
         {
             base.OnPaint(e);
@@ -33,13 +34,13 @@ internal sealed class HighlightLabel : Label
         // Double TextRenderer passes with ClearType cause cyan/red fringing
         // on dark OLED backgrounds (visible on "Mouse scanning" headers).
         string prefix = Text[..index];
-        int highlightEnd = index + HighlightText.Length;
+        int highlightEnd = index + localizedHighlight.Length;
         int highlightLeft = string.IsNullOrEmpty(prefix)
             ? 0
             : TextRenderer.MeasureText(e.Graphics, prefix, Font, Size.Empty, flags & ~TextFormatFlags.EndEllipsis).Width;
         int highlightWidth = TextRenderer.MeasureText(
             e.Graphics,
-            Text.Substring(index, HighlightText.Length),
+            Text.Substring(index, localizedHighlight.Length),
             Font,
             Size.Empty,
             flags & ~TextFormatFlags.EndEllipsis).Width;

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Reflection;
 
 
@@ -10,7 +11,10 @@ public sealed partial class MainForm
     {
         UpdateUiScale();
         Text = "DEVICE TWEAKER";
-        Size formSize = UiScale(1120, 875);
+        // Allocate the complete two-column USB/IMOD layout before the first
+        // visible frame. Previously the form started at 1120 and grew after
+        // enumeration, which made the header jump and briefly clipped settings.
+        Size formSize = UiScale(1172, 875);
         Size = formSize;
         StartPosition = FormStartPosition.CenterScreen;
         AutoScaleMode = AutoScaleMode.None;
@@ -21,9 +25,10 @@ public sealed partial class MainForm
 
         FormBorderStyle = FormBorderStyle.Sizable;
         MaximizeBox = true;
-        MinimumSize = UiScale(1120, 840);
+        MinimumSize = UiScale(1172, 840);
         MaximumSize = Size.Empty;
         SizeGripStyle = SizeGripStyle.Show;
+        ApplyQaInitialWindowBounds();
 
         Panel brandPanel = new()
         {
@@ -39,6 +44,7 @@ public sealed partial class MainForm
             AutoSize = true,
             Font = _brandFont,
             ForeColor = _accent,
+            Padding = new Padding(UiScale(2), 0, UiScale(2), 0),
             Margin = new Padding(0, UiScale(2), 0, 0),
         };
 
@@ -61,7 +67,8 @@ public sealed partial class MainForm
             VisitedLinkColor = _mutedText,
             DisabledLinkColor = _mutedText,
             ForeColor = _mutedText,
-            MaximumSize = new Size(UiScale(940), 0),
+            MaximumSize = new Size(UiScale(940), UiScale(24)),
+            MinimumSize = new Size(1, UiScale(20)),
             TextAlign = ContentAlignment.MiddleCenter,
             Margin = new Padding(0, UiScale(4), 0, 0),
         };
@@ -93,17 +100,8 @@ public sealed partial class MainForm
 
         brandLayout.Controls.Add(logoLabel, 0, 1);
         brandLayout.Controls.Add(logoSubtitle, 0, 2);
-        brandLayout.Layout += (_, _) =>
-        {
-            int w = Math.Max(0, brandLayout.ClientSize.Width);
-            Size newMax = new(w, 0);
-            if (logoSubtitle.MaximumSize != newMax)
-            {
-                logoSubtitle.MaximumSize = newMax;
-            }
-        };
-
         brandPanel.Controls.Add(brandLayout);
+        AddLanguageSelector(brandPanel);
 
         Panel statusPanel = new()
         {
@@ -186,8 +184,6 @@ public sealed partial class MainForm
         AddCpuFlag(cpuFlagsPanel, _cppcPrefixLabel, _cppcStatusLabel);
         AddCpuFlagSeparator(cpuFlagsPanel);
         AddCpuFlag(cpuFlagsPanel, _dualCcdPrefixLabel, _dualCcdStatusLabel);
-        AddCpuFlagSeparator(cpuFlagsPanel);
-        AddCpuFlag(cpuFlagsPanel, _sandboxPrefixLabel, _sandboxStatusLabel);
 
         TableLayoutPanel statusLayout = new()
         {
@@ -225,7 +221,7 @@ public sealed partial class MainForm
         Panel buttonPanel = new()
         {
             Dock = DockStyle.Top,
-            Height = UiScale(108),
+            Height = UiScale(68),
             BackColor = _bgPanel,
             Padding = new Padding(UiScale(24), UiScale(4), UiScale(24), UiScale(16)),
             Margin = Padding.Empty,
@@ -234,17 +230,15 @@ public sealed partial class MainForm
         Button btnScan = NewTopButton("REFRESH");
         Button btnApply = NewTopButton("APPLY");
         Button btnAuto = NewTopButton("AUTO-OPTIMIZATION");
-        Button btnReset = NewTopButton("RESET ALL");
         Button btnRestore = NewTopButton("RESTORE");
+        _operationButtons = [btnScan, btnApply, btnAuto, btnRestore];
         int buttonGap = UiScale(8);
-        int buttonRowGap = UiScale(8);
         btnApply.Margin = Padding.Empty;
         btnAuto.Margin = new Padding(buttonGap, 0, 0, 0);
         btnScan.Margin = new Padding(buttonGap, 0, 0, 0);
-        btnReset.Margin = Padding.Empty;
         btnRestore.Margin = new Padding(buttonGap, 0, 0, 0);
 
-        foreach (Button b in new[] { btnScan, btnApply, btnAuto, btnReset, btnRestore })
+        foreach (Button b in new[] { btnScan, btnApply, btnAuto, btnRestore })
         {
             SetTopButtonBaseStyle(b);
             b.MouseEnter += (_, _) => SetTopButtonHoverStyle(b);
@@ -269,8 +263,8 @@ public sealed partial class MainForm
         {
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 3,
-            RowCount = 2,
+            ColumnCount = 4,
+            RowCount = 1,
             BackColor = _bgPanel,
             Anchor = AnchorStyles.None,
             Margin = Padding.Empty,
@@ -279,28 +273,13 @@ public sealed partial class MainForm
         buttonsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         buttonsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         buttonsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        buttonsGrid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        buttonsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         buttonsGrid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
         buttonsGrid.Controls.Add(btnApply, 0, 0);
         buttonsGrid.Controls.Add(btnAuto, 1, 0);
         buttonsGrid.Controls.Add(btnScan, 2, 0);
-
-        FlowLayoutPanel bottomButtons = new()
-        {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            BackColor = _bgPanel,
-            FlowDirection = FlowDirection.LeftToRight,
-            Margin = new Padding(0, buttonRowGap, 0, 0),
-            Padding = Padding.Empty,
-            WrapContents = false,
-            Anchor = AnchorStyles.None,
-        };
-        bottomButtons.Controls.Add(btnReset);
-        bottomButtons.Controls.Add(btnRestore);
-        buttonsGrid.Controls.Add(bottomButtons, 0, 1);
-        buttonsGrid.SetColumnSpan(bottomButtons, 3);
+        buttonsGrid.Controls.Add(btnRestore, 3, 0);
 
         buttonsHost.Controls.Add(buttonsGrid, 1, 0);
         buttonPanel.Controls.Add(buttonsHost);
@@ -397,11 +376,23 @@ public sealed partial class MainForm
 
         btnScan.Click += (_, _) =>
         {
+            if (_devicesBusyDepth > 0)
+            {
+                WriteLog("UI: REFRESH ignored because another operation is active");
+                return;
+            }
+
             WriteLog("UI: REFRESH button clicked");
             RefreshBlocks();
         };
         btnApply.Click += (_, _) =>
         {
+            if (_devicesBusyDepth > 0)
+            {
+                WriteLog("UI: APPLY ignored because another operation is active");
+                return;
+            }
+
             WriteLog("UI: APPLY button clicked");
             OperationReport report = new();
             bool sandboxDryRun = IsSandboxDryRunActive();
@@ -409,13 +400,17 @@ public sealed partial class MainForm
             {
                 if (!CreateDeviceTweakerBackup("pre-apply", showDialog: false))
                 {
+                    report.MarkNoChangesMade();
                     report.AddError("Automatic backup", "backup could not be created; changes were not applied");
                     ShowOperationResult(
                         report,
                         successMessage: string.Empty,
-                        partialMessage: "APPLY was cancelled because the automatic backup failed.");
+                        partialMessage: "APPLY was cancelled because the automatic backup failed.",
+                        operationName: "APPLY");
                     return;
                 }
+
+                report.SetBackupPath(_lastBackupPath);
             }
             else
             {
@@ -426,6 +421,7 @@ public sealed partial class MainForm
             BeginDevicesBusyWork(sandboxDryRun ? "Previewing APPLY..." : "Applying changes...", applyTotal);
             try
             {
+                int errorsBeforeDevices = report.Errors.Count;
                 int saved = 0;
                 int saveTotal = Math.Max(1, _blocks.Count);
                 foreach (DeviceBlock b in _blocks)
@@ -452,7 +448,12 @@ public sealed partial class MainForm
                         1);
                     SaveBlockSettings(b, report: report);
                 }
+                if (report.Errors.Count == errorsBeforeDevices)
+                {
+                    report.AddSuccess("DEVICE SETTINGS", $"{_blocks.Count} processed");
+                }
 
+                int errorsBeforePower = report.Errors.Count;
                 TickDevicesBusy(sandboxDryRun ? "Skipping USB selective suspend..." : "Applying USB selective suspend...", 1);
                 if (sandboxDryRun)
                 {
@@ -462,6 +463,10 @@ public sealed partial class MainForm
                 {
                     ApplyUsbSelectiveSuspendPowerPlan(forceDisable: false, report);
                 }
+                if (!sandboxDryRun && report.Errors.Count == errorsBeforePower)
+                {
+                    report.AddSuccess("USB POWER", "Applied");
+                }
 
                 TickDevicesBusy(sandboxDryRun ? "Skipping USB IMOD..." : "Applying USB IMOD...", 1);
                 if (sandboxDryRun)
@@ -470,22 +475,13 @@ public sealed partial class MainForm
                 }
                 else
                 {
-                    ImodApplyOutcome imodOutcome = ApplyImodSettings(out string? imodNote);
+                    ImodApplyOutcome imodOutcome = ApplyImodSettings(out string? imodNote, out string? imodTechnicalDetails);
                     if (!string.IsNullOrWhiteSpace(imodNote))
                     {
                         WriteLog($"IMOD.NOTE: {imodNote}");
                     }
 
-                    if (imodOutcome == ImodApplyOutcome.Failed)
-                    {
-                        report.AddError("IMOD", imodNote ?? "apply failed");
-                    }
-                    else if (!string.IsNullOrWhiteSpace(imodNote)
-                        && (imodNote.Contains("failure", StringComparison.OrdinalIgnoreCase)
-                            || imodNote.Contains("failed", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        report.AddError("IMOD", imodNote);
-                    }
+                    AddImodResultToReport(report, imodOutcome, imodNote, imodTechnicalDetails);
                 }
 
                 TickDevicesBusy("Updating IMOD / IRQ display...", 1);
@@ -513,19 +509,27 @@ public sealed partial class MainForm
             {
                 ShowOperationResult(
                     report,
-                    successMessage: "All changes have been applied and saved.\nPlease reboot your PC to finish applying them.",
-                    partialMessage: "APPLY finished with errors. Some changes may be incomplete.");
+                    successMessage: "Please reboot your PC to finish applying the changes.",
+                    partialMessage: "Applied steps were saved. One or more steps were not completed.",
+                    operationName: "APPLY");
+                MaybeOfferVulnerableDriverBlocklistDisable(report);
             }
         };
         btnAuto.Click += (_, _) =>
         {
+            if (_devicesBusyDepth > 0)
+            {
+                WriteLog("UI: AUTO-OPTIMIZATION ignored because another operation is active");
+                return;
+            }
+
             WriteLog("UI: AUTO-OPTIMIZATION button clicked");
             bool hasUsbImodTarget = _blocks.Any(b => IsUsbImodTarget(b.Device));
             bool optimizeUsbImod = false;
             if (hasUsbImodTarget)
             {
                 optimizeUsbImod = ShowThemedConfirm(
-                    "USB IMOD tuning is available for detected XHCI controller(s).\n\nDTIMOD driver access can be blocked by Windows Defender or anti-cheats.\n\nApply it during AUTO-OPTIMIZATION?",
+                    "USB IMOD tuning is available for detected XHCI controller(s).\n\nDTIMOD can be blocked by Vulnerable Driver Blocklist, Windows driver signature protection, antivirus, or anti-cheats.\n\nApply it during AUTO-OPTIMIZATION?",
                     "USB IMOD TUNING",
                     "APPLY",
                     "SKIP");
@@ -551,17 +555,33 @@ public sealed partial class MainForm
                     BackupLocation backupLocation = backupChoice == AutoBackupChoice.Local ? BackupLocation.Local : BackupLocation.Roaming;
                     if (!CreateDeviceTweakerBackup("pre-auto", showDialog: false, backupLocation))
                     {
+                        report.MarkNoChangesMade();
                         report.AddError("Automatic backup", "backup could not be created; changes were not applied");
                         ShowOperationResult(
                             report,
                             successMessage: string.Empty,
-                            partialMessage: "AUTO-OPTIMIZATION was cancelled because the automatic backup failed.");
+                            partialMessage: "AUTO-OPTIMIZATION was cancelled because the automatic backup failed.",
+                            operationName: "AUTO-OPTIMIZATION");
                         return;
                     }
+
+                    report.SetBackupPath(_lastBackupPath);
                 }
                 else
                 {
-                    WriteLog("BACKUP.PROMPT.AUTO: skipped by user");
+                    if (!EnsureOriginalDeviceTweakerBackup(BackupLocation.Local))
+                    {
+                        report.MarkNoChangesMade();
+                        report.AddError("Original-state backup", "the initial recovery snapshot could not be created; changes were not applied");
+                        ShowOperationResult(
+                            report,
+                            successMessage: string.Empty,
+                            partialMessage: "AUTO-OPTIMIZATION was cancelled because the original-state backup failed.",
+                            operationName: "AUTO-OPTIMIZATION");
+                        return;
+                    }
+
+                    WriteLog("BACKUP.PROMPT.AUTO: operation backup skipped; original-state snapshot retained");
                 }
             }
 
@@ -574,7 +594,7 @@ public sealed partial class MainForm
             try
             {
                 TickDevicesBusy("Planning AUTO-OPTIMIZATION...", 1);
-                bool planBuilt = InvokeAutoOptimization(optimizeUsbImod, report);
+                bool planBuilt = InvokeAutoOptimization(optimizeUsbImod, hasUsbImodTarget, report);
                 bool applyImod = optimizeUsbImod && hasUsbImodTarget;
                 if (applyImod)
                 {
@@ -583,11 +603,18 @@ public sealed partial class MainForm
 
                 if (!planBuilt)
                 {
+                    report.MarkNoChangesMade();
                     WriteLog("AUTO: plan was not built -> skipping apply/save");
                     _devicesBusyDone = _devicesBusyTotal;
                     UpdateDevicesBusy("Ready", 100);
                     showAutoResult = true;
-                    return;
+                    goto AutoCompleted;
+                }
+                report.AddSuccess("AUTO PLAN", "Built");
+                if (!applyImod)
+                {
+                    string skipReason = GetAutoImodSkipReason(hasUsbImodTarget);
+                    WriteLog($"AUTO.IMOD.RESULT: status=skipped reason={skipReason}");
                 }
 
                 if (_testAutoDryRun)
@@ -595,16 +622,18 @@ public sealed partial class MainForm
                     WriteLog("AUTO.DRYRUN: enabled -> skipping registry writes");
                     if (applyImod)
                     {
-                        WriteLog("AUTO.DRYRUN: IMOD apply skipped");
+                        WriteLog("AUTO.IMOD.RESULT: status=preview-only reason=dry-run");
                     }
 
                     _devicesBusyDone = _devicesBusyTotal;
                     UpdateDevicesBusy("Ready", 100);
                     dryRunInfo = "AUTO-OPTIMIZATION preview completed.\nSandbox dry-run is ON (no registry changes).";
-                    return;
+                    goto AutoCompleted;
                 }
 
+                int errorsBeforeDevices = report.Errors.Count;
                 int saved = 0;
+                int deviceWriteAttempts = 0;
                 foreach (DeviceBlock b in _blocks)
                 {
                     saved++;
@@ -616,36 +645,34 @@ public sealed partial class MainForm
                     }
 
                     TickDevicesBusy($"Applying device settings ({saved}/{saveTotal})", 1);
-                    SaveBlockSettings(b, msiOnlyForIntegratedGpu: true, report: report);
+                    deviceWriteAttempts++;
+                    SaveBlockSettings(b, autoMsiOnly: IsAutoMsiOnlyDevice(b), report: report);
+                }
+                if (report.Errors.Count == errorsBeforeDevices)
+                {
+                    report.AddSuccess("DEVICE SETTINGS", $"{deviceWriteAttempts} processed");
                 }
 
+                int errorsBeforePower = report.Errors.Count;
                 TickDevicesBusy("Applying USB selective suspend...", 1);
                 ApplyUsbSelectiveSuspendPowerPlan(forceDisable: true, report);
+                if (report.Errors.Count == errorsBeforePower)
+                {
+                    report.AddSuccess("USB POWER", "Applied");
+                }
 
                 WriteLog("UI: AUTO-OPTIMIZATION applied and saved");
                 if (applyImod)
                 {
                     TickDevicesBusy("Applying USB IMOD...", 1);
-                    ImodApplyOutcome imodOutcome = ApplyImodSettings(out string? imodNote);
+                    ImodApplyOutcome imodOutcome = ApplyImodSettings(out string? imodNote, out string? imodTechnicalDetails);
                     if (!string.IsNullOrWhiteSpace(imodNote))
                     {
                         WriteLog($"IMOD.NOTE: {imodNote}");
                     }
 
-                    if (imodOutcome == ImodApplyOutcome.Failed)
-                    {
-                        report.AddError("IMOD", imodNote ?? "apply failed");
-                    }
-                    else if (!string.IsNullOrWhiteSpace(imodNote)
-                        && (imodNote.Contains("failure", StringComparison.OrdinalIgnoreCase)
-                            || imodNote.Contains("failed", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        report.AddError("IMOD", imodNote);
-                    }
-                }
-                else
-                {
-                    WriteLog("IMOD skipped (AUTO-OPTIMIZATION): no eligible XHCI controllers");
+                    AddImodResultToReport(report, imodOutcome, imodNote, imodTechnicalDetails);
+                    WriteLog($"AUTO.IMOD.RESULT: status={imodOutcome}");
                 }
 
                 WriteLog($"UI: AUTO-OPTIMIZATION done errors={report.Errors.Count} -> triggering REFRESH");
@@ -659,6 +686,7 @@ public sealed partial class MainForm
                 EndDevicesBusy();
             }
 
+        AutoCompleted:
             // Dialog only after progress overlay is closed — never over a mid-stage %.
             if (!showAutoResult)
             {
@@ -673,43 +701,20 @@ public sealed partial class MainForm
             {
                 ShowOperationResult(
                     report,
-                    successMessage: "AUTO-OPTIMIZATION completed and saved.\nPlease reboot your PC to finish applying the changes.",
-                    partialMessage: "AUTO-OPTIMIZATION finished with errors. Some changes may be incomplete.");
-            }
-        };
-        btnReset.Click += (_, _) =>
-        {
-            WriteLog("UI: RESET ALL button clicked");
-            OperationReport report = new();
-            if (!_testAutoDryRun)
-            {
-                if (!CreateDeviceTweakerBackup("pre-reset", showDialog: false))
-                {
-                    report.AddError("Automatic backup", "backup could not be created; changes were not applied");
-                    ShowOperationResult(
-                        report,
-                        successMessage: string.Empty,
-                        partialMessage: "RESET ALL was cancelled because the automatic backup failed.");
-                    return;
-                }
-            }
-            else
-            {
-                WriteLog("RESET: dry-run -> skipped pre-reset backup");
-            }
-
-            BeginDevicesBusyWork("Running RESET ALL...", Math.Max(4, _blocks.Count + 4));
-            try
-            {
-                ResetAllTweaks(report);
-            }
-            finally
-            {
-                EndDevicesBusy();
+                    successMessage: "Please reboot your PC to finish applying the changes.",
+                    partialMessage: "Applied steps were saved. One or more steps were not completed.",
+                    operationName: "AUTO-OPTIMIZATION");
+                MaybeOfferVulnerableDriverBlocklistDisable(report);
             }
         };
         btnRestore.Click += (_, _) =>
         {
+            if (_devicesBusyDepth > 0)
+            {
+                WriteLog("UI: RESTORE ignored because another operation is active");
+                return;
+            }
+
             WriteLog("UI: RESTORE button clicked");
             RestoreLatestDeviceTweakerBackup();
         };
@@ -746,6 +751,37 @@ public sealed partial class MainForm
         {
             return 96;
         }
+    }
+
+    private void ApplyQaInitialWindowBounds()
+    {
+        string? value = Environment.GetEnvironmentVariable("DEVICE_TWEAKER_QA_WINDOW_BOUNDS");
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        string[] parts = value.Split(',');
+        if (parts.Length != 4
+            || !int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int x)
+            || !int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int y)
+            || !int.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out int width)
+            || !int.TryParse(parts[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out int height)
+            || width < MinimumSize.Width
+            || height < MinimumSize.Height)
+        {
+            return;
+        }
+
+        Rectangle requested = new(x, y, width, height);
+        bool fitsKnownScreen = Screen.AllScreens.Any(screen => screen.WorkingArea.Contains(requested));
+        if (!fitsKnownScreen)
+        {
+            return;
+        }
+
+        StartPosition = FormStartPosition.Manual;
+        Bounds = requested;
     }
 
     private void QueueDeviceLayoutRebuild(bool force)
@@ -787,85 +823,21 @@ public sealed partial class MainForm
         RefreshBlocks(includeImodReadback: false);
     }
 
-    private bool TryExpandMainWindowForViewportWidth(int desiredViewportWidth)
-    {
-        if (IsDisposed || !IsHandleCreated || WindowState != FormWindowState.Normal || _expandingMainWindowForLayout)
-        {
-            return false;
-        }
-
-        int currentViewportWidth = GetDevicesViewportWidth();
-        int delta = desiredViewportWidth - currentViewportWidth;
-        if (delta <= UiScale(2))
-        {
-            return true;
-        }
-
-        Rectangle workingArea = Screen.FromControl(this).WorkingArea;
-        int maxWidthToRight = Math.Max(Width, workingArea.Right - Left);
-        int nextWidth = Math.Min(maxWidthToRight, Width + delta);
-        if (nextWidth <= Width + UiScale(2))
-        {
-            return false;
-        }
-
-        _expandingMainWindowForLayout = true;
-        try
-        {
-            Width = nextWidth;
-            UpdateDevicesScrollLayout();
-            UpdateDevicesHostLayout();
-        }
-        finally
-        {
-            _expandingMainWindowForLayout = false;
-        }
-
-        return GetDevicesViewportWidth() >= desiredViewportWidth - UiScale(2);
-    }
-
     private void AdjustInitialDeviceViewportHeight()
     {
         if (_initialDeviceViewportHeightAdjusted
             || IsDisposed
             || !IsHandleCreated
-            || WindowState != FormWindowState.Normal
-            || _devicesHost is null
-            || _blocks.Count == 0)
+            || _devicesHost is null)
         {
             return;
         }
 
-        Control firstBlock = _blocks[0].Group;
-        int desiredViewportHeight = firstBlock.Bottom + UiScale(10);
-        if (_blocks.Count > 1)
-        {
-            desiredViewportHeight = Math.Min(desiredViewportHeight, _blocks[1].Group.Top - UiScale(2));
-        }
-
-        desiredViewportHeight = Math.Max(firstBlock.Bottom + UiScale(2), desiredViewportHeight);
-
-        int delta = desiredViewportHeight - _devicesHost.ClientSize.Height;
-        if (Math.Abs(delta) <= UiScale(3))
-        {
-            _initialDeviceViewportHeightAdjusted = true;
-            return;
-        }
-
-        Rectangle workingArea = Screen.FromControl(this).WorkingArea;
-        int maxHeight = Math.Max(Height, workingArea.Bottom - Top);
-        int nextHeight = Math.Max(MinimumSize.Height, Math.Min(Height + delta, maxHeight));
-        if (Math.Abs(nextHeight - Height) <= UiScale(2))
-        {
-            _initialDeviceViewportHeightAdjusted = true;
-            return;
-        }
-
+        // Device cards use the internal scrollbar. Resizing the top-level form
+        // after it is already visible makes the header and language selector
+        // jump during startup/REFRESH, so the user-selected window bounds stay
+        // authoritative for the complete session.
         _initialDeviceViewportHeightAdjusted = true;
-        Height = nextHeight;
-        UpdateDevicesScrollLayout();
-        UpdateDevicesHostLayout();
-        LayoutBlocks();
     }
 
     private void ApplyDarkScrollBarTheme(Control control)
@@ -1059,8 +1031,9 @@ public sealed partial class MainForm
 
     private Button NewTopButton(string text)
     {
-        return new Button
+        return new ThemedButton
         {
+            Name = text,
             Text = text,
             Size = UiScale(178, 36),
             Margin = new Padding(UiScale(8), UiScale(4), UiScale(8), UiScale(4)),
@@ -1074,7 +1047,7 @@ public sealed partial class MainForm
 
     private void SetTopButtonBaseStyle(Button btn)
     {
-        bool isPrimary = string.Equals(btn.Text, "AUTO-OPTIMIZATION", StringComparison.OrdinalIgnoreCase);
+        bool isPrimary = string.Equals(btn.Name, "AUTO-OPTIMIZATION", StringComparison.OrdinalIgnoreCase);
         btn.FlatAppearance.BorderSize = 1;
         btn.BackColor = _bgForm;
         btn.ForeColor = _fgMain;

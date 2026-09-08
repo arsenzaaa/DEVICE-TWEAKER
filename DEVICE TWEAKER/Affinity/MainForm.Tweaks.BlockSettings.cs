@@ -138,7 +138,12 @@ public sealed partial class MainForm
             return "active=Unknown";
         }
 
-        return $"adapterFound={state.AdapterFound} rssFound={state.RssFound} active={FormatNdisRuntimeBool(state.Enabled)} adapter=\"{state.AdapterName}\" desc=\"{state.InterfaceDescription}\" base=G{FormatNdisRuntimeValue(state.BaseProcessorGroup)}:{FormatNdisRuntimeValue(state.BaseProcessorNumber)} max=G{FormatNdisRuntimeValue(state.MaxProcessorGroup)}:{FormatNdisRuntimeValue(state.MaxProcessorNumber)} maxProcessors={FormatNdisRuntimeValue(state.MaxProcessors)} queues={FormatNdisRuntimeValue(state.NumberOfReceiveQueues)} profile=\"{state.Profile}\" error=\"{state.Error}\"";
+        return $"adapterFound={state.AdapterFound} rssFound={state.RssFound} active={FormatNdisRuntimeBool(state.Enabled)} "
+            + $"adapter=\"{SanitizeLogValue(state.AdapterName)}\" desc=\"{SanitizeLogValue(state.InterfaceDescription)}\" "
+            + $"base=G{FormatNdisRuntimeValue(state.BaseProcessorGroup)}:{FormatNdisRuntimeValue(state.BaseProcessorNumber)} "
+            + $"max=G{FormatNdisRuntimeValue(state.MaxProcessorGroup)}:{FormatNdisRuntimeValue(state.MaxProcessorNumber)} "
+            + $"maxProcessors={FormatNdisRuntimeValue(state.MaxProcessors)} queues={FormatNdisRuntimeValue(state.NumberOfReceiveQueues)} "
+            + $"profile=\"{SanitizeLogValue(state.Profile)}\" error=\"{SanitizeLogValue(state.Error)}\"";
     }
 
     private static string BuildNdisRssConflictText(NdisRssRuntimeState? state, int? registryBase, int? registryQueues, int? registryMaxProcessors)
@@ -467,15 +472,10 @@ public sealed partial class MainForm
         }
         else
         {
-            // Test devices: honor explicit MSI status from Test Admin.
-            msiSupported = block.Device.TestMsiStatus switch
-            {
-                "Enabled" => 1,
-                "Disabled" => 0,
-                _ => 1, // Auto / unknown -> Enabled for preview
-            };
-            limit = 0;
-            limitPresent = true;
+            TestDeviceState testState = EnsureTestDeviceState(block.Device);
+            msiSupported = testState.MsiEnabled ? 1 : 0;
+            limit = testState.MsiLimit ?? 0;
+            limitPresent = testState.MsiLimit.HasValue;
         }
 
         block.MsiCombo.SelectedItem = msiSupported == 1 ? "Enabled" : "Disabled";
@@ -493,7 +493,8 @@ public sealed partial class MainForm
                 }
                 else
                 {
-                    powerSavingEnabled = !string.Equals(block.Device.UsbSelectiveSuspend, "off", StringComparison.OrdinalIgnoreCase);
+                    powerSavingEnabled = EnsureTestDeviceState(block.Device).PowerSavingEnabled
+                        ?? !string.Equals(block.Device.UsbSelectiveSuspend, "off", StringComparison.OrdinalIgnoreCase);
                 }
             }
             else if (!block.Device.Wifi)
@@ -516,7 +517,8 @@ public sealed partial class MainForm
                 }
                 else
                 {
-                    powerSavingEnabled = !string.Equals(block.Device.NicPowerSaving, "off", StringComparison.OrdinalIgnoreCase);
+                    powerSavingEnabled = EnsureTestDeviceState(block.Device).PowerSavingEnabled
+                        ?? !string.Equals(block.Device.NicPowerSaving, "off", StringComparison.OrdinalIgnoreCase);
                 }
 
                 block.Device.NicPowerSaving = powerSavingEnabled ? "on" : "off";
@@ -541,6 +543,10 @@ public sealed partial class MainForm
             {
             }
         }
+        else
+        {
+            prioValue = EnsureTestDeviceState(block.Device).Priority;
+        }
 
         block.PrioCombo.SelectedItem = prioValue switch
         {
@@ -562,12 +568,13 @@ public sealed partial class MainForm
             block.PolicyCombo.Visible = false;
 
             bool skipTestWifiAffinity = isTestDevice && block.Device.Wifi;
+            TestDeviceState? testState = isTestDevice ? EnsureTestDeviceState(block.Device) : null;
             int? baseCore = skipTestWifiAffinity
                 ? null
                 : isTestDevice
-                    ? 0
+                    ? testState!.RssBaseCore
                     : GetNdisBaseCore(block.Device.InstanceId);
-            int? registryQueues = isTestDevice ? 1 : GetNdisRssQueues(block.Device.InstanceId);
+            int? registryQueues = isTestDevice ? testState!.RssQueues : GetNdisRssQueues(block.Device.InstanceId);
             int queues = registryQueues ?? 1;
             queues = ClampRssQueueCount(queues);
             block.NdisRssRuntime = isTestDevice
@@ -584,14 +591,21 @@ public sealed partial class MainForm
                     AdapterName: block.Device.Name,
                     InterfaceDescription: block.Device.Name,
                     Profile: "TEST",
-                    Error: "test-device")
+                    Error: string.Empty)
                 : GetNdisRssRuntimeState(block.Device.InstanceId);
             (int irqPolicy, ulong irqMask) = isTestDevice
-                ? (0, 0UL)
+                ? (testState!.Policy, testState.AffinityMask)
                 : ReadAffinityPolicyState(prioAffPath);
             bool hasRss = baseCore.HasValue;
             bool hasIrqPolicy = irqPolicy == 4 && irqMask != 0;
-            NdisAffinityMode ndisMode = skipTestWifiAffinity
+            NdisAffinityMode ndisMode = isTestDevice && !skipTestWifiAffinity
+                ? testState!.NdisMode.ToUpperInvariant() switch
+                {
+                    "IRQ" => NdisAffinityMode.IrqPolicy,
+                    "BOTH" => NdisAffinityMode.Both,
+                    _ => NdisAffinityMode.Rss,
+                }
+                : skipTestWifiAffinity
                 ? NdisAffinityMode.IrqPolicy
                 : hasRss && hasIrqPolicy
                     ? NdisAffinityMode.Both
@@ -676,16 +690,14 @@ public sealed partial class MainForm
                 {
                 }
             }
-
-            block.PolicyCombo.SelectedItem = policyVal switch
+            else
             {
-                1 => "All",
-                2 => "Single",
-                3 => "AllClose",
-                4 => "SpecCPU",
-                5 => "SpreadMessages",
-                _ => "MachineDefault",
-            };
+                TestDeviceState testState = EnsureTestDeviceState(block.Device);
+                policyVal = testState.Policy;
+                mask = testState.AffinityMask;
+            }
+
+            block.PolicyCombo.SelectedItem = FormatPolicyValue(policyVal);
 
             block.AffinityMask = mask;
             block.SuppressCpuEvents++;
@@ -717,7 +729,7 @@ public sealed partial class MainForm
                 string defaultText = FormatImodValue(config.GlobalInterval);
                 block.ImodDefaultLabel.Text = $"default: {defaultText}";
                 block.ImodDefaultLabel.Tag = defaultText;
-                string currentText = block.ImodCurrentLabel.Text ?? string.Empty;
+                string currentText = GetSourceControlText(block.ImodCurrentLabel);
                 if (string.IsNullOrWhiteSpace(currentText)
                     || currentText.Equals("current: -", StringComparison.OrdinalIgnoreCase)
                     || currentText.Equals("current: reading...", StringComparison.OrdinalIgnoreCase))
@@ -801,6 +813,12 @@ public sealed partial class MainForm
         info.AppendLine($"PNP ID: {shortPnp}");
         info.AppendLine($"Class: {block.Device.Class}");
         info.Append($"Registry: {displayReg}");
+
+        if (block.Device.Wifi)
+        {
+            info.AppendLine();
+            info.Append("Protection: Wi-Fi settings preserved (no changes)");
+        }
 
         if (block.Device.Kind == DeviceKind.USB && !string.IsNullOrWhiteSpace(usbRoles))
         {
@@ -902,32 +920,14 @@ public sealed partial class MainForm
 
     private void SaveBlockSettings(
         DeviceBlock block,
-        bool msiOnlyForIntegratedGpu = false,
+        bool autoMsiOnly = false,
         OperationReport? report = null)
     {
         if (block.Device.IsTestDevice)
         {
-            if (block.PowerSavingCheck is not null)
-            {
-                bool powerSavingEnabled = block.PowerSavingCheck.Checked;
-                if (block.Kind == DeviceKind.USB)
-                {
-                    block.Device.UsbSelectiveSuspend = powerSavingEnabled ? "on" : "off";
-                    WriteLog(
-                        $"APPLY.PREVIEW: {block.Device.InstanceId} PowerSaving={block.Device.UsbSelectiveSuspend} " +
-                        "(test USB — no registry/WMI/power plan)");
-                }
-                else if (!block.Device.Wifi)
-                {
-                    block.Device.NicPowerSaving = powerSavingEnabled ? "on" : "off";
-                    WriteLog(
-                        $"APPLY.PREVIEW: {block.Device.InstanceId} PowerSaving={block.Device.NicPowerSaving} " +
-                        "(test NIC — no registry/WMI)");
-                }
-            }
-
+            ApplyTestBlockSettings(block, autoMsiOnly, report);
             UpdateBlockInfoText(block);
-            WriteLog($"APPLY.SKIP: {block.Device.InstanceId} Kind={block.Kind} reason=TEST_DEVICE (preview only)");
+            WriteLog($"APPLY.VIRTUAL: {block.Device.InstanceId} Kind={block.Kind} reason=TEST_DEVICE");
             return;
         }
 
@@ -979,67 +979,60 @@ public sealed partial class MainForm
             RecordError("set MSI mode", ex);
         }
 
-        if (msiOnlyForIntegratedGpu && block.Kind == DeviceKind.GPU && block.Device.IsIntegratedGpu)
+        if (autoMsiOnly)
         {
-            WriteLog($"APPLY: {block.Device.InstanceId} MSI={mode} Kind={block.Kind} mode=autoIntegratedGpuMsiOnly");
+            string reason = block.Kind == DeviceKind.GPU && block.Device.IsIntegratedGpu
+                ? "integrated-gpu"
+                : IsAutoDisplayAudioMsiOnly(block)
+                    ? "display-audio"
+                    : "auto-policy";
+            WriteLog($"APPLY: {block.Device.InstanceId} MSI={mode} Kind={block.Kind} mode=autoMsiOnly reason={reason} preserved=limit,priority,policy,affinity");
             return;
         }
 
         string limitText = block.LimitBox.Text?.Trim() ?? string.Empty;
-        bool isUnlimited = string.IsNullOrWhiteSpace(limitText) || limitText == "0" || Regex.IsMatch(limitText, "^(?i)unlimited$", RegexOptions.CultureInvariant);
-
-        try
+        if (!TryParseMsiLimitInput(limitText, out bool isUnlocked, out int limitValue))
         {
-            using RegistryKey? msiKey = Registry.LocalMachine.OpenSubKey(msiPath, writable: true);
-            if (msiKey is null)
+            const string msiLimitMessage =
+                "MSI Limit must be a whole number from 1 to 2048. Leave empty or set 0 to unlock it. The invalid value was not applied.";
+            WriteLog($"APPLY.VALIDATION.ERROR: {block.Device.InstanceId} setting=MSI-Limit value=\"{FlattenLogText(limitText)}\" expected=0..2048");
+            if (report is null)
             {
-                throw new InvalidOperationException("MSI registry key could not be opened for writing");
-            }
-
-            if (isUnlimited)
-            {
-                msiKey.DeleteValue("MessageNumberLimit", throwOnMissingValue: false);
-                block.LimitBox.Text = "0";
-                limitText = "0";
-            }
-            else if (Regex.IsMatch(limitText, "^\\d+$", RegexOptions.CultureInvariant))
-            {
-                if (!int.TryParse(limitText, out int limitVal))
-                {
-                    throw new InvalidOperationException("MSI Limit is outside the supported 32-bit range");
-                }
-
-                if (limitVal < 0)
-                {
-                    limitVal = 0;
-                }
-
-                msiKey.SetValue("MessageNumberLimit", limitVal, RegistryValueKind.DWord);
-                block.LimitBox.Text = limitVal.ToString();
-                limitText = limitVal.ToString();
+                ShowThemedInfo(msiLimitMessage);
             }
             else
             {
-                const string msiLimitMessage =
-                    "MSI Limit must be a whole number. Leave empty or set 0 for unlimited. Value has been reset to 0 (unlimited).";
-                if (report is null)
+                report.AddError($"{block.Device.Name} — MSI Limit", "invalid value; expected 0 or a whole number from 1 to 2048");
+            }
+        }
+        else
+        {
+            try
+            {
+                using RegistryKey? msiKey = Registry.LocalMachine.OpenSubKey(msiPath, writable: true);
+                if (msiKey is null)
                 {
-                    ShowThemedInfo(msiLimitMessage);
+                    throw new InvalidOperationException("MSI registry key could not be opened for writing");
+                }
+
+                if (isUnlocked)
+                {
+                    msiKey.DeleteValue("MessageNumberLimit", throwOnMissingValue: false);
+                    block.LimitBox.Text = "0";
+                    limitText = "0";
                 }
                 else
                 {
-                    report.AddError($"{block.Device.Name} — MSI Limit", "invalid value; reset to 0 (unlimited)");
+                    msiKey.SetValue("MessageNumberLimit", limitValue, RegistryValueKind.DWord);
+                    block.LimitBox.Text = limitValue.ToString();
+                    limitText = limitValue.ToString();
                 }
-
-                msiKey.DeleteValue("MessageNumberLimit", throwOnMissingValue: false);
-                block.LimitBox.Text = "0";
-                limitText = "0";
             }
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"APPLY.REG.ERROR: {block.Device.InstanceId} operation=set-msi-limit value=\"{limitText}\" path=HKLM\\{msiPath} error=\"{FlattenLogText(ex.ToString())}\"");
-            RecordError("set MSI limit", ex);
+            catch (Exception ex)
+            {
+                WriteLog($"APPLY.REG.ERROR: {block.Device.InstanceId} operation=set-msi-limit value=\"{limitText}\" path=HKLM\\{msiPath} error=\"{FlattenLogText(ex.ToString())}\"");
+                RecordError("set MSI limit", ex);
+            }
         }
 
         string prioPath = intBase + @"\Priority";
@@ -1104,25 +1097,25 @@ public sealed partial class MainForm
             string suspendMode = suspendEnabled ? "Enabled" : "Disabled";
             try
             {
-                IReadOnlyList<string> hubs = UsbSelectiveSuspendPolicy.EnumerateRootHubs(block.Device.InstanceId);
-                UsbSelectiveSuspendPolicy.ApplyControllerAndHubs(block.Device.InstanceId, suspendEnabled);
-                bool msPowerOk = DevicePowerPolicy.TrySetDevicePowerEnable(block.Device.InstanceId, allowTurnOff: suspendEnabled);
-                foreach (string hubId in hubs)
-                {
-                    msPowerOk |= DevicePowerPolicy.TrySetDevicePowerEnable(hubId, allowTurnOff: suspendEnabled);
-                }
+                UsbSelectiveSuspendPolicy.ApplyResult powerResult =
+                    UsbSelectiveSuspendPolicy.ApplyControllerAndHubs(block.Device.InstanceId, suspendEnabled);
 
                 block.Device.UsbSelectiveSuspend = suspendEnabled ? "on" : "off";
                 WriteLog(
                     $"APPLY: {block.Device.InstanceId} PowerSaving={suspendMode} " +
-                    $"controller+hubs={1 + hubs.Count} hubs=[{string.Join("; ", hubs)}] " +
+                    $"controller+hubs={powerResult.TargetCount} " +
                     $"(SelectiveSuspendEnabled + EnhancedPowerManagementEnabled + PnPCapabilities + MSPower) " +
-                    $"wmiWrite={(msPowerOk ? "ok" : "miss")}");
-                if (!msPowerOk)
+                    $"pnp={powerResult.PnpSucceeded}/{powerResult.TargetCount} " +
+                    $"wmi={powerResult.WmiSucceeded}/{powerResult.WmiExposed} exposed");
+                foreach (string note in powerResult.Notes)
+                {
+                    WriteLog($"APPLY.POWER.NOTE: {note}");
+                }
+                if (!powerResult.Success)
                 {
                     RecordError(
                         "set USB power saving (Device Manager)",
-                        new InvalidOperationException("MSPower_DeviceEnable write missed; reboot may still be required"));
+                        new InvalidOperationException(string.Join(" | ", powerResult.Errors)));
                 }
 
                 UpdateBlockInfoText(block);
@@ -1146,17 +1139,24 @@ public sealed partial class MainForm
             {
                 string? classKey = GetClassKeyForDevice(block.Device.InstanceId);
                 int pnpCaps = DevicePowerPolicy.ApplyNicPnPCapabilities(classKey ?? string.Empty, allowTurnOff);
-                bool msPowerWrote = DevicePowerPolicy.TrySetDevicePowerEnable(block.Device.InstanceId, allowTurnOff);
+                DevicePowerPolicy.WriteStatus msPowerStatus = DevicePowerPolicy.SetDevicePowerEnable(
+                    block.Device.InstanceId,
+                    allowTurnOff,
+                    out string? msPowerError);
                 block.Device.NicPowerSaving = allowTurnOff ? "on" : "off";
                 WriteLog(
                     $"APPLY: {block.Device.InstanceId} PowerSaving={powerMode} " +
                     $"PnPCapabilities=0x{pnpCaps:X} class=HKLM\\{classKey} " +
-                    $"MSPower_DeviceEnable={(allowTurnOff ? "True" : "False")} wmiWrite={(msPowerWrote ? "ok" : "miss")}");
-                if (!msPowerWrote)
+                    $"MSPower_DeviceEnable={(allowTurnOff ? "True" : "False")} wmiWrite={msPowerStatus}");
+                if (msPowerStatus == DevicePowerPolicy.WriteStatus.NotExposed)
+                {
+                    WriteLog($"APPLY.POWER.NOTE: {block.Device.InstanceId}: MSPower_DeviceEnable is not exposed by this driver");
+                }
+                else if (msPowerStatus == DevicePowerPolicy.WriteStatus.Failed)
                 {
                     RecordError(
                         "set NIC power saving (Device Manager)",
-                        new InvalidOperationException("MSPower_DeviceEnable write missed; reboot may still be required"));
+                        new InvalidOperationException(msPowerError ?? "MSPower_DeviceEnable write failed"));
                 }
 
                 UpdateBlockInfoText(block);
@@ -1223,6 +1223,9 @@ public sealed partial class MainForm
                 using RegistryKey? affKey = Registry.LocalMachine.OpenSubKey(affPath, writable: true);
                 affKey?.DeleteValue("AssignmentSetOverride", throwOnMissingValue: false);
                 affKey?.DeleteValue("DevicePolicy", throwOnMissingValue: false);
+                WriteLog(
+                    $"APPLY: STORAGE {block.Device.InstanceId} MSI={mode} Limit={limitText} Prio={prioStr} " +
+                    "affinity=WindowsDefault removed=AssignmentSetOverride,DevicePolicy");
             }
             catch (Exception ex)
             {
@@ -1244,15 +1247,7 @@ public sealed partial class MainForm
         }
 
         string policyStr = block.PolicyCombo.SelectedItem?.ToString() ?? "MachineDefault";
-        int policyVal = policyStr switch
-        {
-            "All" => 1,
-            "Single" => 2,
-            "AllClose" => 3,
-            "SpecCPU" => 4,
-            "SpreadMessages" => 5,
-            _ => 0,
-        };
+        int policyVal = MapPolicyText(policyStr) ?? 0;
 
         ulong mask = block.AffinityMask;
         if (policyVal == 0)
@@ -1289,6 +1284,19 @@ public sealed partial class MainForm
             WriteLog($"APPLY.REG.ERROR: {block.Device.InstanceId} operation=set-affinity policy={policyStr} mask=0x{mask:X} path=HKLM\\{affPath} error=\"{FlattenLogText(ex.ToString())}\"");
             RecordError("set affinity", ex);
         }
+    }
+
+    private static bool TryParseMsiLimitInput(string? input, out bool isUnlocked, out int value)
+    {
+        string text = input?.Trim() ?? string.Empty;
+        isUnlocked = string.IsNullOrWhiteSpace(text)
+            || text == "0"
+            || Regex.IsMatch(text, "^(?i)(unlimited|unlocked)$", RegexOptions.CultureInvariant);
+        value = 0;
+        return isUnlocked
+            || (Regex.IsMatch(text, "^\\d+$", RegexOptions.CultureInvariant)
+                && int.TryParse(text, out value)
+                && value is >= 1 and <= 2048);
     }
 
     private void ResetBlockSettings(DeviceBlock block, OperationReport? report = null)
@@ -1348,6 +1356,7 @@ public sealed partial class MainForm
             }
 
             UpdateBlockInfoText(block);
+            ResetTestBlockState(block);
             WriteLog($"RESET.TEST: {block.Device.InstanceId} kind={block.Kind} -> cleared preview priority/affinity/power");
             return;
         }
@@ -1421,12 +1430,8 @@ public sealed partial class MainForm
         {
             try
             {
-                UsbSelectiveSuspendPolicy.ApplyControllerAndHubs(block.Device.InstanceId, enabled: true);
-                bool msPowerOk = DevicePowerPolicy.TrySetDevicePowerEnable(block.Device.InstanceId, allowTurnOff: true);
-                foreach (string hubId in UsbSelectiveSuspendPolicy.EnumerateRootHubs(block.Device.InstanceId))
-                {
-                    msPowerOk |= DevicePowerPolicy.TrySetDevicePowerEnable(hubId, allowTurnOff: true);
-                }
+                UsbSelectiveSuspendPolicy.ApplyResult powerResult =
+                    UsbSelectiveSuspendPolicy.ApplyControllerAndHubs(block.Device.InstanceId, enabled: true);
 
                 block.Device.UsbSelectiveSuspend = "on";
                 if (block.PowerSavingCheck is not null)
@@ -1436,7 +1441,18 @@ public sealed partial class MainForm
 
                 WriteLog(
                     $"RESET.POWER: {block.Device.InstanceId} -> Power Saving=Enabled " +
-                    $"(USB controller+hubs + PnPCapabilities + MSPower) wmiWrite={(msPowerOk ? "ok" : "miss")}");
+                    $"targets={powerResult.TargetCount} pnp={powerResult.PnpSucceeded}/{powerResult.TargetCount} " +
+                    $"wmi={powerResult.WmiSucceeded}/{powerResult.WmiExposed} exposed");
+                foreach (string note in powerResult.Notes)
+                {
+                    WriteLog($"RESET.POWER.NOTE: {note}");
+                }
+                if (!powerResult.Success)
+                {
+                    RecordResetError(
+                        "reset USB power saving (Device Manager)",
+                        new InvalidOperationException(string.Join(" | ", powerResult.Errors)));
+                }
             }
             catch (Exception ex)
             {
@@ -1453,12 +1469,25 @@ public sealed partial class MainForm
             {
                 string? classKey = GetClassKeyForDevice(block.Device.InstanceId);
                 int pnpCaps = DevicePowerPolicy.ApplyNicPnPCapabilities(classKey ?? string.Empty, allowTurnOff: true);
-                bool msPowerWrote = DevicePowerPolicy.TrySetDevicePowerEnable(block.Device.InstanceId, allowTurnOff: true);
+                DevicePowerPolicy.WriteStatus msPowerStatus = DevicePowerPolicy.SetDevicePowerEnable(
+                    block.Device.InstanceId,
+                    allowTurnOff: true,
+                    out string? msPowerError);
                 block.PowerSavingCheck.Checked = true;
                 block.Device.NicPowerSaving = "on";
                 WriteLog(
                     $"RESET.POWER: {block.Device.InstanceId} -> Power Saving=Enabled " +
-                    $"PnPCapabilities=0x{pnpCaps:X} wmiWrite={(msPowerWrote ? "ok" : "miss")}");
+                    $"PnPCapabilities=0x{pnpCaps:X} wmiWrite={msPowerStatus}");
+                if (msPowerStatus == DevicePowerPolicy.WriteStatus.NotExposed)
+                {
+                    WriteLog($"RESET.POWER.NOTE: {block.Device.InstanceId}: MSPower_DeviceEnable is not exposed by this driver");
+                }
+                else if (msPowerStatus == DevicePowerPolicy.WriteStatus.Failed)
+                {
+                    RecordResetError(
+                        "reset NIC power saving (Device Manager)",
+                        new InvalidOperationException(msPowerError ?? "MSPower_DeviceEnable write failed"));
+                }
             }
             catch (Exception ex)
             {

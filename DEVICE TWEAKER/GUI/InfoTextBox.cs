@@ -21,6 +21,19 @@ internal sealed class InfoTextBox : RichTextBox
         "Power Saving:",
         "USB selective suspend:",
         "Raw input throttle:",
+        "ТЕСТОВОЕ УСТРОЙСТВО",
+        "Класс:",
+        "Реестр:",
+        "Опрос:",
+        "Тип сети:",
+        "Тип:",
+        "Аудиовыходы:",
+        "Путь:",
+        "Топология:",
+        "Возможности контроллера:",
+        "Питание:",
+        "Выборочное отключение USB:",
+        "Ограничение Raw Input:",
     ];
 
     private bool _formatting;

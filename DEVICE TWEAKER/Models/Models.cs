@@ -147,6 +147,7 @@ internal sealed class DeviceInfo
     public bool IsTestDevice { get; init; }
     public int? TestIrqCount { get; init; }
     public string TestMsiStatus { get; init; } = "Auto";
+    public TestDeviceState? TestState { get; set; }
 }
 
 internal sealed class DeviceBlock

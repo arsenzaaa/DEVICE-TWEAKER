@@ -1,4 +1,6 @@
+using Microsoft.Win32;
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace DeviceTweakerCS;
@@ -9,19 +11,21 @@ public sealed partial class MainForm
     private const uint ImodDefaultHcsparamsOffset = 0x4;
     private const uint ImodDefaultRtsoff = 0x18;
     private const string ImodScriptFileName = "ApplyIMOD.ps1";
+    private const string ImodStartupRunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    private const string ImodStartupRunValueName = "DEVICE TWEAKER IMOD";
     private const string ImodDriverName = "DTIMOD.sys";
     private const string ImodScriptMarkerStart = "$imodSettingsBegin = $true";
     private const string ImodScriptMarkerEnd = "$imodSettingsEnd = $true";
-    private const string ImodScriptVersionMarker = "$imodScriptVersion = 27";
+    private const string ImodScriptVersionMarker = "$imodScriptVersion = 29";
     private const string ImodScriptConfigToken = "{{IMOD_CONFIG_BLOCK}}";
-    private const bool ImodStartupScriptLoggingEnabled = true;
-    private const bool ImodStartupScriptVerboseLoggingEnabled = true;
+    private const bool ImodStartupScriptLoggingEnabled = false;
+    private const bool ImodStartupScriptVerboseLoggingEnabled = false;
     private static readonly string ImodScriptTemplate = """
     param(
         [switch]$verbose
     )
     
-    $imodScriptVersion = 27
+    $imodScriptVersion = 29
     
     {{IMOD_CONFIG_BLOCK}}
     
@@ -46,7 +50,14 @@ public sealed partial class MainForm
             $psExe = 'powershell.exe'
         }
     
-        $args = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $scriptPath)
+        $args = @(
+            '-NoLogo',
+            '-NoProfile',
+            '-NonInteractive',
+            '-WindowStyle', 'Hidden',
+            '-ExecutionPolicy', 'Bypass',
+            '-File', $scriptPath
+        )
         if ($extraArgs) {
             $args += $extraArgs
         }
@@ -574,6 +585,7 @@ public sealed partial class MainForm
         public string Caption;
         public uint ProblemCode;
         public ulong BaseAddress;
+        public ulong MemoryLength;
         public bool HasBase;
         public string BaseError;
     }
@@ -925,14 +937,16 @@ public sealed partial class MainForm
                     TryGetDeviceProblemCode(devInfo.DevInst, out problemCode);
 
                     ulong baseAddress;
+                    ulong memoryLength;
                     string baseError;
-                    bool hasBase = TryGetDeviceMemoryBase(devInfo.DevInst, out baseAddress, out baseError);
+                    bool hasBase = TryGetDeviceMemoryRange(devInfo.DevInst, out baseAddress, out memoryLength, out baseError);
 
                     DeviceTweakerImodController controller = new DeviceTweakerImodController();
                     controller.DeviceId = instanceId;
                     controller.Caption = GetDeviceCaption(devInfoSet, ref devInfo);
                     controller.ProblemCode = problemCode;
                     controller.BaseAddress = baseAddress;
+                    controller.MemoryLength = memoryLength;
                     controller.HasBase = hasBase;
                     controller.BaseError = baseError ?? string.Empty;
                     controllers.Add(controller);
@@ -982,14 +996,16 @@ public sealed partial class MainForm
                     TryGetDeviceProblemCode(devInfo.DevInst, out problemCode);
 
                     ulong baseAddress;
+                    ulong memoryLength;
                     string baseError;
-                    bool hasBase = TryGetDeviceMemoryBase(devInfo.DevInst, out baseAddress, out baseError);
+                    bool hasBase = TryGetDeviceMemoryRange(devInfo.DevInst, out baseAddress, out memoryLength, out baseError);
 
                     DeviceTweakerImodController device = new DeviceTweakerImodController();
                     device.DeviceId = instanceId;
                     device.Caption = GetDeviceCaption(devInfoSet, ref devInfo);
                     device.ProblemCode = problemCode;
                     device.BaseAddress = baseAddress;
+                    device.MemoryLength = memoryLength;
                     device.HasBase = hasBase;
                     device.BaseError = baseError ?? string.Empty;
                     devices.Add(device);
@@ -1003,7 +1019,90 @@ public sealed partial class MainForm
             return devices.ToArray();
         }
 
-        public static string ApplyController(ulong capabilityAddress, uint hcsparamsOffset, uint rtsoff, uint interval, uint[] intervals)
+        private static bool RangeContains(ulong memoryLength, uint offset, ulong size)
+        {
+            ulong value = offset;
+            return value <= memoryLength && size <= memoryLength - value;
+        }
+
+        private static bool TryResolveXhciRuntimeLayout(
+            IntPtr handle,
+            ulong capabilityAddress,
+            ulong memoryLength,
+            uint hcsparamsOffset,
+            uint rtsoffOffset,
+            out uint maxIntrs,
+            out ulong runtimeAddress,
+            out uint hcsparamsValue,
+            out uint rtsoffValue,
+            out string error)
+        {
+            maxIntrs = 0;
+            runtimeAddress = 0;
+            hcsparamsValue = 0;
+            rtsoffValue = 0;
+            error = null;
+
+            if (capabilityAddress == 0 || memoryLength < 0x20UL)
+            {
+                error = "missing or undersized PCI memory resource";
+                return false;
+            }
+            if (!RangeContains(memoryLength, 0, 4) || !RangeContains(memoryLength, hcsparamsOffset, 4) || !RangeContains(memoryLength, rtsoffOffset, 4))
+            {
+                error = "capability offsets exceed PCI memory resource";
+                return false;
+            }
+
+            uint capabilityHeader;
+            if (!TryReadPhys32(handle, capabilityAddress, out capabilityHeader, out error))
+            {
+                error = "failed to read capability header: " + error;
+                return false;
+            }
+            uint capabilityLength = capabilityHeader & 0xFFU;
+            uint hciVersion = capabilityHeader >> 16;
+            if (capabilityLength < 0x20U || capabilityLength > memoryLength)
+            {
+                error = "invalid xHCI CAPLENGTH 0x" + capabilityLength.ToString("X");
+                return false;
+            }
+            if (hciVersion < 0x0090U || hciVersion > 0x0120U)
+            {
+                error = "unexpected xHCI version 0x" + hciVersion.ToString("X4");
+                return false;
+            }
+
+            if (!TryReadPhys32(handle, capabilityAddress + hcsparamsOffset, out hcsparamsValue, out error))
+            {
+                error = "failed to read HCSPARAMS: " + error;
+                return false;
+            }
+            maxIntrs = (hcsparamsValue >> 8) & 0x7FFU;
+            if (maxIntrs == 0 || maxIntrs > 2047)
+            {
+                error = "invalid MaxIntrs value " + maxIntrs;
+                return false;
+            }
+
+            if (!TryReadPhys32(handle, capabilityAddress + rtsoffOffset, out rtsoffValue, out error))
+            {
+                error = "failed to read RTSOFF: " + error;
+                return false;
+            }
+            ulong runtimeOffset = ((ulong)rtsoffValue) & 0xFFFFFFE0UL;
+            ulong finalRegisterEnd = runtimeOffset + 0x24UL + (0x20UL * ((ulong)maxIntrs - 1UL)) + 4UL;
+            if (runtimeOffset == 0 || finalRegisterEnd < runtimeOffset || finalRegisterEnd > memoryLength)
+            {
+                error = "xHCI runtime registers exceed PCI memory resource";
+                return false;
+            }
+
+            runtimeAddress = capabilityAddress + runtimeOffset;
+            return true;
+        }
+
+        public static string ApplyController(ulong capabilityAddress, ulong memoryLength, uint hcsparamsOffset, uint rtsoff, uint interval, uint[] intervals)
         {
             IntPtr handle;
             string openError;
@@ -1014,21 +1113,15 @@ public sealed partial class MainForm
 
             try
             {
-                uint hcsparamsValue;
                 string ioError;
-                if (!TryReadPhys32(handle, capabilityAddress + hcsparamsOffset, out hcsparamsValue, out ioError))
-                {
-                    return "error: failed to read HCSPARAMS: " + ioError;
-                }
-
+                uint maxIntrs;
+                ulong runtimeAddress;
+                uint hcsparamsValue;
                 uint rtsoffValue;
-                if (!TryReadPhys32(handle, capabilityAddress + rtsoff, out rtsoffValue, out ioError))
+                if (!TryResolveXhciRuntimeLayout(handle, capabilityAddress, memoryLength, hcsparamsOffset, rtsoff, out maxIntrs, out runtimeAddress, out hcsparamsValue, out rtsoffValue, out ioError))
                 {
-                    return "error: failed to read RTSOFF: " + ioError;
+                    return "error: unsafe or invalid xHCI MMIO layout: " + ioError;
                 }
-
-                uint maxIntrs = (hcsparamsValue >> 8) & 0x7FF;
-                ulong runtimeAddress = capabilityAddress + rtsoffValue;
                 uint writeCount = intervals != null && intervals.Length > 0
                     ? Math.Min(maxIntrs, (uint)intervals.Length)
                     : maxIntrs;
@@ -1060,6 +1153,7 @@ public sealed partial class MainForm
 
         public static string TryBuildAdaptiveIntervals(
             ulong capabilityAddress,
+            ulong memoryLength,
             uint hcsparamsOffset,
             uint fallbackInterval,
             string roleIntervalsText,
@@ -1094,7 +1188,7 @@ public sealed partial class MainForm
                 uint maxIntrs;
                 XhciInterrupterTopology topology;
                 string topologyDetail;
-                if (!TryReadXhciInterrupterTopology(handle, capabilityAddress, hcsparamsOffset, out maxIntrs, out topology, out topologyDetail))
+                if (!TryReadXhciInterrupterTopology(handle, capabilityAddress, memoryLength, hcsparamsOffset, out maxIntrs, out topology, out topologyDetail))
                 {
                     return "error: " + topologyDetail;
                 }
@@ -1168,7 +1262,7 @@ public sealed partial class MainForm
             }
         }
 
-        public static string ApplyNicItr(ulong baseAddress, uint baseOffset, uint stride, uint queues, uint width, ulong mask, ulong orBits, ulong[] values)
+        public static string ApplyNicItr(ulong baseAddress, ulong memoryLength, uint baseOffset, uint stride, uint queues, uint width, ulong mask, ulong orBits, ulong[] values)
         {
             if (queues == 0)
             {
@@ -1177,6 +1271,12 @@ public sealed partial class MainForm
             if (width != 16 && width != 32)
             {
                 return "error: unsupported width=" + width;
+            }
+            ulong registerWidth = width / 8U;
+            ulong lastOffset = (ulong)baseOffset + ((ulong)(queues - 1U) * stride);
+            if (baseAddress == 0 || memoryLength == 0 || lastOffset > memoryLength || registerWidth > memoryLength - lastOffset)
+            {
+                return "error: NIC ITR register range exceeds PCI memory resource";
             }
             if (values == null || values.Length == 0)
             {
@@ -1207,6 +1307,14 @@ public sealed partial class MainForm
                     applied.Append("Q").Append(q).Append("@0x").Append(address.ToString("X")).Append("=0x").Append(finalValue.ToString("X"));
                     string ioError;
                     if (!TryWritePhysicalMemory(handle, address, size, finalValue, out ioError))
+                    {
+                        failures++;
+                        continue;
+                    }
+
+                    ulong readback;
+                    if (!TryReadPhysicalMemory(handle, address, size, out readback, out ioError)
+                        || (readback & mask) != (selected & mask))
                     {
                         failures++;
                     }
@@ -1490,6 +1598,7 @@ public sealed partial class MainForm
         private static bool TryReadXhciInterrupterTopology(
             IntPtr handle,
             ulong capabilityAddress,
+            ulong memoryLength,
             uint hcsparamsOffset,
             out uint maxIntrs,
             out XhciInterrupterTopology topology,
@@ -1498,6 +1607,14 @@ public sealed partial class MainForm
             maxIntrs = 0;
             topology = new XhciInterrupterTopology();
             detail = null;
+
+            if (capabilityAddress == 0 || memoryLength < 0x40UL
+                || !RangeContains(memoryLength, hcsparamsOffset, 4)
+                || !RangeContains(memoryLength, 0x10, 4))
+            {
+                detail = "xHCI capability registers exceed PCI memory resource";
+                return false;
+            }
 
             uint capReg;
             string ioError;
@@ -1508,9 +1625,15 @@ public sealed partial class MainForm
             }
 
             uint capLength = capReg & 0xFFU;
-            if (capLength == 0)
+            uint hciVersion = capReg >> 16;
+            if (capLength < 0x20U || capLength > memoryLength)
             {
-                detail = "xHCI CAPLENGTH is zero";
+                detail = "invalid xHCI CAPLENGTH";
+                return false;
+            }
+            if (hciVersion < 0x0090U || hciVersion > 0x0120U)
+            {
+                detail = "unexpected xHCI version 0x" + hciVersion.ToString("X4");
                 return false;
             }
 
@@ -1537,6 +1660,11 @@ public sealed partial class MainForm
             }
 
             uint contextSize = ((hccparamsValue >> 2) & 0x1U) != 0 ? 64U : 32U;
+            if ((ulong)capLength + 0x38UL > memoryLength)
+            {
+                detail = "xHCI operational registers exceed PCI memory resource";
+                return false;
+            }
             ulong operationalAddress = capabilityAddress + capLength;
             ulong dcbaap;
             if (!TryReadPhys64(handle, operationalAddress + 0x30, out dcbaap, out ioError))
@@ -1828,9 +1956,10 @@ public sealed partial class MainForm
             return true;
         }
 
-        private static bool TryGetDeviceMemoryBase(uint devInst, out ulong baseAddress, out string error)
+        private static bool TryGetDeviceMemoryRange(uint devInst, out ulong baseAddress, out ulong length, out string error)
         {
             baseAddress = 0;
+            length = 0;
             error = null;
             IntPtr logConf;
             int cr = CM_Get_First_Log_Conf(out logConf, devInst, AllocLogConf);
@@ -1846,8 +1975,6 @@ public sealed partial class MainForm
 
             try
             {
-                bool found = false;
-                ulong minBase = 0;
                 uint[] resTypes = new uint[] { ResTypeMem, ResTypeMemLarge };
                 foreach (uint resType in resTypes)
                 {
@@ -1863,12 +1990,13 @@ public sealed partial class MainForm
                             if (CM_Get_Res_Des_Data(resDes, buffer, dataSize, 0) == CrSuccess)
                             {
                                 ulong candidate;
-                                if (TryExtractBaseFromResource(resType, buffer, out candidate))
+                                ulong candidateLength;
+                                if (TryExtractMemoryRangeFromResource(resType, buffer, out candidate, out candidateLength))
                                 {
-                                    if (!found || candidate < minBase)
+                                    if (candidateLength > length)
                                     {
-                                        minBase = candidate;
-                                        found = true;
+                                        baseAddress = candidate;
+                                        length = candidateLength;
                                     }
                                 }
                             }
@@ -1882,13 +2010,12 @@ public sealed partial class MainForm
                     }
                 }
 
-                if (!found)
+                if (baseAddress == 0 || length == 0)
                 {
                     error = "no memory resource found";
                     return false;
                 }
 
-                baseAddress = minBase;
                 return true;
             }
             finally
@@ -1897,9 +2024,10 @@ public sealed partial class MainForm
             }
         }
 
-        private static bool TryExtractBaseFromResource(uint resType, byte[] data, out ulong baseAddress)
+        private static bool TryExtractMemoryRangeFromResource(uint resType, byte[] data, out ulong baseAddress, out ulong length)
         {
             baseAddress = 0;
+            length = 0;
             if (resType == ResTypeMem)
             {
                 if (data.Length < Marshal.SizeOf(typeof(MemDes)))
@@ -1908,6 +2036,7 @@ public sealed partial class MainForm
                 }
                 MemDes mem = BytesToStruct<MemDes>(data, 0);
                 ulong candidate = mem.MD_Alloc_Base;
+                ulong candidateEnd = mem.MD_Alloc_End;
                 if (candidate == 0 && mem.MD_Count > 0)
                 {
                     int offset = Marshal.SizeOf(typeof(MemDes));
@@ -1915,6 +2044,7 @@ public sealed partial class MainForm
                     {
                         MemRange range = BytesToStruct<MemRange>(data, offset);
                         candidate = range.MR_Min;
+                        candidateEnd = range.MR_nBytes > 0 ? candidate + range.MR_nBytes - 1UL : range.MR_Max;
                     }
                 }
                 if (candidate == 0)
@@ -1922,6 +2052,11 @@ public sealed partial class MainForm
                     return false;
                 }
                 baseAddress = candidate;
+                length = candidateEnd >= candidate ? candidateEnd - candidate + 1UL : 0;
+                if (length == 0)
+                {
+                    return false;
+                }
                 return true;
             }
 
@@ -1933,6 +2068,7 @@ public sealed partial class MainForm
                 }
                 MemLargeDes mem = BytesToStruct<MemLargeDes>(data, 0);
                 ulong candidate = mem.MLD_Alloc_Base;
+                ulong candidateEnd = mem.MLD_Alloc_End;
                 if (candidate == 0 && mem.MLD_Count > 0)
                 {
                     int offset = Marshal.SizeOf(typeof(MemLargeDes));
@@ -1940,6 +2076,7 @@ public sealed partial class MainForm
                     {
                         MemLargeRange range = BytesToStruct<MemLargeRange>(data, offset);
                         candidate = range.MLR_Min;
+                        candidateEnd = range.MLR_nBytes > 0 ? candidate + range.MLR_nBytes - 1UL : range.MLR_Max;
                     }
                 }
                 if (candidate == 0)
@@ -1947,6 +2084,11 @@ public sealed partial class MainForm
                     return false;
                 }
                 baseAddress = candidate;
+                length = candidateEnd >= candidate ? candidateEnd - candidate + 1UL : 0;
+                if (length == 0)
+                {
+                    return false;
+                }
                 return true;
             }
 
@@ -2165,6 +2307,27 @@ public sealed partial class MainForm
             return $false
         }
 
+        foreach ($payload in @(
+            @('DTIMOD.sys', $ImodDriverPath, $ImodDriverSha256),
+            @('kdu.exe', $ImodKduPath, $ImodKduSha256),
+            @('drv64.dll', $ImodKduDbPath, $ImodKduDbSha256)
+        )) {
+            if ([string]::IsNullOrWhiteSpace([string]$payload[2])) {
+                Write-ImodLog ("startup loader: missing trusted hash for " + $payload[0])
+                return $false
+            }
+            try {
+                $actualHash = (Get-FileHash -LiteralPath $payload[1] -Algorithm SHA256 -ErrorAction Stop).Hash
+                if (-not $actualHash.Equals([string]$payload[2], [System.StringComparison]::OrdinalIgnoreCase)) {
+                    Write-ImodLog ("startup loader: hash mismatch for " + $payload[0] + " actual=" + $actualHash)
+                    return $false
+                }
+            } catch {
+                Write-ImodLog ("startup loader: hash check failed for " + $payload[0] + ": " + $_.Exception.Message)
+                return $false
+            }
+        }
+
         try {
             $psi = New-Object System.Diagnostics.ProcessStartInfo
             $psi.FileName = $ImodKduPath
@@ -2183,20 +2346,35 @@ public sealed partial class MainForm
                 return $false
             }
 
+            $stdoutTask = $proc.StandardOutput.ReadToEndAsync()
+            $stderrTask = $proc.StandardError.ReadToEndAsync()
             if (-not $proc.WaitForExit(60000)) {
                 try { $proc.Kill() } catch {}
                 Write-ImodLog "startup loader: KDU timeout"
+                try { $proc.WaitForExit(2000) } catch {}
+            }
+
+            $stdout = if ($stdoutTask.IsCompleted) { $stdoutTask.GetAwaiter().GetResult() } else { "<capture incomplete>" }
+            $stderr = if ($stderrTask.IsCompleted) { $stderrTask.GetAwaiter().GetResult() } else { "<capture incomplete>" }
+            foreach ($stream in @(@("STDOUT", $stdout), @("STDERR", $stderr))) {
+                $normalized = ([string]$stream[1]).Replace("`r`n", "`n").Replace("`r", "`n")
+                $lines = $normalized.Split("`n")
+                Write-ImodLog ("startup loader: KDU " + $stream[0] + " BEGIN chars=" + $normalized.Length + " lines=" + $lines.Length)
+                if ($normalized.Length -eq 0) {
+                    Write-ImodLog ("startup loader: KDU " + $stream[0] + ": <empty>")
+                } else {
+                    for ($lineIndex = 0; $lineIndex -lt $lines.Length; $lineIndex++) {
+                        Write-ImodLog ("startup loader: KDU " + $stream[0] + " " + ($lineIndex + 1).ToString("D4") + ": " + $lines[$lineIndex])
+                    }
+                }
+                Write-ImodLog ("startup loader: KDU " + $stream[0] + " END")
+            }
+
+            if (-not $proc.HasExited) {
                 return $false
             }
 
-            $stdout = $proc.StandardOutput.ReadToEnd()
-            $stderr = $proc.StandardError.ReadToEnd()
-            $combined = (($stdout + " " + $stderr) -replace '\s+', ' ').Trim()
-            if ($combined.Length -gt 400) {
-                $combined = $combined.Substring(0, 400)
-            }
-
-            Write-ImodLog ("startup loader: KDU exit=" + $proc.ExitCode + " output=" + $combined)
+            Write-ImodLog ("startup loader: KDU exit=" + $proc.ExitCode)
             if ([DeviceTweakerImodRuntime]::IsDriverDeviceAvailable()) {
                 Write-ImodLog "startup loader: KDU device available"
                 return $true
@@ -2221,7 +2399,7 @@ public sealed partial class MainForm
             Write-ImodLog ("usb controllers=" + $controllers.Count)
             foreach ($controller in $controllers) {
                 $controllerBaseText = if ($controller.HasBase) { Format-ImodHex ([uint64]$controller.BaseAddress) } else { '-' }
-                Write-ImodLog ("usb controller: id=$($controller.DeviceId) caption=$(Format-ImodText $controller.Caption) problem=$($controller.ProblemCode) hasBase=$($controller.HasBase) base=$controllerBaseText") -verboseOnly
+                Write-ImodLog ("usb controller: id=$($controller.DeviceId) caption=$(Format-ImodText $controller.Caption) problem=$($controller.ProblemCode) hasBase=$($controller.HasBase) base=$controllerBaseText length=$(Format-ImodHex ([uint64]$controller.MemoryLength))") -verboseOnly
                 if ([DeviceTweakerImodRuntime]::IsDisabledProblem([uint32]$controller.ProblemCode)) {
                     Write-ImodLog ("skip disabled " + $controller.DeviceId)
                     continue
@@ -2290,6 +2468,7 @@ public sealed partial class MainForm
                         if (-not [string]::IsNullOrWhiteSpace($rootPortRoles)) {
                             $adaptiveResult = [DeviceTweakerImodRuntime]::TryBuildAdaptiveIntervals(
                                 [uint64]$controller.BaseAddress,
+                                [uint64]$controller.MemoryLength,
                                 $hcsparamsOffset,
                                 $interval,
                                 $roleText,
@@ -2309,7 +2488,7 @@ public sealed partial class MainForm
                     $intervalArray = $adaptiveIntervals
                 }
 
-                $result = [DeviceTweakerImodRuntime]::ApplyController([uint64]$controller.BaseAddress, $hcsparamsOffset, $rtsoff, $interval, $intervalArray)
+                $result = [DeviceTweakerImodRuntime]::ApplyController([uint64]$controller.BaseAddress, [uint64]$controller.MemoryLength, $hcsparamsOffset, $rtsoff, $interval, $intervalArray)
                 Write-ImodLog ($controller.DeviceId + " " + $result)
                 if (-not $result.StartsWith('error:', [System.StringComparison]::OrdinalIgnoreCase)) {
                     $appliedUsb++
@@ -2360,6 +2539,7 @@ public sealed partial class MainForm
                 $values = [uint64[]]@($nic['VALUES'] | ForEach-Object { [uint64]$_ })
                 $result = [DeviceTweakerImodRuntime]::ApplyNicItr(
                     [uint64]$target.BaseAddress,
+                    [uint64]$target.MemoryLength,
                     [uint32]$nic['BASE_OFFSET'],
                     [uint32]$nic['STRIDE'],
                     [uint32]$nic['QUEUES'],
@@ -2427,6 +2607,7 @@ public sealed partial class MainForm
     private enum ImodApplyOutcome
     {
         Applied,
+        AppliedWithWarnings,
         SkippedNoUsb,
         SkippedNoController,
         SkippedNoConfig,
@@ -2465,6 +2646,27 @@ public sealed partial class MainForm
         {
             ImodConfig config = ParseImodScriptFile(scriptPath);
             config.HasScript = true;
+            string existing = File.ReadAllText(scriptPath, Encoding.UTF8);
+            if (!existing.Contains(ImodScriptVersionMarker, StringComparison.Ordinal))
+            {
+                try
+                {
+                    string managedPath = GetImodStartupPath();
+                    WriteImodScript(config, managedPath);
+                    if (!string.Equals(scriptPath, managedPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        File.Delete(scriptPath);
+                    }
+
+                    WriteLog($"IMOD.STARTUP.UPGRADE: source=\"{scriptPath}\" target=\"{managedPath}\" version=29 status=success");
+                    scriptPath = managedPath;
+                }
+                catch (Exception ex)
+                {
+                    WriteLog($"IMOD.STARTUP.UPGRADE.WARN: path=\"{scriptPath}\" version=29 error=\"{FlattenLogText(ex.ToString())}\"");
+                }
+            }
+
             return config;
         }
         catch (Exception ex)
@@ -2476,6 +2678,17 @@ public sealed partial class MainForm
 
     private string GetImodStartupPath()
     {
+        string roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        if (string.IsNullOrWhiteSpace(roaming))
+        {
+            roaming = GetScriptRoot();
+        }
+
+        return Path.Combine(roaming, "DEVICE TWEAKER", "IMOD", ImodScriptFileName);
+    }
+
+    private string GetLegacyImodStartupPath()
+    {
         string startup = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
         if (string.IsNullOrWhiteSpace(startup))
         {
@@ -2483,6 +2696,109 @@ public sealed partial class MainForm
         }
 
         return Path.Combine(startup, ImodScriptFileName);
+    }
+
+    private bool IsManagedImodScriptPath(string path)
+    {
+        try
+        {
+            string fullPath = Path.GetFullPath(path);
+            return string.Equals(fullPath, Path.GetFullPath(GetImodStartupPath()), StringComparison.OrdinalIgnoreCase)
+                || string.Equals(fullPath, Path.GetFullPath(GetLegacyImodStartupPath()), StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string GetImodStartupRunCommand()
+        => "\"%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\""
+            + " -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden"
+            + " -ExecutionPolicy Bypass -File"
+            + " \"%APPDATA%\\DEVICE TWEAKER\\IMOD\\ApplyIMOD.ps1\"";
+
+    private bool ValidateImodStartupPersistenceContract(out string error)
+    {
+        string scriptPath = Path.GetFullPath(GetImodStartupPath());
+        string legacyPath = Path.GetFullPath(GetLegacyImodStartupPath());
+        string command = GetImodStartupRunCommand();
+        string[] required =
+        [
+            "powershell.exe\"",
+            "-NoProfile",
+            "-NonInteractive",
+            "-WindowStyle Hidden",
+            "-ExecutionPolicy Bypass",
+            "-File",
+            "%APPDATA%\\DEVICE TWEAKER\\IMOD\\ApplyIMOD.ps1",
+        ];
+
+        if (string.Equals(scriptPath, legacyPath, StringComparison.OrdinalIgnoreCase))
+        {
+            error = "managed script path still resolves to the Startup folder";
+            return false;
+        }
+
+        string? missing = required.FirstOrDefault(token =>
+            !command.Contains(token, StringComparison.OrdinalIgnoreCase));
+        if (missing is not null)
+        {
+            error = $"startup command is missing token: {missing}";
+            return false;
+        }
+
+        if (command.Length > 260)
+        {
+            error = $"startup command exceeds the Run key limit: {command.Length}";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
+    }
+
+    private bool EnsureImodStartupRegistration(out string? error)
+    {
+        try
+        {
+            string expected = GetImodStartupRunCommand();
+            using RegistryKey key = Registry.CurrentUser.CreateSubKey(ImodStartupRunKeyPath, writable: true)
+                ?? throw new InvalidOperationException("HKCU Run key could not be opened.");
+            object? current = key.GetValue(
+                ImodStartupRunValueName,
+                null,
+                RegistryValueOptions.DoNotExpandEnvironmentNames);
+            RegistryValueKind? currentKind = current is null
+                ? null
+                : key.GetValueKind(ImodStartupRunValueName);
+            if (currentKind == RegistryValueKind.ExpandString
+                && string.Equals(current as string, expected, StringComparison.Ordinal))
+            {
+                error = null;
+                return true;
+            }
+
+            key.SetValue(ImodStartupRunValueName, expected, RegistryValueKind.ExpandString);
+            object? written = key.GetValue(
+                ImodStartupRunValueName,
+                null,
+                RegistryValueOptions.DoNotExpandEnvironmentNames);
+            if (!string.Equals(written as string, expected, StringComparison.Ordinal)
+                || key.GetValueKind(ImodStartupRunValueName) != RegistryValueKind.ExpandString)
+            {
+                throw new InvalidOperationException("HKCU Run value verification failed.");
+            }
+
+            WriteLog($"IMOD.STARTUP: registered HKCU\\{ImodStartupRunKeyPath} value=\"{ImodStartupRunValueName}\" command=[{FlattenLogText(expected)}]");
+            error = null;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
     }
 
     private static string GetImodDriverSystemPath()
@@ -2560,16 +2876,79 @@ public sealed partial class MainForm
 
     private void ResolveImodPaths(out string? scriptPath)
     {
-        string startupPath = GetImodStartupPath();
-        scriptPath = File.Exists(startupPath) ? startupPath : null;
+        string managedPath = GetImodStartupPath();
+        if (File.Exists(managedPath))
+        {
+            if (!EnsureImodStartupRegistration(out string? registrationError))
+            {
+                WriteLog($"IMOD.STARTUP.WARN: registration repair failed: {registrationError}");
+            }
+
+            scriptPath = managedPath;
+            return;
+        }
+
+        string legacyPath = GetLegacyImodStartupPath();
+        if (!File.Exists(legacyPath))
+        {
+            scriptPath = null;
+            return;
+        }
+
+        try
+        {
+            string legacyScript = File.ReadAllText(legacyPath, Encoding.UTF8);
+            string? directory = Path.GetDirectoryName(managedPath);
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            WriteAllTextAtomic(managedPath, legacyScript, new UTF8Encoding(false));
+            if (!EnsureImodStartupRegistration(out string? registrationError))
+            {
+                throw new InvalidOperationException($"startup registration failed: {registrationError}");
+            }
+
+            File.Delete(legacyPath);
+            WriteLog($"IMOD.STARTUP.MIGRATE: source=\"{legacyPath}\" target=\"{managedPath}\" status=success");
+            scriptPath = managedPath;
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"IMOD.STARTUP.MIGRATE: source=\"{legacyPath}\" target=\"{managedPath}\" status=failed error=\"{FlattenLogText(ex.ToString())}\"");
+            scriptPath = legacyPath;
+        }
     }
 
     private void RemoveImodPersistenceFiles(OperationReport? report = null)
     {
+        DeleteImodStartupRegistration(report);
         DeleteFileIfExists(GetImodStartupPath(), "IMOD.CONFIG", report);
+        DeleteFileIfExists(GetLegacyImodStartupPath(), "IMOD.CONFIG.LEGACY", report);
         DeleteFileIfExists(Path.Combine(GetScriptRoot(), "dtimod.sys"), "IMOD.DRIVER.LEGACY", report);
         DeleteFileIfExists(Path.Combine(GetScriptRoot(), ImodDriverName), "IMOD.DRIVER.LEGACY", report);
         WriteLog($"IMOD.DRIVER: keep staged system driver {GetImodDriverSystemPath()}");
+    }
+
+    private void DeleteImodStartupRegistration(OperationReport? report = null)
+    {
+        try
+        {
+            using RegistryKey? key = Registry.CurrentUser.OpenSubKey(ImodStartupRunKeyPath, writable: true);
+            if (key?.GetValue(ImodStartupRunValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames) is null)
+            {
+                return;
+            }
+
+            key.DeleteValue(ImodStartupRunValueName, throwOnMissingValue: false);
+            WriteLog($"IMOD.STARTUP: deleted HKCU\\{ImodStartupRunKeyPath} value=\"{ImodStartupRunValueName}\"");
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"IMOD.STARTUP: failed to delete registration: {ex.Message}");
+            report?.AddError("IMOD.STARTUP", $"failed to delete startup registration: {ex.Message}");
+        }
     }
 
     private void DeleteFileIfExists(string? path, string label, OperationReport? report = null)
@@ -3350,7 +3729,11 @@ public sealed partial class MainForm
             Directory.CreateDirectory(dir);
         }
 
-        File.WriteAllText(path, scriptBody, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        WriteAllTextAtomic(path, scriptBody, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        if (!EnsureImodStartupRegistration(out string? registrationError))
+        {
+            throw new InvalidOperationException($"IMOD startup registration failed: {registrationError}");
+        }
     }
 
     private string BuildImodConfigBlock(ImodConfig config)
@@ -3359,7 +3742,7 @@ public sealed partial class MainForm
         string kduDbPath = string.Empty;
         if (!EnsureImodStartupKduPayload(out kduPath, out kduDbPath, out string? kduError))
         {
-            WriteLog($"IMOD.CONFIG.KDU: payload unavailable: {kduError}");
+            WriteLog($"IMOD.CONFIG.KDU.WARN: payload unavailable: {kduError}");
         }
 
         StringBuilder sb = new();
@@ -3367,6 +3750,9 @@ public sealed partial class MainForm
         sb.AppendLine($"$ImodDriverPath = {FormatPowerShellString(GetImodDriverSystemPathForScript())}");
         sb.AppendLine($"$ImodKduPath = {FormatPowerShellString(kduPath)}");
         sb.AppendLine($"$ImodKduDbPath = {FormatPowerShellString(kduDbPath)}");
+        sb.AppendLine($"$ImodDriverSha256 = {FormatPowerShellString(ReadEmbeddedImodDriverHash() ?? string.Empty)}");
+        sb.AppendLine($"$ImodKduSha256 = {FormatPowerShellString(ComputeEmbeddedImodResourceHash("DeviceTweakerCS.IMOD.Loader.kdu.exe", ".kdu.exe"))}");
+        sb.AppendLine($"$ImodKduDbSha256 = {FormatPowerShellString(ComputeEmbeddedImodResourceHash("DeviceTweakerCS.IMOD.Loader.drv64.dll", ".drv64.dll"))}");
         sb.AppendLine($"$ImodLogDirectory = {FormatPowerShellString(AppDiagnostics.LogDirectory)}");
         sb.AppendLine($"$ImodStartupLogEnabled = {FormatPowerShellBool(ImodStartupScriptLoggingEnabled)}");
         sb.AppendLine($"$ImodStartupVerboseLogEnabled = {FormatPowerShellBool(ImodStartupScriptVerboseLoggingEnabled)}");
@@ -3445,6 +3831,14 @@ public sealed partial class MainForm
         sb.AppendLine(ImodScriptMarkerEnd);
         sb.AppendLine();
         return sb.ToString();
+    }
+
+    private static string ComputeEmbeddedImodResourceHash(string exactName, string suffix)
+    {
+        using Stream? stream = OpenManifestResourceStreamExactOrSuffix(exactName, suffix);
+        return stream is null
+            ? string.Empty
+            : Convert.ToHexString(SHA256.HashData(stream));
     }
 
     private static bool TryReplaceImodConfigBlock(string existing, string configBlock, out string updated)
@@ -3582,9 +3976,10 @@ public sealed partial class MainForm
         return false;
     }
 
-    private ImodApplyOutcome ApplyImodSettings(out string? note)
+    private ImodApplyOutcome ApplyImodSettings(out string? note, out string? technicalDetails)
     {
         note = null;
+        technicalDetails = null;
         List<DeviceBlock> xhciBlocks = _blocks
             .Where(b => b.Kind == DeviceKind.USB && b.Device.UsbIsXhci && b.Device.UsbHasDevices && !b.Device.IsTestDevice)
             .ToList();
@@ -3725,8 +4120,8 @@ public sealed partial class MainForm
         {
             string shown = string.Join(", ", invalidInputs.Take(3));
             string suffix = invalidInputs.Count > 3 ? " ..." : string.Empty;
-            ShowThemedInfo(
-                $"Invalid IMOD interval value detected for: {shown}{suffix}\nValues have been reset to default ({FormatImodValue(config.GlobalInterval)}).");
+            note = $"{invalidInputs.Count} invalid value(s) were reset to {FormatImodValue(config.GlobalInterval)}.";
+            technicalDetails = $"Invalid IMOD values: {shown}{suffix}";
         }
 
         bool hasCustomUsb = HasCustomUsbImod(config);
@@ -3736,8 +4131,9 @@ public sealed partial class MainForm
         ImodApplyStats stats = new();
         if (shouldApplyUsbLive && !TryApplyImod(config, hasCustom, out stats, out string? applyError))
         {
-            note = applyError is null ? "IMOD failed." : $"IMOD failed: {applyError}";
-            WriteLog($"IMOD: {note}");
+            note = FormatImodUnavailableUserMessage(applyError, includeNotChanged: true);
+            technicalDetails = applyError ?? "Unknown IMOD driver error.";
+            WriteLog($"IMOD: failed: {technicalDetails}");
             return ImodApplyOutcome.Failed;
         }
         if (!shouldApplyUsbLive)
@@ -3755,9 +4151,10 @@ public sealed partial class MainForm
             }
             catch (Exception ex)
             {
-                note = $"IMOD applied, but failed to write startup script: {ex.Message}";
-                WriteLog($"IMOD.CONFIG: write failed {startupPath}: {ex.Message}");
-                return ImodApplyOutcome.Failed;
+                note = "USB IMOD is active for this session, but startup persistence was not saved.";
+                technicalDetails = ex.ToString();
+                WriteLog($"IMOD.CONFIG: write failed {startupPath}: {FlattenLogText(ex.ToString())}");
+                return ImodApplyOutcome.AppliedWithWarnings;
             }
         }
         else
@@ -3786,14 +4183,32 @@ public sealed partial class MainForm
 
         if (stats.ControllersApplied == 0)
         {
+            if (stats.ControllersPartiallyApplied > 0)
+            {
+                note = $"USB IMOD was only partially written ({stats.WritesSucceeded}/{stats.WritesAttempted} writes).";
+                technicalDetails = $"controllersPartial={stats.ControllersPartiallyApplied}; controllersFailed={stats.ControllersFailed}; readFailures={stats.ReadFailures}; writeFailures={stats.WriteFailures}";
+                WriteLog($"IMOD: {note} {technicalDetails}");
+                return ImodApplyOutcome.AppliedWithWarnings;
+            }
+
+            if (stats.WriteFailures > 0 || stats.ControllersFailed > 0 || stats.ReadFailures > 0 || stats.WritesAttempted > 0)
+            {
+                note = "USB IMOD was not applied.";
+                technicalDetails = $"controllersFailed={stats.ControllersFailed}; readFailures={stats.ReadFailures}; writeFailures={stats.WriteFailures}; writesAttempted={stats.WritesAttempted}";
+                WriteLog($"IMOD: {note} {technicalDetails}");
+                return ImodApplyOutcome.Failed;
+            }
+
             note = "IMOD skipped (no eligible USB controllers).";
             WriteLog($"IMOD: {note}");
             return ImodApplyOutcome.SkippedNoController;
         }
 
-        if (stats.ReadFailures > 0 || stats.WriteFailures > 0)
+        if (stats.ReadFailures > 0 || stats.WriteFailures > 0 || stats.ControllersPartiallyApplied > 0 || stats.ControllersFailed > 0)
         {
-            note = $"IMOD applied to {stats.ControllersApplied} USB controller(s) with {stats.ReadFailures} read failure(s) and {stats.WriteFailures} write failure(s).";
+            note = $"USB IMOD was applied with warnings ({stats.WritesSucceeded}/{stats.WritesAttempted} writes).";
+            technicalDetails = $"controllersApplied={stats.ControllersApplied}; controllersPartial={stats.ControllersPartiallyApplied}; controllersFailed={stats.ControllersFailed}; readFailures={stats.ReadFailures}; writeFailures={stats.WriteFailures}";
+            return ImodApplyOutcome.AppliedWithWarnings;
         }
         else
         {
@@ -3801,6 +4216,32 @@ public sealed partial class MainForm
         }
 
         return ImodApplyOutcome.Applied;
+    }
+
+    private static void AddImodResultToReport(
+        OperationReport report,
+        ImodApplyOutcome outcome,
+        string? userMessage,
+        string? technicalDetails,
+        string component = "USB IMOD")
+    {
+        switch (outcome)
+        {
+            case ImodApplyOutcome.Failed:
+                report.AddError(component, userMessage ?? "USB IMOD was not applied.", technicalDetails);
+                break;
+            case ImodApplyOutcome.AppliedWithWarnings:
+                report.AddWarning(component, userMessage ?? "USB IMOD was applied with warnings.", technicalDetails);
+                break;
+            case ImodApplyOutcome.SkippedNoUsb:
+            case ImodApplyOutcome.SkippedNoController:
+            case ImodApplyOutcome.SkippedNoConfig:
+                report.AddWarning(component, userMessage ?? "No eligible target was found.", technicalDetails);
+                break;
+            default:
+                report.AddSuccess(component, userMessage ?? "Applied");
+                break;
+        }
     }
 }
 

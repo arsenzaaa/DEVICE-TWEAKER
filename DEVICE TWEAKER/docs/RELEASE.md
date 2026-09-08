@@ -31,7 +31,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Flavor both -Co
 - `DEVICE.TWEAKER.exe`
 - `DEVICE.TWEAKER.NET.FRAMEWORK.exe`
 
-Остальные файлы пакета (`DTIMOD.sys`, notes, `SHA256SUMS.txt` и т.п.) в assets релиза не загружать — драйвер уже встроен в EXE.
+Остальные файлы (`DTIMOD.sys`, notes и т.п.) в assets релиза не загружать — драйвер уже встроен в EXE. Локальный `bin\ReleasePackages\` содержит только два EXE и `SHA256SUMS.txt`.
 
 ## Публикация
 

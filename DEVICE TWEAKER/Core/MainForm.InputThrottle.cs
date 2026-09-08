@@ -243,8 +243,15 @@ public sealed partial class MainForm
         }
         catch (Exception ex)
         {
-            WriteLog($"USBPOLL.THROTTLE.SET: failed: {ex.Message}");
-            ShowThemedInfo($"Failed to update RawMouseThrottleDuration.\n{ex.Message}");
+            WriteLog($"USBPOLL.THROTTLE.SET: failed: {FlattenLogText(ex.ToString())}");
+            OperationReport report = new();
+            report.MarkNoChangesMade();
+            report.AddError("RAW INPUT THROTTLE", "The setting was not changed.", ex.ToString());
+            ShowOperationResult(
+                report,
+                string.Empty,
+                "The setting could not be updated.",
+                operationName: "RAW INPUT THROTTLE");
         }
 
         RefreshRawMouseThrottleUi();

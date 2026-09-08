@@ -180,7 +180,7 @@ public sealed partial class MainForm
         }
 
         UpdateReservedCpuValueLabel(tag);
-        WriteLog("RESERVED.RESET: cleared ReservedCpuSets via Reset-AllTweaks");
+        WriteLog("RESERVED.RESET: cleared ReservedCpuSets via RESET WINDOWS DEFAULT");
     }
 
     private void ResetReservedCpuSetsPreview()
@@ -304,6 +304,12 @@ public sealed partial class MainForm
 
     private Panel? NewReservedCpuSetsPanel()
     {
+        if (!_cpuSetIdsReliable)
+        {
+            WriteLog("RESERVED.SKIP: CPU Set IDs unavailable from Windows; panel disabled");
+            return null;
+        }
+
         int logicalCount = _maxLogical;
         if (_cpuInfo is not null)
         {

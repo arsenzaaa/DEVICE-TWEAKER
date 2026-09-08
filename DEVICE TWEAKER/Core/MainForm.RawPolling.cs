@@ -60,7 +60,7 @@ public sealed partial class MainForm
             }
             catch (Exception ex)
             {
-                WriteLog($"USBPOLL.RAW: failed to process raw input: {ex.Message}");
+                WriteLog($"USBPOLL.RAW.WARN: failed to process raw input: {ex.Message}");
             }
         }
 
@@ -78,7 +78,7 @@ public sealed partial class MainForm
         if (!RawInputInterop.RegisterMouseAndKeyboard(Handle))
         {
             _rawPollingInitialized = false;
-            WriteLog("USBPOLL.RAW: registration failed");
+            WriteLog("USBPOLL.RAW.WARN: registration failed");
             return;
         }
 

@@ -116,7 +116,7 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
         using SolidBrush buttonBrush = new(ButtonColor);
         e.Graphics.FillRectangle(buttonBrush, arrowRect);
 
-        string text = SelectedItem?.ToString() ?? string.Empty;
+        string text = UiLanguage.Text(SelectedItem?.ToString() ?? string.Empty);
         // TextRenderer clips glyph overhang unless NoPadding is set — without it "Enabled" becomes "nabled".
         Rectangle textRect = new(bounds.Left + 8, bounds.Top + 1, Math.Max(0, bounds.Width - arrowWidth - 12), bounds.Height - 2);
         Color textColor = Enabled ? ForeColor : Color.FromArgb(120, 120, 125);
@@ -452,7 +452,7 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
                     e.Graphics.FillRectangle(markerBrush, new Rectangle(itemRect.Left, itemRect.Top, 3, itemRect.Height));
                 }
 
-                string text = _owner.Items[index].ToString() ?? string.Empty;
+                string text = UiLanguage.Text(_owner.Items[index].ToString() ?? string.Empty);
                 Rectangle textRect = new(itemRect.Left + 8, itemRect.Top, Math.Max(0, itemRect.Width - 14), itemRect.Height);
                 TextRenderer.DrawText(
                     e.Graphics,

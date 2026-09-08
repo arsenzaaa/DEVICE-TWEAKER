@@ -26,16 +26,17 @@ public sealed partial class MainForm
         ulong ReadMask,
         ulong WriteOrBits,
         NicItrTimingKind TimingKind,
-        string[]? VectorLabels = null);
+        string[]? VectorLabels = null,
+        uint IntelEitrUnitUs = 2);
 
     private static readonly NicItrProfile[] NicItrProfiles =
     [
-        new("Intel I225/I226 (EITR)", "8086", ["15F2", "15F3", "0D9F", "5502", "125B", "125C", "125D", "5503"], 0x1680, 0x4, 5, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr, ["Other", "Q0", "Q1", "Q2", "Q3"]),
-        new("Intel I210/I211 (EITR)", "8086", ["1533", "1536", "1537", "1538", "1539", "157B", "157C", "1F40", "1F41", "1F45"], 0x1680, 0x4, 4, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr),
-        new("Intel I350 (EITR)", "8086", ["1521", "1522", "1523", "1524"], 0x1680, 0x4, 8, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr),
+        new("Intel I225/I226 (EITR)", "8086", ["15F2", "15F3", "0D9F", "5502", "125B", "125C", "125D", "5503"], 0x1680, 0x4, 5, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr, ["Other", "IRQ0", "IRQ1", "IRQ2", "IRQ3"]),
+        new("Intel I210/I211 (EITR)", "8086", ["1533", "1536", "1537", "1538", "1539", "157B", "157C", "1F40", "1F41", "1F45"], 0x1680, 0x4, 5, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr, IntelEitrUnitUs: 1),
+        new("Intel I350 (EITR)", "8086", ["1521", "1522", "1523", "1524"], 0x1680, 0x4, 25, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr, IntelEitrUnitUs: 1),
         new("Intel 82580 (EITR)", "8086", ["150E", "150F", "1510", "1511"], 0x1680, 0x4, 10, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr),
         new("Intel 82576 (EITR)", "8086", ["1516", "1518", "1526"], 0x1680, 0x4, 25, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr),
-        new("Killer E3100 (EITR)", "8086", ["3100", "3101", "3102"], 0x1680, 0x4, 5, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr, ["Other", "Q0", "Q1", "Q2", "Q3"]),
+        new("Killer E3100 (EITR)", "8086", ["3100", "3101", "3102"], 0x1680, 0x4, 5, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr, ["Other", "IRQ0", "IRQ1", "IRQ2", "IRQ3"]),
         new("Intel I219 (ITR)", "8086", ["15B7", "15B8", "15B9", "15D7", "15D8", "15E3", "15BB", "15BC", "15BD", "15BE", "0D4C", "0D4D", "0D4E", "0D4F", "0D53", "0D55", "0D5C", "0D5D", "0D5E", "0D5F", "15FB", "15FC", "1A1E", "1A1F", "550A", "550B", "550C", "550D", "550E", "550F", "0DC5", "0DC6", "0DC7", "0DC8", "1A1C", "1A1D", "15F9", "15FA", "3166", "3167", "3197", "3198", "4DF4", "4B33", "4B34", "4DC2", "4DC3", "54B4", "54B5", "54B6", "54B7", "0126", "153A", "153B", "1559", "155A", "156F", "1570", "15D6"], 0x00C4, 0x0, 1, 32, 0x0000FFFF, 0, NicItrTimingKind.IntelItr),
         new("Realtek RTL8111/8168", "10EC", ["8168", "8161", "8136", "8167", "8169"], 0x00E2, 0x0, 1, 16, 0xFFFF, 0, NicItrTimingKind.RealtekIntrMit),
         new("Realtek RTL8125/8126", "10EC", ["8125", "8162", "8126"], 0x0A00, 0x8, 4, 32, 0x7F7F7F7F, 0, NicItrTimingKind.RealtekIntrMitV2),
@@ -62,7 +63,7 @@ public sealed partial class MainForm
         return null;
     }
 
-    private async void RefreshNicItrBlock(DeviceBlock block)
+    private async void RefreshNicItrBlock(DeviceBlock block, bool showReadingStatus = true)
     {
         if (block.NicItrBox is null || block.NicItrStatusLabel is null)
         {
@@ -86,7 +87,14 @@ public sealed partial class MainForm
 
         if (block.Device.IsTestDevice)
         {
-            List<ulong> previewValues = Enumerable.Repeat(0UL, Math.Max(1, profile.MaxQueues)).ToList();
+            TestDeviceState testState = EnsureTestDeviceState(block.Device);
+            List<ulong> previewValues;
+            if (string.IsNullOrWhiteSpace(testState.NicItrValue)
+                || string.Equals(testState.NicItrValue, "default", StringComparison.OrdinalIgnoreCase)
+                || !TryParseNicItrInput(testState.NicItrValue, profile, out previewValues))
+            {
+                previewValues = Enumerable.Repeat(0UL, Math.Max(1, profile.MaxQueues)).ToList();
+            }
             string previewText = FormatNicItrValueList(previewValues, profile);
             block.NicItrBox.Text = previewText;
             block.NicItrStatusLabel.Text = $"current: test profile {profile.FamilyName}";
@@ -103,14 +111,17 @@ public sealed partial class MainForm
         }
 
         int generation = ++block.NicItrOperationGeneration;
-        block.NicItrStatusLabel.Text = "current: reading...";
-        if (block.NicItrTimeLabel is not null)
+        if (showReadingStatus)
         {
-            block.NicItrTimeLabel.Text = "time: reading...";
-            block.NicItrTimeLabel.ForeColor = _statusInactive;
+            block.NicItrStatusLabel.Text = "current: reading...";
+            if (block.NicItrTimeLabel is not null)
+            {
+                block.NicItrTimeLabel.Text = "time: reading...";
+                block.NicItrTimeLabel.ForeColor = _statusInactive;
+            }
+            block.NicItrStatusLabel.ForeColor = _statusInactive;
+            SetNicItrTooltip(block, $"{profile.FamilyName}\nreading...");
         }
-        block.NicItrStatusLabel.ForeColor = _statusInactive;
-        SetNicItrTooltip(block, $"{profile.FamilyName}\nreading...");
 
         string instanceId = block.Device.InstanceId;
         try
@@ -142,7 +153,9 @@ public sealed partial class MainForm
                     block.NicItrTimeLabel.ForeColor = _statusInactive;
                 }
                 SetNicItrTooltip(block, $"{profile.FamilyName}\nread failed: {result.error}");
-                WriteLog($"NIC.ITR.READ: {instanceId} failed: {result.error}");
+                WriteLog(IsImodNeedsCheckStatus(result.error)
+                    ? $"NIC.ITR.READ.SKIPPED: {instanceId} reason=driver-not-loaded action=press-CHECK"
+                    : $"NIC.ITR.READ.FAILED: {instanceId} error=\"{SanitizeLogValue(result.error)}\"");
                 return;
             }
 
@@ -198,15 +211,9 @@ public sealed partial class MainForm
             return;
         }
 
-        if (TryBlockSandboxHardwareWrite("NIC ITR CHECK"))
+        if (TryBlockBusyHardwareWrite("NIC ITR CHECK") || TryBlockSandboxHardwareWrite("NIC ITR CHECK"))
         {
             return;
-        }
-
-        if (block.NicItrStatusLabel is not null)
-        {
-            block.NicItrStatusLabel.Text = "current: loading driver...";
-            block.NicItrStatusLabel.ForeColor = _statusInactive;
         }
 
         if (!TryCheckImodDriver(out string? error))
@@ -215,16 +222,27 @@ public sealed partial class MainForm
             {
                 block.NicItrStatusLabel.Text = "current: driver load failed";
                 block.NicItrStatusLabel.ForeColor = _statusDanger;
-                SetNicItrTooltip(block, error ?? "DTIMOD.sys load failed");
+                SetNicItrTooltip(block, "DTIMOD driver unavailable. Open the session log for diagnostics.");
             }
 
             WriteLog($"NIC.ITR.CHECK: failed device={block.Device.InstanceId} error={error}");
-            ShowThemedInfo($"IMOD driver load failed.\n{error}");
+            OperationReport report = new();
+            report.MarkNoChangesMade();
+            report.AddError(
+                "NIC ITR DRIVER",
+                FormatImodUnavailableUserMessage(error, includeNotChanged: false),
+                error ?? "Unknown DTIMOD driver load error.");
+            ShowOperationResult(
+                report,
+                string.Empty,
+                "The driver check did not complete.",
+                operationName: "NIC ITR CHECK");
+            MaybeOfferVulnerableDriverBlocklistDisable(report);
             return;
         }
 
         WriteLog($"NIC.ITR.CHECK: ok device={block.Device.InstanceId}");
-        RefreshNicItrBlock(block);
+        RefreshNicItrBlock(block, showReadingStatus: false);
     }
 
     private async void ApplyNicItrFromBlock(DeviceBlock block)
@@ -254,6 +272,7 @@ public sealed partial class MainForm
         NormalizeNicItrTextBox(block, profile, values);
         if (block.Device.IsTestDevice)
         {
+            EnsureTestDeviceState(block.Device).NicItrValue = FormatNicItrValueList(values, profile);
             block.NicItrStatusLabel.Text = "current: test preview";
             block.NicItrStatusLabel.ForeColor = _statusActive;
             UpdateNicItrInputTimeLabel(block);
@@ -261,7 +280,7 @@ public sealed partial class MainForm
             return;
         }
 
-        if (TryBlockSandboxHardwareWrite("NIC ITR SET"))
+        if (TryBlockBusyHardwareWrite("NIC ITR SET") || TryBlockSandboxHardwareWrite("NIC ITR SET"))
         {
             return;
         }
@@ -272,7 +291,14 @@ public sealed partial class MainForm
             block.NicItrStatusLabel.ForeColor = _statusDanger;
             SetNicItrTooltip(block, $"{profile.FamilyName}\nwrite cancelled: automatic backup failed");
             WriteLog($"NIC.ITR.WRITE: {block.Device.InstanceId} cancelled because automatic backup failed");
-            ShowThemedInfo("NIC ITR apply was cancelled because the automatic backup failed.\nNo registry/hardware changes were made.");
+            OperationReport report = new();
+            report.MarkNoChangesMade();
+            report.AddError("AUTOMATIC BACKUP", "The backup could not be created. No changes were made.", "Pre-NIC-ITR backup failed.");
+            ShowOperationResult(
+                report,
+                string.Empty,
+                "NIC ITR was cancelled before any changes were made.",
+                operationName: "NIC ITR");
             return;
         }
 
@@ -363,10 +389,25 @@ public sealed partial class MainForm
         NormalizeNicItrTextBox(block, profile, values);
         if (block.Device.IsTestDevice)
         {
+            EnsureTestDeviceState(block.Device).NicItrValue = FormatNicItrValueList(values, profile);
             block.NicItrStatusLabel.Text = "current: test preview";
             block.NicItrStatusLabel.ForeColor = _statusActive;
             UpdateNicItrInputTimeLabel(block);
             WriteLog($"NIC.ITR.TEST.SAVE.SKIP: {block.Device.InstanceId} profile=\"{profile.FamilyName}\" values={FormatNicItrValueList(values, profile)}");
+            return;
+        }
+
+        if (TryBlockBusyHardwareWrite("NIC ITR SAVE"))
+        {
+            return;
+        }
+
+        if (!CreateDeviceTweakerBackup("pre-nic-itr-save", showDialog: false))
+        {
+            block.NicItrStatusLabel.Text = "current: backup failed";
+            block.NicItrStatusLabel.ForeColor = _statusDanger;
+            SetNicItrTooltip(block, $"{profile.FamilyName}\nsave cancelled: automatic backup failed");
+            WriteLog($"NIC.ITR.SAVE: {block.Device.InstanceId} cancelled because automatic backup failed");
             return;
         }
 
@@ -427,7 +468,8 @@ public sealed partial class MainForm
             return false;
         }
 
-        if (!TryGetPciMemoryBaseByInstanceId(instanceId, out ulong baseAddress, out error))
+        if (!TryGetPciMemoryRangeByInstanceId(instanceId, out ulong baseAddress, out ulong memoryLength, out error)
+            || !TryValidateNicItrMemoryRange(profile, memoryLength, out error))
         {
             return false;
         }
@@ -490,7 +532,8 @@ public sealed partial class MainForm
             return false;
         }
 
-        if (!TryGetPciMemoryBaseByInstanceId(instanceId, out ulong baseAddress, out error))
+        if (!TryGetPciMemoryRangeByInstanceId(instanceId, out ulong baseAddress, out ulong memoryLength, out error)
+            || !TryValidateNicItrMemoryRange(profile, memoryLength, out error))
         {
             return false;
         }
@@ -517,6 +560,20 @@ public sealed partial class MainForm
                 ulong address = baseAddress + profile.BaseOffset + (profile.Stride * (uint)q);
                 if (!TryWriteNicRegister(ctx, address, profile.ReadWidth, finalValue, out error))
                 {
+                    return false;
+                }
+
+                if (!TryReadNicRegister(ctx, address, profile.ReadWidth, out ulong readback, out error))
+                {
+                    error = $"write completed but readback failed at {GetNicItrVectorLabel(profile, q)}: {error}";
+                    return false;
+                }
+
+                ulong expected = selected & profile.ReadMask;
+                ulong actual = readback & profile.ReadMask;
+                if (actual != expected)
+                {
+                    error = $"write verification failed at {GetNicItrVectorLabel(profile, q)}: expected {FormatNicItrValue(expected, profile)}, read {FormatNicItrValue(actual, profile)}";
                     return false;
                 }
             }
@@ -588,9 +645,24 @@ public sealed partial class MainForm
         return TryWritePhysicalMemory(ctx, address, 2, value, out error);
     }
 
-    private bool TryGetPciMemoryBaseByInstanceId(string instanceId, out ulong baseAddress, out string? error)
+    private static bool TryValidateNicItrMemoryRange(NicItrProfile profile, ulong memoryLength, out string? error)
+    {
+        ulong registerWidth = (ulong)(profile.ReadWidth / 8);
+        ulong lastOffset = profile.BaseOffset + ((ulong)Math.Max(0, profile.MaxQueues - 1) * profile.Stride);
+        if (registerWidth == 0 || memoryLength == 0 || lastOffset > memoryLength || registerWidth > memoryLength - lastOffset)
+        {
+            error = $"NIC ITR register range exceeds the allocated BAR (required end=0x{lastOffset + registerWidth:X}, BAR length=0x{memoryLength:X})";
+            return false;
+        }
+
+        error = null;
+        return true;
+    }
+
+    private bool TryGetPciMemoryRangeByInstanceId(string instanceId, out ulong baseAddress, out ulong memoryLength, out string? error)
     {
         baseAddress = 0;
+        memoryLength = 0;
         error = null;
         string target = NormalizeInstanceId(instanceId);
 
@@ -628,7 +700,7 @@ public sealed partial class MainForm
                     continue;
                 }
 
-                if (!TryGetDeviceMemoryBase(devInfo.DevInst, out baseAddress, out error))
+                if (!TryGetDeviceMemoryRange(devInfo.DevInst, out baseAddress, out memoryLength, out error))
                 {
                     return false;
                 }
@@ -795,7 +867,9 @@ public sealed partial class MainForm
             return profile.VectorLabels[index];
         }
 
-        return profile.MaxQueues == 1 ? "ITR" : $"Q{index}";
+        return profile.MaxQueues == 1
+            ? "ITR"
+            : profile.TimingKind == NicItrTimingKind.IntelEitr ? $"EITR{index}" : $"Q{index}";
     }
 
     private static string FormatNicItrQueueSummary(IReadOnlyList<ulong> values, NicItrProfile profile)
@@ -818,6 +892,12 @@ public sealed partial class MainForm
             })
             .ToArray();
 
+        int stateWidth = states.Select(state => state.Length).DefaultIfEmpty(1).Max();
+        for (int index = 0; index < states.Length - 1; index++)
+        {
+            states[index] = states[index].PadRight(stateWidth);
+        }
+
         return "current: " + string.Join(" | ", states);
     }
 
@@ -834,12 +914,29 @@ public sealed partial class MainForm
             return prefix + FormatNicItrTimingList(values, profile);
         }
 
+        string[] labels = values.Select((_, index) => GetNicItrVectorLabel(profile, index)).ToArray();
+        string[] rawValues = values.Select(value => FormatNicItrValue(value, profile)).ToArray();
+        string[] details = values.Select(value => FormatNicItrTimingDetail(value, profile)).ToArray();
+        int labelWidth = labels.Select(label => label.Length).DefaultIfEmpty(1).Max();
+        int rawWidth = rawValues.Select(raw => raw.Length).DefaultIfEmpty(1).Max();
+        int rxWidth = details
+            .Select(detail => detail.Split([", "], 2, StringSplitOptions.None)[0])
+            .Where(detail => detail.StartsWith("RX ", StringComparison.Ordinal))
+            .Select(detail => detail.Length)
+            .DefaultIfEmpty(0)
+            .Max();
+
         string[] rows = values
-            .Select((value, index) =>
+            .Select((_, index) =>
             {
-                string label = GetNicItrVectorLabel(profile, index);
-                string raw = FormatNicItrValue(value, profile).PadRight(profile.ReadWidth == 16 ? 6 : 10);
-                return $"{label}: {raw}   {FormatNicItrTimingDetail(value, profile)}";
+                string detail = details[index];
+                string[] timingColumns = detail.Split([", "], 2, StringSplitOptions.None);
+                if (timingColumns.Length == 2 && timingColumns[0].StartsWith("RX ", StringComparison.Ordinal))
+                {
+                    detail = $"{timingColumns[0].PadRight(rxWidth)} | {timingColumns[1]}";
+                }
+
+                return $"{labels[index].PadRight(labelWidth)}: {rawValues[index].PadRight(rawWidth)} | {detail}";
             })
             .ToArray();
 
@@ -864,7 +961,7 @@ public sealed partial class MainForm
         raw &= profile.ReadMask;
         return profile.TimingKind switch
         {
-            NicItrTimingKind.IntelEitr => FormatDurationUs(((raw >> 2) & 0x1FFF) * 2),
+            NicItrTimingKind.IntelEitr => FormatDurationUs(((raw >> 2) & 0x1FFF) * profile.IntelEitrUnitUs),
             NicItrTimingKind.IntelItr => FormatDurationNs(raw * 256),
             NicItrTimingKind.RealtekIntrMit => FormatRealtekIntrMit(raw, timerUnitUs: 125, extended: false),
             NicItrTimingKind.RealtekIntrMitV2 => FormatRealtekIntrMit(raw, timerUnitUs: 1, extended: true),
@@ -963,8 +1060,8 @@ public sealed partial class MainForm
         ulong txTimer = (raw >> txTimerShift) & timerMask;
         ulong txFrames = (raw >> txFrameShift) & frameMask;
 
-        string rx = $"RX {rxTimer * timerUnitUs}us/{rxFrames}f";
-        string tx = $"TX {txTimer * timerUnitUs}us/{txFrames}f";
+        string rx = $"RX {rxTimer * timerUnitUs} us / {rxFrames}f";
+        string tx = $"TX {txTimer * timerUnitUs} us / {txFrames}f";
         return $"{rx}, {tx}";
     }
 

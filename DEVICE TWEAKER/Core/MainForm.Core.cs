@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using System.Diagnostics;
 using System.Globalization;
+using System.Text;
 
 namespace DeviceTweakerCS;
 
@@ -21,6 +22,7 @@ public sealed partial class MainForm : Form
     private int _devicesBusyDepth;
     private int _devicesBusyDone;
     private int _devicesBusyTotal = 1;
+    private Button[] _operationButtons = [];
 
     private int _suppressReservedCpuEvents;
     private bool _testCpuActive;
@@ -30,6 +32,7 @@ public sealed partial class MainForm : Form
     private bool _testDevicesEnabled;
     private bool _testDevicesOnly;
     private bool _testAutoDryRun;
+    private readonly TestSandboxRuntime _testSandbox = new();
     private int _dialogDimDepth;
     private int _testDeviceSequence;
     private string _testCpuName = string.Empty;
@@ -47,6 +50,8 @@ public sealed partial class MainForm : Form
     private FlowLayoutPanel? _cpuFlagsPanel;
 
     private bool _detailedLogEnabled;
+    private string? _loggingFailureMessage;
+    private bool _loggingFailureShown;
     private Dictionary<string, SignedDriverInfo>? _signedDriverInfoCache;
     private bool _syncingScroll;
     private bool? _lastGpuDriverDetected;
@@ -56,9 +61,9 @@ public sealed partial class MainForm : Form
     private DateTime _imodKernelCiBlockStatusUtc;
     private int _imodReadbackGeneration;
     private System.Windows.Forms.Timer? _layoutRefreshTimer;
+    private System.Windows.Forms.Timer? _startupRefreshTimer;
     private int _lastLayoutViewportWidth;
     private int _lastLayoutDpi;
-    private bool _expandingMainWindowForLayout;
     private bool _initialDeviceViewportHeightAdjusted;
     private int _irqRefreshGeneration;
 
@@ -70,6 +75,7 @@ public sealed partial class MainForm : Form
         EnableDetailedLog();
         InitializeCpu();
         InitializeGui();
+        InitializeLocalization();
         ApplyAppIcon();
     }
 
@@ -91,26 +97,51 @@ public sealed partial class MainForm : Form
             $"client={ClientSize.Width}x{ClientSize.Height} dpi={GetCurrentWindowDpi()} " +
             $"screen=\"{Screen.FromControl(this).DeviceName}\" monitors={Screen.AllScreens.Length}");
         InitializeRawPolling();
-        BeginInvoke(new Action(() => RefreshBlocks()));
-        if (string.Equals(
-                Environment.GetEnvironmentVariable("DEVICE_TWEAKER_QA_TEST_ADMIN"),
-                "1",
-                StringComparison.Ordinal))
+        bool showTestAdmin = string.Equals(
+            Environment.GetEnvironmentVariable("DEVICE_TWEAKER_QA_TEST_ADMIN"),
+            "1",
+            StringComparison.Ordinal);
+
+        // Let Windows complete the first full paint before synchronous device
+        // enumeration starts. Posting RefreshBlocks directly from OnShown can run
+        // ahead of WM_PAINT and expose half-rendered header/buttons during startup.
+        _startupRefreshTimer?.Dispose();
+        _startupRefreshTimer = new System.Windows.Forms.Timer { Interval = 80 };
+        _startupRefreshTimer.Tick += (_, _) =>
         {
-            BeginInvoke(new Action(ShowTestAdminDialog));
-        }
+            _startupRefreshTimer?.Stop();
+            _startupRefreshTimer?.Dispose();
+            _startupRefreshTimer = null;
+            if (IsDisposed)
+            {
+                return;
+            }
+
+            Refresh();
+            RefreshBlocks();
+            if (showTestAdmin && !IsDisposed)
+            {
+                BeginInvoke(new Action(ShowTestAdminDialog));
+            }
+        };
+        _startupRefreshTimer.Start();
 
         if (_pendingGpuDriverWarning)
         {
             _pendingGpuDriverWarning = false;
             ShowMissingGpuDriverWarning();
         }
+
+        ShowLoggingFailureIfNeeded();
     }
 
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
-        WriteLog($"LOG.SESSION.END: closeReason={e.CloseReason}");
-        DisableDetailedLog(writeClosingEntry: false);
+        if (_detailedLogEnabled)
+        {
+            AppDiagnostics.CompleteSession($"closeReason={e.CloseReason}");
+            _detailedLogEnabled = false;
+        }
         base.OnFormClosed(e);
     }
 
@@ -197,6 +228,80 @@ public sealed partial class MainForm : Form
         }
     }
 
+    private static void WriteAllTextAtomic(string path, string content, Encoding encoding)
+    {
+        string fullPath = Path.GetFullPath(path);
+        string? directory = Path.GetDirectoryName(fullPath);
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            throw new InvalidOperationException($"Cannot resolve the destination directory for {path}.");
+        }
+
+        Directory.CreateDirectory(directory);
+        string temporaryPath = Path.Combine(directory, $".{Path.GetFileName(fullPath)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            using (FileStream stream = new(
+                       temporaryPath,
+                       FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None,
+                       bufferSize: 4096,
+                       FileOptions.WriteThrough))
+            using (StreamWriter writer = new(stream, encoding))
+            {
+                writer.Write(content);
+                writer.Flush();
+                stream.Flush(flushToDisk: true);
+            }
+
+            File.Move(temporaryPath, fullPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
+        }
+    }
+
+    private static void WriteAllBytesAtomic(string path, byte[] content)
+    {
+        string fullPath = Path.GetFullPath(path);
+        string? directory = Path.GetDirectoryName(fullPath);
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            throw new InvalidOperationException($"Cannot resolve the destination directory for {path}.");
+        }
+
+        Directory.CreateDirectory(directory);
+        string temporaryPath = Path.Combine(directory, $".{Path.GetFileName(fullPath)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            using (FileStream stream = new(
+                       temporaryPath,
+                       FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None,
+                       bufferSize: 4096,
+                       FileOptions.WriteThrough))
+            {
+                stream.Write(content);
+                stream.Flush(flushToDisk: true);
+            }
+
+            File.Move(temporaryPath, fullPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
+        }
+    }
+
     private void WriteLog(string message)
     {
         if (!_detailedLogEnabled || string.IsNullOrWhiteSpace(message))
@@ -210,6 +315,11 @@ public sealed partial class MainForm : Form
         }
 
         _detailedLogEnabled = false;
+        _loggingFailureMessage ??= "The current diagnostic log stopped accepting new entries.";
+        if (IsHandleCreated && !IsDisposed)
+        {
+            BeginInvoke(new Action(ShowLoggingFailureIfNeeded));
+        }
     }
 
     private void EnableDetailedLog()
@@ -222,13 +332,20 @@ public sealed partial class MainForm : Form
         if (!AppDiagnostics.TryEnable(out string? logPath, out string? logError))
         {
             _detailedLogEnabled = false;
+            _loggingFailureMessage = string.IsNullOrWhiteSpace(logError)
+                ? "The logs folder could not be created."
+                : "The logs folder could not be created. " + FlattenLogText(logError);
             Debug.WriteLine($"DEVICE TWEAKER detailed logging unavailable: {logError}");
             return;
         }
 
         _detailedLogEnabled = true;
+        _loggingFailureMessage = null;
 
-        WriteLog($"LOG: detailed logging ENABLED path=\"{logPath}\"");
+        WriteLog(
+            $"LOG.SCHEMA: version={AppDiagnostics.SchemaVersion} encoding=UTF-8-BOM " +
+            "columns=timestamp,sequence,elapsed,thread,level,category,event continuations=structured");
+        WriteLog($"LOG.SESSION.START: path=\"{logPath}\"");
         WriteLog($"LOG.VERSION: {GetAppVersion()}");
 
         try
@@ -361,6 +478,23 @@ public sealed partial class MainForm : Form
         }
     }
 
+    private void ShowLoggingFailureIfNeeded()
+    {
+        if (_loggingFailureShown || string.IsNullOrWhiteSpace(_loggingFailureMessage) || IsDisposed)
+        {
+            return;
+        }
+
+        _loggingFailureShown = true;
+        string detail = _loggingFailureMessage.Length > 360
+            ? _loggingFailureMessage[..360] + "..."
+            : _loggingFailureMessage;
+        ShowThemedInfo(
+            "DIAGNOSTIC LOGGING IS UNAVAILABLE\n\n"
+            + "DEVICE TWEAKER can continue, but this session may not contain enough information for troubleshooting.\n\n"
+            + detail);
+    }
+
     private static string FlattenLogText(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -380,15 +514,13 @@ public sealed partial class MainForm : Form
         try
         {
             Assembly asm = Assembly.GetExecutingAssembly();
-            AssemblyInformationalVersionAttribute? info =
-                asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
-            if (!string.IsNullOrWhiteSpace(info?.InformationalVersion))
-            {
-                return info.InformationalVersion;
-            }
-
-            Version? ver = asm.GetName().Version;
-            return ver?.ToString() ?? "unknown";
+            string product = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                ?? "unknown";
+            string file = asm.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version
+                ?? "unknown";
+            string assembly = asm.GetName().Version?.ToString()
+                ?? "unknown";
+            return $"product={product} file={file} assembly={assembly}";
         }
         catch
         {
@@ -490,12 +622,25 @@ public sealed partial class MainForm : Form
         return text switch
         {
             "MachineDefault" => 0,
-            "All" => 1,
+            "AllClose" => 1,
             "Single" => 2,
-            "AllClose" => 3,
+            "All" => 3,
             "SpecCPU" => 4,
             "SpreadMessages" => 5,
             _ => null,
+        };
+    }
+
+    private static string FormatPolicyValue(int value)
+    {
+        return value switch
+        {
+            1 => "AllClose",
+            2 => "Single",
+            3 => "All",
+            4 => "SpecCPU",
+            5 => "SpreadMessages",
+            _ => "MachineDefault",
         };
     }
 
@@ -949,31 +1094,39 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        int issueCount = 0;
-        Dictionary<string, SignedDriverInfo> signedDriverMap = BuildSignedDriverInfoMap(out string? wmiError);
-        bool wmiMapEmpty = signedDriverMap.Count == 0;
-        if (!string.IsNullOrWhiteSpace(wmiError))
-        {
-            WriteLog($"GUI.ISSUE: reason=wmiQueryFailed error=\"{SanitizeLogValue(wmiError)}\"");
-            issueCount++;
-        }
-        else if (wmiMapEmpty)
-        {
-            WriteLog("GUI.ISSUE: reason=wmiQueryEmpty");
-            issueCount++;
-        }
-
-        WriteLog($"GUI.WMI: signedDrivers={signedDriverMap.Count}");
-
         string safeReason = string.IsNullOrWhiteSpace(reason) ? "unknown" : reason.Trim();
-        WriteLog($"GUI.SNAPSHOT: start reason={safeReason}");
+        bool includeDeviceDiagnostics = !safeReason.Equals("language-change", StringComparison.OrdinalIgnoreCase)
+            && !safeReason.Equals("irq-refresh", StringComparison.OrdinalIgnoreCase);
+        int issueCount = 0;
+        Dictionary<string, SignedDriverInfo> signedDriverMap = [];
+        bool wmiMapEmpty = false;
+        if (includeDeviceDiagnostics)
+        {
+            signedDriverMap = BuildSignedDriverInfoMap(out string? wmiError);
+            wmiMapEmpty = signedDriverMap.Count == 0;
+            if (!string.IsNullOrWhiteSpace(wmiError))
+            {
+                WriteLog($"GUI.ISSUE: reason=wmiQueryFailed error=\"{SanitizeLogValue(wmiError)}\"");
+                issueCount++;
+            }
+            else if (wmiMapEmpty)
+            {
+                WriteLog("GUI.ISSUE: reason=wmiQueryEmpty");
+                issueCount++;
+            }
 
-        string cpuHeader = _cpuHeaderLabel?.Text ?? _cpuHeaderText;
-        string htPrefix = _htPrefixLabel?.Text ?? string.Empty;
-        string htStatus = _htStatusLabel?.Text ?? string.Empty;
-        string hybridCpuStatus = _hybridCpuStatusLabel?.Text ?? string.Empty;
-        string cppcStatus = _cppcStatusLabel?.Text ?? string.Empty;
-        string dualCcdStatus = _dualCcdStatusLabel?.Text ?? string.Empty;
+            WriteLog($"GUI.WMI: signedDrivers={signedDriverMap.Count}");
+        }
+
+        string snapshotScope = includeDeviceDiagnostics ? "full" : "layout-state";
+        WriteLog($"GUI.SNAPSHOT: start reason={safeReason} scope={snapshotScope}");
+
+        string cpuHeader = _cpuHeaderLabel is null ? _cpuHeaderText : GetSourceControlText(_cpuHeaderLabel);
+        string htPrefix = _htPrefixLabel is null ? string.Empty : GetSourceControlText(_htPrefixLabel);
+        string htStatus = _htStatusLabel is null ? string.Empty : GetSourceControlText(_htStatusLabel);
+        string hybridCpuStatus = _hybridCpuStatusLabel is null ? string.Empty : GetSourceControlText(_hybridCpuStatusLabel);
+        string cppcStatus = _cppcStatusLabel is null ? string.Empty : GetSourceControlText(_cppcStatusLabel);
+        string dualCcdStatus = _dualCcdStatusLabel is null ? string.Empty : GetSourceControlText(_dualCcdStatusLabel);
 
         WriteLog(
             $"GUI.HEADER: cpuHeader=\"{FlattenLogText(cpuHeader)}\" smt=\"{FlattenLogText(htPrefix)} {FlattenLogText(htStatus)}\" hybridCpu=\"{FlattenLogText(hybridCpuStatus)}\" cppc=\"{FlattenLogText(cppcStatus)}\" dualCcd=\"{FlattenLogText(dualCcdStatus)}\" smtText=\"{FlattenLogText(_smtText)}\"");
@@ -1003,16 +1156,16 @@ public sealed partial class MainForm : Form
             string prio = b.PrioCombo.SelectedItem?.ToString() ?? "(none)";
             string policy = b.PolicyCombo.SelectedItem?.ToString() ?? "(none)";
             string limit = b.LimitBox.Text?.Trim() ?? string.Empty;
-            string affinityText = FlattenLogText(b.AffinityLabel.Text);
-            string irqText = FlattenLogText(b.IrqLabel.Text);
-            string policyLabel = FlattenLogText(b.PolicyLabel.Text);
+            string affinityText = FlattenLogText(GetSourceControlText(b.AffinityLabel));
+            string irqText = FlattenLogText(GetSourceControlText(b.IrqLabel));
+            string policyLabel = FlattenLogText(GetSourceControlText(b.PolicyLabel));
 
             WriteLog(
                 $"GUI.BLOCK.STATE: idx={i} msi={msi} limit={limit} prio={prio} policy={policy} policyLabel=\"{policyLabel}\" policyEnabled={b.PolicyCombo.Enabled} mask=0x{b.AffinityMask:X} affinityText=\"{affinityText}\" irqText=\"{irqText}\" cpuChecked=[{FormatIndexList(selected)}]");
 
             string imodValue = b.ImodBox.Text?.Trim() ?? string.Empty;
-            string imodDefault = FlattenLogText(b.ImodDefaultLabel.Text);
-            string imodCurrent = FlattenLogText(b.ImodCurrentLabel.Text);
+            string imodDefault = FlattenLogText(GetSourceControlText(b.ImodDefaultLabel));
+            string imodCurrent = FlattenLogText(GetSourceControlText(b.ImodCurrentLabel));
             string imodMap = FlattenLogText(b.ImodMapLabel?.Text);
             string imodMapDetail = FlattenLogText(b.ImodMapLabel?.Tag as string);
             WriteLog(
@@ -1029,12 +1182,12 @@ public sealed partial class MainForm : Form
             if (b.NicItrBox is not null)
             {
                 string nicItrValue = b.NicItrBox.Text?.Trim() ?? string.Empty;
-                string nicItrStatus = FlattenLogText(b.NicItrStatusLabel?.Text);
-                string nicItrTime = FlattenLogText(b.NicItrTimeLabel?.Text);
+                string nicItrStatus = b.NicItrStatusLabel is null ? string.Empty : FlattenLogText(GetSourceControlText(b.NicItrStatusLabel));
+                string nicItrTime = b.NicItrTimeLabel is null ? string.Empty : FlattenLogText(GetSourceControlText(b.NicItrTimeLabel));
                 WriteLog($"GUI.BLOCK.NICITR: idx={i} value=\"{nicItrValue}\" status=\"{nicItrStatus}\" time=\"{nicItrTime}\"");
             }
 
-            string infoText = FlattenLogText(b.InfoLabel.Text);
+            string infoText = FlattenLogText(GetSourceControlText(b.InfoLabel));
             string infoReg = FlattenLogText(b.InfoLabel.Tag as string);
             WriteLog($"GUI.BLOCK.INFO: idx={i} text=\"{infoText}\" reg=\"{infoReg}\"");
 
@@ -1064,7 +1217,10 @@ public sealed partial class MainForm : Form
                 }
             }
 
-            issueCount += LogGuiBlockDetails(b, i, signedDriverMap, wmiMapEmpty);
+            if (includeDeviceDiagnostics)
+            {
+                issueCount += LogGuiBlockDetails(b, i, signedDriverMap, wmiMapEmpty);
+            }
         }
 
         if (_reservedCpuPanel?.Tag is ReservedCpuPanelTag tag)
@@ -1074,7 +1230,7 @@ public sealed partial class MainForm : Form
                 .Select(m => m.Index)
                 .OrderBy(x => x)
                 .ToList();
-            string valueText = tag.ValueLabel.Text;
+            string valueText = GetSourceControlText(tag.ValueLabel);
             byte[] bytes = BuildReservedCpuSetBytes(reserved);
             string bytesText = bytes.Length == 0 ? "none" : string.Join(" ", bytes.Select(b => b.ToString("X2")));
             WriteLog($"GUI.RESERVED: count={tag.Meta.Count} set=[{FormatIndexList(reserved)}] bytes=[{bytesText}] value=\"{SanitizeLogValue(valueText)}\"");
@@ -1084,8 +1240,8 @@ public sealed partial class MainForm : Form
             WriteLog("GUI.RESERVED: none");
         }
 
-        WriteLog($"GUI.ISSUE.SUMMARY: count={issueCount}");
-        WriteLog($"GUI.SNAPSHOT: end reason={safeReason}");
+        WriteLog($"GUI.ISSUE.SUMMARY: count={issueCount} scope={snapshotScope}");
+        WriteLog($"GUI.SNAPSHOT: end reason={safeReason} scope={snapshotScope}");
     }
 
     private int LogGuiBlockLayout(DeviceBlock block, int index)
@@ -1119,6 +1275,72 @@ public sealed partial class MainForm : Form
                 || settingsBottom > settingsPanel.ClientSize.Height + UiScale(2));
         int settingsHorizontalSlack = settingsPanel is null ? 0 : settingsPanel.ClientSize.Width - settingsRight;
         bool settingsTight = settingsPanel is not null && settingsHorizontalSlack >= 0 && settingsHorizontalSlack < UiScale(12);
+        int settingsTextClipCount = 0;
+        int settingsTextMaxOverflow = 0;
+        int settingsOverlapCount = 0;
+        if (settingsPanel is not null)
+        {
+            foreach (Control child in settingsPanel.Controls)
+            {
+                if (!child.Visible || string.IsNullOrWhiteSpace(child.Text))
+                {
+                    continue;
+                }
+
+                int requiredWidth = 0;
+                if (child is Button button)
+                {
+                    requiredWidth = TextRenderer.MeasureText(
+                        button.Text,
+                        button.Font,
+                        Size.Empty,
+                        TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width + UiScale(24);
+                }
+                else if (child is Label label
+                         && !label.AutoSize
+                         && child is not ImodMapTextBox
+                         && child is not NicItrTableLabel
+                         && !label.Text.Contains('\n'))
+                {
+                    requiredWidth = TextRenderer.MeasureText(
+                        label.Text,
+                        label.Font,
+                        Size.Empty,
+                        TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width;
+                }
+
+                int overflow = requiredWidth - child.ClientSize.Width;
+                if (requiredWidth > 0 && overflow > UiScale(2))
+                {
+                    settingsTextClipCount++;
+                    settingsTextMaxOverflow = Math.Max(settingsTextMaxOverflow, overflow);
+                }
+            }
+
+            Control[] visibleSettingsControls = settingsPanel.Controls.Cast<Control>()
+                .Where(control => control.Visible)
+                .ToArray();
+            for (int first = 0; first < visibleSettingsControls.Length; first++)
+            {
+                for (int second = first + 1; second < visibleSettingsControls.Length; second++)
+                {
+                    Control left = visibleSettingsControls[first];
+                    Control right = visibleSettingsControls[second];
+                    if (left.Bounds.IntersectsWith(right.Bounds))
+                    {
+                        settingsOverlapCount++;
+                    }
+                }
+            }
+        }
+
+        TextBox?[] generatedEditors = [block.ImodBox, block.NicItrBox];
+        int horizontallyScrolledGeneratedFields = generatedEditors.Count(editor =>
+            editor is not null
+            && editor.Visible
+            && !editor.Focused
+            && editor.TextLength > 0
+            && editor.SelectionStart > 0);
 
         (int groupRight, int groupBottom) = GetVisibleContentBounds(group);
         bool groupClip = groupRight > group.ClientSize.Width + UiScale(2)
@@ -1127,12 +1349,28 @@ public sealed partial class MainForm : Form
         int infoPreferredHeight = GetPreferredTextHeight(info, Math.Max(1, info.ClientSize.Width));
         bool infoClip = infoPreferredHeight > info.ClientSize.Height + UiScale(2);
 
+        Control? imodMap = block.ImodMapLabel;
+        int imodMapLines = imodMap switch
+        {
+            ImodMapTextBox table => table.DisplayRowCount,
+            null => 0,
+            _ => CountDisplayLines(imodMap.Text),
+        };
+        int imodMapLineHeight = imodMap is null ? 0 : Math.Max(imodMap.Font?.Height ?? UiScale(16), UiScale(14));
+        int imodMapVisibleRows = imodMap is null || imodMapLineHeight <= 0
+            ? 0
+            : Math.Max(0, (imodMap.ClientSize.Height - UiScale(4)) / imodMapLineHeight);
+        bool imodMapClip = imodMap is not null
+            && imodMap.Visible
+            && imodMapLines <= 11
+            && imodMapVisibleRows < imodMapLines;
+
         string cpuScroll = cpuPanel is ScrollableControl scrollable
             ? $" autoScroll={scrollable.AutoScroll} scrollMin={FormatGuiSize(scrollable.AutoScrollMinSize)}"
             : string.Empty;
 
         WriteLog(
-            $"GUI.LAYOUT: idx={index} group={FormatGuiBounds(group)} header={FormatGuiBounds(header)} headerPref={headerPreferred} headerAvail={headerAvailable} headerClip={headerClip} divider={FormatGuiBounds(divider)} cpuTitle={FormatGuiBounds(cpuTitle)} cpuPanel={FormatGuiBounds(cpuPanel)} cpuContent={cpuRight}x{cpuBottom} cpuSlack={cpuHorizontalSlack} cpuCellWidth={minCpuCellWidth}-{maxCpuCellWidth} cpuCellMismatch={cpuCellMismatch} cpuTextClip={cpuTextClipCount} cpuTextOverflow={cpuTextMaxOverflow} cpuClip={cpuClip} cpuTight={cpuTight}{cpuScroll} settings={FormatGuiBounds(settingsPanel)} settingsContent={settingsRight}x{settingsBottom} settingsSlack={settingsHorizontalSlack} settingsClip={settingsClip} settingsTight={settingsTight} info={FormatGuiBounds(info)} infoPrefH={infoPreferredHeight} infoClip={infoClip} groupContent={groupRight}x{groupBottom} groupClip={groupClip}");
+            $"GUI.LAYOUT: idx={index} group={FormatGuiBounds(group)} header={FormatGuiBounds(header)} headerPref={headerPreferred} headerAvail={headerAvailable} headerClip={headerClip} divider={FormatGuiBounds(divider)} cpuTitle={FormatGuiBounds(cpuTitle)} cpuPanel={FormatGuiBounds(cpuPanel)} cpuContent={cpuRight}x{cpuBottom} cpuSlack={cpuHorizontalSlack} cpuCellWidth={minCpuCellWidth}-{maxCpuCellWidth} cpuCellMismatch={cpuCellMismatch} cpuTextClip={cpuTextClipCount} cpuTextOverflow={cpuTextMaxOverflow} cpuClip={cpuClip} cpuTight={cpuTight}{cpuScroll} settings={FormatGuiBounds(settingsPanel)} settingsContent={settingsRight}x{settingsBottom} settingsSlack={settingsHorizontalSlack} settingsClip={settingsClip} settingsTight={settingsTight} settingsTextClip={settingsTextClipCount} settingsTextOverflow={settingsTextMaxOverflow} settingsOverlap={settingsOverlapCount} generatedFieldScroll={horizontallyScrolledGeneratedFields} imodMap={FormatGuiBounds(imodMap)} imodMapLines={imodMapLines} imodMapVisibleRows={imodMapVisibleRows} imodMapClip={imodMapClip} info={FormatGuiBounds(info)} infoPrefH={infoPreferredHeight} infoClip={infoClip} groupContent={groupRight}x{groupBottom} groupClip={groupClip}");
 
         List<string> reasons = [];
         if (headerClip)
@@ -1168,9 +1406,29 @@ public sealed partial class MainForm : Form
             WriteLog($"GUI.LAYOUT.NOTE: idx={index} settingsTight slack={settingsHorizontalSlack}");
         }
 
+        if (settingsTextClipCount > 0)
+        {
+            reasons.Add($"settingsTextClip:{settingsTextClipCount},overflow={settingsTextMaxOverflow}");
+        }
+
+        if (settingsOverlapCount > 0)
+        {
+            reasons.Add($"settingsOverlap:{settingsOverlapCount}");
+        }
+
+        if (horizontallyScrolledGeneratedFields > 0)
+        {
+            reasons.Add($"generatedFieldScroll:{horizontallyScrolledGeneratedFields}");
+        }
+
         if (infoClip)
         {
             reasons.Add($"infoH:{infoPreferredHeight}>{info.ClientSize.Height}");
+        }
+
+        if (imodMapClip)
+        {
+            reasons.Add($"imodMapRows:{imodMapVisibleRows}<{imodMapLines}");
         }
 
         if (groupClip)
@@ -1274,6 +1532,47 @@ public sealed partial class MainForm : Form
 
         Size proposed = new(Math.Max(1, width), int.MaxValue);
         return TextRenderer.MeasureText(text, control.Font, proposed, TextFormatFlags.WordBreak).Height;
+    }
+
+    /// <summary>
+    /// Size the IMOD map box to its text (not a fixed 11-row slot). Tall maps stay
+    /// capped so scrollbars handle overflow instead of inflating the card gap.
+    /// </summary>
+    private void FitImodMapLabel(Control? map, int width, int maxRows = 11)
+    {
+        if (map is null || map.IsDisposed)
+        {
+            return;
+        }
+
+        int lineHeight = Math.Max(map.Font?.Height ?? UiScale(16), UiScale(14));
+        int lines = map is ImodMapTextBox table ? table.DisplayRowCount : CountDisplayLines(map.Text);
+        int cappedLines = Math.Clamp(lines, 1, Math.Max(1, maxRows));
+        int height = (cappedLines * lineHeight) + UiScale(4);
+        int resolvedWidth = Math.Max(UiScale(120), width);
+        if (map.Width != resolvedWidth || map.Height != height)
+        {
+            map.Size = new Size(resolvedWidth, height);
+        }
+    }
+
+    private static int CountDisplayLines(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return 1;
+        }
+
+        int lines = 1;
+        for (int i = 0; i < text.Length; i++)
+        {
+            if (text[i] == '\n')
+            {
+                lines++;
+            }
+        }
+
+        return lines;
     }
 
     private static (int Count, int MaxOverflow) GetCpuTextClipStats(DeviceBlock block)

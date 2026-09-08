@@ -10,7 +10,7 @@ param(
     [switch]$TrustImodDriverCert,
     [switch]$SkipReleasePackage,
     [string]$MsBuildPath,
-    [string]$ImodDriverCertThumbprint = "9CE4C30CD75905786774B1DDFAC126329ACAEA8D",
+    [string]$ImodDriverCertThumbprint = "B263CA124676681D028FFD7A3D605F5733E991B5",
     [string]$ImodDriverCertSubject = "MADE BY ARSENZA",
     [string]$TimestampUrl = "http://timestamp.digicert.com"
 )
@@ -28,6 +28,7 @@ $selfContainedDisplayName = "DEVICE TWEAKER (NET FRAMEWORK)"
 $frameworkDependentDisplayName = "DEVICE TWEAKER"
 $withNetOut = Join-Path $publishRoot $selfContainedDisplayName
 $withoutNetOut = Join-Path $publishRoot $frameworkDependentDisplayName
+$legacySelfContainedOut = Join-Path $publishRoot "DEVICE TWEAKER (SELF-CONTAINED)"
 
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -158,14 +159,18 @@ function Invoke-ImodDriverManualBuild {
     Write-Host "CL:    $($vs.Cl)"
     Write-Host "Link:  $($vs.Link)"
 
-    & $vs.Cl /nologo /c /TC /GS- /Zl /W3 /D_AMD64_ /DAMD64 /DWIN64 /D_KERNEL_MODE /DNTDDI_VERSION=0x0A00000A /D_WIN32_WINNT=0x0A00 /Fo"$driverObj" /I"$($vs.Include)" /I"$($wdk.Include)\km" /I"$($wdk.Include)\shared" /I"$($wdk.Include)\ucrt" /I"$($wdk.Include)\um" $driverSource
-    if ($LASTEXITCODE -ne 0) {
-        throw "IMOD driver manual compile failed with exit code $LASTEXITCODE"
+    $compileOutput = & $vs.Cl /nologo /c /TC /GS /Zl /W4 /D_AMD64_ /DAMD64 /DWIN64 /D_KERNEL_MODE /DNTDDI_VERSION=0x0A00000A /D_WIN32_WINNT=0x0A00 /Fo"$driverObj" /I"$($vs.Include)" /I"$($wdk.Include)\km" /I"$($wdk.Include)\shared" /I"$($wdk.Include)\ucrt" /I"$($wdk.Include)\um" $driverSource
+    $compileExitCode = $LASTEXITCODE
+    $compileOutput | ForEach-Object { Write-Host $_ }
+    if ($compileExitCode -ne 0) {
+        throw "IMOD driver manual compile failed with exit code $compileExitCode"
     }
 
-    & $vs.Link /nologo /driver /subsystem:native /entry:DriverEntry /out:"$driverOut" /nodefaultlib /machine:x64 /libpath:"$($wdk.Lib)" /libpath:"$($vs.Lib)" "$driverObj" ntoskrnl.lib hal.lib wdm.lib wdmsec.lib libcntpr.lib BufferOverflowK.lib
-    if ($LASTEXITCODE -ne 0) {
-        throw "IMOD driver manual link failed with exit code $LASTEXITCODE"
+    $linkOutput = & $vs.Link /nologo /driver /subsystem:native /entry:GsDriverEntry /out:"$driverOut" /nodefaultlib /machine:x64 /libpath:"$($wdk.Lib)" /libpath:"$($vs.Lib)" "$driverObj" ntoskrnl.lib hal.lib wdm.lib wdmsec.lib libcntpr.lib BufferOverflowK.lib
+    $linkExitCode = $LASTEXITCODE
+    $linkOutput | ForEach-Object { Write-Host $_ }
+    if ($linkExitCode -ne 0) {
+        throw "IMOD driver manual link failed with exit code $linkExitCode"
     }
 
     return $driverOut
@@ -566,19 +571,17 @@ function New-ReleasePackage {
     param(
         [string]$Version,
         [string]$SelfContainedExe,
-        [string]$FrameworkDependentExe,
-        [string]$DriverPath,
-        [string]$ReleaseNotesPath,
-        [string]$ThirdPartyNoticesPath
+        [string]$FrameworkDependentExe
     )
 
     $packageRoot = Join-Path $PSScriptRoot "bin\ReleasePackages"
     $packageDir = Join-Path $packageRoot "v$Version"
 
-    # Fresh package directory only. Never ship local run logs.
+    # Fresh package directory only. Never ship local run logs or loose driver copies —
+    # DTIMOD/KDU are already EmbeddedResource inside both EXEs.
     if (Test-Path -LiteralPath $packageDir) {
         Get-ChildItem -LiteralPath $packageDir -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.Extension -in ".exe", ".sys" } |
+            Where-Object { $_.Extension -eq ".exe" } |
             ForEach-Object {
                 Stop-PublishedProcessIfRunning -TargetExePath $_.FullName
             }
@@ -589,10 +592,7 @@ function New-ReleasePackage {
 
     $targets = @(
         @{ Source = $FrameworkDependentExe; Name = "DEVICE.TWEAKER.exe" },
-        @{ Source = $SelfContainedExe; Name = "DEVICE.TWEAKER.NET.FRAMEWORK.exe" },
-        @{ Source = $DriverPath; Name = "DTIMOD.sys" },
-        @{ Source = $ReleaseNotesPath; Name = "RELEASE_NOTES.md" },
-        @{ Source = $ThirdPartyNoticesPath; Name = "THIRD_PARTY_NOTICES.md" }
+        @{ Source = $SelfContainedExe; Name = "DEVICE.TWEAKER.NET.FRAMEWORK.exe" }
     )
 
     foreach ($target in $targets) {
@@ -605,10 +605,7 @@ function New-ReleasePackage {
 
     $sumNames = @(
         "DEVICE.TWEAKER.exe",
-        "DEVICE.TWEAKER.NET.FRAMEWORK.exe",
-        "DTIMOD.sys",
-        "RELEASE_NOTES.md",
-        "THIRD_PARTY_NOTICES.md"
+        "DEVICE.TWEAKER.NET.FRAMEWORK.exe"
     )
     $sumsPath = Join-Path $packageDir "SHA256SUMS.txt"
     $sumLines = foreach ($name in $sumNames) {
@@ -640,6 +637,18 @@ if (-not $SkipImodDriverBuild) {
     Invoke-ImodDriverBuild
 }
 
+if ($Clean -and (Test-Path -LiteralPath $legacySelfContainedOut)) {
+    $resolvedLegacy = [System.IO.Path]::GetFullPath($legacySelfContainedOut)
+    $resolvedPublishRoot = [System.IO.Path]::GetFullPath($publishRoot).TrimEnd('\') + '\'
+    if (-not $resolvedLegacy.StartsWith($resolvedPublishRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to remove legacy publish directory outside publish root: $resolvedLegacy"
+    }
+    Get-ChildItem -LiteralPath $resolvedLegacy -Filter '*.exe' -File -ErrorAction SilentlyContinue |
+        ForEach-Object { Stop-PublishedProcessIfRunning -TargetExePath $_.FullName }
+    Remove-Item -LiteralPath $resolvedLegacy -Recurse -Force
+    Write-Host "Removed legacy publish directory: $resolvedLegacy"
+}
+
 Write-Host "Restoring project..."
 dotnet restore $projectPath -p:BuildImodDriver=false
 if ($LASTEXITCODE -ne 0) {
@@ -661,23 +670,10 @@ switch ($Flavor) {
 
 if (-not $SkipReleasePackage -and $Configuration -eq "Release" -and $Flavor -eq "both") {
     $version = Get-ProjectInformationalVersion
-    $releaseNotesSource = Join-Path $PSScriptRoot "RELEASE_NOTES_v$version.md"
-    if (-not (Test-Path -LiteralPath $releaseNotesSource)) {
-        throw ("Release notes were not found for version {0}: {1}" -f $version, $releaseNotesSource)
-    }
-
-    $thirdPartySource = Join-Path $PSScriptRoot "THIRD_PARTY_NOTICES.md"
-    if (-not (Test-Path -LiteralPath $thirdPartySource)) {
-        throw "Third-party notices were not found: $thirdPartySource"
-    }
-
     New-ReleasePackage `
         -Version $version `
         -SelfContainedExe (Join-Path $withNetOut "$selfContainedDisplayName.exe") `
-        -FrameworkDependentExe (Join-Path $withoutNetOut "$frameworkDependentDisplayName.exe") `
-        -DriverPath $driverOutPath `
-        -ReleaseNotesPath $releaseNotesSource `
-        -ThirdPartyNoticesPath $thirdPartySource
+        -FrameworkDependentExe (Join-Path $withoutNetOut "$frameworkDependentDisplayName.exe")
 }
 
 Write-Host ""

@@ -1,5 +1,6 @@
 using Microsoft.Win32;
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -10,6 +11,8 @@ public sealed partial class MainForm
     private const int DeviceTweakerBackupVersion = 1;
     private const string BackupFolderName = "Backups";
     private const string BackupFilePrefix = "DeviceTweakerBackup_";
+    private string? _lastBackupPath;
+    private const string OriginalBackupFileName = "DeviceTweakerBackup_ORIGINAL.json";
 
     private enum BackupLocation
     {
@@ -28,10 +31,10 @@ public sealed partial class MainForm
     private enum RestoreChoice
     {
         Cancel,
-        ResetDefault,
+        SafeReset,
+        RestoreLatest,
         RestoreBackup,
         DeleteBackup,
-        DeleteAllBackups,
     }
 
     private sealed class BackupSnapshotInfo
@@ -41,12 +44,15 @@ public sealed partial class MainForm
         public required DateTime LastWriteUtc { get; init; }
         public string Reason { get; init; } = string.Empty;
         public DateTime? CreatedAt { get; init; }
+        public bool IsOriginal { get; init; }
 
         public override string ToString()
         {
             DateTime stamp = CreatedAt ?? LastWriteUtc.ToLocalTime();
-            string reason = string.IsNullOrWhiteSpace(Reason) ? "backup" : Reason;
-            return $"{stamp:yyyy-MM-dd HH:mm:ss} [{Location}] {reason}";
+            string reason = IsOriginal
+                ? "ORIGINAL STATE"
+                : string.IsNullOrWhiteSpace(Reason) ? "backup" : Reason;
+            return $"{stamp:yyyy-MM-dd HH:mm:ss} [{Location}] {UiLanguage.Text(reason)}";
         }
     }
 
@@ -75,6 +81,15 @@ public sealed partial class MainForm
         public bool Exists { get; set; }
         public string? Text { get; set; }
     }
+
+    private sealed record BackupValidationResult(
+        int ValueCount,
+        int ExistingCount,
+        int MissingCount,
+        int ReadErrorCount,
+        string ImodScriptState,
+        long Bytes,
+        string Sha256);
 
     private string GetBackupDirectory()
     {
@@ -111,6 +126,12 @@ public sealed partial class MainForm
                 RefreshBlocks();
             }
 
+            if (reason.StartsWith("pre-", StringComparison.OrdinalIgnoreCase)
+                && !EnsureOriginalDeviceTweakerBackup(location))
+            {
+                throw new InvalidOperationException("The original-state backup could not be created or validated.");
+            }
+
             DeviceTweakerBackup backup = CaptureDeviceTweakerBackup(reason);
             string directory = GetBackupDirectory(location);
             Directory.CreateDirectory(directory);
@@ -123,9 +144,16 @@ public sealed partial class MainForm
                 path = Path.Combine(directory, $"{BackupFilePrefix}{stamp}_{safeReason}_{Guid.NewGuid().ToString("N")[..8]}.json");
             }
             JsonSerializerOptions options = new() { WriteIndented = true };
-            File.WriteAllText(path, JsonSerializer.Serialize(backup, options), Encoding.UTF8);
-            WriteLog($"BACKUP: saved location={location} path={path} values={backup.RegistryValues.Count} reason={reason}");
+            ValidateCapturedBackupForWrite(backup);
+            WriteAllTextAtomic(path, JsonSerializer.Serialize(backup, options), Encoding.UTF8);
+            BackupValidationResult validation = ValidateWrittenBackup(path, backup);
+            WriteLog(
+                $"BACKUP.VALIDATION: status=passed schema={backup.Version} values={validation.ValueCount} " +
+                $"existing={validation.ExistingCount} missing={validation.MissingCount} readErrors={validation.ReadErrorCount} " +
+                $"imodScript={validation.ImodScriptState} bytes={validation.Bytes} sha256={validation.Sha256}");
+            WriteLog($"BACKUP: saved location={location} path={path} values={backup.RegistryValues.Count} reason={reason} atomic=true validated=true");
             PruneDeviceTweakerBackups(directory, keepLatest: 10);
+            _lastBackupPath = path;
 
             if (showDialog)
             {
@@ -139,9 +167,97 @@ public sealed partial class MainForm
             WriteLog($"BACKUP: failed reason={reason}: {ex.Message}");
             if (showDialog)
             {
-                ShowThemedInfo($"Backup failed.\n{ex.Message}");
+                OperationReport report = new();
+                report.MarkNoChangesMade();
+                report.AddError("BACKUP", "The backup file could not be created.", ex.ToString());
+                ShowOperationResult(
+                    report,
+                    string.Empty,
+                    "No backup was created.",
+                    operationName: "BACKUP");
             }
 
+            return false;
+        }
+    }
+
+    private bool EnsureOriginalDeviceTweakerBackup(BackupLocation preferredLocation)
+    {
+        foreach (string directory in EnumerateBackupDirectories())
+        {
+            string existingPath = Path.Combine(directory, OriginalBackupFileName);
+            if (!File.Exists(existingPath))
+            {
+                continue;
+            }
+
+            try
+            {
+                string json = File.ReadAllText(existingPath, Encoding.UTF8);
+                DeviceTweakerBackup? existing = JsonSerializer.Deserialize<DeviceTweakerBackup>(json);
+                if (existing is null)
+                {
+                    WriteLog($"BACKUP.ORIGINAL.ERROR: invalid snapshot path={existingPath}");
+                    return false;
+                }
+
+                ValidateDeviceTweakerBackup(existing);
+
+                BackupValidationResult validation = ValidateWrittenBackup(existingPath, existing);
+                WriteLog(
+                    $"BACKUP.ORIGINAL.VALIDATION: status=passed schema={existing.Version} values={validation.ValueCount} " +
+                    $"existing={validation.ExistingCount} missing={validation.MissingCount} readErrors={validation.ReadErrorCount} " +
+                    $"imodScript={validation.ImodScriptState} bytes={validation.Bytes} sha256={validation.Sha256}");
+                WriteLog($"BACKUP.ORIGINAL: existing path={existingPath} created={existing.CreatedAt:O} validated=true");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                WriteLog($"BACKUP.ORIGINAL.ERROR: validation failed path={existingPath} error=\"{FlattenLogText(ex.ToString())}\"");
+                return false;
+            }
+        }
+
+        try
+        {
+            string directory = GetBackupDirectory(preferredLocation);
+            Directory.CreateDirectory(directory);
+            string path = Path.Combine(directory, OriginalBackupFileName);
+
+            DeviceTweakerBackup? original = null;
+            BackupSnapshotInfo? oldestKnown = GetBackupSnapshots()
+                .Where(snapshot => !snapshot.IsOriginal)
+                .OrderBy(snapshot => snapshot.CreatedAt ?? snapshot.LastWriteUtc.ToLocalTime())
+                .FirstOrDefault();
+            if (oldestKnown is not null)
+            {
+                string oldestJson = File.ReadAllText(oldestKnown.Path, Encoding.UTF8);
+                original = JsonSerializer.Deserialize<DeviceTweakerBackup>(oldestJson);
+                if (original is null)
+                {
+                    throw new InvalidOperationException($"The oldest known backup is invalid: {oldestKnown.Path}");
+                }
+
+                ValidateDeviceTweakerBackup(original);
+
+                WriteLog($"BACKUP.ORIGINAL: importing oldest known snapshot path={oldestKnown.Path} created={original.CreatedAt:O}");
+            }
+
+            original ??= CaptureDeviceTweakerBackup("original-state");
+            ValidateCapturedBackupForWrite(original);
+            string json = JsonSerializer.Serialize(original, new JsonSerializerOptions { WriteIndented = true });
+            WriteAllTextAtomic(path, json, Encoding.UTF8);
+            BackupValidationResult validation = ValidateWrittenBackup(path, original);
+            WriteLog(
+                $"BACKUP.ORIGINAL.VALIDATION: status=passed schema={original.Version} values={validation.ValueCount} " +
+                $"existing={validation.ExistingCount} missing={validation.MissingCount} readErrors={validation.ReadErrorCount} " +
+                $"imodScript={validation.ImodScriptState} bytes={validation.Bytes} sha256={validation.Sha256}");
+            WriteLog($"BACKUP.ORIGINAL: created location={preferredLocation} path={path} values={original.RegistryValues.Count} atomic=true validated=true");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"BACKUP.ORIGINAL.ERROR: creation failed location={preferredLocation} error=\"{FlattenLogText(ex.ToString())}\"");
             return false;
         }
     }
@@ -244,6 +360,11 @@ public sealed partial class MainForm
             RawMouseThrottleValueName);
 
         AddValues(
+            RegistryHive.CurrentUser,
+            ImodStartupRunKeyPath,
+            ImodStartupRunValueName);
+
+        AddValues(
             RegistryHive.LocalMachine,
             @"SYSTEM\CurrentControlSet\Control\Session Manager\Kernel",
             "ReservedCpuSets");
@@ -266,6 +387,38 @@ public sealed partial class MainForm
         };
 
         return backup;
+    }
+
+    private bool ValidateImodBackupPersistenceContract(out string error)
+    {
+        try
+        {
+            DeviceTweakerBackup backup = CaptureDeviceTweakerBackup("qa-imod-persistence");
+            ValidateDeviceTweakerBackup(backup);
+            RegistryValueBackup? runValue = backup.RegistryValues.FirstOrDefault(value =>
+                string.Equals(value.Hive, "HKCU", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(value.Path, ImodStartupRunKeyPath, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(value.Name, ImodStartupRunValueName, StringComparison.OrdinalIgnoreCase));
+            if (runValue is null)
+            {
+                error = "HKCU Run value is not captured";
+                return false;
+            }
+
+            if (backup.ImodScript is null || !IsManagedImodScriptPath(backup.ImodScript.Path))
+            {
+                error = "managed IMOD script state is not captured";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = FlattenLogText(ex.ToString());
+            return false;
+        }
     }
 
     private RegistryValueBackup CaptureRegistryValue(RegistryHive hive, string path, string name)
@@ -327,11 +480,9 @@ public sealed partial class MainForm
                 return;
             }
 
-            if (choice == RestoreChoice.ResetDefault)
+            if (choice == RestoreChoice.SafeReset)
             {
-                WriteLog("BACKUP.RESTORE: reset-default requested");
-                ResetAllTweaks();
-                RefreshBlocks();
+                RunSafeResetFromRestore();
                 return;
             }
 
@@ -345,12 +496,9 @@ public sealed partial class MainForm
                 return;
             }
 
-            if (choice == RestoreChoice.DeleteAllBackups)
+            if (choice == RestoreChoice.RestoreLatest)
             {
-                int deleted = DeleteDeviceTweakerBackups(backups);
-                WriteLog($"BACKUP.RESTORE: deleted all backups count={deleted}");
-                ShowThemedInfo($"Backup files deleted: {deleted}");
-                return;
+                path = backups.FirstOrDefault()?.Path;
             }
 
             if (string.IsNullOrWhiteSpace(path))
@@ -360,7 +508,12 @@ public sealed partial class MainForm
                 return;
             }
 
-            WriteLog($"BACKUP.RESTORE: restore-backup requested path={path}");
+            if (!CreateDeviceTweakerBackup("pre-restore", showDialog: false))
+            {
+                throw new InvalidOperationException("A rollback backup could not be created; restore was cancelled.");
+            }
+
+            WriteLog($"BACKUP.RESTORE: restore-backup requested choice={choice} path={path}");
             RestoreDeviceTweakerBackup(path);
             BeginDevicesBusyWork("Refreshing devices...", 4);
             try
@@ -376,8 +529,46 @@ public sealed partial class MainForm
         }
         catch (Exception ex)
         {
-            WriteLog($"BACKUP.RESTORE: failed: {ex.Message}");
-            ShowThemedInfo($"Backup restore failed.\n{ex.Message}");
+            WriteLog($"BACKUP.RESTORE: failed: {FlattenLogText(ex.ToString())}");
+            OperationReport report = new();
+            report.AddError(
+                "BACKUP RESTORE",
+                "Restore did not finish. Any completed rollback steps were preserved.",
+                ex.ToString());
+            ShowOperationResult(
+                report,
+                "Some restore steps may already have run.",
+                "Restore did not finish. Open DETAILS before rebooting.",
+                operationName: "BACKUP RESTORE");
+        }
+    }
+
+    private void RunSafeResetFromRestore()
+    {
+        WriteLog("BACKUP.RESTORE: safe-reset requested");
+        OperationReport report = new();
+        if (!_testAutoDryRun && !CreateDeviceTweakerBackup("pre-reset-tweaks", showDialog: false))
+        {
+            report.MarkNoChangesMade();
+            report.AddError("Automatic backup", "backup could not be created; no settings were changed");
+            ShowOperationResult(
+                report,
+                string.Empty,
+                "RESET WINDOWS DEFAULT was cancelled because the rollback backup failed.",
+                operationName: "RESET WINDOWS DEFAULT");
+            return;
+        }
+
+        BeginDevicesBusyWork(
+            _testAutoDryRun ? "Previewing RESET WINDOWS DEFAULT..." : "Running RESET WINDOWS DEFAULT...",
+            Math.Max(4, _blocks.Count + 4));
+        try
+        {
+            SafeResetTweaks(report);
+        }
+        finally
+        {
+            EndDevicesBusy();
         }
     }
 
@@ -408,7 +599,7 @@ public sealed partial class MainForm
             }
             catch (Exception ex)
             {
-                WriteLog($"BACKUP.SCAN: directory={directory} failed={ex.Message}");
+                WriteLog($"BACKUP.SCAN.WARN: directory={directory} failed={ex.Message}");
             }
         }
 
@@ -441,10 +632,17 @@ public sealed partial class MainForm
             {
                 string json = File.ReadAllText(path, Encoding.UTF8);
                 backup = JsonSerializer.Deserialize<DeviceTweakerBackup>(json);
+                if (backup is null)
+                {
+                    throw new InvalidDataException("Backup JSON is empty.");
+                }
+
+                ValidateDeviceTweakerBackup(backup);
             }
             catch (Exception ex)
             {
-                WriteLog($"BACKUP.SCAN.WARN: metadata read failed path={path} error=\"{FlattenLogText(ex.ToString())}\"");
+                WriteLog($"BACKUP.SCAN.WARN: invalid backup excluded path={path} error=\"{FlattenLogText(ex.ToString())}\"");
+                return null;
             }
 
             string location = string.Equals(directory, GetBackupDirectory(BackupLocation.Roaming), StringComparison.OrdinalIgnoreCase)
@@ -458,6 +656,8 @@ public sealed partial class MainForm
                 LastWriteUtc = file.LastWriteTimeUtc,
                 CreatedAt = backup?.CreatedAt,
                 Reason = backup?.Reason ?? string.Empty,
+                IsOriginal = string.Equals(file.Name, OriginalBackupFileName, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(backup?.Reason, "original-state", StringComparison.OrdinalIgnoreCase),
             };
         }
         catch
@@ -471,6 +671,12 @@ public sealed partial class MainForm
         int deleted = 0;
         foreach (BackupSnapshotInfo backup in backups)
         {
+            if (backup.IsOriginal)
+            {
+                WriteLog($"BACKUP.DELETE: protected original snapshot path={backup.Path}");
+                continue;
+            }
+
             try
             {
                 if (File.Exists(backup.Path))
@@ -498,6 +704,7 @@ public sealed partial class MainForm
             }
 
             List<FileInfo> files = Directory.EnumerateFiles(directory, $"{BackupFilePrefix}*.json")
+                .Where(file => !string.Equals(Path.GetFileName(file), OriginalBackupFileName, StringComparison.OrdinalIgnoreCase))
                 .Select(path => new FileInfo(path))
                 .OrderByDescending(file => file.LastWriteTimeUtc)
                 .ToList();
@@ -511,13 +718,13 @@ public sealed partial class MainForm
                 }
                 catch (Exception ex)
                 {
-                    WriteLog($"BACKUP.PRUNE: failed path={file.FullName}: {ex.Message}");
+                    WriteLog($"BACKUP.PRUNE.WARN: failed path={file.FullName}: {ex.Message}");
                 }
             }
         }
         catch (Exception ex)
         {
-            WriteLog($"BACKUP.PRUNE: failed directory={directory}: {ex.Message}");
+            WriteLog($"BACKUP.PRUNE.WARN: failed directory={directory}: {ex.Message}");
         }
     }
 
@@ -537,38 +744,7 @@ public sealed partial class MainForm
             throw new InvalidOperationException("Backup file is empty or invalid.");
         }
 
-        if (backup.Version != DeviceTweakerBackupVersion)
-        {
-            throw new InvalidOperationException($"Unsupported backup version: {backup.Version}.");
-        }
-
-        HashSet<string> restoreTargets = new(StringComparer.OrdinalIgnoreCase);
-        foreach (RegistryValueBackup value in backup.RegistryValues)
-        {
-            if (!IsManagedBackupRegistryValue(value))
-            {
-                throw new InvalidOperationException(
-                    $"Backup contains an unmanaged registry target: {value.Hive}\\{value.Path}\\{value.Name}");
-            }
-
-            string target = $"{value.Hive.Trim()}|{value.Path.Trim().Trim('\\')}|{value.Name.Trim()}";
-            if (!restoreTargets.Add(target))
-            {
-                throw new InvalidOperationException(
-                    $"Backup contains a duplicate registry target: {value.Hive}\\{value.Path}\\{value.Name}");
-            }
-
-            ValidateRegistryValueBackup(value);
-        }
-
-        if (backup.ImodScript is not null
-            && !string.Equals(
-                Path.GetFullPath(backup.ImodScript.Path),
-                Path.GetFullPath(GetImodStartupPath()),
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("Backup contains an unmanaged IMOD script path.");
-        }
+        ValidateDeviceTweakerBackup(backup);
 
         List<RegistryValueBackup> rollbackValues = [];
         FileBackup? rollbackScript = null;
@@ -659,6 +835,111 @@ public sealed partial class MainForm
         SyncLivePowerManagementAfterRestore();
     }
 
+    private void ValidateDeviceTweakerBackup(DeviceTweakerBackup backup)
+    {
+        if (backup.Version != DeviceTweakerBackupVersion)
+        {
+            throw new InvalidOperationException($"Unsupported backup version: {backup.Version}.");
+        }
+
+        if (backup.CreatedAt == default)
+        {
+            throw new InvalidOperationException("Backup creation time is missing.");
+        }
+
+        if (backup.RegistryValues is null)
+        {
+            throw new InvalidOperationException("Backup registry data is missing.");
+        }
+
+        HashSet<string> restoreTargets = new(StringComparer.OrdinalIgnoreCase);
+        foreach (RegistryValueBackup value in backup.RegistryValues)
+        {
+            if (value is null || !IsManagedBackupRegistryValue(value))
+            {
+                throw new InvalidOperationException("Backup contains an unmanaged or empty registry target.");
+            }
+
+            string target = $"{value.Hive.Trim()}|{value.Path.Trim().Trim('\\')}|{value.Name.Trim()}";
+            if (!restoreTargets.Add(target))
+            {
+                throw new InvalidOperationException(
+                    $"Backup contains a duplicate registry target: {value.Hive}\\{value.Path}\\{value.Name}");
+            }
+
+            ValidateRegistryValueBackup(value);
+        }
+
+        if (backup.ImodScript is not null
+            && !IsManagedImodScriptPath(backup.ImodScript.Path))
+        {
+            throw new InvalidOperationException("Backup contains an unmanaged IMOD script path.");
+        }
+    }
+
+    private void ValidateCapturedBackupForWrite(DeviceTweakerBackup backup)
+    {
+        ValidateDeviceTweakerBackup(backup);
+        List<RegistryValueBackup> readErrors = backup.RegistryValues
+            .Where(value => string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (readErrors.Count == 0)
+        {
+            return;
+        }
+
+        string targets = string.Join(
+            " | ",
+            readErrors.Take(5).Select(value => $"{value.Hive}\\{value.Path}\\{value.Name}"));
+        throw new InvalidOperationException(
+            $"Backup capture is incomplete: {readErrors.Count} registry value(s) could not be read. {targets}");
+    }
+
+    private BackupValidationResult ValidateWrittenBackup(string path, DeviceTweakerBackup expected)
+    {
+        FileInfo file = new(path);
+        if (!file.Exists || file.Length <= 0)
+        {
+            throw new InvalidOperationException($"The written backup is missing or empty: {path}");
+        }
+
+        string json = File.ReadAllText(path, Encoding.UTF8);
+        DeviceTweakerBackup? actual = JsonSerializer.Deserialize<DeviceTweakerBackup>(json);
+        if (actual is null)
+        {
+            throw new InvalidOperationException($"The written backup could not be read back: {path}");
+        }
+
+        ValidateDeviceTweakerBackup(actual);
+        string expectedPayload = JsonSerializer.Serialize(expected);
+        string actualPayload = JsonSerializer.Serialize(actual);
+        if (!string.Equals(actualPayload, expectedPayload, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"The written backup does not match the captured snapshot: {path}");
+        }
+
+        int existing = actual.RegistryValues.Count(value => value.Exists);
+        int readErrors = actual.RegistryValues.Count(value =>
+            string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase));
+        using FileStream stream = file.Open(FileMode.Open, FileAccess.Read, FileShare.Read);
+        string sha256 = Convert.ToHexString(SHA256.HashData(stream));
+        string imodScriptState = actual.ImodScript switch
+        {
+            null => "not-captured",
+            { Exists: true } => "present",
+            _ => "absent",
+        };
+
+        return new BackupValidationResult(
+            actual.RegistryValues.Count,
+            existing,
+            actual.RegistryValues.Count - existing,
+            readErrors,
+            imodScriptState,
+            file.Length,
+            sha256);
+    }
+
     private static void ValidateRegistryValueBackup(RegistryValueBackup value)
     {
         if (!value.Exists || string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase))
@@ -702,8 +983,11 @@ public sealed partial class MainForm
 
         if (string.Equals(hive, "HKCU", StringComparison.OrdinalIgnoreCase))
         {
-            return string.Equals(path, @"Control Panel\Mouse", StringComparison.OrdinalIgnoreCase)
+            bool isMouseSetting = string.Equals(path, @"Control Panel\Mouse", StringComparison.OrdinalIgnoreCase)
                 && string.Equals(name, RawMouseThrottleValueName, StringComparison.OrdinalIgnoreCase);
+            bool isImodStartup = string.Equals(path, ImodStartupRunKeyPath, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(name, ImodStartupRunValueName, StringComparison.OrdinalIgnoreCase);
+            return isMouseSetting || isImodStartup;
         }
 
         if (!string.Equals(hive, "HKLM", StringComparison.OrdinalIgnoreCase))
@@ -856,29 +1140,34 @@ public sealed partial class MainForm
             return;
         }
 
-        string expectedPath = Path.GetFullPath(GetImodStartupPath());
-        string actualPath = Path.GetFullPath(backup.Path);
-        if (!string.Equals(actualPath, expectedPath, StringComparison.OrdinalIgnoreCase))
+        if (!IsManagedImodScriptPath(backup.Path))
         {
             throw new InvalidOperationException("Refusing to restore an unmanaged file path.");
         }
 
+        string expectedPath = Path.GetFullPath(GetImodStartupPath());
+
         if (!backup.Exists)
         {
-            if (File.Exists(backup.Path))
-            {
-                File.Delete(backup.Path);
-            }
+            DeleteImodStartupRegistration();
+            File.Delete(expectedPath);
+            File.Delete(GetLegacyImodStartupPath());
             return;
         }
 
-        string? directory = Path.GetDirectoryName(backup.Path);
+        string? directory = Path.GetDirectoryName(expectedPath);
         if (!string.IsNullOrWhiteSpace(directory))
         {
             Directory.CreateDirectory(directory);
         }
 
-        File.WriteAllText(backup.Path, backup.Text ?? string.Empty, Encoding.UTF8);
+        WriteAllTextAtomic(expectedPath, backup.Text ?? string.Empty, new UTF8Encoding(false));
+        if (!EnsureImodStartupRegistration(out string? registrationError))
+        {
+            throw new InvalidOperationException($"IMOD startup registration failed: {registrationError}");
+        }
+
+        File.Delete(GetLegacyImodStartupPath());
     }
 
     private static string MakeBackupFileReason(string reason)

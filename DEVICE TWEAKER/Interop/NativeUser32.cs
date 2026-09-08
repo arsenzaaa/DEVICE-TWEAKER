@@ -1,9 +1,13 @@
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace DeviceTweakerCS;
 
 internal static class NativeUser32
 {
+    internal delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    internal const int SwRestore = 9;
     internal const int SbHorz = 0;
     internal const int SbVert = 1;
     internal const int SbBoth = 3;
@@ -47,4 +51,27 @@ internal static class NativeUser32
         int cx,
         int cy,
         int uFlags);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool IsIconic(IntPtr hWnd);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    internal static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int maxCount);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool ShowWindow(IntPtr hWnd, int command);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool SetForegroundWindow(IntPtr hWnd);
 }

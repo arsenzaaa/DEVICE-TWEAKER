@@ -53,6 +53,7 @@ public sealed partial class MainForm
         string text = (e.Index >= 0 && e.Index < comboBox.Items.Count
             ? comboBox.GetItemText(comboBox.Items[e.Index])
             : comboBox.Text) ?? string.Empty;
+        text = UiLanguage.Text(text);
 
         Rectangle textBounds = new(
             e.Bounds.Left + UiScale(5),
@@ -141,7 +142,7 @@ internal sealed class ThemedComboBox : ComboBox
         using SolidBrush backgroundBrush = new(background);
         e.Graphics.FillRectangle(backgroundBrush, e.Bounds);
 
-        string text = GetItemText(Items[e.Index]) ?? string.Empty;
+        string text = UiLanguage.Text(GetItemText(Items[e.Index]) ?? string.Empty);
         Rectangle textBounds = new(e.Bounds.Left + 6, e.Bounds.Top, Math.Max(0, e.Bounds.Width - 12), e.Bounds.Height);
         TextRenderer.DrawText(
             e.Graphics,
@@ -358,7 +359,7 @@ internal sealed class ThemedComboBox : ComboBox
         using SolidBrush buttonBrush = new(DropButtonColor);
         g.FillRectangle(buttonBrush, arrowRect);
 
-        string text = GetItemText(SelectedItem) ?? Text ?? string.Empty;
+        string text = UiLanguage.Text(GetItemText(SelectedItem) ?? Text ?? string.Empty);
         Rectangle textRect = new(bounds.Left + 6, bounds.Top + 1, Math.Max(0, bounds.Width - arrowWidth - 10), bounds.Height - 2);
         Color textColor = Enabled ? ForeColor : Color.FromArgb(130, 130, 135);
         TextRenderer.DrawText(
@@ -529,7 +530,7 @@ internal sealed class ThemedComboBox : ComboBox
                 using SolidBrush itemBrush = new(background);
                 e.Graphics.FillRectangle(itemBrush, itemRect);
 
-                string text = _owner.GetItemText(_owner.Items[index]) ?? string.Empty;
+                string text = UiLanguage.Text(_owner.GetItemText(_owner.Items[index]) ?? string.Empty);
                 Rectangle textRect = new(itemRect.Left + 6, itemRect.Top, Math.Max(0, itemRect.Width - 12), itemRect.Height);
                 TextRenderer.DrawText(
                     e.Graphics,

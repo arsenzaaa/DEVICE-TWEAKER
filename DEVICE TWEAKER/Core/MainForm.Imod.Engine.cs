@@ -71,10 +71,6 @@ public sealed partial class MainForm
     private const string ImodKduFileName = "kdu.exe";
     private const string ImodKduDatabaseFileName = "drv64.dll";
     private const string ImodKduDisableEnv = "DEVICE_TWEAKER_DISABLE_KDU_FALLBACK";
-    private static readonly uint IoctlImodMapPhysicalMemory =
-        CtlCode(FileDeviceImod, ImodIoctlIndex, MethodBuffered, FileAnyAccess);
-    private static readonly uint IoctlImodUnmapPhysicalMemory =
-        CtlCode(FileDeviceImod, ImodIoctlIndex + 1, MethodBuffered, FileAnyAccess);
     private static readonly uint IoctlImodReadPhysicalMemory =
         CtlCode(FileDeviceImod, ImodIoctlIndex + 2, MethodBuffered, FileAnyAccess);
     private static readonly uint IoctlImodWritePhysicalMemory =
@@ -86,6 +82,7 @@ public sealed partial class MainForm
         public string Caption { get; init; } = string.Empty;
         public uint ProblemCode { get; init; }
         public ulong BaseAddress { get; init; }
+        public ulong MemoryLength { get; init; }
         public bool HasBase { get; init; }
         public string BaseError { get; init; } = string.Empty;
     }
@@ -236,17 +233,6 @@ public sealed partial class MainForm
     private static extern bool DeviceIoControl(
         IntPtr deviceHandle,
         uint ioControlCode,
-        ref PhysStruct inBuffer,
-        int inBufferSize,
-        ref PhysStruct outBuffer,
-        int outBufferSize,
-        out int bytesReturned,
-        IntPtr overlapped);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool DeviceIoControl(
-        IntPtr deviceHandle,
-        uint ioControlCode,
         ref PhysAccessStruct inBuffer,
         int inBufferSize,
         ref PhysAccessStruct outBuffer,
@@ -272,6 +258,10 @@ public sealed partial class MainForm
     {
         public int ControllersFound { get; set; }
         public int ControllersApplied { get; set; }
+        public int ControllersPartiallyApplied { get; set; }
+        public int ControllersFailed { get; set; }
+        public int WritesAttempted { get; set; }
+        public int WritesSucceeded { get; set; }
         public int WriteFailures { get; set; }
         public int SkippedDisabled { get; set; }
         public int MissingBase { get; set; }
@@ -396,24 +386,19 @@ public sealed partial class MainForm
                         continue;
                     }
 
-                    ulong capabilityAddress = controller.BaseAddress;
-
-                    if (!TryReadPhys32(imodDriver, capabilityAddress + hcsparamsOffset, out uint hcsparamsValue, out string? ioError))
+                    if (!TryResolveXhciRuntimeLayout(
+                            controller,
+                            imodDriver,
+                            hcsparamsOffset,
+                            rtsoff,
+                            out uint maxIntrs,
+                            out ulong runtimeAddress,
+                            out string? ioError))
                     {
                         stats.ReadFailures++;
-                        WriteLog($"IMOD: read HCSPARAMS failed {controller.DeviceId}: {ioError}");
+                        WriteLog($"IMOD: unsafe or invalid xHCI MMIO layout {controller.DeviceId}: {ioError}");
                         continue;
                     }
-
-                    if (!TryReadPhys32(imodDriver, capabilityAddress + rtsoff, out uint rtsoffValue, out ioError))
-                    {
-                        stats.ReadFailures++;
-                        WriteLog($"IMOD: read RTSOFF failed {controller.DeviceId}: {ioError}");
-                        continue;
-                    }
-
-                    uint maxIntrs = (hcsparamsValue >> 8) & 0x7FF;
-                    ulong runtimeAddress = capabilityAddress + rtsoffValue;
 
                     if (adaptiveEntry?.RoleIntervals is { Count: > 0 } roleIntervals)
                     {
@@ -432,7 +417,7 @@ public sealed partial class MainForm
                         }
                         else
                         {
-                            WriteLog($"IMOD.ADAPTIVE.FALLBACK: {controller.DeviceId} {adaptiveDetail}");
+                            WriteLog($"IMOD.ADAPTIVE.FALLBACK.WARN: {controller.DeviceId} {adaptiveDetail}");
                         }
                     }
 
@@ -453,8 +438,21 @@ public sealed partial class MainForm
                         }
                     }
 
-                    stats.ControllersApplied++;
+                    stats.WritesAttempted += (int)writeCount;
+                    stats.WritesSucceeded += (int)(writeCount - writeFailures);
                     stats.WriteFailures += (int)writeFailures;
+                    if (writeCount > 0 && writeFailures == 0)
+                    {
+                        stats.ControllersApplied++;
+                    }
+                    else if (writeCount > 0 && writeFailures < writeCount)
+                    {
+                        stats.ControllersPartiallyApplied++;
+                    }
+                    else
+                    {
+                        stats.ControllersFailed++;
+                    }
 
                     string modeText = desiredIntervals is { Count: > 0 }
                         ? $"vector={desiredIntervals.Count}"
@@ -483,38 +481,44 @@ public sealed partial class MainForm
             return;
         }
 
-        if (TryBlockSandboxHardwareWrite("IMOD CHECK"))
+        if (TryBlockBusyHardwareWrite("IMOD CHECK") || TryBlockSandboxHardwareWrite("IMOD CHECK"))
         {
             return;
         }
-
-        block.ImodCurrentLabel.Text = "current: loading driver...";
-        block.ImodCurrentLabel.Tag = block.ImodCurrentLabel.Text;
-        block.ImodCurrentLabel.ForeColor = _statusInactive;
-        SetImodDetailsVisibility(block, forceVisible: true);
 
         if (!TryCheckImodDriver(out string? error))
         {
             string status = "current: driver load failed";
             block.ImodCurrentLabel.Text = status;
-            block.ImodCurrentLabel.Tag = string.IsNullOrWhiteSpace(error) ? status : $"{status}\r\n{error}";
+            block.ImodCurrentLabel.Tag = "DTIMOD driver unavailable. Open the session log for diagnostics.";
             block.ImodCurrentLabel.ForeColor = _statusDanger;
             SetImodStatusTooltip(block.ImodCurrentLabel);
             if (block.ImodMapLabel is not null)
             {
-                block.ImodMapLabel.Text = error ?? "DTIMOD.sys load failed";
-                block.ImodMapLabel.Tag = block.ImodMapLabel.Text;
+                block.ImodMapLabel.Text = "devices: driver unavailable";
+                block.ImodMapLabel.Tag = "DTIMOD driver unavailable. Open the session log for diagnostics.";
                 block.ImodMapLabel.ForeColor = _statusDanger;
                 SetImodStatusTooltip(block.ImodMapLabel);
             }
 
             WriteLog($"IMOD.CHECK: failed device={block.Device.InstanceId} error={error}");
-            ShowThemedInfo($"IMOD driver load failed.\n{error}");
+            OperationReport report = new();
+            report.MarkNoChangesMade();
+            report.AddError(
+                "USB IMOD",
+                FormatImodUnavailableUserMessage(error, includeNotChanged: false),
+                error ?? "Unknown DTIMOD driver load error.");
+            ShowOperationResult(
+                report,
+                string.Empty,
+                "The driver check did not complete.",
+                operationName: "USB IMOD CHECK");
+            MaybeOfferVulnerableDriverBlocklistDisable(report);
             return;
         }
 
         WriteLog($"IMOD.CHECK: ok device={block.Device.InstanceId}");
-        RefreshImodCurrentValues(reason: "imod-check");
+        RefreshImodCurrentValues(showReadingStatus: false, reason: "imod-check");
     }
 
     private void RefreshImodCurrentValues(bool showReadingStatus = true, string reason = "refresh")
@@ -637,7 +641,9 @@ public sealed partial class MainForm
                 LogImodUiSnapshot(block, reason);
             }
 
-            WriteLog($"IMOD.READBACK: failed: {readback.error}");
+            WriteLog(IsImodNeedsCheckStatus(readback.error)
+                ? "IMOD.READBACK.SKIPPED: reason=driver-not-loaded action=press-CHECK"
+                : $"IMOD.READBACK.FAILED: error=\"{SanitizeLogValue(readback.error)}\"");
             return;
         }
 
@@ -697,13 +703,12 @@ public sealed partial class MainForm
         string value = block.ImodBox.Text?.Trim() ?? string.Empty;
         string defaultText = FlattenLogText(block.ImodDefaultLabel.Text);
         string currentText = FlattenLogText(block.ImodCurrentLabel.Text);
-        string devicesAndInterrupts = FlattenLogText(block.ImodMapLabel?.Text);
-        string detail = FlattenLogText(mapDetail ?? (block.ImodMapLabel?.Tag as string));
         string baseRoles = block.Device.UsbRoles ?? string.Empty;
         string effectiveRoles = GetEffectiveUsbRolesForController(block.Device, block.Device.InstanceId);
         string rawValues = values is { Count: > 0 }
             ? FormatImodValueListForLog(values)
             : string.Empty;
+        string detail = (mapDetail ?? (block.ImodMapLabel?.Tag as string) ?? block.ImodMapLabel?.Text ?? string.Empty).Trim();
 
         WriteLog(
             "IMOD.UI: "
@@ -714,10 +719,19 @@ public sealed partial class MainForm
             + $"current=\"{SanitizeLogValue(currentText)}\" "
             + $"baseRoles=\"{SanitizeLogValue(baseRoles)}\" "
             + $"effectiveRoles=\"{SanitizeLogValue(effectiveRoles)}\" "
-            + $"map=\"{SanitizeLogValue(devicesAndInterrupts)}\" "
             + $"raw=\"{SanitizeLogValue(rawValues)}\" "
-            + $"detail=\"{SanitizeLogValue(detail)}\"");
+            + $"detailLines={CountNonEmptyLines(detail)}");
+
+        if (!string.IsNullOrWhiteSpace(detail))
+        {
+            WriteLog(
+                $"IMOD.UI.DETAIL: reason={reason} controller={block.Device.InstanceId}\r\n"
+                + detail);
+        }
     }
+
+    private static int CountNonEmptyLines(string value)
+        => value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
 
     private void RefreshTestImodPreview(DeviceBlock block, string reason = "test-preview")
     {
@@ -728,7 +742,19 @@ public sealed partial class MainForm
 
         EnsureImodConfigLoaded();
         uint fallback = (_imodConfigCache?.GlobalInterval ?? ImodDefaultInterval) & 0xFFFF;
-        string text = block.ImodBox.Text?.Trim() ?? string.Empty;
+        TestDeviceState testState = EnsureTestDeviceState(block.Device);
+        if (reason.Contains("set", StringComparison.OrdinalIgnoreCase))
+        {
+            testState.ImodValue = block.ImodBox.Text?.Trim() ?? FormatImodValue(fallback);
+        }
+        else if (reason.Contains("delete", StringComparison.OrdinalIgnoreCase)
+            || reason.Contains("reset", StringComparison.OrdinalIgnoreCase))
+        {
+            testState.ImodValue = FormatImodValue(fallback);
+        }
+        string text = string.IsNullOrWhiteSpace(testState.ImodValue)
+            ? FormatImodValue(fallback)
+            : testState.ImodValue.Trim();
         if (!TryParseImodInput(text, fallback, out ImodInput parsedInput))
         {
             block.ImodCurrentLabel.Text = "current: invalid input";
@@ -934,7 +960,7 @@ public sealed partial class MainForm
     private void SetImodDetailsVisibility(DeviceBlock block, bool forceVisible)
     {
         bool showDetails = block.ImodAutoCheck.Visible
-            && (block.ImodAutoCheck.Checked || forceVisible || IsImodAttentionStatus(block.ImodCurrentLabel.Text));
+            && (block.ImodAutoCheck.Checked || forceVisible || IsImodAttentionStatus(GetSourceControlText(block.ImodCurrentLabel)));
 
         block.ImodCurrentLabel.Visible = showDetails;
         block.ImodDefaultLabel.Visible = showDetails;
@@ -973,6 +999,20 @@ public sealed partial class MainForm
             cpuPanel.Width = maxCpuPanelWidth;
         }
 
+        bool stackedSettings = settingsPanel.Left <= UiScale(24);
+        if (!stackedSettings && block.Group.Width - settingsPanel.Left - UiScale(24) < UiScale(320))
+        {
+            stackedSettings = true;
+            settingsPanel.Left = UiScale(18);
+        }
+
+        int availableSettingsWidth = Math.Max(UiScale(120), block.Group.Width - settingsPanel.Left - UiScale(24));
+        if (block.ImodMapLabel is not null && block.ImodMapLabel.Visible)
+        {
+            int mapWidth = Math.Max(UiScale(120), availableSettingsWidth - block.ImodMapLabel.Left);
+            FitImodMapLabel(block.ImodMapLabel, mapWidth);
+        }
+
         int visibleSettingsRight = 0;
         int visibleSettingsBottom = 0;
         foreach (Control child in settingsPanel.Controls)
@@ -986,14 +1026,6 @@ public sealed partial class MainForm
             visibleSettingsBottom = Math.Max(visibleSettingsBottom, child.Bottom);
         }
 
-        bool stackedSettings = settingsPanel.Left <= UiScale(24);
-        if (!stackedSettings && block.Group.Width - settingsPanel.Left - UiScale(24) < UiScale(320))
-        {
-            stackedSettings = true;
-            settingsPanel.Left = UiScale(18);
-        }
-
-        int availableSettingsWidth = Math.Max(UiScale(120), block.Group.Width - settingsPanel.Left - UiScale(24));
         int settingsMinWidth = Math.Min(UiScale(420), availableSettingsWidth);
         Size currentSettingsSize = new(
             Math.Min(Math.Max(visibleSettingsRight + UiScale(8), settingsMinWidth), availableSettingsWidth),
@@ -1001,18 +1033,23 @@ public sealed partial class MainForm
         settingsPanel.Size = currentSettingsSize;
 
         int settingsTop = stackedSettings
-            ? block.IrqLabel.Bottom + UiScale(18)
-            : cpuPanel.Top + Math.Max(0, (cpuPanel.Height - currentSettingsSize.Height) / 2);
+            ? Math.Max(cpuPanel.Bottom, block.IrqLabel.Bottom) + UiScale(18)
+            : cpuPanel.Top;
         settingsPanel.Location = new Point(settingsPanel.Left, settingsTop);
 
-        int infoY = Math.Max(block.IrqLabel.Bottom + UiScale(14), cpuPanel.Bottom + UiScale(18));
-        infoY = Math.Max(infoY, settingsPanel.Bottom + UiScale(10));
+        if (!stackedSettings)
+        {
+            int maskY = cpuPanel.Bottom + UiScale(12);
+            block.AffinityLabel.Location = new Point(block.AffinityLabel.Left, maskY);
+            block.IrqLabel.Location = new Point(block.IrqLabel.Left, maskY + UiScale(20));
+        }
+
+        int infoY = Math.Max(block.IrqLabel.Bottom, settingsPanel.Bottom) + UiScale(12);
+
         block.InfoLabel.Location = new Point(block.InfoLabel.Left, infoY);
         block.InfoLabel.Size = new Size(block.Group.Width - UiScale(40), block.InfoLabel.Height);
 
-        block.Group.Height = Math.Max(
-            Math.Max(cpuPanel.Bottom + UiScale(110), settingsPanel.Bottom + UiScale(20)),
-            block.InfoLabel.Bottom + UiScale(20));
+        block.Group.Height = block.InfoLabel.Bottom + UiScale(20);
     }
 
     private bool TryGetCachedImodKernelCiBlockStatus(out string statusText, out string detailText)
@@ -1140,22 +1177,20 @@ public sealed partial class MainForm
                     }
                 }
 
-                ulong capabilityAddress = controller.BaseAddress;
-                if (!TryReadPhys32(imodDriver, capabilityAddress + hcsparamsOffset, out uint hcsparamsValue, out string? ioError))
+                if (!TryResolveXhciRuntimeLayout(
+                        controller,
+                        imodDriver,
+                        hcsparamsOffset,
+                        rtsoff,
+                        out uint maxIntrs,
+                        out ulong runtimeAddress,
+                        out string? ioError))
                 {
-                    WriteLog($"IMOD.READBACK: read HCSPARAMS failed {controller.DeviceId}: {ioError}");
+                    WriteLog($"IMOD.READBACK: unsafe or invalid xHCI MMIO layout {controller.DeviceId}: {ioError}");
                     continue;
                 }
 
-                if (!TryReadPhys32(imodDriver, capabilityAddress + rtsoff, out uint rtsoffValue, out ioError))
-                {
-                    WriteLog($"IMOD.READBACK: read RTSOFF failed {controller.DeviceId}: {ioError}");
-                    continue;
-                }
-
-                uint maxIntrs = (hcsparamsValue >> 8) & 0x7FF;
                 uint readCount = Math.Min(maxIntrs, readbackLimit);
-                ulong runtimeAddress = capabilityAddress + rtsoffValue;
                 List<uint> values = [];
 
                 for (uint i = 0; i < readCount; i++)
@@ -1182,7 +1217,7 @@ public sealed partial class MainForm
                     }
                     else
                     {
-                        WriteLog($"IMOD.MAP: unavailable {controller.DeviceId}: {mapDetail}");
+                        WriteLog($"IMOD.MAP.WARN: unavailable {controller.DeviceId}: {mapDetail}");
                     }
 
                     if (maxIntrs > readbackLimit)
@@ -1297,17 +1332,19 @@ public sealed partial class MainForm
 
         if (error.Contains("virus", StringComparison.OrdinalIgnoreCase)
             || error.Contains("potentially unwanted", StringComparison.OrdinalIgnoreCase)
-            || error.Contains("PUA", StringComparison.OrdinalIgnoreCase))
+            || error.Contains("PUA", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("Defender", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("quarantine", StringComparison.OrdinalIgnoreCase))
         {
             return "DTIMOD.sys blocked by Windows Defender";
         }
 
         if (error.Contains("KDU", StringComparison.OrdinalIgnoreCase))
         {
-            return "DTIMOD.sys loader blocked";
+            return "DTIMOD.sys loader blocked by Vulnerable Driver Blocklist";
         }
 
-        return "DTIMOD.sys blocked by Windows";
+        return "DTIMOD.sys blocked by Vulnerable Driver Blocklist";
     }
 
     private bool TryBuildAdaptiveImodIntervals(
@@ -1423,7 +1460,7 @@ public sealed partial class MainForm
             allowFallback: false);
         if (!hasRoleMap)
         {
-            WriteLog($"IMOD.MAP.ROLES: unavailable {controller.DeviceId}: {resolveDetail}");
+            WriteLog($"IMOD.MAP.ROLES.WARN: unavailable {controller.DeviceId}: {resolveDetail}");
         }
 
         Dictionary<string, List<string>> displayLabelsByRole = BuildAdaptiveRoleDisplayLabels(controller.DeviceId);
@@ -1565,15 +1602,32 @@ public sealed partial class MainForm
 
     private static string FormatDeviceFirstImodLines(IReadOnlyList<string> parts)
     {
-        const int itemsPerLine = 2;
-        List<string> lines = [];
-        for (int i = 0; i < parts.Count; i += itemsPerLine)
+        List<(string Role, string Intr, string Value, string Time)> rows = [];
+        foreach (string part in parts)
         {
-            string prefix = i == 0 ? "devices: " : "         ";
-            lines.Add(prefix + string.Join(" | ", parts.Skip(i).Take(itemsPerLine)));
+            string[] roleAndValue = part.Split([" -> "], 2, StringSplitOptions.None);
+            string role = roleAndValue[0].Trim();
+            string assignment = roleAndValue.Length == 2 ? roleAndValue[1].Trim() : string.Empty;
+            string[] intrAndValue = assignment.Split(['='], 2);
+            string intr = intrAndValue[0].Trim();
+            string valueAndTime = intrAndValue.Length == 2 ? intrAndValue[1].Trim() : string.Empty;
+            string[] valueParts = valueAndTime.Split(['/'], 2);
+            rows.Add((
+                role,
+                intr,
+                valueParts[0].Trim(),
+                valueParts.Length == 2 ? valueParts[1].Trim() : string.Empty));
         }
 
-        return string.Join("\r\n", lines);
+        int roleWidth = rows.Select(row => row.Role.Length).DefaultIfEmpty(0).Max();
+        int intrWidth = rows.Select(row => row.Intr.Length).DefaultIfEmpty(0).Max();
+        int valueWidth = rows.Select(row => row.Value.Length).DefaultIfEmpty(0).Max();
+        return string.Join("\r\n", rows.Select((row, index) =>
+        {
+            string prefix = index == 0 ? "devices: " : "         ";
+            string time = string.IsNullOrEmpty(row.Time) ? string.Empty : $"  {row.Time}";
+            return $"{prefix}{row.Role.PadRight(roleWidth)} -> {row.Intr.PadRight(intrWidth)}  {row.Value.PadRight(valueWidth)}{time}";
+        }));
     }
 
     private static string FormatVisibleImodInterrupterLines(IReadOnlyList<uint> values)
@@ -1590,15 +1644,17 @@ public sealed partial class MainForm
 
         int visibleCount = Math.Min(values.Count, maxVisible);
         List<string> lines = [];
+        List<(string Intr, string Value, string Time)> formatted = Enumerable.Range(0, visibleCount)
+            .Select(index => ($"intr{index}", FormatImodValue(values[index]), FormatUsbImodTime(values[index])))
+            .ToList();
+        int intrWidth = formatted.Select(part => part.Intr.Length).DefaultIfEmpty(0).Max();
+        int valueWidth = formatted.Select(part => part.Value.Length).DefaultIfEmpty(0).Max();
+        int timeWidth = formatted.Select(part => part.Time.Length).DefaultIfEmpty(0).Max();
 
         for (int start = 0; start < visibleCount; start += chunkSize)
         {
             int end = Math.Min(start + chunkSize, visibleCount);
-            List<string> parts = [];
-            for (int i = start; i < end; i++)
-            {
-                parts.Add($"intr{i}={FormatImodValue(values[i])}/{FormatUsbImodTime(values[i])}");
-            }
+            IReadOnlyList<(string Intr, string Value, string Time)> parts = formatted.Skip(start).Take(end - start).ToList();
 
             string suffix = string.Empty;
             if (end == visibleCount && values.Count > visibleCount)
@@ -1606,7 +1662,12 @@ public sealed partial class MainForm
                 suffix = $" | +{values.Count - visibleCount} more";
             }
 
-            lines.Add($"interrupters {start}-{end - 1}: {string.Join(" | ", parts)}{suffix}");
+            string[] columns = parts
+                .Select(part => $"{part.Intr.PadRight(intrWidth)}  {part.Value.PadRight(valueWidth)}  {part.Time.PadRight(timeWidth)}")
+                .ToArray();
+            columns[^1] = columns[^1].TrimEnd();
+            string rowText = string.Join(" | ", columns);
+            lines.Add($"interrupters {start}-{end - 1}: {rowText}{suffix}");
         }
 
         return string.Join("\r\n", lines);
@@ -1839,7 +1900,7 @@ public sealed partial class MainForm
         if (ns >= 1000)
         {
             double us = ns / 1000.0;
-            return us.ToString(us % 1 == 0 ? "0" : "0.###", System.Globalization.CultureInfo.InvariantCulture) + "us";
+            return us.ToString(us % 1 == 0 ? "0" : "0.###", System.Globalization.CultureInfo.InvariantCulture) + " us";
         }
 
         return ns.ToString(System.Globalization.CultureInfo.InvariantCulture) + " ns";
@@ -2737,7 +2798,7 @@ public sealed partial class MainForm
                 return false;
             }
 
-            File.WriteAllBytes(driverPath, driverBytes);
+            WriteAllBytesAtomic(driverPath, driverBytes);
 
             string writtenHash = ComputeFileSha256(driverPath);
             if (!HashEquals(writtenHash, expectedHash ?? embeddedHash))
@@ -2779,17 +2840,6 @@ public sealed partial class MainForm
 
             AddRule(WellKnownSidType.LocalSystemSid);
             AddRule(WellKnownSidType.BuiltinAdministratorsSid);
-
-            SecurityIdentifier? userSid = WindowsIdentity.GetCurrent().User;
-            if (userSid is not null)
-            {
-                security.AddAccessRule(new FileSystemAccessRule(
-                    userSid,
-                    FileSystemRights.FullControl,
-                    InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
-                    PropagationFlags.None,
-                    AccessControlType.Allow));
-            }
 
             new DirectoryInfo(directoryPath).SetAccessControl(security);
             return true;
@@ -3006,7 +3056,8 @@ public sealed partial class MainForm
                 _ = TryGetDeviceProblemCode(devInfo.DevInst, out uint problemCode);
 
                 ulong baseAddress = 0;
-                bool hasBase = TryGetDeviceMemoryBase(devInfo.DevInst, out baseAddress, out string? baseError);
+                ulong memoryLength = 0;
+                bool hasBase = TryGetDeviceMemoryRange(devInfo.DevInst, out baseAddress, out memoryLength, out string? baseError);
 
                 controllers.Add(new ImodControllerInfo
                 {
@@ -3014,6 +3065,7 @@ public sealed partial class MainForm
                     Caption = caption,
                     ProblemCode = problemCode,
                     BaseAddress = baseAddress,
+                    MemoryLength = memoryLength,
                     HasBase = hasBase,
                     BaseError = baseError ?? string.Empty,
                 });
@@ -3093,9 +3145,10 @@ public sealed partial class MainForm
         return true;
     }
 
-    private static bool TryGetDeviceMemoryBase(uint devInst, out ulong baseAddress, out string? error)
+    private static bool TryGetDeviceMemoryRange(uint devInst, out ulong baseAddress, out ulong length, out string? error)
     {
         baseAddress = 0;
+        length = 0;
         error = null;
 
         int cr = CM_Get_First_Log_Conf(out IntPtr logConf, devInst, AllocLogConf);
@@ -3111,8 +3164,6 @@ public sealed partial class MainForm
 
         try
         {
-            bool found = false;
-            ulong minBase = 0;
             foreach (uint resType in new[] { ResTypeMem, ResTypeMemLarge })
             {
                 int resCr = CM_Get_Next_Res_Des(out IntPtr resDes, logConf, resType, IntPtr.Zero, 0);
@@ -3124,12 +3175,15 @@ public sealed partial class MainForm
                         byte[] buffer = new byte[dataSize];
                         if (CM_Get_Res_Des_Data(resDes, buffer, dataSize, 0) == CrSuccess)
                         {
-                            if (TryExtractBaseFromResource(resType, buffer, out ulong candidate))
+                            if (TryExtractMemoryRangeFromResource(resType, buffer, out ulong candidate, out ulong candidateLength))
                             {
-                                if (!found || candidate < minBase)
+                                // The controller register BAR is normally the largest allocated
+                                // non-prefetchable memory resource. Selecting by physical address
+                                // can accidentally pick a small auxiliary BAR.
+                                if (candidateLength > length)
                                 {
-                                    minBase = candidate;
-                                    found = true;
+                                    baseAddress = candidate;
+                                    length = candidateLength;
                                 }
                             }
                         }
@@ -3142,14 +3196,13 @@ public sealed partial class MainForm
                 }
             }
 
-            if (!found)
+            if (baseAddress != 0 && length != 0)
             {
-                error = "no memory resource found";
-                return false;
+                return true;
             }
 
-            baseAddress = minBase;
-            return true;
+            error = "no allocated memory resource found";
+            return false;
         }
         finally
         {
@@ -3157,9 +3210,10 @@ public sealed partial class MainForm
         }
     }
 
-    private static bool TryExtractBaseFromResource(uint resType, byte[] data, out ulong baseAddress)
+    private static bool TryExtractMemoryRangeFromResource(uint resType, byte[] data, out ulong baseAddress, out ulong length)
     {
         baseAddress = 0;
+        length = 0;
 
         if (resType == ResTypeMem)
         {
@@ -3170,6 +3224,7 @@ public sealed partial class MainForm
 
             MemDes mem = MemoryMarshal.Read<MemDes>(data);
             ulong candidate = mem.MD_Alloc_Base;
+            ulong candidateEnd = mem.MD_Alloc_End;
             if (candidate == 0 && mem.MD_Count > 0)
             {
                 int offset = Marshal.SizeOf<MemDes>();
@@ -3177,6 +3232,11 @@ public sealed partial class MainForm
                 {
                     MemRange range = MemoryMarshal.Read<MemRange>(data.AsSpan(offset));
                     candidate = range.MR_Min;
+                    candidateEnd = range.MR_Max;
+                    if (range.MR_nBytes > 0)
+                    {
+                        candidateEnd = candidate + range.MR_nBytes - 1;
+                    }
                 }
             }
 
@@ -3186,6 +3246,11 @@ public sealed partial class MainForm
             }
 
             baseAddress = candidate;
+            length = candidateEnd >= candidate ? candidateEnd - candidate + 1 : 0;
+            if (length == 0)
+            {
+                return false;
+            }
             return true;
         }
 
@@ -3198,6 +3263,7 @@ public sealed partial class MainForm
 
             MemLargeDes mem = MemoryMarshal.Read<MemLargeDes>(data);
             ulong candidate = mem.MLD_Alloc_Base;
+            ulong candidateEnd = mem.MLD_Alloc_End;
             if (candidate == 0 && mem.MLD_Count > 0)
             {
                 int offset = Marshal.SizeOf<MemLargeDes>();
@@ -3205,6 +3271,11 @@ public sealed partial class MainForm
                 {
                     MemLargeRange range = MemoryMarshal.Read<MemLargeRange>(data.AsSpan(offset));
                     candidate = range.MLR_Min;
+                    candidateEnd = range.MLR_Max;
+                    if (range.MLR_nBytes > 0)
+                    {
+                        candidateEnd = candidate + range.MLR_nBytes - 1;
+                    }
                 }
             }
 
@@ -3214,6 +3285,11 @@ public sealed partial class MainForm
             }
 
             baseAddress = candidate;
+            length = candidateEnd >= candidate ? candidateEnd - candidate + 1 : 0;
+            if (length == 0)
+            {
+                return false;
+            }
             return true;
         }
 
@@ -3330,6 +3406,100 @@ public sealed partial class MainForm
         return !string.IsNullOrWhiteSpace(instanceId);
     }
 
+    private static bool TryResolveXhciRuntimeLayout(
+        ImodControllerInfo controller,
+        ImodDriverContext driver,
+        uint hcsparamsOffset,
+        uint rtsoffOffset,
+        out uint maxInterrupters,
+        out ulong runtimeAddress,
+        out string? error)
+    {
+        maxInterrupters = 0;
+        runtimeAddress = 0;
+        error = null;
+
+        if (!controller.HasBase || controller.BaseAddress == 0 || controller.MemoryLength < 0x20)
+        {
+            error = $"missing or undersized PCI memory resource (length=0x{controller.MemoryLength:X})";
+            return false;
+        }
+
+        bool Contains(uint offset, ulong size)
+        {
+            ulong value = offset;
+            return value <= controller.MemoryLength && size <= controller.MemoryLength - value;
+        }
+
+        if (!Contains(0, sizeof(uint))
+            || !Contains(hcsparamsOffset, sizeof(uint))
+            || !Contains(rtsoffOffset, sizeof(uint)))
+        {
+            error = $"capability offsets exceed PCI memory resource (HCS=0x{hcsparamsOffset:X}, RTS=0x{rtsoffOffset:X}, length=0x{controller.MemoryLength:X})";
+            return false;
+        }
+
+        if (!TryReadPhys32(driver, controller.BaseAddress, out uint capabilityHeader, out error))
+        {
+            error = $"failed to read xHCI capability header: {error}";
+            return false;
+        }
+
+        uint capabilityLength = capabilityHeader & 0xFF;
+        uint hciVersion = capabilityHeader >> 16;
+        if (capabilityLength < 0x20 || capabilityLength > controller.MemoryLength)
+        {
+            error = $"invalid xHCI CAPLENGTH 0x{capabilityLength:X} for BAR length 0x{controller.MemoryLength:X}";
+            return false;
+        }
+
+        if (hciVersion < 0x0090 || hciVersion > 0x0120)
+        {
+            error = $"unexpected xHCI version 0x{hciVersion:X4}";
+            return false;
+        }
+
+        if (!TryReadPhys32(driver, controller.BaseAddress + hcsparamsOffset, out uint hcsparamsValue, out error))
+        {
+            error = $"failed to read HCSPARAMS: {error}";
+            return false;
+        }
+
+        maxInterrupters = (hcsparamsValue >> 8) & 0x7FF;
+        if (maxInterrupters == 0 || maxInterrupters > 2047)
+        {
+            error = $"invalid MaxIntrs value {maxInterrupters}";
+            return false;
+        }
+
+        if (!TryReadPhys32(driver, controller.BaseAddress + rtsoffOffset, out uint rtsoffValue, out error))
+        {
+            error = $"failed to read RTSOFF: {error}";
+            return false;
+        }
+
+        ulong runtimeOffset = rtsoffValue & 0xFFFFFFE0u;
+        ulong finalRegisterEnd;
+        try
+        {
+            finalRegisterEnd = checked(runtimeOffset + 0x24UL + (0x20UL * (maxInterrupters - 1UL)) + sizeof(uint));
+        }
+        catch (OverflowException)
+        {
+            error = "xHCI runtime register range overflowed";
+            return false;
+        }
+
+        if (runtimeOffset == 0 || finalRegisterEnd > controller.MemoryLength)
+        {
+            error = $"xHCI runtime registers exceed PCI memory resource (RTSOFF=0x{runtimeOffset:X}, end=0x{finalRegisterEnd:X}, length=0x{controller.MemoryLength:X})";
+            return false;
+        }
+
+        runtimeAddress = controller.BaseAddress + runtimeOffset;
+        return true;
+    }
+
     private static bool TryReadPhys32(ImodDriverContext ctx, ulong address, out uint value, out string? error)
     {
         value = 0;
@@ -3357,45 +3527,6 @@ public sealed partial class MainForm
 
         uint mergedValue = (currentValue & 0xFFFF0000) | (interval & 0xFFFF);
         return TryWritePhys32(ctx, address, mergedValue, out error);
-    }
-
-    private static bool TryMapPhysicalMemory(ImodDriverContext ctx, ulong address, ulong size, out PhysStruct phys, out string? error)
-    {
-        error = null;
-        phys = new PhysStruct
-        {
-            physMemSizeInBytes = size,
-            physAddress = address,
-        };
-
-        int bytesReturned = 0;
-        if (!DeviceIoControl(
-                ctx.DriverHandle,
-                IoctlImodMapPhysicalMemory,
-                ref phys,
-                Marshal.SizeOf<PhysStruct>(),
-                ref phys,
-                Marshal.SizeOf<PhysStruct>(),
-                out bytesReturned,
-                IntPtr.Zero))
-        {
-            error = $"failed to map physical memory: {GetWin32ErrorMessage(Marshal.GetLastWin32Error())}";
-            return false;
-        }
-
-        if (bytesReturned < Marshal.SizeOf<PhysStruct>())
-        {
-            error = "failed to map physical memory: incomplete ioctl response";
-            return false;
-        }
-
-        if (phys.physMemLin == 0)
-        {
-            error = "failed to map physical memory: returned null linear address";
-            return false;
-        }
-
-        return true;
     }
 
     private static bool TryReadPhysicalMemory(
@@ -3471,27 +3602,6 @@ public sealed partial class MainForm
         return true;
     }
 
-    private static bool TryUnmapPhysicalMemory(ImodDriverContext ctx, PhysStruct phys, out string? error)
-    {
-        error = null;
-        int bytesReturned = 0;
-        if (!DeviceIoControl(
-                ctx.DriverHandle,
-                IoctlImodUnmapPhysicalMemory,
-                ref phys,
-                Marshal.SizeOf<PhysStruct>(),
-                ref phys,
-                Marshal.SizeOf<PhysStruct>(),
-                out bytesReturned,
-                IntPtr.Zero))
-        {
-            error = $"failed to unmap physical memory: {GetWin32ErrorMessage(Marshal.GetLastWin32Error())}";
-            return false;
-        }
-
-        return true;
-    }
-
     private static bool TryLoadImodDriverWithKduFallback(string driverPath, Action<string>? log, out string? error)
     {
         error = null;
@@ -3522,6 +3632,22 @@ public sealed partial class MainForm
         {
             error = $"drv64.dll missing next to kdu.exe: {kduDatabasePath}";
             log?.Invoke($"IMOD.DRIVER.KDU: skipped reason=db_missing path={kduDatabasePath}");
+            return false;
+        }
+
+        if (!TryVerifyEmbeddedImodResourceFile("DeviceTweakerCS.IMOD.Loader.kdu.exe", ".kdu.exe", kduPath, out error)
+            || !TryVerifyEmbeddedImodResourceFile("DeviceTweakerCS.IMOD.Loader.drv64.dll", ".drv64.dll", kduDatabasePath, out error))
+        {
+            log?.Invoke($"IMOD.DRIVER.KDU: payload verification failed error={CompactImodLogValue(error)}");
+            return false;
+        }
+
+        string? expectedDriverHash = ReadEmbeddedImodDriverHash();
+        if (string.IsNullOrWhiteSpace(expectedDriverHash)
+            || !HashEquals(ComputeFileSha256(driverPath), expectedDriverHash))
+        {
+            error = "DTIMOD.sys changed after staging or its embedded hash is unavailable";
+            log?.Invoke($"IMOD.DRIVER.KDU: driver verification failed path={driverPath}");
             return false;
         }
 
@@ -3557,7 +3683,13 @@ public sealed partial class MainForm
         kduPath = string.Empty;
         error = null;
 
-        string payloadRoot = Path.Combine(Path.GetTempPath(), "DeviceTweaker", "IMOD", "Loader");
+        string commonData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        if (string.IsNullOrWhiteSpace(commonData))
+        {
+            commonData = Path.GetTempPath();
+        }
+
+        string payloadRoot = Path.Combine(commonData, "DEVICE TWEAKER", "IMOD", "Loader");
         string kduTarget = Path.Combine(payloadRoot, ImodKduFileName);
         string dbTarget = Path.Combine(payloadRoot, ImodKduDatabaseFileName);
 
@@ -3570,12 +3702,6 @@ public sealed partial class MainForm
         }
 
         log?.Invoke($"IMOD.DRIVER.KDU: embedded payload unavailable error={CompactImodLogValue(error)}");
-        if (TryFindExternalKdu(out string externalKduPath, out error))
-        {
-            kduPath = externalKduPath;
-            return true;
-        }
-
         return false;
     }
 
@@ -3611,12 +3737,47 @@ public sealed partial class MainForm
                 }
             }
 
-            File.WriteAllBytes(targetPath, bytes);
+            WriteAllBytesAtomic(targetPath, bytes);
             return true;
         }
         catch (Exception ex)
         {
             error = $"failed to write {targetPath}: {ex.Message}";
+            return false;
+        }
+    }
+
+    private static bool TryVerifyEmbeddedImodResourceFile(string exactName, string suffix, string targetPath, out string? error)
+    {
+        error = null;
+        using Stream? resource = OpenManifestResourceStreamExactOrSuffix(exactName, suffix);
+        if (resource is null)
+        {
+            error = $"embedded resource missing: {exactName}";
+            return false;
+        }
+
+        if (!File.Exists(targetPath))
+        {
+            error = $"staged payload missing: {targetPath}";
+            return false;
+        }
+
+        try
+        {
+            string expectedHash = NormalizeHash(Convert.ToHexString(SHA256.HashData(resource))) ?? string.Empty;
+            string actualHash = ComputeFileSha256(targetPath);
+            if (!HashEquals(actualHash, expectedHash))
+            {
+                error = $"staged payload hash mismatch: {Path.GetFileName(targetPath)}";
+                return false;
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = $"failed to verify {targetPath}: {ex.Message}";
             return false;
         }
     }
@@ -3641,63 +3802,10 @@ public sealed partial class MainForm
         return null;
     }
 
-    private static bool TryFindExternalKdu(out string kduPath, out string? error)
-    {
-        kduPath = string.Empty;
-        error = null;
-
-        IEnumerable<string?> rawCandidates =
-        [
-            Environment.GetEnvironmentVariable("DEVICE_TWEAKER_KDU_EXE"),
-            Environment.GetEnvironmentVariable("KDU_EXE"),
-            Environment.GetEnvironmentVariable("KDU_PATH"),
-            Path.Combine(AppContext.BaseDirectory, ImodKduFileName),
-            Path.Combine(AppContext.BaseDirectory, "Tools", "kdu", ImodKduFileName),
-            Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
-                "HYPE-MODE",
-                "HYPE-MODE",
-                "Tools",
-                "kdu",
-                ImodKduFileName)
-        ];
-
-        foreach (string? rawCandidate in rawCandidates)
-        {
-            if (string.IsNullOrWhiteSpace(rawCandidate))
-            {
-                continue;
-            }
-
-            string candidate = rawCandidate;
-            if (Directory.Exists(candidate))
-            {
-                candidate = Path.Combine(candidate, ImodKduFileName);
-            }
-
-            if (!File.Exists(candidate))
-            {
-                continue;
-            }
-
-            string dbPath = Path.Combine(Path.GetDirectoryName(candidate) ?? string.Empty, ImodKduDatabaseFileName);
-            if (!File.Exists(dbPath))
-            {
-                error = $"external KDU db missing: {dbPath}";
-                continue;
-            }
-
-            kduPath = candidate;
-            return true;
-        }
-
-        error ??= "kdu.exe not found";
-        return false;
-    }
-
     private static bool RunImodKduMap(string kduPath, string driverPath, Action<string>? log, out string? error)
     {
         error = null;
+        Stopwatch timer = Stopwatch.StartNew();
 
         try
         {
@@ -3724,15 +3832,23 @@ public sealed partial class MainForm
             if (!process.WaitForExit(ImodKduTimeoutMs))
             {
                 TryKillProcess(process);
-                error = "kdu.exe timed out";
+                _ = process.WaitForExit(2000);
+                _ = Task.WaitAll(new Task[] { stdout, stderr }, 2000);
+                string timeoutOutput = stdout.IsCompletedSuccessfully ? stdout.Result : string.Empty;
+                string timeoutError = stderr.IsCompletedSuccessfully ? stderr.Result : string.Empty;
+                log?.Invoke($"IMOD.DRIVER.KDU: timeout elapsedMs={timer.ElapsedMilliseconds}");
+                LogImodKduOutput(log, "STDOUT", timeoutOutput);
+                LogImodKduOutput(log, "STDERR", timeoutError);
+                error = "kdu.exe timed out. See full KDU output in the session log.";
                 return false;
             }
 
             _ = Task.WaitAll(new Task[] { stdout, stderr }, 2000);
             string output = stdout.IsCompletedSuccessfully ? stdout.Result : string.Empty;
             string errOutput = stderr.IsCompletedSuccessfully ? stderr.Result : string.Empty;
-            string combinedOutput = CompactImodLogValue((output + " " + errOutput).Trim());
-            log?.Invoke($"IMOD.DRIVER.KDU: exit code={process.ExitCode} output={combinedOutput}");
+            log?.Invoke($"IMOD.DRIVER.KDU: exit code={process.ExitCode} elapsedMs={timer.ElapsedMilliseconds}");
+            LogImodKduOutput(log, "STDOUT", output);
+            LogImodKduOutput(log, "STDERR", errOutput);
 
             if (TryOpenImodDriverDevice(out IntPtr mappedHandle, out string? mappedOpenError))
             {
@@ -3749,18 +3865,43 @@ public sealed partial class MainForm
 
             if (process.ExitCode != 0)
             {
-                error = $"kdu.exe failed code={process.ExitCode} device={mappedOpenError} output={combinedOutput}";
+                error = $"kdu.exe failed code={process.ExitCode}; DTIMOD device unavailable: {mappedOpenError}. See full KDU output in the session log.";
                 return false;
             }
 
-            error = $"kdu.exe exited successfully but device is unavailable: {mappedOpenError}";
+            error = $"kdu.exe exited successfully but DTIMOD device was not created: {mappedOpenError}. See full KDU output in the session log.";
             return false;
         }
         catch (Exception ex)
         {
+            log?.Invoke($"IMOD.DRIVER.KDU.EXCEPTION: {FlattenLogText(ex.ToString())}");
             error = $"{ex.GetType().Name}: {ex.Message}";
             return false;
         }
+    }
+
+    private static void LogImodKduOutput(Action<string>? log, string streamName, string? content)
+    {
+        if (log is null)
+        {
+            return;
+        }
+
+        string normalized = (content ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
+        string[] lines = normalized.Split('\n');
+        log($"IMOD.DRIVER.KDU.{streamName}: BEGIN chars={normalized.Length} lines={lines.Length}");
+        if (normalized.Length == 0)
+        {
+            log($"IMOD.DRIVER.KDU.{streamName}: <empty>");
+        }
+        else
+        {
+            for (int i = 0; i < lines.Length; i++)
+            {
+                log($"IMOD.DRIVER.KDU.{streamName}: {i + 1:D4}: {lines[i]}");
+            }
+        }
+        log($"IMOD.DRIVER.KDU.{streamName}: END");
     }
 
     private static void TryKillProcess(Process process)
@@ -3845,14 +3986,14 @@ public sealed partial class MainForm
                 return true;
             }
 
-            _log?.Invoke($"IMOD.DRIVER: device not open before KDU start: {openError}");
+            _log?.Invoke($"IMOD.DRIVER.PRELOAD: deviceAvailable=false loaderNext=kdu detail=\"{SanitizeLogValue(openError)}\"");
             if (TryLoadImodDriverWithKduFallback(DriverPath, _log, out string? kduError))
             {
                 _log?.Invoke("IMOD.DRIVER.SUMMARY: final=kdu loader=kdu");
                 return true;
             }
 
-            _log?.Invoke($"IMOD.DRIVER: KDU load failed, falling back to service: {kduError}");
+            _log?.Invoke($"IMOD.DRIVER.KDU.WARN: load failed; falling back to service: {kduError}");
             if (TryEnsureImodDriverService(out string? serviceError))
             {
                 _log?.Invoke($"IMOD.DRIVER.SUMMARY: final=service loader=service kdu_error={kduError ?? "none"}");
@@ -4160,16 +4301,6 @@ public sealed partial class MainForm
         public Guid ClassGuid;
         public uint DevInst;
         public IntPtr Reserved;
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    private struct PhysStruct
-    {
-        public ulong physMemSizeInBytes;
-        public ulong physAddress;
-        public ulong physicalMemoryHandle;
-        public ulong physMemLin;
-        public ulong physSection;
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]

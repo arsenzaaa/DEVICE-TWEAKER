@@ -1,4 +1,4 @@
-# Build output and intermediate artifacts
+﻿# Build output and intermediate artifacts
 DEVICE TWEAKER/bin/
 DEVICE TWEAKER/obj/
 DEVICE TWEAKER/artifacts/
@@ -28,9 +28,20 @@ DEVICE TWEAKER/**/*.lastbuildstate
 *.userosscache
 *.sln.docstates
 
+# Secrets
+DEVICE TWEAKER/**/*.pfx
+DEVICE TWEAKER/**/*.p12
+DEVICE TWEAKER/**/*.snk
+
 # Local-only / QA leftovers
 DEVICE TWEAKER/_compare/
 DEVICE TWEAKER/_handoff*/
-DEVICE TWEAKER/bin/SmokeSafe/
+DEVICE TWEAKER/_audit/
+DEVICE TWEAKER/tmp/
+DEVICE TWEAKER/документации/
+DEVICE TWEAKER/bin/Smoke*/
+DEVICE TWEAKER/bin/UserRunAudit/
 DEVICE TWEAKER/DEVICE TWEAKER — копия/
 DEVICE TWEAKER/**/Backups/
+DEVICE TWEAKER/**/logs/
+DEVICE TWEAKER/**/last-crash.txt

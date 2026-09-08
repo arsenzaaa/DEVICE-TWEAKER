@@ -119,7 +119,6 @@ static NTSTATUS ImodDriverDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
     ULONG ioControlCode;
     PVOID ioBuffer = Irp->AssociatedIrp.SystemBuffer;
     NTSTATUS status = STATUS_SUCCESS;
-    struct tagPhysStruct phys;
     struct tagPhysAccessStruct access;
     PHYSICAL_ADDRESS physicalAddress;
 
@@ -141,59 +140,6 @@ static NTSTATUS ImodDriverDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 
         switch (ioControlCode)
         {
-        case IOCTL_IMOD_MAP_PHYSICAL:
-            if (ioBuffer == NULL || inputLength < sizeof(phys) || outputLength < sizeof(phys))
-            {
-                status = STATUS_INVALID_PARAMETER;
-                break;
-            }
-
-            PVOID mappedAddress = NULL;
-            PVOID mappedBase = NULL;
-            SIZE_T mappedSize = 0;
-
-            RtlCopyMemory(&phys, ioBuffer, sizeof(phys));
-
-            physicalAddress.QuadPart = (LONGLONG)(ULONG_PTR)phys.physAddress;
-            status = ImodMapPhysicalMemory(
-                physicalAddress,
-                (SIZE_T)phys.physMemSizeInBytes,
-                &mappedAddress,
-                &mappedBase,
-                &mappedSize);
-
-            if (NT_SUCCESS(status))
-            {
-                phys.physMemLin = (ULONGLONG)(ULONG_PTR)mappedAddress;
-                phys.physicalMemoryHandle = (ULONGLONG)(ULONG_PTR)mappedBase;
-                phys.physSection = (ULONGLONG)mappedSize;
-                RtlCopyMemory(ioBuffer, &phys, sizeof(phys));
-                Irp->IoStatus.Information = sizeof(phys);
-            }
-
-            break;
-
-        case IOCTL_IMOD_UNMAP_PHYSICAL:
-            if (ioBuffer == NULL || inputLength < sizeof(phys))
-            {
-                status = STATUS_INVALID_PARAMETER;
-                break;
-            }
-
-            RtlCopyMemory(&phys, ioBuffer, sizeof(phys));
-
-            if (phys.physicalMemoryHandle == 0 || phys.physSection == 0)
-            {
-                status = STATUS_INVALID_PARAMETER;
-                break;
-            }
-
-            status = ImodUnmapPhysicalMemory(
-                (PVOID)(ULONG_PTR)phys.physicalMemoryHandle,
-                (SIZE_T)phys.physSection);
-
-            break;
-
         case IOCTL_IMOD_READ_PHYSICAL:
             if (ioBuffer == NULL || inputLength < sizeof(access) || outputLength < sizeof(access))
             {

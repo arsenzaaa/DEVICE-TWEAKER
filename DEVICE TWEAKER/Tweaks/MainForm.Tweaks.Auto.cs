@@ -4,6 +4,33 @@ namespace DeviceTweakerCS;
 
 public sealed partial class MainForm
 {
+    private static bool IsAutoDisplayAudioMsiOnly(DeviceBlock block)
+    {
+        return block.Kind == DeviceKind.AUDIO
+            && (IsDisplayHdmiaudio(block.Device.InstanceId, block.Device.Name)
+                || IsDisplayAudioEndpointsText(block.Device.AudioEndpoints));
+    }
+
+    private static bool IsAutoMsiOnlyDevice(DeviceBlock block)
+    {
+        return (block.Kind == DeviceKind.GPU && block.Device.IsIntegratedGpu)
+            || IsAutoDisplayAudioMsiOnly(block);
+    }
+
+    private static string FormatAutoImodRequestState(bool optimizeUsbImod, bool hasUsbImodTarget)
+    {
+        return !hasUsbImodTarget
+            ? "skipped: no eligible XHCI controller"
+            : optimizeUsbImod
+                ? "requested for eligible XHCI controller(s)"
+                : "skipped: declined by user";
+    }
+
+    private static string GetAutoImodSkipReason(bool hasUsbImodTarget)
+    {
+        return hasUsbImodTarget ? "user-declined" : "no-eligible-xhci-controller";
+    }
+
     private enum AutoAffinityRole
     {
         Gpu,
@@ -426,25 +453,26 @@ public sealed partial class MainForm
         return picker?.SelectedItem?.ToString() ?? "n/a";
     }
 
-    private static string FormatAutoResultDeviceName(DeviceBlock block)
+    private static string FormatAutoResultDeviceFields(DeviceBlock block)
     {
         string name = SanitizeLogValue(block.Device.Name);
         if (string.IsNullOrWhiteSpace(name))
         {
-            name = block.Device.InstanceId;
+            name = SanitizeLogValue(block.Device.InstanceId);
         }
 
         string roles = SanitizeLogValue(block.Device.UsbRoles);
         if (block.Kind == DeviceKind.USB && !string.IsNullOrWhiteSpace(roles))
         {
-            return $"{name} roles=\"{roles}\"";
+            return $"device=\"{name}\" roles=\"{roles}\"";
         }
 
-        return name;
+        return $"device=\"{name}\"";
     }
 
     private void WriteAutoOptimizationResultSummary(
         bool optimizeUsbImod,
+        bool hasUsbImodTarget,
         bool usingP,
         IReadOnlyList<int> primaryP,
         IReadOnlyList<int> primaryE,
@@ -478,21 +506,18 @@ public sealed partial class MainForm
         int skipped = planSlots.Count(slot => slot.Lps.Count == 0)
             + wifiIds.Count
             + msiOnlyGpuIds.Count
-            + skipReasons.Count
-            + storCount;
+            + skipReasons.Count;
 
-        string imodState = optimizeUsbImod
-            ? "enabled for eligible XHCI"
-            : "skipped by user/no eligible target";
+        string imodState = FormatAutoImodRequestState(optimizeUsbImod, hasUsbImodTarget);
 
-        WriteLog($"AUTO.RESULT.MODE: {(_testAutoDryRun ? "dry-run preview, nothing saved" : "apply mode")} | CPU={(usingP ? "P-cores" : "E-cores")} | primaryP=[{string.Join(',', primaryP)}] primaryE=[{string.Join(',', primaryE)}] targetCCD=[{string.Join(',', targetCcdLps)}]");
-        WriteLog($"AUTO.RESULT.DETECTED: USB={usbBlocks.Count} GPU={gpuBlocks.Count} iGPU={integratedGpuBlocks.Count} NET={netCount} AUDIO={audioBlocks.Count} STOR={storCount} WiFi={wifiIds.Count} | USB IMOD={imodState}");
+        WriteLog($"AUTO.RESULT.MODE: mode=\"{(_testAutoDryRun ? "dry-run preview, nothing saved" : "apply mode")}\" cpuType={(usingP ? "P-cores" : "E-cores")} primaryP=[{string.Join(',', primaryP)}] primaryE=[{string.Join(',', primaryE)}] targetCCD=[{string.Join(',', targetCcdLps)}]");
+        WriteLog($"AUTO.RESULT.DETECTED: usb={usbBlocks.Count} gpu={gpuBlocks.Count} integratedGpu={integratedGpuBlocks.Count} network={netCount} audio={audioBlocks.Count} storage={storCount} wifi={wifiIds.Count} usbImod=\"{SanitizeLogValue(imodState)}\"");
 
         foreach (AutoAffinityPlanSlot slot in planSlots.Where(slot => slot.Lps.Count > 0))
         {
             DeviceBlock block = slot.Block;
             string lps = string.Join(',', slot.Lps);
-            string name = FormatAutoResultDeviceName(block);
+            string deviceFields = FormatAutoResultDeviceFields(block);
             string role = FormatAutoResultRole(slot.Role);
             string kind = FormatAutoResultKind(block.Kind);
             string policy = FormatAutoResultPicker(block.PolicyCombo);
@@ -504,48 +529,53 @@ public sealed partial class MainForm
             {
                 string mode = FormatAutoResultPicker(block.NdisModeCombo);
                 string queues = block.RssQueueBox?.Value.ToString() ?? "n/a";
-                extra = $" | NDIS={mode} queues={queues}";
+                extra = $" ndisMode=\"{SanitizeLogValue(mode)}\" rssQueues={queues}";
             }
             else if (block.Kind == DeviceKind.USB && IsUsbImodTarget(block.Device))
             {
                 string imod = SanitizeLogValue(block.ImodBox.Text);
-                extra = $" | IMOD={(string.IsNullOrWhiteSpace(imod) ? "n/a" : imod)}";
+                extra = $" imod=\"{(string.IsNullOrWhiteSpace(imod) ? "n/a" : imod)}\"";
             }
 
-            WriteLog($"AUTO.RESULT.APPLIED: {role} | {kind} | \"{name}\" -> CPU=[{lps}] mask=0x{block.AffinityMask:X} MSI={msi} prio={prio} policy={policy}{extra} | reason={slot.Reason}");
+            WriteLog($"AUTO.RESULT.APPLIED: role=\"{SanitizeLogValue(role)}\" kind={kind} {deviceFields} cpu=[{lps}] mask=0x{block.AffinityMask:X} msi={msi} priority={prio} policy=\"{SanitizeLogValue(policy)}\"{extra} reason=\"{SanitizeLogValue(slot.Reason)}\"");
         }
 
         foreach (AutoAffinityPlanSlot slot in planSlots.Where(slot => slot.Lps.Count == 0))
         {
             DeviceBlock block = slot.Block;
-            WriteLog($"AUTO.RESULT.SKIPPED: {FormatAutoResultRole(slot.Role)} | {FormatAutoResultKind(block.Kind)} | \"{FormatAutoResultDeviceName(block)}\" -> no safe CPU core");
+            WriteLog($"AUTO.RESULT.SKIPPED: role=\"{SanitizeLogValue(FormatAutoResultRole(slot.Role))}\" kind={FormatAutoResultKind(block.Kind)} {FormatAutoResultDeviceFields(block)} reason=\"no safe CPU core\"");
         }
 
         foreach (DeviceBlock block in _blocks.Where(block => wifiIds.Contains(block.Device.InstanceId)))
         {
-            string wifiAction = block.Device.IsTestDevice ? "test affinity cleared, MSI/prio only" : "affinity preserved, MSI/prio only";
-            WriteLog($"AUTO.RESULT.SKIPPED: WiFi | {FormatAutoResultKind(block.Kind)} | \"{FormatAutoResultDeviceName(block)}\" -> {wifiAction}");
+            WriteLog($"AUTO.RESULT.PRESERVED: role=\"WiFi\" kind={FormatAutoResultKind(block.Kind)} {FormatAutoResultDeviceFields(block)} reason=\"no changes\"");
         }
 
         foreach (DeviceBlock block in _blocks.Where(block => msiOnlyGpuIds.Contains(block.Device.InstanceId)))
         {
-            WriteLog($"AUTO.RESULT.SKIPPED: Integrated GPU | {FormatAutoResultKind(block.Kind)} | \"{FormatAutoResultDeviceName(block)}\" -> affinity preserved, MSI only");
+            WriteLog($"AUTO.RESULT.SKIPPED: role=\"Integrated GPU\" kind={FormatAutoResultKind(block.Kind)} {FormatAutoResultDeviceFields(block)} reason=\"affinity preserved, MSI only\"");
         }
 
         foreach (DeviceBlock block in _blocks.Where(block => skipReasons.ContainsKey(block.Device.InstanceId)))
         {
-            WriteLog($"AUTO.RESULT.SKIPPED: {FormatAutoResultKind(block.Kind)} | \"{FormatAutoResultDeviceName(block)}\" -> {skipReasons[block.Device.InstanceId]}");
+            WriteLog($"AUTO.RESULT.SKIPPED: kind={FormatAutoResultKind(block.Kind)} {FormatAutoResultDeviceFields(block)} reason=\"{SanitizeLogValue(skipReasons[block.Device.InstanceId])}\"");
         }
 
         if (storCount > 0)
         {
-            WriteLog($"AUTO.RESULT.SKIPPED: Storage devices={storCount} -> AUTO does not touch storage affinity");
+            foreach (DeviceBlock block in _blocks.Where(block => block.Kind == DeviceKind.STOR))
+            {
+                WriteLog(
+                    $"AUTO.RESULT.CONFIGURED: role=\"Storage\" kind={FormatAutoResultKind(block.Kind)} {FormatAutoResultDeviceFields(block)} " +
+                    "msi=Enabled priority=High limit=unlocked affinity=WindowsDefault " +
+                    "removed=[MessageNumberLimit,DevicePolicy,AssignmentSetOverride]");
+            }
         }
 
-        WriteLog($"AUTO.RESULT.FINAL: assigned={assigned} skippedOrPreserved={skipped} usedLPs=[{string.Join(',', assignedLps)}] reservedSpacingLPs=[{string.Join(',', reservedLps)}] inputShareLPs=[{string.Join(',', inputShareCores.Distinct().OrderBy(lp => lp))}]");
+        WriteLog($"AUTO.RESULT.FINAL: assignedCpuAffinity={assigned} skippedOrPreserved={skipped} storageConfigured={storCount} usedLPs=[{string.Join(',', assignedLps)}] reservedSpacingLPs=[{string.Join(',', reservedLps)}] inputShareLPs=[{string.Join(',', inputShareCores.Distinct().OrderBy(lp => lp))}]");
     }
 
-    private bool InvokeAutoOptimization(bool optimizeUsbImod, OperationReport? report = null)
+    private bool InvokeAutoOptimization(bool optimizeUsbImod, bool hasUsbImodTarget, OperationReport? report = null)
     {
         if (_blocks.Count == 0)
         {
@@ -553,25 +583,14 @@ public sealed partial class MainForm
             return false;
         }
 
+        if (!_cpuTopologyReliable)
+        {
+            report?.AddError("AUTO-OPTIMIZATION", "Windows CPU topology APIs failed; no affinity changes were applied");
+            WriteLog("AUTO: aborted (CPU topology is display-only and not reliable)");
+            return false;
+        }
+
         WriteLog("AUTO: Invoke-AutoOptimization start");
-        if (_testAutoDryRun)
-        {
-            WriteLog("AUTO.THROTTLE: dry-run -> skipped");
-        }
-        else
-        {
-            ApplyAutoRawMouseThrottle(report);
-        }
-
-        if (_testAutoDryRun)
-        {
-            ResetReservedCpuSetsPreview();
-        }
-        else
-        {
-            ResetReservedCpuSets(report);
-        }
-
         (List<int> P, List<int> E)? cpuSets = GetAutoCpuSets();
         if (cpuSets is null)
         {
@@ -658,6 +677,19 @@ public sealed partial class MainForm
             report?.AddError("AUTO-OPTIMIZATION", "no performance P-cores available for affinity plan");
             WriteLog("AUTO: aborted (performance P count is 0)");
             return false;
+        }
+
+        // Do not touch registry-backed global settings until the CPU plan has
+        // passed its preflight checks. A planning failure must leave Windows unchanged.
+        if (_testAutoDryRun)
+        {
+            WriteLog("AUTO.THROTTLE: dry-run -> skipped");
+            ResetReservedCpuSetsPreview();
+        }
+        else
+        {
+            ApplyAutoRawMouseThrottle(report);
+            ResetReservedCpuSets(report);
         }
 
         WriteLog($"AUTO: CPU primary P=[{string.Join(',', primaryP)}] E=[{string.Join(',', primaryE)}] performanceP=[{string.Join(',', performanceP)}] performanceE=[{string.Join(',', performanceE)}]");
@@ -759,6 +791,7 @@ public sealed partial class MainForm
         HashSet<string> msiOnlyGpuIds = integratedGpuBlocks
             .Select(b => b.Device.InstanceId)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> msiOnlyDisplayAudioIds = new(StringComparer.OrdinalIgnoreCase);
 
         foreach (DeviceBlock usbBlock in usbBlocks)
         {
@@ -794,7 +827,15 @@ public sealed partial class MainForm
 
             skipAutoIds.Add(pnpId);
             string reason = isSpdif ? "digital S/PDIF audio" : "display/HDMI audio";
-            skipReasons[pnpId] = $"{reason}, left untouched by AUTO";
+            if (isDisplay)
+            {
+                msiOnlyDisplayAudioIds.Add(pnpId);
+                skipReasons[pnpId] = $"{reason}: MSI enabled; CPU affinity, priority and MSI limit preserved";
+            }
+            else
+            {
+                skipReasons[pnpId] = $"{reason}: excluded from CPU assignment; MSI enabled, priority reset, limit unlimited, affinity reset to Windows default";
+            }
             WriteLog($"AUTO.SKIP.AUDIO: {pnpId} classified as {reason} (name=\"{desc}\" endpoints=\"{audioText}\")");
         }
 
@@ -802,10 +843,16 @@ public sealed partial class MainForm
         {
             bool isSkipAuto = skipAutoIds.Contains(block.Device.InstanceId);
             bool isMsiOnlyGpu = msiOnlyGpuIds.Contains(block.Device.InstanceId);
+            bool isMsiOnlyDisplayAudio = msiOnlyDisplayAudioIds.Contains(block.Device.InstanceId);
             bool isWifi = wifiIds.Contains(block.Device.InstanceId);
             ulong beforeMask = block.AffinityMask;
             string beforePolicy = block.PolicyCombo.SelectedItem?.ToString() ?? "(none)";
-            WriteLog($"AUTO.RESET: {block.Device.InstanceId} Kind={block.Kind} maskBefore=0x{beforeMask:X} policyBefore={beforePolicy}");
+            string beforeMsi = block.MsiCombo.SelectedItem?.ToString() ?? "(none)";
+            string beforeLimit = block.LimitBox.Text?.Trim() ?? string.Empty;
+            string beforePriority = block.PrioCombo.SelectedItem?.ToString() ?? "(none)";
+            WriteLog(
+                $"AUTO.STATE.BEFORE: {block.Device.InstanceId} Kind={block.Kind} MSI={beforeMsi} " +
+                $"limit=\"{beforeLimit}\" priority={beforePriority} policy={beforePolicy} mask=0x{beforeMask:X}");
 
             if (isMsiOnlyGpu)
             {
@@ -816,31 +863,26 @@ public sealed partial class MainForm
                 continue;
             }
 
+            if (isMsiOnlyDisplayAudio)
+            {
+                string msiBefore = block.MsiCombo.SelectedItem?.ToString() ?? "(none)";
+                string limitBefore = block.LimitBox.Text?.Trim() ?? string.Empty;
+                string priorityBefore = block.PrioCombo.SelectedItem?.ToString() ?? "(none)";
+                string policyBefore = block.PolicyCombo.SelectedItem?.ToString() ?? "(none)";
+                ulong maskBefore = block.AffinityMask;
+                block.MsiCombo.SelectedItem = "Enabled";
+                WriteLog(
+                    $"AUTO.MSI-ONLY.DISPLAY-AUDIO: {block.Device.InstanceId} " +
+                    $"MSI={msiBefore}->Enabled limit=\"{limitBefore}\" priority={priorityBefore} " +
+                    $"policy={policyBefore} mask=0x{maskBefore:X} preserved=limit,priority,policy,affinity");
+                continue;
+            }
+
             if (isWifi)
             {
-                if (block.Device.IsTestDevice)
-                {
-                    block.SuppressCpuEvents++;
-                    try
-                    {
-                        foreach (CheckBox cb in block.CpuBoxes)
-                        {
-                            cb.Checked = false;
-                        }
-                    }
-                    finally
-                    {
-                        block.SuppressCpuEvents--;
-                    }
-
-                    block.AffinityMask = 0;
-                    block.RssBaseCore = null;
-                }
-
-                block.MsiCombo.SelectedItem = "Enabled";
-                block.PrioCombo.SelectedItem = "High";
-                string affinityState = block.Device.IsTestDevice ? "test affinity cleared" : "affinity/limit preserved";
-                WriteLog($"AUTO.WIFI.SKIP: {block.Device.InstanceId} -> MSI=Enabled Prio=High ({affinityState})");
+                WriteLog(
+                    $"AUTO.WIFI.PRESERVE: {block.Device.InstanceId} -> no changes " +
+                    $"MSI={beforeMsi} limit=\"{beforeLimit}\" priority={beforePriority} policy={beforePolicy} mask=0x{beforeMask:X}");
                 continue;
             }
 
@@ -900,7 +942,13 @@ public sealed partial class MainForm
 
             ulong afterMask = block.AffinityMask;
             string afterPolicy = block.PolicyCombo.SelectedItem?.ToString() ?? "(none)";
-            WriteLog($"AUTO.RESET: {block.Device.InstanceId} Kind={block.Kind} maskAfter=0x{afterMask:X} policyAfter={afterPolicy} skipAuto={isSkipAuto}");
+            string afterMsi = block.MsiCombo.SelectedItem?.ToString() ?? "(none)";
+            string afterLimit = block.LimitBox.Text?.Trim() ?? string.Empty;
+            string afterPriority = block.PrioCombo.SelectedItem?.ToString() ?? "(none)";
+            WriteLog(
+                $"AUTO.STATE.AFTER: {block.Device.InstanceId} Kind={block.Kind} MSI={afterMsi} " +
+                $"limit=\"{afterLimit}\" priority={afterPriority} policy={afterPolicy} mask=0x{afterMask:X} " +
+                $"cpuAssignmentSkipped={isSkipAuto || block.Kind == DeviceKind.STOR}");
             if (isSkipAuto)
             {
                 string reason = IsSpdifAudioEndpointsText(block.Device.AudioEndpoints) ? "digital S/PDIF audio" : "display/HDMI audio";
@@ -909,13 +957,13 @@ public sealed partial class MainForm
         }
 
         List<DeviceBlock> imodTargets = usbBlocks.Where(b => IsUsbImodTarget(b.Device)).ToList();
-        if (!optimizeUsbImod)
+        if (!hasUsbImodTarget)
         {
-            WriteLog("AUTO.IMOD: skipped by user choice");
+            WriteLog("AUTO.IMOD: skipped reason=no-eligible-xhci-controller");
         }
-        else if (imodTargets.Count == 0)
+        else if (!optimizeUsbImod)
         {
-            WriteLog("AUTO.IMOD: no eligible XHCI controllers -> skipping");
+            WriteLog("AUTO.IMOD: skipped reason=user-declined");
         }
         else
         {
@@ -1575,6 +1623,7 @@ public sealed partial class MainForm
         WriteLog($"AUTO.PLAN.FINAL: consumed=[{string.Join(',', consumedCores.OrderBy(x => x))}] inputShare=[{string.Join(',', inputShareCores.Distinct().OrderBy(x => x))}] assigned={planSlots.Count(s => s.Lps.Count > 0)} skipped={planSlots.Count(s => s.Lps.Count == 0)}");
         WriteAutoOptimizationResultSummary(
             optimizeUsbImod,
+            hasUsbImodTarget,
             usingP,
             performanceP,
             performanceE,
@@ -1595,21 +1644,21 @@ public sealed partial class MainForm
         return true;
     }
 
-    private void ResetAllTweaks(OperationReport? report = null)
+    private void SafeResetTweaks(OperationReport? report = null)
     {
         report ??= new OperationReport();
-        WriteLog("RESET: full reset requested");
+        WriteLog("SAFE_RESET: requested; MSI mode/limit and Wi-Fi are preserved");
         bool ownsBusy = _devicesBusyDepth > 0;
         int blockCount = Math.Max(1, _blocks.Count);
         if (ownsBusy)
         {
             // prepare + blocks + reserved + imod + suspend/finalize
             SetDevicesBusyWork(1 + blockCount + 3, 0);
-            TickDevicesBusy("Preparing RESET ALL...", 1);
+            TickDevicesBusy("Preparing RESET WINDOWS DEFAULT...", 1);
         }
         else
         {
-            SetDevicesBusyStage("Preparing RESET ALL...");
+            SetDevicesBusyStage("Preparing RESET WINDOWS DEFAULT...");
         }
 
         if (_blocks.Count == 0)
@@ -1624,7 +1673,7 @@ public sealed partial class MainForm
 
         if (_testAutoDryRun)
         {
-            WriteLog("RESET: dry-run -> ReservedCpuSets/IMOD persistence/registry left untouched");
+            WriteLog("SAFE_RESET: dry-run -> ReservedCpuSets/IMOD persistence/registry left untouched");
             if (ownsBusy)
             {
                 SetDevicesBusyWork(1 + blockCount + 1, Math.Min(_devicesBusyDone, 1 + blockCount + 1));
@@ -1645,6 +1694,12 @@ public sealed partial class MainForm
 
                 try
                 {
+                    if (b.Device.Wifi)
+                    {
+                        WriteLog($"SAFE_RESET.WIFI.PRESERVE: {b.Device.InstanceId} -> no changes");
+                        continue;
+                    }
+
                     if (b.Device.IsTestDevice)
                     {
                         ResetBlockSettings(b, report);
@@ -1711,13 +1766,13 @@ public sealed partial class MainForm
                         b.ImodAutoCheck.Checked = false;
                         if (b.Device.IsTestDevice)
                         {
-                            RefreshTestImodPreview(b, "reset-all-dry-run");
+                            RefreshTestImodPreview(b, "safe-reset-dry-run");
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    WriteLog($"RESET.ERROR: {b.Device.InstanceId} -> {ex.Message}");
+                    WriteLog($"SAFE_RESET.ERROR: {b.Device.InstanceId} -> {ex.Message}");
                     report.AddError($"{b.Device.Name} — reset", ex.Message);
                 }
             }
@@ -1732,23 +1787,24 @@ public sealed partial class MainForm
             }
 
             ResetReservedCpuSetsPreview();
-            CalculateIrqCounts("reset-all");
-            LogGuiSnapshot("reset-all-dry-run");
+            CalculateIrqCounts("safe-reset");
+            LogGuiSnapshot("safe-reset-dry-run");
             if (ownsBusy)
             {
                 _devicesBusyDone = _devicesBusyTotal;
                 UpdateDevicesBusy("Ready", 100);
             }
 
-            WriteLog($"RESET.DONE: mode=dry-run blocks={_blocks.Count} errors={report.Errors.Count}");
+            WriteLog($"SAFE_RESET.DONE: mode=dry-run blocks={_blocks.Count} errors={report.Errors.Count}");
             CloseDevicesBusyOverlay();
             ShowOperationResult(
                 report,
                 successMessage:
                     "Dry-run reset complete (UI only).\n" +
                     "No registry / IMOD startup files were changed.\n" +
-                    "Uncheck AUTO-OPTIMIZATION dry-run in TEST ADMIN for a real RESET ALL.",
-                partialMessage: "Dry-run RESET finished with errors.");
+                    "Disable sandbox dry-run to perform a real RESET WINDOWS DEFAULT.",
+                partialMessage: "RESET WINDOWS DEFAULT preview finished with errors.",
+                operationName: "RESET WINDOWS DEFAULT PREVIEW");
             return;
         }
 
@@ -1767,6 +1823,12 @@ public sealed partial class MainForm
 
             try
             {
+                if (b.Device.Wifi)
+                {
+                    WriteLog($"SAFE_RESET.WIFI.PRESERVE: {b.Device.InstanceId} -> no changes");
+                    continue;
+                }
+
                 ResetBlockSettings(b, report);
                 if (!b.Device.IsTestDevice)
                 {
@@ -1775,7 +1837,7 @@ public sealed partial class MainForm
             }
             catch (Exception ex)
             {
-                WriteLog($"RESET.ERROR: {b.Device.InstanceId} -> {ex.Message}");
+                WriteLog($"SAFE_RESET.ERROR: {b.Device.InstanceId} -> {ex.Message}");
                 report.AddError($"{b.Device.Name} — reset", ex.Message);
             }
         }
@@ -1795,27 +1857,46 @@ public sealed partial class MainForm
         }
         catch (Exception ex)
         {
-            WriteLog($"RESET.ERROR: ReservedCpuSets -> {ex.Message}");
+            WriteLog($"SAFE_RESET.ERROR: ReservedCpuSets -> {ex.Message}");
             report.AddError("Reserved CPU sets", ex.Message);
+        }
+
+        try
+        {
+            if (SupportsRawMouseThrottleOs())
+            {
+                SetRawMouseThrottle(enabled: false, DefaultRawMouseThrottleDuration);
+                RefreshRawMouseThrottleUi();
+                WriteLog("SAFE_RESET.THROTTLE: custom RawMouseThrottleDuration removed");
+            }
+            else
+            {
+                WriteLog("SAFE_RESET.THROTTLE: skipped (unsupported OS)");
+            }
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"SAFE_RESET.ERROR: RawMouseThrottleDuration -> {ex.Message}");
+            report.AddError("Raw mouse throttle", ex.Message);
         }
 
         try
         {
             if (ownsBusy)
             {
-                TickDevicesBusy("Resetting IMOD defaults...", 1);
+                TickDevicesBusy("Removing IMOD persistence...", 1);
             }
             else
             {
-                SetDevicesBusyStage("Resetting IMOD defaults...");
+                SetDevicesBusyStage("Removing IMOD persistence...");
             }
 
-            ResetImodIntervalsToDefault("reset-all", report);
+            ClearImodPersistenceForSafeReset(report);
         }
         catch (Exception ex)
         {
-            WriteLog($"RESET.ERROR: IMOD defaults -> {ex.Message}");
-            report.AddError("IMOD reset", ex.Message);
+            WriteLog($"SAFE_RESET.ERROR: IMOD persistence -> {ex.Message}");
+            report.AddError("IMOD persistence", ex.Message);
         }
 
         try
@@ -1827,16 +1908,16 @@ public sealed partial class MainForm
             if (anyRealUsb)
             {
                 UsbSelectiveSuspendPolicy.SetPowerPlanEnabled(true);
-                WriteLog("RESET.SUSPEND.PLAN: USB selective suspend power plan restored to Enabled");
+                WriteLog("SAFE_RESET.SUSPEND.PLAN: USB selective suspend power plan restored to Enabled");
             }
             else
             {
-                WriteLog("RESET.SUSPEND.PLAN: skipped (no real USB blocks)");
+                WriteLog("SAFE_RESET.SUSPEND.PLAN: skipped (no real USB blocks)");
             }
         }
         catch (Exception ex)
         {
-            WriteLog($"RESET.ERROR: USB selective suspend power plan -> {ex.Message}");
+            WriteLog($"SAFE_RESET.ERROR: USB selective suspend power plan -> {ex.Message}");
             report.AddError("USB Selective Suspend power plan", ex.Message);
         }
 
@@ -1849,20 +1930,41 @@ public sealed partial class MainForm
             SetDevicesBusyStage("Updating IRQ counts...");
         }
 
-        CalculateIrqCounts("reset-all");
-        LogGuiSnapshot("reset-all");
+        CalculateIrqCounts("safe-reset");
+        LogGuiSnapshot("safe-reset");
         if (ownsBusy)
         {
             _devicesBusyDone = _devicesBusyTotal;
             UpdateDevicesBusy("Ready", 100);
         }
 
-        WriteLog($"RESET.DONE: mode=apply blocks={_blocks.Count} errors={report.Errors.Count}");
+        WriteLog($"SAFE_RESET.DONE: mode=apply blocks={_blocks.Count} errors={report.Errors.Count}");
         CloseDevicesBusyOverlay();
         ShowOperationResult(
             report,
-            successMessage: "All DEVICE TWEAKER changes have been cleared.\nPlease reboot your PC to fully revert device behavior.",
-            partialMessage: "RESET ALL finished with errors. Some settings may still be active.");
+            successMessage:
+                "Supported tweaks were reset.\n" +
+                "Please reboot your PC to restore runtime hardware defaults.",
+            partialMessage: "RESET WINDOWS DEFAULT finished with errors. Some settings may still be active.",
+            operationName: "RESET WINDOWS DEFAULT");
+    }
+
+    private void ClearImodPersistenceForSafeReset(OperationReport? report)
+    {
+        foreach (DeviceBlock block in _blocks.Where(block => IsUsbImodTarget(block.Device)))
+        {
+            block.ImodAutoCheck.Checked = false;
+        }
+
+        if (_testAutoDryRun)
+        {
+            WriteLog("SAFE_RESET.IMOD: dry-run -> persistence preserved; runtime MMIO untouched");
+            return;
+        }
+
+        RemoveImodPersistenceFiles(report);
+        WriteLog("SAFE_RESET.IMOD: persistence removed; runtime MMIO intentionally untouched until reboot");
+        RefreshImodCurrentValues(reason: "safe-reset");
     }
 
     private void ResetImodIntervalsToDefault(string reason = "reset-imod", OperationReport? report = null)
@@ -1894,21 +1996,15 @@ public sealed partial class MainForm
                 // the driver was already loaded explicitly (CHECK / prior IMOD apply).
                 if (IsImodDriverAlreadyAvailable())
                 {
-                    ImodApplyOutcome outcome = ApplyImodSettings(out string? note);
+                    ImodApplyOutcome outcome = ApplyImodSettings(out string? note, out string? technicalDetails);
                     if (!string.IsNullOrWhiteSpace(note))
                     {
                         WriteLog($"RESET.IMOD.USB: {note}");
                     }
 
-                    if (outcome == ImodApplyOutcome.Failed)
+                    if (report is not null)
                     {
-                        report?.AddError("IMOD reset", note ?? "apply failed");
-                    }
-                    else if (!string.IsNullOrWhiteSpace(note)
-                        && (note.Contains("failure", StringComparison.OrdinalIgnoreCase)
-                            || note.Contains("failed", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        report?.AddError("IMOD reset", note);
+                        AddImodResultToReport(report, outcome, note, technicalDetails, "IMOD reset");
                     }
                 }
                 else

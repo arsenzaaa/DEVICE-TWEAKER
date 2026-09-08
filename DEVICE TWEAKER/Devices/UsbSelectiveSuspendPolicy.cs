@@ -10,6 +10,17 @@ namespace DeviceTweakerCS;
 /// </summary>
 internal static class UsbSelectiveSuspendPolicy
 {
+    internal sealed record ApplyResult(
+        int TargetCount,
+        int PnpSucceeded,
+        int WmiExposed,
+        int WmiSucceeded,
+        IReadOnlyList<string> Notes,
+        IReadOnlyList<string> Errors)
+    {
+        public bool Success => Errors.Count == 0;
+    }
+
     public const string SelectiveSuspendEnabledName = "SelectiveSuspendEnabled";
     public const string EnhancedPowerManagementEnabledName = "EnhancedPowerManagementEnabled";
 
@@ -67,25 +78,70 @@ internal static class UsbSelectiveSuspendPolicy
         return ids;
     }
 
-    public static void ApplyControllerAndHubs(string controllerInstanceId, bool enabled)
+    public static ApplyResult ApplyControllerAndHubs(string controllerInstanceId, bool enabled)
     {
         if (string.IsNullOrWhiteSpace(controllerInstanceId))
         {
             throw new InvalidOperationException("USB controller instance id is empty.");
         }
 
-        SetDeviceParameterDword(controllerInstanceId, SelectiveSuspendEnabledName, enabled ? 1 : 0);
-        SetDeviceParameterDword(controllerInstanceId, EnhancedPowerManagementEnabledName, enabled ? 1 : 0);
-        DevicePowerPolicy.TryApplyInstancePnPCapabilities(controllerInstanceId, allowTurnOff: enabled, out _);
-        DevicePowerPolicy.TrySetDevicePowerEnable(controllerInstanceId, allowTurnOff: enabled);
-
-        foreach (string hubId in EnumerateRootHubs(controllerInstanceId))
+        List<string> targets = [controllerInstanceId, .. EnumerateRootHubs(controllerInstanceId)];
+        List<string> notes = [];
+        List<string> errors = [];
+        int pnpSucceeded = 0;
+        int wmiExposed = 0;
+        int wmiSucceeded = 0;
+        foreach (string target in targets)
         {
-            SetDeviceParameterDword(hubId, SelectiveSuspendEnabledName, enabled ? 1 : 0);
-            SetDeviceParameterDword(hubId, EnhancedPowerManagementEnabledName, enabled ? 1 : 0);
-            DevicePowerPolicy.TryApplyInstancePnPCapabilities(hubId, allowTurnOff: enabled, out _);
-            DevicePowerPolicy.TrySetDevicePowerEnable(hubId, allowTurnOff: enabled);
+            try
+            {
+                SetDeviceParameterDword(target, SelectiveSuspendEnabledName, enabled ? 1 : 0);
+                SetDeviceParameterDword(target, EnhancedPowerManagementEnabledName, enabled ? 1 : 0);
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"{target}: registry: {ex.Message}");
+            }
+
+            DevicePowerPolicy.WriteStatus pnpStatus = DevicePowerPolicy.ApplyInstancePnPCapabilities(
+                target,
+                allowTurnOff: enabled,
+                out _,
+                out string? pnpError);
+            if (pnpStatus == DevicePowerPolicy.WriteStatus.Applied)
+            {
+                pnpSucceeded++;
+            }
+            else if (pnpStatus == DevicePowerPolicy.WriteStatus.NotExposed)
+            {
+                notes.Add($"{target}: PnPCapabilities class key is not exposed");
+            }
+            else
+            {
+                errors.Add($"{target}: PnPCapabilities: {pnpError ?? "write failed"}");
+            }
+
+            DevicePowerPolicy.WriteStatus wmiStatus = DevicePowerPolicy.SetDevicePowerEnable(
+                target,
+                allowTurnOff: enabled,
+                out string? wmiError);
+            if (wmiStatus == DevicePowerPolicy.WriteStatus.Applied)
+            {
+                wmiExposed++;
+                wmiSucceeded++;
+            }
+            else if (wmiStatus == DevicePowerPolicy.WriteStatus.NotExposed)
+            {
+                notes.Add($"{target}: MSPower_DeviceEnable is not exposed by this driver");
+            }
+            else
+            {
+                wmiExposed++;
+                errors.Add($"{target}: MSPower_DeviceEnable: {wmiError ?? "write failed"}");
+            }
         }
+
+        return new ApplyResult(targets.Count, pnpSucceeded, wmiExposed, wmiSucceeded, notes, errors);
     }
 
     public static bool TryReadEnabled(string instanceId, out bool enabled)

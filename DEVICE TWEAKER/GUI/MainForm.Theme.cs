@@ -10,6 +10,8 @@ public sealed partial class MainForm
     private readonly Color _accentDark = Color.FromArgb(190, 190, 190);
     private readonly Color _border = Color.FromArgb(150, 150, 150);
     private readonly Color _statusDanger = Color.FromArgb(255, 80, 60);
+    private readonly Color _statusSuccess = Color.FromArgb(90, 200, 130);
+    private readonly Color _statusWarn = Color.FromArgb(230, 170, 70);
     private readonly Color _statusActive = Color.FromArgb(208, 230, 250);
     private readonly Color _statusInactive = Color.FromArgb(145, 145, 152);
     private readonly Color _statusPrefix = Color.FromArgb(172, 180, 190);
@@ -58,7 +60,9 @@ public sealed partial class MainForm
     {
         if (disposing)
         {
+            UiLanguage.Changed -= HandleUiLanguageChanged;
             DisposeRawPolling();
+            _startupRefreshTimer?.Dispose();
             _layoutRefreshTimer?.Dispose();
             _copyToolTip?.Dispose();
             _appIcon?.Dispose();

@@ -229,7 +229,7 @@ public sealed partial class MainForm
         int settingsMinimumWidth = Math.Min(UiScale(420), Math.Max(UiScale(320), grp.Width - UiScale(48)));
         int desiredSettingsSideWidth = UiScale(600);
         int settingsSideMinimumWidth = desiredSettingsSideWidth;
-        int cpuPanelMinimumWidth = UiScale(308);
+        int cpuPanelMinimumWidth = UiScale(320);
         int settingsSideGap = UiScale(40);
         int cpuPanelFullMaximumWidth = Math.Max(
             cpuPanelMinimumWidth,
@@ -381,25 +381,18 @@ public sealed partial class MainForm
             runningX += maxWidth + columnGap;
         }
 
-        int requiredWidth = columns.Count == 0 ? cpuPanel.Width : runningX - columnGap + startX + UiScale(18);
+        int cpuContentRight = columns.Count == 0 ? 0 : runningX - columnGap;
+        int requiredWidth = columns.Count == 0 ? cpuPanel.Width : cpuContentRight + startX + UiScale(18);
         int cpuPanelHorizontalSlack = UiScale(30);
         int sideSettingsX = 0;
         int sideSettingsWidth = 0;
         int settingsX = UiScale(18);
         int availableSettingsWidth = Math.Max(UiScale(260), grp.Width - settingsX - UiScale(24));
-        bool allowWindowAutoExpand = true;
-
         void UpdateResponsivePlacement()
         {
             settingsSideMinimumWidth = Math.Min(desiredSettingsSideWidth, Math.Max(UiScale(440), grp.Width - UiScale(48)));
             settingsMinimumWidth = Math.Min(UiScale(420), Math.Max(UiScale(320), grp.Width - UiScale(48)));
             cpuPanelFullMaximumWidth = Math.Max(cpuPanelMinimumWidth, grp.Width - cpuPanel.Left - UiScale(24));
-            int desiredSideCpuPanelWidth = Math.Max(cpuPanelMinimumWidth, requiredWidth + cpuPanelHorizontalSlack);
-            int desiredSideGroupWidth = cpuPanel.Left + desiredSideCpuPanelWidth + settingsSideGap + settingsSideMinimumWidth + UiScale(24);
-            if (allowWindowAutoExpand && grp.Width < desiredSideGroupWidth)
-            {
-                TryExpandWindowForSideSettings(desiredSideGroupWidth);
-            }
 
             cpuPanelFullMaximumWidth = Math.Max(cpuPanelMinimumWidth, grp.Width - cpuPanel.Left - UiScale(24));
             cpuPanelSideMaximumWidth = Math.Max(
@@ -415,8 +408,7 @@ public sealed partial class MainForm
                 cpuPanel.Width = targetCpuPanelWidth;
             }
 
-            if (requiredWidth > cpuPanel.ClientSize.Width + UiScale(2)
-                && requiredWidth > cpuPanelFullMaximumWidth)
+            if (cpuContentRight > cpuPanel.ClientSize.Width + UiScale(2))
             {
                 cpuPanel.AutoScroll = true;
                 cpuPanel.AutoScrollMinSize = new Size(requiredWidth + cpuPanelHorizontalSlack, cpuPanel.Height);
@@ -470,23 +462,6 @@ public sealed partial class MainForm
         bool showPowerSaving = device.Kind == DeviceKind.USB
             || ((device.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX) && !device.Wifi);
 
-        bool TryExpandWindowForSideSettings(int desiredGroupWidth)
-        {
-            int desiredViewportWidth = desiredGroupWidth + UiScale(36);
-            if (!TryExpandMainWindowForViewportWidth(desiredViewportWidth))
-            {
-                return false;
-            }
-
-            int expandedGroupWidth = Math.Max(grp.Width, GetDevicesViewportWidth() - UiScale(36));
-            if (expandedGroupWidth > grp.Width)
-            {
-                grp.Width = expandedGroupWidth;
-            }
-
-            return grp.Width >= desiredGroupWidth - UiScale(2);
-        }
-
         Panel settingsPanel = new()
         {
             AutoSize = false,
@@ -534,7 +509,7 @@ public sealed partial class MainForm
 
         Label lblLimitHint = new()
         {
-            Text = "(0 = unlimited)",
+            Text = "(0 = unlocked)",
             AutoSize = true,
             ForeColor = _mutedText,
             Location = new Point(txtLimit.Right + UiScale(8), txtLimit.Top + UiScale(4)),
@@ -724,9 +699,11 @@ public sealed partial class MainForm
         int nicInputWidth = nicButtonsInline
             ? Math.Min(nicInputDesiredWidth, Math.Max(nicInputMinWidth, nicInlineMaxWidth))
             : Math.Min(nicInputDesiredWidth, Math.Max(nicInputMinWidth, nicInputAvailableWidth));
-        int nicStatusWidth = Math.Max(UiScale(120), nicInputAvailableWidth);
+        int readbackInset = UiScale(14);
+        int nicReadbackX = valueX + readbackInset;
+        int nicStatusWidth = Math.Max(UiScale(120), availableSettingsWidth - nicReadbackX - UiScale(8));
         int nicDetailRows = nicItrProfile is { MaxQueues: > 1 and <= 4 } ? nicItrProfile.MaxQueues : 2;
-        int nicDetailHeight = Math.Max(UiScale(42), UiScale((nicDetailRows * 17) + 8));
+        int nicDetailHeight = Math.Max(UiScale(42), UiScale(((nicDetailRows + 1) * 17) + 8));
         Label lblNicItr = new()
         {
             Text = "NIC ITR:",
@@ -781,7 +758,7 @@ public sealed partial class MainForm
         btnNicItrSave.MouseEnter += (_, _) => SetTopButtonHoverStyle(btnNicItrSave);
         btnNicItrSave.MouseLeave += (_, _) => SetTopButtonBaseStyle(btnNicItrSave);
 
-        int nicCheckButtonWidth = UiScale(70);
+        int nicCheckButtonWidth = UiScale(76);
         Button btnNicItrCheck = new()
         {
             Text = "CHECK",
@@ -826,21 +803,63 @@ public sealed partial class MainForm
             AutoSize = false,
             Size = new Size(nicStatusWidth, UiScale(22)),
             ForeColor = _statusInactive,
-            Location = new Point(valueX, Math.Max(txtNicItr.Bottom, btnNicItrCheck.Bottom) + UiScale(4)),
+            Location = new Point(nicReadbackX, Math.Max(txtNicItr.Bottom, btnNicItrCheck.Bottom) + UiScale(4)),
             Visible = showNicItr,
             UseMnemonic = false,
         };
 
-        Label lblNicItrTime = new()
+        Label lblNicItrTime = new NicItrTableLabel()
         {
             Text = "time: reading...",
             AutoSize = false,
             Size = new Size(nicStatusWidth, nicDetailHeight),
             ForeColor = _statusInactive,
-            Location = new Point(valueX, lblNicItrStatus.Bottom + UiScale(2)),
+            BackColor = _bgGroup,
+            Font = _technicalFont,
+            Location = new Point(nicReadbackX, lblNicItrStatus.Bottom + UiScale(2)),
             Visible = showNicItr,
             UseMnemonic = false,
         };
+
+        void LayoutNicItrRow()
+        {
+            if (!showNicItr)
+            {
+                return;
+            }
+
+            int usableSettingsWidth = Math.Max(UiScale(120), availableSettingsWidth - UiScale(4));
+            int nicValueX = Math.Max(valueX, lblNicItr.PreferredWidth + UiScale(14));
+            nicReadbackX = nicValueX + readbackInset;
+            txtNicItr.Location = new Point(nicValueX, txtNicItr.Top);
+
+            int buttonsWidth = btnNicItr.Width + nicButtonGap
+                + btnNicItrSave.Width + nicButtonGap
+                + btnNicItrCheck.Width;
+            int inputAvailable = Math.Max(UiScale(100), usableSettingsWidth - nicValueX - UiScale(8));
+            int inlineAvailable = usableSettingsWidth - nicValueX - nicInlineGap - buttonsWidth - UiScale(8);
+            bool inline = inlineAvailable >= nicInputMinWidth;
+            int inputWidth = inline
+                ? Math.Min(nicInputDesiredWidth, Math.Max(nicInputMinWidth, inlineAvailable))
+                : Math.Min(nicInputDesiredWidth, Math.Max(nicInputMinWidth, inputAvailable));
+
+            txtNicItr.Size = new Size(inputWidth, UiScale(24));
+            btnNicItr.Location = inline
+                ? new Point(txtNicItr.Right + nicInlineGap, txtNicItr.Top)
+                : new Point(nicValueX, txtNicItr.Bottom + UiScale(6));
+            btnNicItrSave.Location = new Point(btnNicItr.Right + nicButtonGap, btnNicItr.Top);
+            btnNicItrCheck.Location = new Point(btnNicItrSave.Right + nicButtonGap, btnNicItr.Top);
+
+            int statusWidth = Math.Max(UiScale(120), usableSettingsWidth - nicReadbackX - UiScale(8));
+            lblNicItrStatus.Location = new Point(
+                nicReadbackX,
+                Math.Max(txtNicItr.Bottom, btnNicItrCheck.Bottom) + UiScale(4));
+            lblNicItrStatus.Size = new Size(statusWidth, UiScale(22));
+            lblNicItrTime.Location = new Point(nicReadbackX, lblNicItrStatus.Bottom + UiScale(2));
+            lblNicItrTime.Size = new Size(statusWidth, nicDetailHeight);
+        }
+
+        LayoutNicItrRow();
 
         if (showNicItr)
         {
@@ -1171,18 +1190,19 @@ public sealed partial class MainForm
 
         if (imodDeviceEditorRoles.Count > 0)
         {
-            int editorLabelWidth = UiScale(72);
+            int editorLabelWidth = UiScale(92);
             int editorBoxWidth = UiScale(78);
             int editorColumnGap = UiScale(18);
             int editorRowHeight = UiScale(28);
-            // 1–3 roles: one row. 4 roles: stable 2×2 grid (Mouse|Keyboard / Audio|Gamepad).
-            // Do not center a lone third cell — it shifts when Gamepad appears and looks unfinished.
-            bool twoColumnGrid = imodDeviceEditorRoles.Count >= 4;
+            // Keep the editor usable on narrower windows: one or two roles fit on one row,
+            // while three or more use a stable two-column grid. This prevents the third
+            // value box from being clipped when Russian labels are wider.
+            bool twoColumnGrid = imodDeviceEditorRoles.Count >= 3;
             int editorX = 0;
             int editorY = 0;
             for (int i = 0; i < imodDeviceEditorRoles.Count; i++)
             {
-                if (twoColumnGrid && i == 2)
+                if (twoColumnGrid && i > 0 && i % 2 == 0)
                 {
                     editorX = 0;
                     editorY += editorRowHeight;
@@ -1252,7 +1272,7 @@ public sealed partial class MainForm
                 return;
             }
 
-            if (TryBlockSandboxHardwareWrite("IMOD SET"))
+            if (TryBlockBusyHardwareWrite("IMOD SET") || TryBlockSandboxHardwareWrite("IMOD SET"))
             {
                 return;
             }
@@ -1260,15 +1280,19 @@ public sealed partial class MainForm
             OperationReport report = new();
             if (!CreateDeviceTweakerBackup("pre-imod", showDialog: false))
             {
+                report.MarkNoChangesMade();
                 report.AddError("Automatic backup", "backup could not be created; changes were not applied");
                 ShowOperationResult(
                     report,
                     successMessage: string.Empty,
-                    partialMessage: "IMOD apply was cancelled because the automatic backup failed.");
+                    partialMessage: "IMOD apply was cancelled because the automatic backup failed.",
+                    operationName: "USB IMOD");
                 return;
             }
 
-            ImodApplyOutcome outcome = ApplyImodSettings(out string? note);
+            report.SetBackupPath(_lastBackupPath);
+
+            ImodApplyOutcome outcome = ApplyImodSettings(out string? note, out string? technicalDetails);
             if (outcome is ImodApplyOutcome.SkippedNoUsb or ImodApplyOutcome.SkippedNoController)
             {
                 ShowThemedInfo(string.IsNullOrWhiteSpace(note)
@@ -1278,18 +1302,9 @@ public sealed partial class MainForm
             }
 
             WaitForBackgroundUiTasks(RefreshImodCurrentValuesAsync(showReadingStatus: true, reason: "imod-set"));
-            if (outcome == ImodApplyOutcome.Failed)
-            {
-                report.AddError("IMOD", note ?? "apply failed");
-            }
-            else if (!string.IsNullOrWhiteSpace(note)
-                && (note.Contains("failure", StringComparison.OrdinalIgnoreCase)
-                    || note.Contains("failed", StringComparison.OrdinalIgnoreCase)))
-            {
-                report.AddError("IMOD", note);
-            }
+            AddImodResultToReport(report, outcome, note, technicalDetails);
 
-            if (report.Succeeded)
+            if (report.Succeeded && report.Warnings.Count == 0)
             {
                 if (!string.IsNullOrWhiteSpace(note))
                 {
@@ -1302,7 +1317,9 @@ public sealed partial class MainForm
             ShowOperationResult(
                 report,
                 successMessage: note ?? "IMOD applied.",
-                partialMessage: "IMOD finished with errors.");
+                partialMessage: "USB IMOD completed with warnings or failed steps.",
+                operationName: "USB IMOD");
+            MaybeOfferVulnerableDriverBlocklistDisable(report);
         };
 
         Button btnImodDelete = new()
@@ -1329,7 +1346,7 @@ public sealed partial class MainForm
                 return;
             }
 
-            if (TryBlockSandboxHardwareWrite("IMOD DELETE"))
+            if (TryBlockBusyHardwareWrite("IMOD DELETE") || TryBlockSandboxHardwareWrite("IMOD DELETE"))
             {
                 return;
             }
@@ -1348,7 +1365,8 @@ public sealed partial class MainForm
             ShowOperationResult(
                 report,
                 successMessage: "IMOD reset to defaults.\nStartup script removed. Reboot your PC to unload DTIMOD.sys from memory if it was loaded.",
-                partialMessage: "IMOD delete finished with errors. Some persistence files may still remain. If the driver was loaded, reboot to unload DTIMOD.sys from memory.");
+                partialMessage: "IMOD delete finished with errors. Some persistence files may still remain. If the driver was loaded, reboot to unload DTIMOD.sys from memory.",
+                operationName: "USB IMOD DELETE");
             if (report.Succeeded)
             {
                 WriteLog("IMOD.DELETE: done; reboot recommended to unload DTIMOD.sys from memory");
@@ -1358,7 +1376,7 @@ public sealed partial class MainForm
         Button btnImodCheck = new()
         {
             Text = "CHECK",
-            Size = UiScale(70, 24),
+            Size = UiScale(76, 24),
             FlatStyle = FlatStyle.Flat,
             Font = _blockFont,
             UseVisualStyleBackColor = false,
@@ -1381,7 +1399,7 @@ public sealed partial class MainForm
         void UpdateImodDetailsVisibility()
         {
             bool showDetails = chkImod.Visible
-                && (chkImod.Checked || IsImodAttentionStatus(lblImodCurrent.Text));
+                && (chkImod.Checked || IsImodAttentionStatus(GetSourceControlText(lblImodCurrent)));
             lblImodCurrent.Visible = showDetails;
             lblImodDefault.Visible = showDetails;
             lblImodMap.Visible = showDetails;
@@ -1399,42 +1417,50 @@ public sealed partial class MainForm
         }
 
         bool showImod = ShouldShowImod(device);
-        if (showImod)
+        int imodRowTop = -1;
+
+        void LayoutImodRow()
         {
-            lblImodMode.Visible = true;
-            cmbImodMode.Visible = true;
-            lblImodModeHint.Visible = true;
+            if (!showImod || imodRowTop < 0)
+            {
+                return;
+            }
 
-            lblImodMode.Location = new Point(0, rowTop + labelOffset);
-            cmbImodMode.Location = new Point(valueX, rowTop);
+            // Manually positioned controls still carry a small WinForms
+            // margin. Keep it inside the panel instead of ending exactly on
+            // the right edge, where layout diagnostics correctly see it as
+            // clipped after a language switch.
+            int usableSettingsWidth = Math.Max(UiScale(120), availableSettingsWidth - UiScale(4));
+
+            lblImodMode.Location = new Point(0, imodRowTop + labelOffset);
+            cmbImodMode.Location = new Point(valueX, imodRowTop);
             int modeHintLeft = cmbImodMode.Right + UiScale(14);
-            lblImodModeHint.Location = new Point(modeHintLeft, rowTop + labelOffset);
+            lblImodModeHint.Location = new Point(modeHintLeft, imodRowTop + labelOffset);
             lblImodModeHint.Size = new Size(
-                Math.Max(UiScale(110), availableSettingsWidth - modeHintLeft - UiScale(8)),
+                Math.Max(UiScale(110), usableSettingsWidth - modeHintLeft - UiScale(8)),
                 UiScale(18));
-            UpdateImodModeHint();
-            rowTop = cmbImodMode.Bottom + rowGap;
 
+            int valueRowTop = cmbImodMode.Bottom + rowGap;
             Size imodLabelSize = TextRenderer.MeasureText(lblImod.Text, _baseFont);
-            int checkY = rowTop + labelOffset + Math.Max(0, (imodLabelSize.Height - imodCheckSize) / 2);
+            int checkY = valueRowTop + labelOffset + Math.Max(0, (imodLabelSize.Height - imodCheckSize) / 2);
             chkImod.Location = new Point(0, checkY);
-            lblImod.Location = new Point(imodCheckSize + imodCheckGap, rowTop + labelOffset);
+            lblImod.Location = new Point(imodCheckSize + imodCheckGap, valueRowTop + labelOffset);
+
             int buttonGap = UiScale(6);
             int inlineGap = UiScale(8);
-            int buttonTotalWidth = btnImodApply.Width + btnImodDelete.Width + buttonGap + btnImodCheck.Width + buttonGap;
-            int inlineInputWidth = availableSettingsWidth - valueX - buttonTotalWidth - inlineGap;
+            int buttonTotalWidth = btnImodApply.Width + btnImodDelete.Width + btnImodCheck.Width + (buttonGap * 2);
+            int inlineInputWidth = usableSettingsWidth - valueX - buttonTotalWidth - inlineGap;
             bool useInlineImodButtons = inlineInputWidth >= UiScale(160);
             int imodInputWidth = useInlineImodButtons
                 ? Math.Min(UiScale(420), inlineInputWidth)
-                : Math.Min(UiScale(420), Math.Max(UiScale(160), availableSettingsWidth - valueX - UiScale(8)));
+                : Math.Min(UiScale(420), Math.Max(UiScale(160), usableSettingsWidth - valueX - UiScale(8)));
             txtImod.Width = imodInputWidth;
-            txtImod.Location = new Point(valueX, rowTop);
+            txtImod.Location = new Point(valueX, valueRowTop);
             lblImodHelp.Visible = false;
             lblImodHelp.Location = new Point(txtImod.Left, txtImod.Bottom + UiScale(4));
             lblImodHelp.Size = new Size(UiScale(180), UiScale(18));
-            int imodButtonTop = useInlineImodButtons
-                ? txtImod.Top
-                : txtImod.Bottom + UiScale(6);
+
+            int imodButtonTop = useInlineImodButtons ? txtImod.Top : txtImod.Bottom + UiScale(6);
             int imodButtonLeft = useInlineImodButtons ? txtImod.Right + inlineGap : 0;
             btnImodApply.Location = new Point(imodButtonLeft, imodButtonTop);
             btnImodDelete.Location = new Point(btnImodApply.Right + buttonGap, imodButtonTop);
@@ -1443,30 +1469,39 @@ public sealed partial class MainForm
             int statusTop = Math.Max(txtImod.Bottom, btnImodCheck.Bottom) + UiScale(6);
             if (imodDeviceEditorPanel.Visible)
             {
-                // Keep a clear gap under SET/DELETE/CHECK so the role editors are not glued to the buttons.
                 imodDeviceEditorPanel.Location = new Point(valueX, statusTop + UiScale(6));
-                int editorRows = imodDeviceEditorRoles.Count >= 4 ? 2 : 1;
+                int editorRows = imodDeviceEditorRoles.Count >= 3 ? 2 : 1;
                 imodDeviceEditorPanel.Size = new Size(
-                    Math.Max(UiScale(80), availableSettingsWidth - valueX - UiScale(8)),
+                    Math.Max(UiScale(80), usableSettingsWidth - valueX - UiScale(8)),
                     UiScale(editorRows * 26));
                 statusTop = imodDeviceEditorPanel.Bottom + UiScale(6);
             }
 
-            int imodDetailsX = UiScale(28);
+            int imodDetailsX = valueX + readbackInset;
             int imodStatusTop = statusTop + UiScale(4);
             lblImodCurrent.Location = new Point(imodDetailsX, imodStatusTop);
-            int defaultStatusWidth = UiScale(120);
+            int defaultStatusWidth = UiScale(UiLanguage.IsRussian ? 152 : 120);
             int statusGap = UiScale(14);
             int currentStatusWidth = Math.Max(
                 UiScale(90),
-                Math.Min(UiScale(260), availableSettingsWidth - imodDetailsX - defaultStatusWidth - statusGap));
+                Math.Min(UiScale(260), usableSettingsWidth - imodDetailsX - defaultStatusWidth - statusGap));
             lblImodCurrent.Size = new Size(currentStatusWidth, UiScale(18));
-            lblImodDefault.Location = new Point(lblImodCurrent.Right + UiScale(14), imodStatusTop);
+            lblImodDefault.Location = new Point(lblImodCurrent.Right + statusGap, imodStatusTop);
             lblImodDefault.Size = new Size(defaultStatusWidth, UiScale(18));
             int imodMapRows = imodDeviceEditorRoles.Contains("Gamepad", StringComparer.OrdinalIgnoreCase) ? 12 : 11;
             lblImodMap.Location = new Point(imodDetailsX, lblImodCurrent.Bottom + UiScale(14));
-            lblImodMap.Size = new Size(Math.Max(UiScale(120), availableSettingsWidth - imodDetailsX), UiScale(imodMapRows * 16));
-            lblImodMap.WordWrap = false;
+            FitImodMapLabel(lblImodMap, usableSettingsWidth - imodDetailsX, imodMapRows);
+        }
+
+        if (showImod)
+        {
+            lblImodMode.Visible = true;
+            cmbImodMode.Visible = true;
+            lblImodModeHint.Visible = true;
+
+            UpdateImodModeHint();
+            imodRowTop = rowTop;
+            LayoutImodRow();
             settingsPanel.Controls.AddRange([lblImodMode, cmbImodMode, lblImodModeHint, chkImod, lblImod, txtImod, btnImodApply, btnImodDelete, btnImodCheck, imodDeviceEditorPanel, lblImodCurrent, lblImodDefault, lblImodMap]);
             _copyToolTip.SetToolTip(txtImod, $"Supported IMOD input:\n0xC8\n0xC8, 0xFA0\n{imodRoleTemplate}");
             _copyToolTip.SetToolTip(cmbImodMode, "XHCI applies one value to all interrupters on this USB host controller. Device mapping assigns detected devices to their interrupter. Interrupter mode applies values by interrupter index.");
@@ -1489,6 +1524,7 @@ public sealed partial class MainForm
             lblImodModeHint.Visible = false;
             lblImodDefault.Visible = false;
             lblImodCurrent.Visible = false;
+            lblImodMap.Visible = false;
             btnImodApply.Visible = false;
             btnImodDelete.Visible = false;
             btnImodCheck.Visible = false;
@@ -1516,11 +1552,20 @@ public sealed partial class MainForm
             Math.Max(settingsContentBottom + UiScale(8), UiScale(24)));
         settingsPanel.Size = settingsSize;
 
-        int settingsTop = cpuPanel.Top + Math.Max(0, (cpuPanel.Height - settingsSize.Height) / 2);
-        settingsPanel.Location = new Point(settingsX, settingsTop);
+        // Top-align settings with the CPU list. Keep Mask/IRQ under the affinity
+        // box; park PNP info under the taller of the two columns.
+        void PlaceAffinityChrome()
+        {
+            settingsPanel.Location = new Point(settingsX, cpuPanel.Top);
 
-        int infoY = Math.Max(lblIrq.Bottom + UiScale(14), cpuPanel.Bottom + UiScale(18));
-        infoY = Math.Max(infoY, settingsPanel.Bottom + UiScale(10));
+            int maskY = cpuPanel.Bottom + UiScale(12);
+            lblMask.Location = new Point(lblMask.Left, maskY);
+            lblIrq.Location = new Point(lblIrq.Left, maskY + UiScale(20));
+        }
+
+        PlaceAffinityChrome();
+
+        int infoY = Math.Max(lblIrq.Bottom, settingsPanel.Bottom) + UiScale(12);
         InfoTextBox lblInfo = new()
         {
             Text = "PNP ID: -",
@@ -1550,22 +1595,51 @@ public sealed partial class MainForm
         void RelayoutDeviceBlockChrome()
         {
             UpdateResponsivePlacement();
+            LayoutNicItrRow();
+            LayoutImodRow();
 
-            int visibleSettingsRight = 0;
-            int visibleSettingsBottom = 0;
-            foreach (Control child in settingsPanel.Controls)
+            void FitCurrentImodMap()
             {
-                if (!child.Visible)
+                if (!showImod || !lblImodMap.Visible)
                 {
-                    continue;
+                    return;
                 }
 
-                visibleSettingsRight = Math.Max(visibleSettingsRight, child.Right);
-                visibleSettingsBottom = Math.Max(visibleSettingsBottom, child.Bottom);
+                int maxRows = imodDeviceEditorRoles.Contains("Gamepad", StringComparer.OrdinalIgnoreCase) ? 12 : 11;
+                int mapWidth = Math.Max(UiScale(120), availableSettingsWidth - lblImodMap.Left - UiScale(4));
+                FitImodMapLabel(lblImodMap, mapWidth, maxRows);
             }
 
+            // IMOD readback replaces the initial one-line placeholder with a
+            // multi-line device/interrupter map. Refit before measuring the
+            // settings panel so the new lines are not trapped in a one-row box.
+            FitCurrentImodMap();
+
+            int MeasureVisibleSettings(out int right, out int bottom)
+            {
+                right = 0;
+                bottom = 0;
+                foreach (Control child in settingsPanel.Controls)
+                {
+                    if (!child.Visible)
+                    {
+                        continue;
+                    }
+
+                    right = Math.Max(right, child.Right);
+                    bottom = Math.Max(bottom, child.Bottom);
+                }
+
+                return bottom;
+            }
+
+            MeasureVisibleSettings(out int visibleSettingsRight, out _);
             desiredSettingsSideWidth = Math.Max(UiScale(600), visibleSettingsRight + UiScale(8));
             UpdateResponsivePlacement();
+            LayoutImodRow();
+            FitCurrentImodMap();
+
+            MeasureVisibleSettings(out visibleSettingsRight, out int visibleSettingsBottom);
 
             int currentAvailableSettingsWidth = Math.Max(UiScale(260), grp.Width - settingsX - UiScale(24));
             int currentSettingsMinWidth = Math.Min(UiScale(420), currentAvailableSettingsWidth);
@@ -1574,19 +1648,14 @@ public sealed partial class MainForm
                 Math.Max(visibleSettingsBottom + UiScale(8), UiScale(24)));
             settingsPanel.Size = currentSettingsSize;
 
-            int currentSettingsTop = cpuPanel.Top + Math.Max(0, (cpuPanel.Height - currentSettingsSize.Height) / 2);
-            settingsPanel.Location = new Point(settingsX, currentSettingsTop);
+            PlaceAffinityChrome();
 
-            int currentInfoY = Math.Max(lblIrq.Bottom + UiScale(14), cpuPanel.Bottom + UiScale(18));
-            currentInfoY = Math.Max(currentInfoY, settingsPanel.Bottom + UiScale(10));
-            lblInfo.Location = new Point(lblInfo.Left, currentInfoY);
             int currentInfoWidth = Math.Max(UiScale(140), grp.Width - lblInfo.Left - UiScale(24));
             int currentInfoHeight = Math.Max(UiScale(70), GetPreferredTextHeight(lblInfo, currentInfoWidth) + UiScale(2));
+            lblInfo.Location = new Point(lblInfo.Left, Math.Max(lblIrq.Bottom, settingsPanel.Bottom) + UiScale(12));
             lblInfo.Size = new Size(currentInfoWidth, currentInfoHeight);
 
-            grp.Height = Math.Max(
-                Math.Max(cpuPanel.Bottom + UiScale(110), settingsPanel.Bottom + UiScale(20)),
-                lblInfo.Bottom + UiScale(20));
+            grp.Height = lblInfo.Bottom + UiScale(20);
         }
 
         List<Control> chrome =
@@ -1739,13 +1808,22 @@ public sealed partial class MainForm
         }
 
         LoadBlockSettings(block);
+        if (device.Wifi)
+        {
+            // Wi-Fi drivers are intentionally left completely untouched. Keep
+            // detected values visible, but do not expose controls that APPLY
+            // and AUTO will never write.
+            settingsPanel.Enabled = false;
+            cpuPanel.Enabled = false;
+            _copyToolTip.SetToolTip(settingsPanel, "Wi-Fi settings are preserved by DEVICE TWEAKER.");
+            _copyToolTip.SetToolTip(cpuPanel, "Wi-Fi settings are preserved by DEVICE TWEAKER.");
+        }
         if (showImod)
         {
             UpdateImodDetailsVisibility();
             RelayoutDeviceBlockChrome();
         }
 
-        allowWindowAutoExpand = false;
         _devicesPanel.Controls.Add(grp);
         _blocks.Add(block);
         if (showImod && block.Device.IsTestDevice)
@@ -1904,6 +1982,10 @@ public sealed partial class MainForm
         }
 
         _devicesBusyDepth++;
+        if (_devicesBusyDepth == 1)
+        {
+            SetOperationButtonsEnabled(false);
+        }
         percent = Math.Clamp(percent, 0, 100);
         _devicesBusyLabel.Text = $"{stage}\r\n{percent}%";
         _devicesBusyOverlay.Visible = true;
@@ -1991,6 +2073,7 @@ public sealed partial class MainForm
         _devicesBusyDone = 0;
         _devicesBusyTotal = 1;
         _devicesBusyOverlay.Visible = false;
+        SetOperationButtonsEnabled(true);
     }
 
     /// <summary>
@@ -2006,6 +2089,29 @@ public sealed partial class MainForm
         {
             _devicesBusyOverlay.Visible = false;
         }
+        SetOperationButtonsEnabled(true);
+    }
+
+    private void SetOperationButtonsEnabled(bool enabled)
+    {
+        foreach (Button button in _operationButtons)
+        {
+            if (!button.IsDisposed)
+            {
+                button.Enabled = enabled;
+            }
+        }
+    }
+
+    private bool TryBlockBusyHardwareWrite(string operation)
+    {
+        if (_devicesBusyDepth <= 0)
+        {
+            return false;
+        }
+
+        WriteLog($"UI.BUSY.BLOCK: operation=\"{operation}\" depth={_devicesBusyDepth}");
+        return true;
     }
 
     private void WaitForBackgroundUiTasks(params Task[] tasks)
@@ -2016,8 +2122,31 @@ public sealed partial class MainForm
         }
 
         Task all = Task.WhenAll(tasks);
+        Stopwatch timeout = Stopwatch.StartNew();
         while (!all.IsCompleted)
         {
+            if (timeout.Elapsed >= TimeSpan.FromSeconds(20))
+            {
+                // Both asynchronous readers validate their generation before touching
+                // controls. Invalidate late results and keep the main window usable if
+                // a WMI/provider call gets stuck inside Windows.
+                Interlocked.Increment(ref _irqRefreshGeneration);
+                Interlocked.Increment(ref _imodReadbackGeneration);
+                WriteLog($"UI.BACKGROUND.TIMEOUT: tasks={tasks.Length} elapsedMs={timeout.ElapsedMilliseconds} late results invalidated");
+                _ = all.ContinueWith(
+                    completed =>
+                    {
+                        if (completed.Exception is not null)
+                        {
+                            WriteLog($"UI.BACKGROUND.LATE.ERROR: {FlattenLogText(completed.Exception.ToString())}");
+                        }
+                    },
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
+                return;
+            }
+
             Application.DoEvents();
             Thread.Sleep(10);
         }
@@ -2065,6 +2194,15 @@ public sealed partial class MainForm
             _devicesPanel.SuspendLayout();
             try
             {
+                // ControlCollection.Clear() only detaches controls. It does not
+                // release their native handles, fonts or event subscriptions.
+                // A REFRESH therefore has to dispose the complete previous card
+                // tree before the new device list is built.
+                foreach (Control control in _devicesPanel.Controls.Cast<Control>().ToArray())
+                {
+                    control.Dispose();
+                }
+
                 _devicesPanel.Controls.Clear();
                 _devicesPanel.Location = new Point(0, 0);
                 if (_devicesScroll is not null)
@@ -2331,11 +2469,13 @@ public sealed partial class MainForm
         Dictionary<string, DeviceIrqInfo> irqCounts;
         try
         {
-            irqCounts = await Task.Run(GetDeviceIrqCounts);
+            irqCounts = _blocks.All(block => block.Device.IsTestDevice)
+                ? new Dictionary<string, DeviceIrqInfo>(StringComparer.OrdinalIgnoreCase)
+                : await Task.Run(GetDeviceIrqCounts);
         }
         catch (Exception ex)
         {
-            WriteLog($"IRQ.MAP: failed to read active IRQ data: {ex.Message}");
+            WriteLog($"IRQ.MAP.WARN: failed to read active IRQ data; using registry fallback: {ex.Message}");
             if (IsDisposed || generation != _irqRefreshGeneration)
             {
                 return;

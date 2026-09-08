@@ -10,6 +10,13 @@ namespace DeviceTweakerCS;
 /// </summary>
 internal static class DevicePowerPolicy
 {
+    internal enum WriteStatus
+    {
+        Applied,
+        NotExposed,
+        Failed
+    }
+
     public const string PnPCapabilitiesName = "PnPCapabilities";
 
     /// <summary>
@@ -92,22 +99,31 @@ internal static class DevicePowerPolicy
     /// Best-effort class-key PnPCapabilities for any PnP instance (USB controller/hub, NIC, …).
     /// </summary>
     public static bool TryApplyInstancePnPCapabilities(string instanceId, bool allowTurnOff, out int? pnpCaps)
+        => ApplyInstancePnPCapabilities(instanceId, allowTurnOff, out pnpCaps, out _) == WriteStatus.Applied;
+
+    public static WriteStatus ApplyInstancePnPCapabilities(
+        string instanceId,
+        bool allowTurnOff,
+        out int? pnpCaps,
+        out string? error)
     {
         pnpCaps = null;
+        error = null;
         string? classKey = TryGetClassKeyPath(instanceId);
         if (string.IsNullOrWhiteSpace(classKey))
         {
-            return false;
+            return WriteStatus.NotExposed;
         }
 
         try
         {
             pnpCaps = ApplyPnPCapabilities(classKey, allowTurnOff);
-            return true;
+            return WriteStatus.Applied;
         }
-        catch
+        catch (Exception ex)
         {
-            return false;
+            error = ex.Message;
+            return WriteStatus.Failed;
         }
     }
 
@@ -159,10 +175,14 @@ internal static class DevicePowerPolicy
     /// Must query full instances (SELECT *) — partial projections make Put() a no-op.
     /// </summary>
     public static bool TrySetDevicePowerEnable(string instanceId, bool allowTurnOff)
+        => SetDevicePowerEnable(instanceId, allowTurnOff, out _) == WriteStatus.Applied;
+
+    public static WriteStatus SetDevicePowerEnable(string instanceId, bool allowTurnOff, out string? error)
     {
+        error = null;
         if (string.IsNullOrWhiteSpace(instanceId))
         {
-            return false;
+            return WriteStatus.NotExposed;
         }
 
         bool wrote = false;
@@ -195,12 +215,13 @@ internal static class DevicePowerPolicy
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
-            return false;
+            error = ex.Message;
+            return WriteStatus.Failed;
         }
 
-        return wrote;
+        return wrote ? WriteStatus.Applied : WriteStatus.NotExposed;
     }
 
     private static bool InstanceNameMatches(string? instanceName, string instanceId)

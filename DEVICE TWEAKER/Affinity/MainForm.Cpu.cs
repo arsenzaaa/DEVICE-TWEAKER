@@ -18,6 +18,8 @@ public sealed partial class MainForm
     private readonly Dictionary<int, int> _cppcRatings = new();
     private readonly Dictionary<int, int> _cppcRanks = new();
     private bool _cppcEnabled;
+    private bool _cpuTopologyReliable;
+    private bool _cpuSetIdsReliable;
     private int _maxLogical;
     private int _grpHeight;
     private int _cpuGroupCount = 1;
@@ -27,10 +29,16 @@ public sealed partial class MainForm
 
     private void InitializeCpu()
     {
+        _cpuTopologyReliable = false;
+        _cpuSetIdsReliable = false;
         CpuTopology? cpuRaw = QueryCpuCpuSet();
         if (cpuRaw is null)
         {
             cpuRaw = QueryCpuGlpi();
+        }
+        if (cpuRaw is null)
+        {
+            cpuRaw = QueryCpuMinimal();
         }
 
         CpuVendorInfo cpuVendor = DetectCpuVendor();
@@ -66,9 +74,11 @@ public sealed partial class MainForm
         foreach (CpuLpInfo lp in cpuRaw.LPs)
         {
             _cpuLpByIndex[lp.LP] = lp;
-            int cpuSetId = lp.CpuSetId >= 0 ? lp.CpuSetId : lp.LP;
-            _cpuSetIdByIndex[lp.LP] = cpuSetId;
-            _cpuIndexByCpuSetId.TryAdd(cpuSetId, lp.LP);
+            if (lp.CpuSetId >= 0)
+            {
+                _cpuSetIdByIndex[lp.LP] = lp.CpuSetId;
+                _cpuIndexByCpuSetId.TryAdd(lp.CpuSetId, lp.LP);
+            }
         }
 
         int group0Count = cpuRaw.LPs.Count(lp => lp.Group == 0);
@@ -78,7 +88,7 @@ public sealed partial class MainForm
         }
 
         _maxLogical = Math.Min(group0Count, MaxAffinityBits);
-        _grpHeight = UiScale(120) + (_maxLogical * UiScale(24)) + UiScale(160);
+        _grpHeight = UiScale(280);
 
         int ccdCount = ccdMap.Values.Distinct().Count();
         int ccxCount = ccxMap.Values.Distinct().Count();
@@ -245,9 +255,13 @@ public sealed partial class MainForm
             RedirectStandardError = true,
         };
 
-        process.Start();
-        string output = process.StandardOutput.ReadToEnd();
-        _ = process.StandardError.ReadToEnd();
+        if (!process.Start())
+        {
+            return string.Empty;
+        }
+
+        Task<string> stdout = process.StandardOutput.ReadToEndAsync();
+        Task<string> stderr = process.StandardError.ReadToEndAsync();
         if (!process.WaitForExit(2500))
         {
             try
@@ -258,10 +272,36 @@ public sealed partial class MainForm
             {
             }
 
+            try
+            {
+                _ = process.WaitForExit(1000);
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                _ = Task.WaitAll([stdout, stderr], 1000);
+            }
+            catch
+            {
+            }
+
             return string.Empty;
         }
 
-        return process.ExitCode == 0 ? output : string.Empty;
+        try
+        {
+            _ = Task.WaitAll([stdout, stderr], 1000);
+        }
+        catch
+        {
+        }
+
+        return process.ExitCode == 0 && stdout.IsCompletedSuccessfully
+            ? stdout.Result
+            : string.Empty;
     }
 
     private static bool TryReadEventDataInt(string eventXml, string name, out int value)
@@ -428,6 +468,9 @@ public sealed partial class MainForm
 
                 CpuTopology topo = new(entries.OrderBy(x => x.LP).ToList());
 
+                _cpuTopologyReliable = true;
+                _cpuSetIdsReliable = true;
+
                 WriteLog("CPU.TOPO: source=CpuSet");
                 foreach (CpuLpInfo e in topo.LPs.OrderBy(x => x.LP))
                 {
@@ -451,30 +494,243 @@ public sealed partial class MainForm
         }
     }
 
-    private CpuTopology QueryCpuGlpi()
+    private CpuTopology? QueryCpuGlpi()
     {
-        int envLP = Environment.ProcessorCount;
-        List<CpuLpInfo> list = [];
-        for (int i = 0; i < envLP; i++)
+        int length = 0;
+        _ = NativeLogicalProcessor.GetLogicalProcessorInformationEx(
+            NativeLogicalProcessor.RelationAll,
+            IntPtr.Zero,
+            ref length);
+        if (length <= 0)
         {
-            list.Add(new CpuLpInfo(
-                Group: 0,
-                LP: i,
-                Core: i,
-                LLC: 0,
-                NUMA: 0,
-                EffClass: 0,
-                LocalIndex: i,
-                CpuSetId: i));
+            WriteLog($"CPU.TOPO: GLPIEx size query failed error={Marshal.GetLastWin32Error()}");
+            return null;
         }
 
-        WriteLog("CPU.TOPO: source=GLPI (fallback)");
-        foreach (CpuLpInfo e in list)
+        IntPtr buffer = Marshal.AllocHGlobal(length);
+        try
         {
-            WriteLog($"CPU.ENTRY: G0 L{e.LP} Local={e.LocalIndex} Id={e.CpuSetId} Core={e.LP} SMT=0 NUMA=0 LLC=0 EffClass=0");
-        }
+            if (!NativeLogicalProcessor.GetLogicalProcessorInformationEx(
+                    NativeLogicalProcessor.RelationAll,
+                    buffer,
+                    ref length))
+            {
+                WriteLog($"CPU.TOPO: GLPIEx query failed error={Marshal.GetLastWin32Error()}");
+                return null;
+            }
 
-        return new CpuTopology(list);
+            List<(IntPtr Address, int Relationship, int Size)> records = [];
+            int offset = 0;
+            while (offset <= length - NativeLogicalProcessor.RecordHeaderSize)
+            {
+                IntPtr record = IntPtr.Add(buffer, offset);
+                int relationship = Marshal.ReadInt32(record);
+                int size = Marshal.ReadInt32(record, sizeof(int));
+                if (size < NativeLogicalProcessor.RecordHeaderSize || size > length - offset)
+                {
+                    WriteLog($"CPU.TOPO: invalid GLPIEx record offset={offset} size={size} remaining={length - offset}");
+                    return null;
+                }
+
+                records.Add((record, relationship, size));
+                offset += size;
+            }
+
+            if (offset != length)
+            {
+                WriteLog($"CPU.TOPO: GLPIEx record length mismatch parsed={offset} returned={length}");
+                return null;
+            }
+
+            Dictionary<(int Group, int Local), GlpiLpBuilder> builders = [];
+            Dictionary<int, int> nextCoreByGroup = [];
+            foreach (var record in records.Where(r => r.Relationship == NativeLogicalProcessor.RelationProcessorCore))
+            {
+                byte efficiencyClass = Marshal.ReadByte(record.Address, NativeLogicalProcessor.RecordHeaderSize + 1);
+                int groupCount = Marshal.ReadInt16(record.Address, NativeLogicalProcessor.ProcessorGroupCountOffset) & 0xFFFF;
+                if (groupCount <= 0)
+                {
+                    continue;
+                }
+
+                if (NativeLogicalProcessor.ProcessorGroupMasksOffset
+                    + (groupCount * NativeLogicalProcessor.GroupAffinitySize) > record.Size)
+                {
+                    WriteLog($"CPU.TOPO: invalid processor-core record size={record.Size} groups={groupCount}");
+                    return null;
+                }
+
+                for (int maskIndex = 0; maskIndex < groupCount; maskIndex++)
+                {
+                    IntPtr groupMask = IntPtr.Add(
+                        record.Address,
+                        NativeLogicalProcessor.ProcessorGroupMasksOffset + (maskIndex * NativeLogicalProcessor.GroupAffinitySize));
+                    ulong mask = NativeLogicalProcessor.ReadAffinityMask(groupMask);
+                    int group = Marshal.ReadInt16(groupMask, IntPtr.Size) & 0xFFFF;
+                    int core = nextCoreByGroup.TryGetValue(group, out int nextCore) ? nextCore : 0;
+                    nextCoreByGroup[group] = core + 1;
+                    foreach (int local in EnumerateAffinityBits(mask))
+                    {
+                        builders[(group, local)] = new GlpiLpBuilder(group, local, core, efficiencyClass);
+                    }
+                }
+            }
+
+            if (builders.Count == 0)
+            {
+                WriteLog("CPU.TOPO: GLPIEx returned no processor-core relationships");
+                return null;
+            }
+
+            foreach (var record in records.Where(r => r.Relationship is NativeLogicalProcessor.RelationNumaNode or NativeLogicalProcessor.RelationNumaNodeEx))
+            {
+                int node = Marshal.ReadInt32(record.Address, NativeLogicalProcessor.NumaNodeNumberOffset);
+                int groupCount = record.Relationship == NativeLogicalProcessor.RelationNumaNode
+                    ? 1
+                    : Math.Max(1, Marshal.ReadInt16(record.Address, NativeLogicalProcessor.NumaGroupCountOffset) & 0xFFFF);
+                ApplyGlpiMasks(record, NativeLogicalProcessor.NumaGroupMasksOffset, groupCount, builders,
+                    builder => builder.Numa = node);
+            }
+
+            Dictionary<int, int> nextCacheByGroup = [];
+            Dictionary<(int Group, int Local), int> cacheLevelByLp = [];
+            foreach (var record in records.Where(r => r.Relationship == NativeLogicalProcessor.RelationCache))
+            {
+                int level = Marshal.ReadByte(record.Address, NativeLogicalProcessor.CacheLevelOffset);
+                int type = Marshal.ReadInt32(record.Address, NativeLogicalProcessor.CacheTypeOffset);
+                if (level <= 0 || type is not (0 or 1))
+                {
+                    continue;
+                }
+
+                int groupCount = Math.Max(1, Marshal.ReadInt16(record.Address, NativeLogicalProcessor.CacheGroupCountOffset) & 0xFFFF);
+                if (NativeLogicalProcessor.CacheGroupMasksOffset
+                    + (groupCount * NativeLogicalProcessor.GroupAffinitySize) > record.Size)
+                {
+                    WriteLog($"CPU.TOPO: invalid cache record size={record.Size} groups={groupCount}");
+                    return null;
+                }
+
+                for (int maskIndex = 0; maskIndex < groupCount; maskIndex++)
+                {
+                    IntPtr groupMask = IntPtr.Add(
+                        record.Address,
+                        NativeLogicalProcessor.CacheGroupMasksOffset + (maskIndex * NativeLogicalProcessor.GroupAffinitySize));
+                    ulong mask = NativeLogicalProcessor.ReadAffinityMask(groupMask);
+                    int group = Marshal.ReadInt16(groupMask, IntPtr.Size) & 0xFFFF;
+                    int cache = nextCacheByGroup.TryGetValue(group, out int nextCache) ? nextCache : 0;
+                    nextCacheByGroup[group] = cache + 1;
+                    foreach (int local in EnumerateAffinityBits(mask))
+                    {
+                        var key = (group, local);
+                        if (builders.TryGetValue(key, out GlpiLpBuilder? builder)
+                            && (!cacheLevelByLp.TryGetValue(key, out int oldLevel) || level >= oldLevel))
+                        {
+                            builder.Llc = cache;
+                            cacheLevelByLp[key] = level;
+                        }
+                    }
+                }
+            }
+
+            List<CpuLpInfo> entries = [];
+            int globalIndex = 0;
+            foreach (GlpiLpBuilder builder in builders.Values.OrderBy(b => b.Group).ThenBy(b => b.Local))
+            {
+                entries.Add(new CpuLpInfo(
+                    builder.Group,
+                    globalIndex++,
+                    builder.Core,
+                    builder.Llc,
+                    builder.Numa,
+                    builder.EfficiencyClass,
+                    builder.Local,
+                    CpuSetId: -1));
+            }
+
+            CpuTopology topology = new(entries);
+            _cpuTopologyReliable = true;
+            _cpuSetIdsReliable = false;
+            WriteLog("CPU.TOPO: source=GLPIEx fallback cpuSetIds=unavailable");
+            foreach (CpuLpInfo entry in topology.LPs)
+            {
+                int coreKey = CpuTopology.MakeCoreKey(entry.Group, entry.Core);
+                bool smt = topology.ByCore.TryGetValue(coreKey, out List<CpuLpInfo>? siblings) && siblings.Count > 1;
+                WriteLog($"CPU.ENTRY: G{entry.Group} L{entry.LP} Local={entry.LocalIndex} Id=n/a Core={entry.Core} SMT={(smt ? 1 : 0)} NUMA={entry.NUMA} LLC={entry.LLC} EffClass={entry.EffClass}");
+            }
+
+            return topology;
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"CPU.TOPO: GLPIEx fallback failed: {ex.Message}");
+            return null;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    private static IEnumerable<int> EnumerateAffinityBits(ulong mask)
+    {
+        for (int bit = 0; bit < 64; bit++)
+        {
+            if ((mask & (1UL << bit)) != 0)
+            {
+                yield return bit;
+            }
+        }
+    }
+
+    private static void ApplyGlpiMasks(
+        (IntPtr Address, int Relationship, int Size) record,
+        int masksOffset,
+        int groupCount,
+        IReadOnlyDictionary<(int Group, int Local), GlpiLpBuilder> builders,
+        Action<GlpiLpBuilder> apply)
+    {
+        for (int maskIndex = 0; maskIndex < groupCount; maskIndex++)
+        {
+            int offset = masksOffset + (maskIndex * NativeLogicalProcessor.GroupAffinitySize);
+            if (offset + NativeLogicalProcessor.GroupAffinitySize > record.Size)
+            {
+                break;
+            }
+
+            IntPtr groupMask = IntPtr.Add(record.Address, offset);
+            ulong mask = NativeLogicalProcessor.ReadAffinityMask(groupMask);
+            int group = Marshal.ReadInt16(groupMask, IntPtr.Size) & 0xFFFF;
+            foreach (int local in EnumerateAffinityBits(mask))
+            {
+                if (builders.TryGetValue((group, local), out GlpiLpBuilder? builder))
+                {
+                    apply(builder);
+                }
+            }
+        }
+    }
+
+    private CpuTopology QueryCpuMinimal()
+    {
+        int logicalCount = Math.Max(1, Environment.ProcessorCount);
+        List<CpuLpInfo> entries = Enumerable.Range(0, logicalCount)
+            .Select(index => new CpuLpInfo(0, index, index, 0, 0, 0, index, -1))
+            .ToList();
+        _cpuTopologyReliable = false;
+        _cpuSetIdsReliable = false;
+        WriteLog($"CPU.TOPO.ERROR: all topology APIs failed; using display-only minimal map logical={logicalCount}; AUTO affinity disabled");
+        return new CpuTopology(entries);
+    }
+
+    private sealed class GlpiLpBuilder(int group, int local, int core, int efficiencyClass)
+    {
+        public int Group { get; } = group;
+        public int Local { get; } = local;
+        public int Core { get; } = core;
+        public int EfficiencyClass { get; } = efficiencyClass;
+        public int Llc { get; set; }
+        public int Numa { get; set; }
     }
 
     private CpuVendorInfo DetectCpuVendor()

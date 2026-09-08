@@ -41,8 +41,11 @@ IMOD/KDU/Source/Hamakaze/Utils/GenAsIo2Unlock.exe
 bin/ReleasePackages/**/logs/
 bin/Publish/**/logs/
 bin/SmokeSafe/
+bin/Smoke*/
+bin/UserRunAudit/
 _audit/
 _handoff*/
 _compare/
+tmp/
+документации/
 DEVICE TWEAKER — копия/
-

@@ -1,236 +1,277 @@
+using System.Text.RegularExpressions;
+
 namespace DeviceTweakerCS;
 
-internal sealed class ImodMapTextBox : RichTextBox
+/// <summary>
+/// Draws IMOD readback in pixel-positioned columns. Text remains available for
+/// logs and copying, but spaces in that text never control the visual layout.
+/// </summary>
+internal sealed partial class ImodMapTextBox : ScrollableControl
 {
-    private bool _formatting;
+    private sealed record DeviceRow(string Name, string Irq, string Value, string Delay);
+    private sealed record InterruptRow(string LeftIrq, string LeftValue, string LeftDelay, string RightIrq, string RightValue, string RightDelay);
+
+    private readonly List<DeviceRow> _devices = [];
+    private readonly List<InterruptRow> _interrupts = [];
+    private string[] _fallbackLines = [];
 
     public Color PrefixColor { get; set; } = Color.FromArgb(172, 180, 190);
     public Color RoleColor { get; set; } = Color.FromArgb(208, 230, 250);
     public Color ValueColor { get; set; } = Color.FromArgb(240, 240, 240);
 
-    public ImodMapTextBox()
+    public int DisplayRowCount
     {
-        BorderStyle = BorderStyle.None;
-        DetectUrls = false;
-        HideSelection = true;
-        Multiline = true;
-        ReadOnly = true;
-        ScrollBars = RichTextBoxScrollBars.Vertical;
-        ShortcutsEnabled = true;
-        // Line breaks are authored by FormatVisibleImodInterrupterLines;
-        // WordWrap would split mid-token (e.g. "intr3=" / "0xC8/50us").
-        WordWrap = false;
-        ZoomFactor = 1.0f;
+        get
+        {
+            if (_devices.Count == 0 && _interrupts.Count == 0)
+            {
+                return Math.Max(1, _fallbackLines.Length);
+            }
+
+            return (_devices.Count > 0 ? _devices.Count + 1 : 0)
+                + (_devices.Count > 0 && _interrupts.Count > 0 ? 1 : 0)
+                + (_interrupts.Count > 0 ? _interrupts.Count + 1 : 0);
+        }
     }
 
-    protected override void OnHandleCreated(EventArgs e)
+    public ImodMapTextBox()
     {
-        base.OnHandleCreated(e);
-        WordWrap = false;
-        ScrollBars = RichTextBoxScrollBars.Vertical;
+        AutoScroll = true;
+        BackColor = Color.FromArgb(12, 12, 15);
+        Cursor = Cursors.Hand;
+        DoubleBuffered = true;
+        Margin = Padding.Empty;
+        TabStop = false;
     }
 
     protected override void OnTextChanged(EventArgs e)
     {
         base.OnTextChanged(e);
-        ApplySyntaxColors();
+        ParseText();
+        RefreshLocalizedAccessibility();
+        UpdateScrollExtent();
+        Invalidate();
+    }
+
+    internal void RefreshLocalizedAccessibility()
+    {
+        if (_devices.Count == 0 && _interrupts.Count == 0)
+        {
+            AccessibleName = string.Join(Environment.NewLine, _fallbackLines.Select(UiLanguage.Text));
+            return;
+        }
+
+        List<string> lines = [];
+        if (_devices.Count > 0)
+        {
+            lines.Add($"{UiLanguage.Text("DEVICE")}; IRQ; {UiLanguage.Text("VALUE")}; {UiLanguage.Text("DELAY")}");
+            lines.AddRange(_devices.Select(row =>
+                $"{UiLanguage.RoleText(row.Name)}; IRQ {row.Irq}; {row.Value}; {row.Delay}"));
+        }
+
+        lines.AddRange(_interrupts.SelectMany(row => new[]
+        {
+            $"IRQ {row.LeftIrq}; {row.LeftValue}; {row.LeftDelay}",
+            string.IsNullOrWhiteSpace(row.RightIrq)
+                ? string.Empty
+                : $"IRQ {row.RightIrq}; {row.RightValue}; {row.RightDelay}",
+        }).Where(line => line.Length > 0));
+        AccessibleName = string.Join(Environment.NewLine, lines);
+    }
+
+    protected override void OnFontChanged(EventArgs e)
+    {
+        base.OnFontChanged(e);
+        UpdateScrollExtent();
+        Invalidate();
     }
 
     protected override void OnForeColorChanged(EventArgs e)
     {
         base.OnForeColorChanged(e);
-        ApplySyntaxColors();
+        Invalidate();
     }
 
-    public void ApplySyntaxColors()
+    protected override void OnResize(EventArgs e)
     {
-        if (_formatting || IsDisposed || TextLength == 0)
+        base.OnResize(e);
+        UpdateScrollExtent();
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        e.Graphics.Clear(BackColor);
+
+        int lineHeight = LineHeight;
+        int y = AutoScrollPosition.Y;
+        int width = Math.Max(1, ClientSize.Width - (VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0));
+        TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis;
+
+        if (_devices.Count == 0 && _interrupts.Count == 0)
         {
+            foreach (string line in _fallbackLines)
+            {
+                DrawCell(e.Graphics, UiLanguage.Text(line), 0, y, width, ForeColor, flags);
+                y += lineHeight;
+            }
             return;
         }
 
-        _formatting = true;
-        int selectionStart = SelectionStart;
-        int selectionLength = SelectionLength;
-
-        try
+        (int nameX, int irqX, int valueX, int delayX) = DeviceColumns(width);
+        if (_devices.Count > 0)
         {
-            string text = Text;
-            SelectAll();
-            // Keep every generated line on the control's explicit font even
-            // after the RichEdit character format has been recolored/reused.
-            SelectionFont = Font;
-            SelectionColor = ForeColor;
+            DrawCell(e.Graphics, UiLanguage.Text("DEVICE"), nameX, y, irqX - nameX - 8, PrefixColor, flags);
+            DrawCell(e.Graphics, "IRQ", irqX, y, valueX - irqX - 8, PrefixColor, flags);
+            DrawCell(e.Graphics, UiLanguage.Text("VALUE"), valueX, y, delayX - valueX - 8, PrefixColor, flags);
+            DrawCell(e.Graphics, UiLanguage.Text("DELAY"), delayX, y, width - delayX, PrefixColor, flags);
+            y += lineHeight;
 
-            int lineStart = 0;
-            while (lineStart < text.Length)
+            foreach (DeviceRow row in _devices)
             {
-                int lineEnd = text.IndexOf('\n', lineStart);
-                if (lineEnd < 0)
-                {
-                    lineEnd = text.Length;
-                }
-
-                int lineLength = lineEnd - lineStart;
-                if (lineLength > 0 && text[lineStart + lineLength - 1] == '\r')
-                {
-                    lineLength--;
-                }
-
-                ColorLine(text, lineStart, lineLength);
-
-                if (lineEnd >= text.Length)
-                {
-                    break;
-                }
-
-                lineStart = lineEnd + 1;
+                DrawCell(e.Graphics, UiLanguage.RoleText(row.Name), nameX, y, irqX - nameX - 8, RoleColor, flags);
+                DrawCell(e.Graphics, row.Irq, irqX, y, valueX - irqX - 8, ValueColor, flags);
+                DrawCell(e.Graphics, row.Value, valueX, y, delayX - valueX - 8, ValueColor, flags);
+                DrawCell(e.Graphics, row.Delay, delayX, y, width - delayX, ForeColor, flags);
+                y += lineHeight;
             }
         }
-        finally
+
+        if (_devices.Count > 0 && _interrupts.Count > 0)
         {
-            int safeStart = Math.Min(selectionStart, TextLength);
-            int safeLength = Math.Min(selectionLength, Math.Max(0, TextLength - safeStart));
-            Select(safeStart, safeLength);
-            _formatting = false;
+            y += lineHeight;
+        }
+
+        if (_interrupts.Count > 0)
+        {
+            (int irq1X, int value1X, int delay1X, int irq2X, int value2X, int delay2X) = InterruptColumns(width);
+            DrawCell(e.Graphics, "IRQ", irq1X, y, value1X - irq1X - 8, PrefixColor, flags);
+            DrawCell(e.Graphics, UiLanguage.Text("VALUE"), value1X, y, delay1X - value1X - 8, PrefixColor, flags);
+            DrawCell(e.Graphics, UiLanguage.Text("DELAY"), delay1X, y, irq2X - delay1X - 12, PrefixColor, flags);
+            DrawCell(e.Graphics, "IRQ", irq2X, y, value2X - irq2X - 8, PrefixColor, flags);
+            DrawCell(e.Graphics, UiLanguage.Text("VALUE"), value2X, y, delay2X - value2X - 8, PrefixColor, flags);
+            DrawCell(e.Graphics, UiLanguage.Text("DELAY"), delay2X, y, width - delay2X, PrefixColor, flags);
+            y += lineHeight;
+
+            foreach (InterruptRow row in _interrupts)
+            {
+                DrawCell(e.Graphics, row.LeftIrq, irq1X, y, value1X - irq1X - 8, ValueColor, flags);
+                DrawCell(e.Graphics, row.LeftValue, value1X, y, delay1X - value1X - 8, ValueColor, flags);
+                DrawCell(e.Graphics, row.LeftDelay, delay1X, y, irq2X - delay1X - 12, ForeColor, flags);
+                DrawCell(e.Graphics, row.RightIrq, irq2X, y, value2X - irq2X - 8, ValueColor, flags);
+                DrawCell(e.Graphics, row.RightValue, value2X, y, delay2X - value2X - 8, ValueColor, flags);
+                DrawCell(e.Graphics, row.RightDelay, delay2X, y, width - delay2X, ForeColor, flags);
+                y += lineHeight;
+            }
         }
     }
 
-    private void ColorLine(string text, int lineStart, int lineLength)
+    internal bool ValidateColumnLayout(int width)
     {
-        if (lineLength <= 0)
-        {
-            return;
-        }
-
-        int lineEnd = lineStart + lineLength;
-        int first = lineStart;
-        while (first < lineEnd && char.IsWhiteSpace(text[first]))
-        {
-            first++;
-        }
-
-        if (StartsWithAt(text, first, lineEnd, "devices:"))
-        {
-            ApplyColor(first, "devices:".Length, PrefixColor);
-        }
-        else if (StartsWithAt(text, first, lineEnd, "interrupters"))
-        {
-            int colon = text.IndexOf(':', first, lineEnd - first);
-            if (colon >= first)
-            {
-                ApplyColor(first, colon - first + 1, PrefixColor);
-            }
-        }
-
-        ColorRoleLabels(text, lineStart, lineEnd);
-        ColorIntrValues(text, lineStart, lineEnd);
+        (int nameX, int irqX, int valueX, int delayX) = DeviceColumns(width);
+        (int irq1X, int value1X, int delay1X, int irq2X, int value2X, int delay2X) = InterruptColumns(width);
+        return nameX < irqX && irqX < valueX && valueX < delayX && delayX < width
+            && irq1X < value1X && value1X < delay1X && delay1X < irq2X
+            && irq2X < value2X && value2X < delay2X && delay2X < width;
     }
 
-    private void ColorRoleLabels(string text, int lineStart, int lineEnd)
+    private int LineHeight => Math.Max(Font?.Height ?? 16, 15);
+
+    private void ParseText()
     {
-        int segmentStart = lineStart;
-        while (segmentStart < lineEnd)
+        _devices.Clear();
+        _interrupts.Clear();
+        _fallbackLines = (Text ?? string.Empty).Split(["\r\n", "\n"], StringSplitOptions.None);
+
+        foreach (string sourceLine in _fallbackLines)
         {
-            int segmentEnd = text.IndexOf('|', segmentStart, lineEnd - segmentStart);
-            if (segmentEnd < 0)
+            string line = sourceLine.Trim();
+            if (line.StartsWith("devices:", StringComparison.OrdinalIgnoreCase))
             {
-                segmentEnd = lineEnd;
+                line = line["devices:".Length..].Trim();
             }
 
-            int arrow = IndexOf(text, "->", segmentStart, segmentEnd);
-            if (arrow > segmentStart)
+            Match device = DeviceLineRegex().Match(line);
+            if (device.Success)
             {
-                int labelStart = segmentStart;
-                while (labelStart < arrow && char.IsWhiteSpace(text[labelStart]))
-                {
-                    labelStart++;
-                }
-
-                if (StartsWithAt(text, labelStart, arrow, "devices:"))
-                {
-                    labelStart += "devices:".Length;
-                    while (labelStart < arrow && char.IsWhiteSpace(text[labelStart]))
-                    {
-                        labelStart++;
-                    }
-                }
-
-                int labelEnd = arrow;
-                while (labelEnd > labelStart && char.IsWhiteSpace(text[labelEnd - 1]))
-                {
-                    labelEnd--;
-                }
-
-                if (labelEnd > labelStart)
-                {
-                    ApplyColor(labelStart, labelEnd - labelStart, RoleColor);
-                }
-            }
-
-            segmentStart = segmentEnd + 1;
-        }
-    }
-
-    private void ColorIntrValues(string text, int lineStart, int lineEnd)
-    {
-        int pos = lineStart;
-        while (pos < lineEnd)
-        {
-            int intr = IndexOf(text, "intr", pos, lineEnd);
-            if (intr < 0)
-            {
-                break;
-            }
-            if (!IsIntrValueToken(text, intr, lineEnd))
-            {
-                pos = intr + 4;
+                _devices.Add(new DeviceRow(
+                    device.Groups["name"].Value.Trim(),
+                    device.Groups["irq"].Value,
+                    device.Groups["value"].Value,
+                    device.Groups["delay"].Value.Trim()));
                 continue;
             }
 
-            int end = intr;
-            while (end < lineEnd && text[end] != '|')
+            if (!line.StartsWith("interrupters ", StringComparison.OrdinalIgnoreCase))
             {
-                end++;
-            }
-            while (end > intr && char.IsWhiteSpace(text[end - 1]))
-            {
-                end--;
+                continue;
             }
 
-            ApplyColor(intr, end - intr, ValueColor);
-            pos = end;
+            int colon = line.IndexOf(':');
+            if (colon < 0)
+            {
+                continue;
+            }
+
+            string[] pair = line[(colon + 1)..].Split([" | "], 2, StringSplitOptions.None);
+            if (TryParseInterrupt(pair[0], out (string Irq, string Value, string Delay) left))
+            {
+                (string Irq, string Value, string Delay) right = pair.Length == 2
+                    && TryParseInterrupt(pair[1], out (string Irq, string Value, string Delay) parsedRight)
+                        ? parsedRight
+                        : (string.Empty, string.Empty, string.Empty);
+                _interrupts.Add(new InterruptRow(left.Irq, left.Value, left.Delay, right.Irq, right.Value, right.Delay));
+            }
         }
     }
 
-    private static bool IsIntrValueToken(string text, int intrStart, int lineEnd)
+    private static bool TryParseInterrupt(string text, out (string Irq, string Value, string Delay) row)
     {
-        int markerEnd = intrStart + 4;
-        return markerEnd < lineEnd && (char.IsDigit(text[markerEnd]) || text[markerEnd] == '?');
-    }
-
-    private void ApplyColor(int start, int length, Color color)
-    {
-        if (length <= 0 || start < 0 || start >= TextLength)
+        Match match = InterruptLineRegex().Match(text.Trim());
+        if (!match.Success)
         {
-            return;
+            row = default;
+            return false;
         }
 
-        Select(start, Math.Min(length, TextLength - start));
-        SelectionColor = color;
+        row = (match.Groups["irq"].Value, match.Groups["value"].Value, match.Groups["delay"].Value.Trim());
+        return true;
     }
 
-    private static bool StartsWithAt(string text, int start, int end, string value)
+    private void UpdateScrollExtent()
     {
-        return start >= 0
-            && start + value.Length <= end
-            && string.Compare(text, start, value, 0, value.Length, StringComparison.OrdinalIgnoreCase) == 0;
+        AutoScrollMinSize = new Size(0, (DisplayRowCount * LineHeight) + 2);
     }
 
-    private static int IndexOf(string text, string value, int start, int end)
+    private static (int Name, int Irq, int Value, int Delay) DeviceColumns(int width)
     {
-        int length = Math.Max(0, end - start);
-        int index = text.IndexOf(value, start, length, StringComparison.OrdinalIgnoreCase);
-        return index >= end ? -1 : index;
+        int irq = Math.Max(120, (int)(width * 0.36));
+        int value = Math.Max(irq + 54, (int)(width * 0.55));
+        int delay = Math.Max(value + 62, (int)(width * 0.75));
+        return (0, irq, value, Math.Min(delay, Math.Max(value + 1, width - 1)));
     }
+
+    private static (int Irq1, int Value1, int Delay1, int Irq2, int Value2, int Delay2) InterruptColumns(int width)
+    {
+        int value1 = Math.Max(54, (int)(width * 0.13));
+        int delay1 = Math.Max(value1 + 62, (int)(width * 0.28));
+        int irq2 = Math.Min(width - 3, Math.Max(210, (int)(width * 0.52)));
+        int value2 = Math.Min(width - 2, Math.Max(irq2 + 54, (int)(width * 0.65)));
+        int delay2 = Math.Min(width - 1, Math.Max(value2 + 62, (int)(width * 0.80)));
+        return (0, value1, delay1, irq2, value2, delay2);
+    }
+
+    private void DrawCell(Graphics graphics, string text, int x, int y, int width, Color color, TextFormatFlags flags)
+    {
+        if (!string.IsNullOrEmpty(text) && width > 0)
+        {
+            TextRenderer.DrawText(graphics, text, Font, new Rectangle(x, y, width, LineHeight), color, BackColor, flags);
+        }
+    }
+
+    [GeneratedRegex(@"^(?<name>.+?)\s*->\s*intr(?<irq>\d+|\?)\s+(?<value>\S+)\s*(?<delay>.*)$", RegexOptions.IgnoreCase)]
+    private static partial Regex DeviceLineRegex();
+
+    [GeneratedRegex(@"^intr(?<irq>\d+|\?)\s+(?<value>\S+)\s+(?<delay>.+)$", RegexOptions.IgnoreCase)]
+    private static partial Regex InterruptLineRegex();
 }

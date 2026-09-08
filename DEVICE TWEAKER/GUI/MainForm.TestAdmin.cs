@@ -1,6 +1,7 @@
 
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 
 namespace DeviceTweakerCS;
 
@@ -22,6 +23,33 @@ public sealed partial class MainForm
 
     private void OnMainFormKeyDown(object? sender, KeyEventArgs e)
     {
+        if (_testDevicesOnly
+            && _testAutoDryRun
+            && _devicesScroll is not null
+            && _devicesScroll.Visible
+            && e.Modifiers == Keys.None
+            && e.KeyCode is Keys.Home or Keys.End or Keys.PageUp or Keys.PageDown)
+        {
+            int before = _devicesScroll.Value;
+            int page = Math.Max(_devicesScroll.SmallChange, _devicesScroll.ViewportSize - UiScale(40));
+            int target = e.KeyCode switch
+            {
+                Keys.Home => 0,
+                Keys.End => _devicesScroll.Maximum,
+                Keys.PageUp => before - page,
+                Keys.PageDown => before + page,
+                _ => before
+            };
+
+            _devicesScroll.Value = target;
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            WriteLog(
+                $"TEST.QA.SCROLL: key={e.KeyCode} before={before} after={_devicesScroll.Value} " +
+                $"page={page} maximum={_devicesScroll.Maximum} viewport={_devicesScroll.ViewportSize}");
+            return;
+        }
+
         if (e.Control && e.Alt && e.Shift && e.KeyCode == Keys.T)
         {
             e.Handled = true;
@@ -52,8 +80,8 @@ public sealed partial class MainForm
                 return;
             }
 
-            prefixLabel.Text = $"{name} -";
-            statusLabel.Text = value;
+            prefixLabel.Text = $"{UiLanguage.Text(name)} -";
+            statusLabel.Text = UiLanguage.Text(value);
             statusLabel.Visible = true;
             statusLabel.ForeColor = active ? _statusActive : _statusInactive;
         }
@@ -145,7 +173,10 @@ public sealed partial class MainForm
             AddHeaderFlag(_hybridCpuPrefixLabel, _hybridCpuStatusLabel);
             AddHeaderFlag(_cppcPrefixLabel, _cppcStatusLabel);
             AddHeaderFlag(_dualCcdPrefixLabel, _dualCcdStatusLabel);
-            AddHeaderFlag(_sandboxPrefixLabel, _sandboxStatusLabel);
+            if (sandboxOn)
+            {
+                AddHeaderFlag(_sandboxPrefixLabel, _sandboxStatusLabel);
+            }
         }
         finally
         {
@@ -179,6 +210,7 @@ public sealed partial class MainForm
     private void ShowTestAdminDialog()
     {
         using Form dialog = new ThemedDialogForm();
+        dialog.Name = "TEST_ADMIN_DIALOG";
         dialog.Text = "TEST ADMIN";
         dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
         dialog.StartPosition = FormStartPosition.CenterParent;
@@ -187,9 +219,10 @@ public sealed partial class MainForm
         dialog.ShowInTaskbar = false;
         dialog.AutoScaleMode = AutoScaleMode.None;
         StyleThemedDialogSurface(dialog);
+        dialog.BackColor = _bgPanel;
         dialog.Font = _baseFont;
         dialog.Icon = Icon;
-        dialog.ClientSize = new Size(860, 540);
+        dialog.ClientSize = new Size(1040, 620);
         using ThemedToolTip adminToolTip = new(showAlways: false, font: _technicalFont)
         {
             InitialDelay = 700,
@@ -204,9 +237,9 @@ public sealed partial class MainForm
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             Dock = DockStyle.Top,
             ColumnCount = 2,
-            RowCount = 17,
-            Padding = new Padding(20, 26, 20, 20),
-            BackColor = _bgForm,
+            RowCount = 20,
+            Padding = new Padding(24, 20, 24, 20),
+            BackColor = _bgPanel,
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190F));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
@@ -334,7 +367,7 @@ public sealed partial class MainForm
         cpuPresetCombo.DropDownWidth = 540;
         cpuPresetCombo.Items.AddRange(new object[]
         {
-            "Manual / current",
+            "Manual (current)",
             "Intel Core i7-10700K/11700K 8C/16T",
             "Intel Core i5-13600K/14600K 6P+8E/20T",
             "Intel Core i9-13900K/14900K 8P+16E/32T",
@@ -344,6 +377,7 @@ public sealed partial class MainForm
             "AMD Ryzen 7 7700X/9700X 8C/16T",
             "AMD Ryzen 9 7900X/9900X 12C/24T",
             "AMD Ryzen 9 7950X/9950X 16C/32T",
+            "AMD Ryzen 5 3500X Zen2 6C/6T SMT off 2 CCX",
             "AMD Ryzen 7 3700X/3800X Zen2 8C/16T 2 CCX",
             "AMD Ryzen 9 3900X Zen2 12C/24T 4 CCX",
             "AMD Ryzen 9 3950X Zen2 16C/32T 4 CCX",
@@ -371,6 +405,7 @@ public sealed partial class MainForm
         const string SystemPresetRyzen9950X3DNetCx = "Full PC | X870E | Ryzen 9 9950X3D | RTX 5090 | Realtek 5G";
         const string SystemPresetRyzen9950X3DNdis = "Full PC | X870E | Ryzen 9 9950X3D | RTX 5090 | Intel I226-V";
         const string SystemPresetRyzen9950X3D2 = "Full PC | X870E | Ryzen 9 9950X3D2 | RTX 5090 | Realtek 5G";
+        const string SystemPresetRyzen3500X = "Full PC | B450/X570 | Ryzen 5 3500X | GTX 1660 SUPER | Realtek 1G";
         const string SystemPresetRyzen3900X = "Full PC | X570 | Ryzen 9 3900X | RTX 3080 | Realtek 2.5G";
         const string SystemPresetRyzen9950X = "Full PC | X670E | Ryzen 9 9950X | RTX 4090 | Intel X550 10G";
         const string SystemPresetLaptopIntel285HX = "Laptop | Core Ultra 9 285HX | RTX 5080 Laptop | BE200 Wi-Fi";
@@ -382,7 +417,7 @@ public sealed partial class MainForm
         systemPresetCombo.DropDownWidth = 560;
         systemPresetCombo.Items.AddRange(new object[]
         {
-            "Manual / current",
+            "Manual (current)",
             SystemPresetIntel14900K,
             SystemPresetIntel14600K,
             SystemPresetIntel285K5090,
@@ -392,6 +427,7 @@ public sealed partial class MainForm
             SystemPresetRyzen9950X3DNetCx,
             SystemPresetRyzen9950X3DNdis,
             SystemPresetRyzen9950X3D2,
+            SystemPresetRyzen3500X,
             SystemPresetRyzen3900X,
             SystemPresetRyzen9950X,
             SystemPresetLaptopIntel285HX,
@@ -585,7 +621,7 @@ public sealed partial class MainForm
             AutoSize = true,
             Font = _titleFont,
             ForeColor = _accent,
-            Margin = new Padding(0, 8, 0, 6),
+            Margin = new Padding(0, 18, 0, 8),
         };
         layout.Controls.Add(testSectionLabel, 0, 13);
         layout.SetColumnSpan(testSectionLabel, 2);
@@ -622,7 +658,7 @@ public sealed partial class MainForm
             Text = "Enable test devices",
             AutoSize = true,
             AutoCheck = false,
-            BackColor = _bgForm,
+            BackColor = _bgPanel,
             ForeColor = _fgMain,
             Checked = _testDevicesEnabled || _testDevices.Count > 0,
             Margin = new Padding(0, 0, 16, 0),
@@ -636,7 +672,7 @@ public sealed partial class MainForm
         {
             Text = "Show test devices only",
             AutoSize = true,
-            BackColor = _bgForm,
+            BackColor = _bgPanel,
             ForeColor = _fgMain,
             Checked = _testDevicesOnly,
             Margin = new Padding(0, 0, 16, 0),
@@ -648,7 +684,7 @@ public sealed partial class MainForm
             Text = "Sandbox dry-run (no registry writes)",
             AutoSize = true,
             AutoCheck = true,
-            BackColor = _bgForm,
+            BackColor = _bgPanel,
             ForeColor = _fgMain,
             Checked = _testAutoDryRun,
             Margin = new Padding(0, 0, 0, 0),
@@ -656,15 +692,20 @@ public sealed partial class MainForm
 
         void SyncSandboxDryRunLock(string reason)
         {
-            if (_testDevicesOnly)
+            bool simulationActive = _testDevicesEnabled || _testDevices.Count > 0;
+            if (simulationActive)
             {
                 _testAutoDryRun = true;
                 dryRunAutoCheck.Checked = true;
-                dryRunAutoCheck.Enabled = false;
+                dryRunAutoCheck.AutoCheck = false;
+                dryRunAutoCheck.Enabled = true;
+                adminToolTip.SetToolTip(dryRunAutoCheck, UiLanguage.Text("Required while simulated devices are active."));
             }
             else
             {
+                dryRunAutoCheck.AutoCheck = true;
                 dryRunAutoCheck.Enabled = true;
+                adminToolTip.SetToolTip(dryRunAutoCheck, string.Empty);
             }
 
             NotifySandboxModeChanged(reason);
@@ -694,7 +735,7 @@ public sealed partial class MainForm
         testDevicePresetCombo.DropDownWidth = 560;
         testDevicePresetCombo.Items.AddRange(new object[]
         {
-            "Manual / custom",
+            "Manual (custom)",
             "USB - Intel Z790 PCH xHCI / Mouse 8K",
             "USB - Intel Z790 PCH xHCI / Mouse 1K",
             "USB - Intel Z790 PCH xHCI / Keyboard 8K",
@@ -802,7 +843,7 @@ public sealed partial class MainForm
         testDevicesLayout.Controls.Add(testMsiStatusLabel, 0, 11);
         testDevicesLayout.Controls.Add(testMsiStatusCombo, 1, 11);
 
-        Label testSuspendLabel = NewDialogLabel("USB suspend:");
+        Label testSuspendLabel = NewDialogLabel("USB Selective Suspend:");
         ThemedDropDownPicker testSuspendCombo = NewDialogCombo(160);
         testSuspendCombo.Items.AddRange(new object[] { "off", "on", "unset" });
         testSuspendCombo.SelectedIndex = 0;
@@ -825,7 +866,7 @@ public sealed partial class MainForm
         {
             Text = "WiFi",
             AutoSize = true,
-            BackColor = _bgForm,
+            BackColor = _bgPanel,
             ForeColor = _fgMain,
             Margin = new Padding(0, 0, 12, 0),
         };
@@ -834,7 +875,7 @@ public sealed partial class MainForm
         {
             Text = "USB XHCI",
             AutoSize = true,
-            BackColor = _bgForm,
+            BackColor = _bgPanel,
             ForeColor = _fgMain,
             Checked = true,
             Margin = new Padding(0, 0, 12, 0),
@@ -844,7 +885,7 @@ public sealed partial class MainForm
         {
             Text = "USB has devices",
             AutoSize = true,
-            BackColor = _bgForm,
+            BackColor = _bgPanel,
             ForeColor = _fgMain,
             Checked = true,
             Margin = new Padding(0, 0, 0, 0),
@@ -854,7 +895,7 @@ public sealed partial class MainForm
         {
             Text = "Integrated GPU (iGPU)",
             AutoSize = true,
-            BackColor = _bgForm,
+            BackColor = _bgPanel,
             ForeColor = _fgMain,
             Margin = new Padding(0, 0, 12, 0),
         };
@@ -891,20 +932,153 @@ public sealed partial class MainForm
         testDevicesLayout.Controls.Add(testListLabel, 0, 16);
         testDevicesLayout.SetColumnSpan(testListLabel, 2);
 
+        Panel CreateThemedListHost(ListBox list, int width, int height)
+        {
+            Panel host = new()
+            {
+                Size = new Size(width, height),
+                BackColor = Color.FromArgb(18, 18, 22),
+                Margin = new Padding(0, 0, 0, 6),
+                Padding = new Padding(1),
+            };
+            host.Paint += (_, e) =>
+            {
+                Rectangle border = host.ClientRectangle;
+                border.Width -= 1;
+                border.Height -= 1;
+                using Pen pen = new(Color.FromArgb(70, 70, 76));
+                e.Graphics.DrawRectangle(pen, border);
+            };
+
+            ThemedScrollBar scroll = new()
+            {
+                Dock = DockStyle.None,
+                Width = UiScale(12),
+                BackColor = Color.FromArgb(18, 18, 22),
+                TrackColor = Color.FromArgb(18, 18, 22),
+                RailColor = Color.FromArgb(18, 18, 22),
+                ThumbColor = _accent,
+                ThumbWidth = UiScale(8),
+                RailWidth = 0,
+                ThumbCornerRadius = UiScale(6),
+                SmallChange = 1,
+                Visible = false,
+            };
+
+            list.BorderStyle = BorderStyle.None;
+            list.HorizontalScrollbar = false;
+            list.Dock = DockStyle.None;
+            list.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            list.Margin = Padding.Empty;
+
+            void LayoutListHost()
+            {
+                if (host.IsDisposed || list.IsDisposed || scroll.IsDisposed)
+                {
+                    return;
+                }
+
+                int border = UiScale(1);
+                int lane = scroll.Visible ? scroll.Width + UiScale(2) : 0;
+                list.Bounds = new Rectangle(
+                    border,
+                    border,
+                    Math.Max(1, host.ClientSize.Width - (border * 2) - lane),
+                    Math.Max(1, host.ClientSize.Height - (border * 2)));
+                scroll.Bounds = new Rectangle(
+                    Math.Max(border, host.ClientSize.Width - border - scroll.Width),
+                    border,
+                    scroll.Width,
+                    Math.Max(1, host.ClientSize.Height - (border * 2)));
+            }
+
+            bool syncing = false;
+            void SyncListScroll()
+            {
+                if (list.IsDisposed || host.IsDisposed)
+                {
+                    return;
+                }
+
+                if (list.IsHandleCreated)
+                {
+                    HideNativeScrollBars(list);
+                }
+
+                int itemHeight = Math.Max(1, list.ItemHeight);
+                int visibleRows = Math.Max(1, list.ClientSize.Height / itemHeight);
+                bool needsScroll = list.Items.Count > visibleRows;
+                scroll.Visible = needsScroll;
+                LayoutListHost();
+                visibleRows = Math.Max(1, list.ClientSize.Height / itemHeight);
+                scroll.Maximum = Math.Max(1, list.Items.Count);
+                scroll.ViewportSize = visibleRows;
+                scroll.LargeChange = visibleRows;
+                syncing = true;
+                scroll.Value = needsScroll && list.Items.Count > 0 ? Math.Max(0, list.TopIndex) : 0;
+                syncing = false;
+                scroll.BringToFront();
+            }
+
+            scroll.ValueChanged += (_, _) =>
+            {
+                if (syncing || list.Items.Count == 0)
+                {
+                    return;
+                }
+
+                list.TopIndex = Math.Min(list.Items.Count - 1, scroll.Value);
+                list.Invalidate();
+            };
+            list.MouseWheel += (_, _) => BeginInvoke(new Action(SyncListScroll));
+            list.SelectedIndexChanged += (_, _) => BeginInvoke(new Action(SyncListScroll));
+            list.KeyUp += (_, _) => BeginInvoke(new Action(SyncListScroll));
+            list.Paint += (_, _) => SyncListScroll();
+            list.HandleCreated += (_, _) => BeginInvoke(new Action(SyncListScroll));
+            host.SizeChanged += (_, _) =>
+            {
+                LayoutListHost();
+                BeginInvoke(new Action(SyncListScroll));
+            };
+            list.MouseMove += (_, e) =>
+            {
+                int index = list.IndexFromPoint(e.Location);
+                string tip = index >= 0 && index < list.Items.Count
+                    ? list.Items[index]?.ToString() ?? string.Empty
+                    : string.Empty;
+                adminToolTip.SetToolTip(list, tip);
+            };
+
+            host.Tag = (Action)SyncListScroll;
+            host.Controls.Add(list);
+            host.Controls.Add(scroll);
+            LayoutListHost();
+            scroll.BringToFront();
+            return host;
+        }
+
+        static void SyncThemedListHost(ListBox list)
+        {
+            if (list.Parent?.Tag is Action sync)
+            {
+                sync();
+            }
+        }
+
         ListBox testDeviceListBox = new()
         {
             Height = 122,
             Width = 700,
-            BorderStyle = BorderStyle.FixedSingle,
             BackColor = Color.FromArgb(18, 18, 22),
             ForeColor = _fgMain,
             IntegralHeight = false,
             SelectionMode = SelectionMode.One,
-            HorizontalScrollbar = true,
-            Margin = new Padding(0, 0, 0, 6),
+            HorizontalScrollbar = false,
         };
-        testDevicesLayout.Controls.Add(testDeviceListBox, 0, 17);
-        testDevicesLayout.SetColumnSpan(testDeviceListBox, 2);
+        Panel testDeviceListHost = CreateThemedListHost(testDeviceListBox, 840, 122);
+        testDeviceListHost.Dock = DockStyle.Top;
+        testDevicesLayout.Controls.Add(testDeviceListHost, 0, 17);
+        testDevicesLayout.SetColumnSpan(testDeviceListHost, 2);
 
         Button removeTestDeviceButton = NewDialogButton("REMOVE SELECTED");
         removeTestDeviceButton.Size = new Size(180, 28);
@@ -931,30 +1105,27 @@ public sealed partial class MainForm
         {
             Height = 100,
             Width = 430,
-            BorderStyle = BorderStyle.FixedSingle,
             BackColor = Color.FromArgb(18, 18, 22),
             ForeColor = _fgMain,
             IntegralHeight = false,
             SelectionMode = SelectionMode.One,
-            HorizontalScrollbar = true,
-            Margin = new Padding(0, 0, 16, 6),
+            HorizontalScrollbar = false,
         };
 
         ListBox hiddenDeviceListBox = new()
         {
             Height = 100,
             Width = 330,
-            BorderStyle = BorderStyle.FixedSingle,
             BackColor = Color.FromArgb(18, 18, 22),
             ForeColor = _fgMain,
             IntegralHeight = false,
             SelectionMode = SelectionMode.One,
-            HorizontalScrollbar = true,
-            Margin = new Padding(0, 0, 0, 6),
+            HorizontalScrollbar = false,
         };
-        ApplyDarkScrollBarTheme(testDeviceListBox);
-        ApplyDarkScrollBarTheme(realDeviceListBox);
-        ApplyDarkScrollBarTheme(hiddenDeviceListBox);
+        Panel realDeviceListHost = CreateThemedListHost(realDeviceListBox, 430, 100);
+        Panel hiddenDeviceListHost = CreateThemedListHost(hiddenDeviceListBox, 430, 100);
+        realDeviceListHost.Dock = DockStyle.Fill;
+        hiddenDeviceListHost.Dock = DockStyle.Fill;
 
         Button hideRealDeviceButton = NewDialogButton("HIDE SELECTED");
         hideRealDeviceButton.Size = new Size(150, 28);
@@ -970,23 +1141,23 @@ public sealed partial class MainForm
 
         TableLayoutPanel realVisibilityPanel = new()
         {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            AutoSize = false,
+            Height = 170,
             ColumnCount = 2,
             RowCount = 3,
             Dock = DockStyle.Top,
             Margin = new Padding(0, 0, 0, 8),
             Padding = Padding.Empty,
         };
-        realVisibilityPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 446F));
-        realVisibilityPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 340F));
-        realVisibilityPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        realVisibilityPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        realVisibilityPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        realVisibilityPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+        realVisibilityPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+        realVisibilityPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
+        realVisibilityPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 108F));
+        realVisibilityPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 38F));
         realVisibilityPanel.Controls.Add(NewHeaderLabel("Visible real devices"), 0, 0);
         realVisibilityPanel.Controls.Add(NewHeaderLabel("Hidden real devices"), 1, 0);
-        realVisibilityPanel.Controls.Add(realDeviceListBox, 0, 1);
-        realVisibilityPanel.Controls.Add(hiddenDeviceListBox, 1, 1);
+        realVisibilityPanel.Controls.Add(realDeviceListHost, 0, 1);
+        realVisibilityPanel.Controls.Add(hiddenDeviceListHost, 1, 1);
 
         FlowLayoutPanel hideButtonsPanel = NewRowFlowPanel();
         hideButtonsPanel.Controls.Add(hideRealDeviceButton);
@@ -1007,6 +1178,595 @@ public sealed partial class MainForm
         layout.Controls.Add(testDevicesPanel, 0, 14);
         layout.SetColumnSpan(testDevicesPanel, 2);
 
+        Label scenarioLabLabel = new()
+        {
+            Text = "Scenario Lab",
+            AutoSize = true,
+            Font = _titleFont,
+            ForeColor = _accent,
+            Margin = new Padding(0, 18, 0, 8),
+        };
+        layout.Controls.Add(scenarioLabLabel, 0, 15);
+        layout.SetColumnSpan(scenarioLabLabel, 2);
+
+        Panel scenarioLabPanel = NewBoxPanel();
+        scenarioLabPanel.AutoSize = true;
+        scenarioLabPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        scenarioLabPanel.Dock = DockStyle.Top;
+        scenarioLabPanel.Margin = new Padding(0, 0, 0, 8);
+
+        TableLayoutPanel scenarioLayout = new()
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            ColumnCount = 2,
+            Dock = DockStyle.Top,
+            Padding = new Padding(4),
+            Margin = Padding.Empty,
+        };
+        scenarioLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150F));
+        scenarioLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+
+        TextBox scenarioNameBox = NewDialogTextBox(500);
+        scenarioNameBox.Text = "Release regression";
+        ThemedDropDownPicker scenarioOperationCombo = NewDialogCombo(180);
+        scenarioOperationCombo.Items.AddRange(Enum.GetValues<TestSandboxOperation>().Cast<object>().ToArray());
+        scenarioOperationCombo.SelectedItem = TestSandboxOperation.Auto;
+        ThemedDropDownPicker scenarioFaultCombo = NewDialogCombo(310);
+        scenarioFaultCombo.Items.AddRange(Enum.GetValues<TestSandboxFault>().Cast<object>().ToArray());
+        scenarioFaultCombo.SelectedItem = TestSandboxFault.None;
+        CheckBox scenarioImodCheck = new()
+        {
+            Text = "Include USB IMOD",
+            AutoSize = true,
+            Checked = true,
+            BackColor = _bgPanel,
+            ForeColor = _fgMain,
+            Margin = new Padding(16, 4, 0, 6),
+        };
+
+        ThemedDropDownPicker scenarioDeviceCombo = NewDialogCombo(560);
+        scenarioDeviceCombo.DropDownWidth = 690;
+        ThemedDropDownPicker stateMsiCombo = NewDialogCombo(130);
+        stateMsiCombo.Items.AddRange(["Enabled", "Disabled"]);
+        TextBox stateLimitBox = NewDialogTextBox(100);
+        ThemedDropDownPicker statePriorityCombo = NewDialogCombo(140);
+        statePriorityCombo.Items.AddRange(["Undefined", "Low", "Normal", "High"]);
+        ThemedDropDownPicker statePolicyCombo = NewDialogCombo(180);
+        statePolicyCombo.Items.AddRange(["MachineDefault", "AllClose", "Single", "All", "SpecCPU", "SpreadMessages"]);
+        TextBox stateMaskBox = NewDialogTextBox(140);
+        TextBox stateRssBaseBox = NewDialogTextBox(90);
+        NumericUpDown stateRssQueuesBox = NewNumericUpDown(1, MaxAffinityBits, 1);
+        ThemedDropDownPicker stateNdisModeCombo = NewDialogCombo(110);
+        stateNdisModeCombo.Items.AddRange(["RSS", "IRQ", "BOTH"]);
+        ThemedDropDownPicker statePowerCombo = NewDialogCombo(140);
+        statePowerCombo.Items.AddRange(["preserve", "on", "off"]);
+        TextBox stateImodBox = NewDialogTextBox(260);
+        TextBox stateNicItrBox = NewDialogTextBox(180);
+
+        FlowLayoutPanel operationRow = NewRowFlowPanel();
+        operationRow.Controls.Add(scenarioOperationCombo);
+        operationRow.Controls.Add(scenarioImodCheck);
+        FlowLayoutPanel stateMsiRow = NewRowFlowPanel();
+        stateMsiRow.Controls.Add(stateMsiCombo);
+        stateMsiRow.Controls.Add(NewInlineLabel("Limit (absent/0..2048):"));
+        stateMsiRow.Controls.Add(stateLimitBox);
+        FlowLayoutPanel stateAffinityRow = NewRowFlowPanel();
+        stateAffinityRow.Controls.Add(statePolicyCombo);
+        stateAffinityRow.Controls.Add(NewInlineLabel("Mask:"));
+        stateAffinityRow.Controls.Add(stateMaskBox);
+        FlowLayoutPanel stateRssRow = NewRowFlowPanel();
+        stateRssRow.Controls.Add(NewInlineLabel("Base (absent/int):"));
+        stateRssRow.Controls.Add(stateRssBaseBox);
+        stateRssRow.Controls.Add(NewInlineLabel("Queues:"));
+        stateRssRow.Controls.Add(stateRssQueuesBox);
+        stateRssRow.Controls.Add(NewInlineLabel("Mode:"));
+        stateRssRow.Controls.Add(stateNdisModeCombo);
+        FlowLayoutPanel stateDriverRow = NewRowFlowPanel();
+        stateDriverRow.Controls.Add(NewInlineLabel("IMOD:"));
+        stateDriverRow.Controls.Add(stateImodBox);
+        stateDriverRow.Controls.Add(NewInlineLabel("NIC ITR:"));
+        stateDriverRow.Controls.Add(stateNicItrBox);
+
+        int scenarioRow = 0;
+        void AddScenarioRow(string label, Control control)
+        {
+            scenarioLayout.Controls.Add(NewDialogLabel(label), 0, scenarioRow);
+            scenarioLayout.Controls.Add(control, 1, scenarioRow);
+            scenarioRow++;
+        }
+        AddScenarioRow("Scenario name:", scenarioNameBox);
+        AddScenarioRow("Operation:", operationRow);
+        AddScenarioRow("Failure injection:", scenarioFaultCombo);
+        AddScenarioRow("Initial state device:", scenarioDeviceCombo);
+        AddScenarioRow("MSI state:", stateMsiRow);
+        AddScenarioRow("IRQ Priority:", statePriorityCombo);
+        AddScenarioRow("CPU Affinity state:", stateAffinityRow);
+        AddScenarioRow("RSS state:", stateRssRow);
+        AddScenarioRow("Power Saving:", statePowerCombo);
+        AddScenarioRow("Driver state:", stateDriverRow);
+
+        void LoadSelectedInitialState()
+        {
+            int index = scenarioDeviceCombo.SelectedIndex;
+            if (index < 0 || index >= _testDevices.Count)
+            {
+                return;
+            }
+            TestDeviceState state = EnsureTestDeviceState(_testDevices[index]);
+            stateMsiCombo.SelectedItem = state.MsiEnabled ? "Enabled" : "Disabled";
+            stateLimitBox.Text = state.MsiLimit?.ToString(CultureInfo.InvariantCulture) ?? "absent";
+            statePriorityCombo.SelectedItem = state.Priority switch { 1 => "Low", 2 => "Normal", 3 => "High", _ => "Undefined" };
+            statePolicyCombo.SelectedItem = FormatPolicyValue(state.Policy);
+            stateMaskBox.Text = $"0x{state.AffinityMask:X}";
+            stateRssBaseBox.Text = state.RssBaseCore?.ToString(CultureInfo.InvariantCulture) ?? "absent";
+            stateRssQueuesBox.Value = Math.Max(1, Math.Min(MaxAffinityBits, state.RssQueues));
+            stateNdisModeCombo.SelectedItem = state.NdisMode;
+            statePowerCombo.SelectedItem = state.PowerSavingEnabled switch { true => "on", false => "off", _ => "preserve" };
+            stateImodBox.Text = state.ImodValue;
+            stateNicItrBox.Text = state.NicItrValue;
+        }
+
+        bool TrySaveSelectedInitialState(out string error)
+        {
+            error = string.Empty;
+            int index = scenarioDeviceCombo.SelectedIndex;
+            if (index < 0 || index >= _testDevices.Count)
+            {
+                error = "Select a test device first.";
+                return false;
+            }
+            string limitText = stateLimitBox.Text.Trim();
+            int? limit = null;
+            if (!limitText.Equals("absent", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(limitText)
+                && limitText != "0")
+            {
+                if (!int.TryParse(limitText, out int parsedLimit) || parsedLimit is < 1 or > 2048)
+                {
+                    error = "MSI Limit must be absent/0 or 1..2048.";
+                    return false;
+                }
+                limit = parsedLimit;
+            }
+            string maskText = stateMaskBox.Text.Trim();
+            if (maskText.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) maskText = maskText[2..];
+            if (!ulong.TryParse(maskText, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong mask))
+            {
+                error = "Affinity mask must be hexadecimal, for example 0x3.";
+                return false;
+            }
+            int? rssBase = null;
+            string rssText = stateRssBaseBox.Text.Trim();
+            if (!rssText.Equals("absent", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(rssText))
+            {
+                if (!int.TryParse(rssText, out int parsedBase) || parsedBase < 0 || parsedBase >= MaxAffinityBits)
+                {
+                    error = $"RSS base must be absent or 0..{MaxAffinityBits - 1}.";
+                    return false;
+                }
+                rssBase = parsedBase;
+            }
+
+            DeviceInfo device = _testDevices[index];
+            TestDeviceState state = EnsureTestDeviceState(device);
+            state.MsiEnabled = string.Equals(stateMsiCombo.SelectedItem?.ToString(), "Enabled", StringComparison.Ordinal);
+            state.MsiLimit = limit;
+            state.Priority = statePriorityCombo.SelectedItem?.ToString() switch { "Low" => 1, "Normal" => 2, "High" => 3, _ => null };
+            state.Policy = MapPolicyText(statePolicyCombo.SelectedItem?.ToString() ?? "MachineDefault") ?? 0;
+            state.AffinityMask = mask;
+            state.RssBaseCore = rssBase;
+            state.RssQueues = (int)stateRssQueuesBox.Value;
+            state.NdisMode = stateNdisModeCombo.SelectedItem?.ToString() ?? "RSS";
+            state.PowerSavingEnabled = statePowerCombo.SelectedItem?.ToString() switch { "on" => true, "off" => false, _ => null };
+            state.ImodValue = stateImodBox.Text.Trim();
+            state.NicItrValue = stateNicItrBox.Text.Trim();
+            if (device.Kind == DeviceKind.USB && state.PowerSavingEnabled.HasValue) device.UsbSelectiveSuspend = state.PowerSavingEnabled.Value ? "on" : "off";
+            if (device.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX && !device.Wifi && state.PowerSavingEnabled.HasValue) device.NicPowerSaving = state.PowerSavingEnabled.Value ? "on" : "off";
+            DeviceBlock? block = _blocks.FirstOrDefault(candidate => string.Equals(candidate.Device.InstanceId, device.InstanceId, StringComparison.OrdinalIgnoreCase));
+            if (block is not null) LoadBlockSettings(block);
+            WriteLog($"TEST.SCENARIO.STATE: id={device.InstanceId} initial-state-updated");
+            return true;
+        }
+
+        Button stateApplyButton = NewDialogButton("APPLY INITIAL STATE");
+        stateApplyButton.Dock = DockStyle.Fill;
+        stateApplyButton.Click += (_, _) =>
+        {
+            if (!TrySaveSelectedInitialState(out string error)) ShowThemedInfo(error);
+        };
+        Button scenarioRunButton = NewDialogButton("RUN SCENARIO");
+        scenarioRunButton.Dock = DockStyle.Fill;
+        scenarioRunButton.Click += (_, _) =>
+        {
+            if (!TrySaveSelectedInitialState(out string error))
+            {
+                ShowThemedInfo(error);
+                return;
+            }
+            TestSandboxScenario scenario = CaptureCurrentTestScenario(
+                scenarioNameBox.Text,
+                (TestSandboxOperation)(scenarioOperationCombo.SelectedItem ?? TestSandboxOperation.Auto),
+                (TestSandboxFault)(scenarioFaultCombo.SelectedItem ?? TestSandboxFault.None),
+                scenarioImodCheck.Checked);
+            _ = RunTestSandboxScenario(scenario, showResult: true);
+        };
+        Button scenarioMatrixButton = NewDialogButton("RUN CORE MATRIX");
+        scenarioMatrixButton.Dock = DockStyle.Fill;
+        bool RunCoreScenarioMatrix(bool showDialog)
+        {
+            if (showDialog && !TrySaveSelectedInitialState(out string error))
+            {
+                ShowThemedInfo(error);
+                return false;
+            }
+            (TestSandboxOperation Operation, TestSandboxFault Fault, bool Imod)[] matrix =
+            [
+                (TestSandboxOperation.Auto, TestSandboxFault.None, true),
+                (TestSandboxOperation.Auto, TestSandboxFault.CpuTopologyUnavailable, false),
+                (TestSandboxOperation.Auto, TestSandboxFault.CpuMapUnavailable, false),
+                (TestSandboxOperation.Apply, TestSandboxFault.None, true),
+                (TestSandboxOperation.SafeReset, TestSandboxFault.None, false),
+                (TestSandboxOperation.Backup, TestSandboxFault.None, false),
+                (TestSandboxOperation.Backup, TestSandboxFault.BackupAccessDenied, false),
+                (TestSandboxOperation.Auto, TestSandboxFault.BackupAccessDenied, true),
+                (TestSandboxOperation.Auto, TestSandboxFault.RegistryWriteDenied, true),
+                (TestSandboxOperation.Auto, TestSandboxFault.UsbPowerWriteFailed, true),
+                (TestSandboxOperation.Auto, TestSandboxFault.WmiTimeout, true),
+                (TestSandboxOperation.Auto, TestSandboxFault.KduMissing, true),
+                (TestSandboxOperation.Auto, TestSandboxFault.KduExitCode, true),
+                (TestSandboxOperation.Auto, TestSandboxFault.KduDeviceUnavailable577, true),
+                (TestSandboxOperation.Auto, TestSandboxFault.KduTimeout, true),
+                (TestSandboxOperation.Auto, TestSandboxFault.ImodReadFailed, true),
+                (TestSandboxOperation.Auto, TestSandboxFault.ImodWriteFailed, true),
+                (TestSandboxOperation.Auto, TestSandboxFault.ImodVerificationMismatch, true),
+                (TestSandboxOperation.Auto, TestSandboxFault.NicItrReadFailed, true),
+                (TestSandboxOperation.Auto, TestSandboxFault.NicItrWriteFailed, true),
+                (TestSandboxOperation.Auto, TestSandboxFault.RefreshFailed, true),
+                (TestSandboxOperation.Restore, TestSandboxFault.None, false),
+                (TestSandboxOperation.Restore, TestSandboxFault.CorruptBackup, false),
+                (TestSandboxOperation.Restore, TestSandboxFault.RestoreWriteFailed, false),
+                (TestSandboxOperation.Restore, TestSandboxFault.RollbackFailed, false),
+            ];
+            int passed = 0;
+            List<string> failed = [];
+            Dictionary<string, TestDeviceState> baselineState = CaptureTestSandboxState();
+            try
+            {
+                static bool PipeColumnsMatch(string text)
+                {
+                    int[] columns = text.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries)
+                        .Select(line => line.IndexOf(" | ", StringComparison.Ordinal))
+                        .Where(column => column >= 0)
+                        .ToArray();
+                    return columns.Length >= 2 && columns.All(column => column == columns[0]);
+                }
+
+                static bool TokenColumnsMatch(string text, string token)
+                {
+                    int[] columns = text.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries)
+                        .Select(line => line.IndexOf(token, StringComparison.Ordinal))
+                        .Where(column => column >= 0)
+                        .ToArray();
+                    return columns.Length >= 2 && columns.All(column => column == columns[0]);
+                }
+
+                string deviceMap = FormatDeviceFirstImodLines(
+                [
+                    "Mouse 1K -> intr0=0x0/0 ns",
+                    "Keyboard 8K -> intr0=0x0/0 ns",
+                    "Audio -> intr0=0xC8/50us",
+                    "Microphone -> intr0=0x0/0 ns",
+                ]);
+                string interrupterMap = FormatVisibleImodInterrupterLines([0, 0xC8, 0xC8, 0xC8, 0, 0xC8, 0xC8, 0]);
+                NicItrProfile nicProfile = NicItrProfiles.First(profile => profile.TimingKind == NicItrTimingKind.RealtekIntrMitV2);
+                string nicDetails = FormatNicItrQueueDetailText([0x7E600958, 0, 0x7E600938, 0], nicProfile);
+                string[] nicRows = nicDetails.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries);
+                int[] rawColumns = nicRows.Select(row => row.IndexOf("0x", StringComparison.Ordinal)).ToArray();
+                int[] rxColumns = nicRows.Where(row => row.Contains("RX ", StringComparison.Ordinal)).Select(row => row.IndexOf("RX ", StringComparison.Ordinal)).ToArray();
+                int[] txColumns = nicRows.Where(row => row.Contains("TX ", StringComparison.Ordinal)).Select(row => row.IndexOf("TX ", StringComparison.Ordinal)).ToArray();
+                string nicSummary = FormatNicItrQueueSummary([0x7E600958, 0, 0x7E600938, 0], nicProfile)["current: ".Length..];
+                string[] summaryCells = nicSummary.Split(" | ", StringSplitOptions.None);
+                using ImodMapTextBox renderedImod = new()
+                {
+                    Text = $"{deviceMap}\r\n\r\n{interrupterMap}",
+                    Font = _technicalFont,
+                    Size = new Size(UiScale(640), UiScale(220)),
+                };
+                using NicItrTableLabel renderedNic = new()
+                {
+                    Text = nicDetails,
+                    Font = _technicalFont,
+                    Size = new Size(UiScale(640), UiScale(110)),
+                };
+                using Bitmap imodBitmap = new(renderedImod.Width, renderedImod.Height);
+                using Bitmap nicBitmap = new(renderedNic.Width, renderedNic.Height);
+                renderedImod.DrawToBitmap(imodBitmap, renderedImod.ClientRectangle);
+                renderedNic.DrawToBitmap(nicBitmap, renderedNic.ClientRectangle);
+                bool layoutPassed = TokenColumnsMatch(deviceMap, " -> ")
+                    && PipeColumnsMatch(interrupterMap)
+                    && rawColumns.Distinct().Count() == 1
+                    && rxColumns.Length >= 2 && rxColumns.Distinct().Count() == 1
+                    && txColumns.Length >= 2 && txColumns.Distinct().Count() == 1
+                    && summaryCells.Length == 4
+                    && summaryCells.Take(summaryCells.Length - 1).Select(cell => cell.Length).Distinct().Count() == 1
+                    && renderedImod.DisplayRowCount == 11
+                    && renderedImod.ValidateColumnLayout(renderedImod.ClientSize.Width)
+                    && renderedNic.ValidateColumnLayout(renderedNic.ClientSize.Width);
+                if (layoutPassed) passed++; else failed.Add("interrupt columns");
+                WriteLog($"TEST.LAYOUT.COLUMNS: status={(layoutPassed ? "PASS" : "FAIL")}");
+            }
+            catch (Exception ex)
+            {
+                failed.Add("interrupt columns");
+                WriteLog($"TEST.LAYOUT.COLUMNS: status=FAIL error=\"{FlattenLogText(ex.ToString())}\"");
+            }
+            try
+            {
+                NicItrProfile i210 = NicItrProfiles.First(profile => profile.FamilyName.StartsWith("Intel I210/I211", StringComparison.Ordinal));
+                NicItrProfile i350 = NicItrProfiles.First(profile => profile.FamilyName.StartsWith("Intel I350", StringComparison.Ordinal));
+                NicItrProfile i82580 = NicItrProfiles.First(profile => profile.FamilyName.StartsWith("Intel 82580", StringComparison.Ordinal));
+                ulong i350RequiredLength = i350.BaseOffset + ((ulong)(i350.MaxQueues - 1) * i350.Stride) + (ulong)(i350.ReadWidth / 8);
+                bool profilePassed = i210.MaxQueues == 5
+                    && i350.MaxQueues == 25
+                    && i210.IntelEitrUnitUs == 1
+                    && i350.IntelEitrUnitUs == 1
+                    && i82580.IntelEitrUnitUs == 2
+                    && FormatNicItrTiming(0x190, i210) == "100 us"
+                    && FormatNicItrTiming(0x190, i82580) == "200 us"
+                    && TryValidateNicItrMemoryRange(i350, i350RequiredLength, out _)
+                    && !TryValidateNicItrMemoryRange(i350, i350RequiredLength - 1, out _);
+                if (profilePassed) passed++; else failed.Add("NIC ITR profiles");
+                WriteLog($"TEST.NIC.ITR.PROFILES: status={(profilePassed ? "PASS" : "FAIL")} i210={i210.MaxQueues}/{i210.IntelEitrUnitUs}us i350={i350.MaxQueues}/{i350.IntelEitrUnitUs}us");
+            }
+            catch (Exception ex)
+            {
+                failed.Add("NIC ITR profiles");
+                WriteLog($"TEST.NIC.ITR.PROFILES: status=FAIL error=\"{FlattenLogText(ex.ToString())}\"");
+            }
+            try
+            {
+                TestSandboxScenario jsonSource = CaptureCurrentTestScenario("JSON round-trip", TestSandboxOperation.Auto, TestSandboxFault.None, true);
+                string json = JsonSerializer.Serialize(jsonSource, TestScenarioJsonOptions());
+                TestSandboxScenario? jsonRoundTrip = JsonSerializer.Deserialize<TestSandboxScenario>(json, TestScenarioJsonOptions());
+                bool jsonPassed = jsonRoundTrip is not null
+                    && jsonRoundTrip.Version == jsonSource.Version
+                    && jsonRoundTrip.Cpu.LogicalCount == jsonSource.Cpu.LogicalCount
+                    && jsonRoundTrip.Devices.Count == jsonSource.Devices.Count
+                    && jsonRoundTrip.Devices.Select(device => device.InstanceId).SequenceEqual(jsonSource.Devices.Select(device => device.InstanceId), StringComparer.OrdinalIgnoreCase);
+                if (jsonPassed) passed++; else failed.Add("JSON round-trip");
+                WriteLog($"TEST.SCENARIO.JSON: status={(jsonPassed ? "PASS" : "FAIL")} bytes={Encoding.UTF8.GetByteCount(json)} devices={jsonSource.Devices.Count}");
+            }
+            catch (Exception ex)
+            {
+                failed.Add("JSON round-trip");
+                WriteLog($"TEST.SCENARIO.JSON: status=FAIL error=\"{FlattenLogText(ex.ToString())}\"");
+            }
+            foreach ((TestSandboxOperation operation, TestSandboxFault fault, bool imod) in matrix)
+            {
+                RestoreTestSandboxState(baselineState);
+                _testSandbox.Backup = null;
+                foreach (DeviceBlock block in _blocks)
+                {
+                    LoadBlockSettings(block);
+                }
+                TestSandboxScenario run = CaptureCurrentTestScenario($"Matrix {operation}/{fault}", operation, fault, imod);
+                TestSandboxRunResult matrixResult = RunTestSandboxScenario(run, showResult: false);
+                if (matrixResult.Passed) passed++; else failed.Add($"{operation}/{fault}");
+                Application.DoEvents();
+            }
+            RestoreTestSandboxState(baselineState);
+            _testSandbox.Backup = null;
+            foreach (DeviceBlock block in _blocks)
+            {
+                LoadBlockSettings(block);
+            }
+            RefreshTestDeviceList();
+            OperationReport matrixReport = new();
+            int totalChecks = matrix.Length + 3;
+            if (failed.Count == 0) matrixReport.AddSuccess("CORE MATRIX", $"{passed}/{totalChecks} checks passed");
+            else matrixReport.AddError("CORE MATRIX", $"{passed}/{totalChecks} checks passed", $"Failed: {string.Join(", ", failed)}");
+            WriteLog($"TEST.MATRIX.FINAL: status={(failed.Count == 0 ? "PASS" : "FAIL")} passed={passed} total={totalChecks} failed=\"{string.Join(",", failed)}\"");
+            if (showDialog)
+            {
+                ShowOperationResult(matrixReport, "Sandbox matrix passed.", "One or more sandbox scenarios failed.", "SANDBOX MATRIX");
+            }
+            return failed.Count == 0;
+        }
+        scenarioMatrixButton.Click += (_, _) => _ = RunCoreScenarioMatrix(showDialog: true);
+        Button scenarioSaveButton = NewDialogButton("SAVE JSON");
+        scenarioSaveButton.Dock = DockStyle.Fill;
+        scenarioSaveButton.Click += (_, _) =>
+        {
+            if (!TrySaveSelectedInitialState(out string error)) { ShowThemedInfo(error); return; }
+            using SaveFileDialog save = new() { Filter = "DEVICE TWEAKER scenario (*.json)|*.json", FileName = "DeviceTweaker_Scenario.json", AddExtension = true };
+            if (save.ShowDialog(dialog) != DialogResult.OK) return;
+            TestSandboxScenario scenario = CaptureCurrentTestScenario(scenarioNameBox.Text, (TestSandboxOperation)(scenarioOperationCombo.SelectedItem ?? TestSandboxOperation.Auto), (TestSandboxFault)(scenarioFaultCombo.SelectedItem ?? TestSandboxFault.None), scenarioImodCheck.Checked);
+            File.WriteAllText(save.FileName, JsonSerializer.Serialize(scenario, TestScenarioJsonOptions()), new UTF8Encoding(false));
+            WriteLog($"TEST.SCENARIO.SAVE: path={save.FileName}");
+        };
+        Button scenarioLoadButton = NewDialogButton("LOAD JSON");
+        scenarioLoadButton.Dock = DockStyle.Fill;
+        scenarioLoadButton.Click += (_, _) =>
+        {
+            using OpenFileDialog open = new() { Filter = "DEVICE TWEAKER scenario (*.json)|*.json" };
+            if (open.ShowDialog(dialog) != DialogResult.OK) return;
+            try
+            {
+                FileInfo scenarioFile = new(open.FileName);
+                if (scenarioFile.Length > 2 * 1024 * 1024)
+                {
+                    throw new InvalidOperationException("Scenario file is larger than 2 MB.");
+                }
+                TestSandboxScenario? scenario = JsonSerializer.Deserialize<TestSandboxScenario>(File.ReadAllText(open.FileName, Encoding.UTF8), TestScenarioJsonOptions());
+                if (scenario is null) throw new InvalidOperationException("Scenario file is empty.");
+                LoadTestSandboxScenario(scenario);
+                scenarioNameBox.Text = scenario.Name;
+                scenarioOperationCombo.SelectedItem = scenario.Operation;
+                scenarioFaultCombo.SelectedItem = scenario.Fault;
+                scenarioImodCheck.Checked = scenario.OptimizeUsbImod;
+                RefreshTestDeviceList();
+            }
+            catch (Exception ex)
+            {
+                ShowThemedInfo($"Scenario could not be loaded.\n{ex.Message}");
+                WriteLog($"TEST.SCENARIO.LOAD.ERROR: {FlattenLogText(ex.ToString())}");
+            }
+        };
+
+        TableLayoutPanel scenarioButtons = new()
+        {
+            Size = new Size(690, 108),
+            ColumnCount = 2,
+            RowCount = 3,
+            Margin = new Padding(0, 6, 0, 2),
+            Padding = Padding.Empty,
+        };
+        scenarioButtons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+        scenarioButtons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+        scenarioButtons.RowStyles.Add(new RowStyle(SizeType.Percent, 33.333F));
+        scenarioButtons.RowStyles.Add(new RowStyle(SizeType.Percent, 33.333F));
+        scenarioButtons.RowStyles.Add(new RowStyle(SizeType.Percent, 33.334F));
+        foreach (Button button in new[] { stateApplyButton, scenarioRunButton, scenarioMatrixButton, scenarioSaveButton, scenarioLoadButton })
+        {
+            button.Margin = new Padding(0, 0, 10, 6);
+        }
+        scenarioButtons.Controls.Add(stateApplyButton, 0, 0);
+        scenarioButtons.Controls.Add(scenarioRunButton, 1, 0);
+        scenarioButtons.Controls.Add(scenarioSaveButton, 0, 1);
+        scenarioButtons.Controls.Add(scenarioLoadButton, 1, 1);
+        scenarioButtons.Controls.Add(scenarioMatrixButton, 0, 2);
+        scenarioButtons.SetColumnSpan(scenarioMatrixButton, 2);
+        scenarioLayout.Controls.Add(scenarioButtons, 0, scenarioRow);
+        scenarioLayout.SetColumnSpan(scenarioButtons, 2);
+        scenarioLabPanel.Controls.Add(scenarioLayout);
+        layout.Controls.Add(scenarioLabPanel, 0, 16);
+        layout.SetColumnSpan(scenarioLabPanel, 2);
+
+        Label resultGalleryLabel = new()
+        {
+            Text = "Result Dialog Gallery",
+            AutoSize = true,
+            Font = _titleFont,
+            ForeColor = _accent,
+            Margin = new Padding(0, 18, 0, 8),
+        };
+        layout.Controls.Add(resultGalleryLabel, 0, 17);
+        layout.SetColumnSpan(resultGalleryLabel, 2);
+
+        Label resultGalleryHint = NewHintLabel(
+            "Preview the production result dialogs without running APPLY or AUTO-OPTIMIZATION. Partial also exercises the Vulnerable Driver Blocklist confirm when the blocklist is enabled.");
+        resultGalleryHint.Margin = new Padding(0, 0, 0, 12);
+        layout.Controls.Add(resultGalleryHint, 0, 18);
+        layout.SetColumnSpan(resultGalleryHint, 2);
+
+        FlowLayoutPanel resultGalleryPanel = NewRowFlowPanel();
+        resultGalleryPanel.WrapContents = true;
+        resultGalleryPanel.Margin = new Padding(0, 0, 0, 10);
+
+        void AttachPreviewBackupPath(OperationReport preview)
+        {
+            // Prefer an existing managed folder; otherwise point at EXE\Backups so BACKUPS
+            // always resolves the same way as production result dialogs.
+            string backupDir = EnumerateBackupDirectories().FirstOrDefault(Directory.Exists)
+                ?? GetBackupDirectory(BackupLocation.Local);
+            preview.SetBackupPath(Path.Combine(backupDir, "DeviceTweakerBackup_ORIGINAL.json"));
+        }
+
+        Button resultSuccessButton = NewDialogButton("RESULT: SUCCESS");
+        resultSuccessButton.Size = new Size(168, 32);
+        resultSuccessButton.Margin = new Padding(0, 0, 10, 8);
+        resultSuccessButton.Click += (_, _) =>
+        {
+            CloseDevicesBusyOverlay();
+            OperationReport preview = new();
+            preview.AddSuccess("DEVICE SETTINGS", "7 processed");
+            preview.AddSuccess("CPU AFFINITY", "4 targets");
+            preview.AddSuccess("USB POWER", "Applied");
+            preview.AddSuccess("USB IMOD", "Applied");
+            AttachPreviewBackupPath(preview);
+            ShowOperationResult(
+                preview,
+                "Please reboot your PC to finish applying the changes.",
+                string.Empty,
+                operationName: "AUTO-OPTIMIZATION");
+        };
+
+        Button resultPartialButton = NewDialogButton("RESULT: PARTIAL");
+        resultPartialButton.Size = new Size(168, 32);
+        resultPartialButton.Margin = new Padding(0, 0, 10, 8);
+        resultPartialButton.Click += (_, _) =>
+        {
+            CloseDevicesBusyOverlay();
+            OperationReport preview = new();
+            preview.AddSuccess("DEVICE SETTINGS", "7 processed");
+            preview.AddSuccess("CPU AFFINITY", "4 targets");
+            preview.AddSuccess("USB POWER", "Applied");
+            preview.AddError(
+                "USB IMOD",
+                FormatImodUnavailableUserMessage(
+                    "Windows cannot verify the digital signature for this file. (code 577) (kernel CI blocked; enabled=True testSign=False)",
+                    includeNotChanged: true),
+                "KDU exit code: 0\r\nDTIMOD device: unavailable\r\nService fallback: Windows error 577\r\nKernel CI: enabled\r\nVulnerable Driver Blocklist: likely enabled\r\nHVCI/VBS: disabled\r\n\r\nThis is simulated TEST ADMIN diagnostic text.");
+            AttachPreviewBackupPath(preview);
+            ShowOperationResult(
+                preview,
+                "Core optimization was saved.",
+                "Applied steps were saved. One optional step was not completed.",
+                operationName: "AUTO-OPTIMIZATION");
+            MaybeOfferVulnerableDriverBlocklistDisable(preview);
+        };
+
+        Button resultFailedButton = NewDialogButton("RESULT: FAILED");
+        resultFailedButton.Size = new Size(168, 32);
+        resultFailedButton.Margin = new Padding(0, 0, 10, 8);
+        resultFailedButton.Click += (_, _) =>
+        {
+            CloseDevicesBusyOverlay();
+            OperationReport preview = new();
+            preview.MarkNoChangesMade();
+            preview.AddError(
+                "AUTOMATIC BACKUP",
+                "The backup could not be created. No changes were made.",
+                "UnauthorizedAccessException: simulated access denied while creating the pre-operation backup.");
+            AttachPreviewBackupPath(preview);
+            ShowOperationResult(
+                preview,
+                string.Empty,
+                "The operation stopped before any changes were made.",
+                operationName: "APPLY");
+        };
+
+        Button resultStressButton = NewDialogButton("RESULT: STRESS");
+        resultStressButton.Size = new Size(168, 32);
+        resultStressButton.Margin = new Padding(0, 0, 0, 8);
+        resultStressButton.Click += (_, _) =>
+        {
+            CloseDevicesBusyOverlay();
+            OperationReport preview = new();
+            preview.AddSuccess("DEVICE SETTINGS", "12 processed");
+            for (int i = 1; i <= 14; i++)
+            {
+                preview.AddError(
+                    $"TEST COMPONENT {i:D2}",
+                    i == 1 ? "A deliberately long summary verifies wrapping without exposing raw diagnostics in the main result." : null,
+                    $"Simulated technical detail #{i:D2}\r\n" + new string((char)('A' + ((i - 1) % 26)), 420));
+            }
+            AttachPreviewBackupPath(preview);
+            ShowOperationResult(
+                preview,
+                "Some test steps completed.",
+                "Stress preview: verify clipping, wrapping, scrolling and DETAILS.",
+                operationName: "GUI STRESS TEST");
+        };
+
+        resultGalleryPanel.Controls.Add(resultSuccessButton);
+        resultGalleryPanel.Controls.Add(resultPartialButton);
+        resultGalleryPanel.Controls.Add(resultFailedButton);
+        resultGalleryPanel.Controls.Add(resultStressButton);
+        layout.Controls.Add(resultGalleryPanel, 0, 19);
+        layout.SetColumnSpan(resultGalleryPanel, 2);
+
         bool suppressTestDeviceToggle = false;
         bool suppressTestDeviceSelection = false;
         List<DeviceInfo> realVisibleDevices = [];
@@ -1024,6 +1784,7 @@ public sealed partial class MainForm
                 testDeviceListBox.Items.Add(FormatTestDeviceLabel(device));
             }
             testDeviceListBox.EndUpdate();
+            SyncThemedListHost(testDeviceListBox);
             if (targetIndex >= 0 && targetIndex < _testDevices.Count)
             {
                 testDeviceListBox.SelectedIndex = targetIndex;
@@ -1039,7 +1800,21 @@ public sealed partial class MainForm
                 LoadTestDeviceToFields(_testDevices[testDeviceListBox.SelectedIndex]);
             }
             testListLabel.Text = $"Current test devices: {_testDevices.Count}";
+
+            int previousScenarioIndex = scenarioDeviceCombo.SelectedIndex;
+            scenarioDeviceCombo.Items.Clear();
+            foreach (DeviceInfo device in _testDevices)
+            {
+                scenarioDeviceCombo.Items.Add($"{device.Kind}: {device.Name} | {device.InstanceId}");
+            }
+            int scenarioIndex = selectIndex >= 0 ? selectIndex : previousScenarioIndex;
+            if (_testDevices.Count > 0)
+            {
+                scenarioDeviceCombo.SelectedIndex = Math.Max(0, Math.Min(_testDevices.Count - 1, scenarioIndex));
+            }
         }
+
+        scenarioDeviceCombo.SelectedIndexChanged += (_, _) => LoadSelectedInitialState();
 
         void RefreshRealDeviceVisibilityLists()
         {
@@ -1061,6 +1836,7 @@ public sealed partial class MainForm
                 realDeviceListBox.Items.Add(label);
             }
             realDeviceListBox.EndUpdate();
+            SyncThemedListHost(realDeviceListBox);
 
             hiddenDeviceKeys = _testHiddenDeviceIds
                 .OrderBy(key => _testHiddenDeviceLabels.TryGetValue(key, out string? label) ? label : key, StringComparer.OrdinalIgnoreCase)
@@ -1074,6 +1850,7 @@ public sealed partial class MainForm
                 hiddenDeviceListBox.Items.Add(label);
             }
             hiddenDeviceListBox.EndUpdate();
+            SyncThemedListHost(hiddenDeviceListBox);
 
             realVisibilityLabel.Text = $"Real device visibility: visible={realVisibleDevices.Count}, hidden={hiddenDeviceKeys.Count}";
         }
@@ -1102,6 +1879,7 @@ public sealed partial class MainForm
             testDevicesOnlyCheck.Checked = false;
             testDevicesOnlyCheck.Enabled = false;
             dryRunAutoCheck.Checked = false;
+            dryRunAutoCheck.AutoCheck = true;
             dryRunAutoCheck.Enabled = true;
             suppressTestDeviceToggle = false;
 
@@ -1346,7 +2124,8 @@ public sealed partial class MainForm
             testDevicesOnlyCheck.Checked = true;
             testDevicesOnlyCheck.Enabled = true;
             dryRunAutoCheck.Checked = true;
-            dryRunAutoCheck.Enabled = false;
+            dryRunAutoCheck.AutoCheck = false;
+            dryRunAutoCheck.Enabled = true;
             suppressTestDeviceToggle = false;
             NotifySandboxModeChanged("system-preset");
         }
@@ -1367,10 +2146,173 @@ public sealed partial class MainForm
             }
         }
 
+        Dictionary<string, (string Msi, string Limit, string Priority, string Policy, ulong Mask)> SeedAutoPolicyRegressionState()
+        {
+            Dictionary<string, (string Msi, string Limit, string Priority, string Policy, ulong Mask)> preservedExpected =
+                new(StringComparer.OrdinalIgnoreCase);
+
+            foreach (DeviceBlock block in _blocks)
+            {
+                if (IsAutoDisplayAudioMsiOnly(block))
+                {
+                    block.MsiCombo.SelectedItem = "Disabled";
+                    block.LimitBox.Text = "17";
+                    block.PrioCombo.SelectedItem = "Normal";
+                    block.PolicyCombo.SelectedItem = "SpecCPU";
+                    block.SuppressCpuEvents++;
+                    try
+                    {
+                        for (int i = 0; i < block.CpuBoxes.Count; i++)
+                        {
+                            block.CpuBoxes[i].Checked = i == 0;
+                        }
+                    }
+                    finally
+                    {
+                        block.SuppressCpuEvents--;
+                    }
+
+                    RecalcAffinityMask(block);
+                    preservedExpected[block.Device.InstanceId] =
+                        ("Enabled", block.LimitBox.Text, block.PrioCombo.SelectedItem?.ToString() ?? string.Empty,
+                            block.PolicyCombo.SelectedItem?.ToString() ?? string.Empty, block.AffinityMask);
+                }
+                else if (block.Device.Wifi)
+                {
+                    block.MsiCombo.SelectedItem = "Disabled";
+                    block.LimitBox.Text = "8";
+                    block.PrioCombo.SelectedItem = "Low";
+                    block.RssBaseCore = 3;
+                    if (block.RssQueueBox is not null)
+                    {
+                        block.RssQueueBox.Value = Math.Min(2, block.RssQueueBox.Maximum);
+                    }
+                    if (block.NdisModeCombo is not null)
+                    {
+                        block.NdisModeCombo.SelectedItem = "BOTH";
+                    }
+                    preservedExpected[block.Device.InstanceId] =
+                        ("Disabled", "8", "Low", block.PolicyCombo.SelectedItem?.ToString() ?? string.Empty, block.AffinityMask);
+                }
+                else if (block.Kind == DeviceKind.STOR)
+                {
+                    block.MsiCombo.SelectedItem = "Disabled";
+                    block.LimitBox.Text = "2048";
+                    block.PrioCombo.SelectedItem = "Normal";
+                    block.PolicyCombo.SelectedItem = "SpreadMessages";
+                }
+            }
+
+            return preservedExpected;
+        }
+
+        void ValidateAutoPolicyRegressionState(
+            IReadOnlyDictionary<string, (string Msi, string Limit, string Priority, string Policy, ulong Mask)> preservedExpected)
+        {
+            int failures = 0;
+            foreach (DeviceBlock block in _blocks.Where(IsAutoDisplayAudioMsiOnly))
+            {
+                (string msi, string limit, string priority, string policy, ulong mask) = preservedExpected[block.Device.InstanceId];
+                bool passed = string.Equals(block.MsiCombo.SelectedItem?.ToString(), msi, StringComparison.Ordinal)
+                    && string.Equals(block.LimitBox.Text, limit, StringComparison.Ordinal)
+                    && string.Equals(block.PrioCombo.SelectedItem?.ToString(), priority, StringComparison.Ordinal)
+                    && string.Equals(block.PolicyCombo.SelectedItem?.ToString(), policy, StringComparison.Ordinal)
+                    && block.AffinityMask == mask;
+                failures += passed ? 0 : 1;
+                WriteLog(
+                    $"TEST.AUTO.POLICY.DISPLAY-AUDIO: status={(passed ? "PASS" : "FAIL")} id={block.Device.InstanceId} " +
+                    $"MSI={block.MsiCombo.SelectedItem} limit={block.LimitBox.Text}/{limit} " +
+                    $"priority={block.PrioCombo.SelectedItem}/{priority} policy={block.PolicyCombo.SelectedItem}/{policy} " +
+                    $"mask=0x{block.AffinityMask:X}/0x{mask:X}");
+            }
+
+            foreach (DeviceBlock block in _blocks.Where(block => block.Device.Wifi))
+            {
+                (string msi, string limit, string priority, string policy, ulong mask) = preservedExpected[block.Device.InstanceId];
+                bool passed = string.Equals(block.MsiCombo.SelectedItem?.ToString(), msi, StringComparison.Ordinal)
+                    && string.Equals(block.LimitBox.Text, limit, StringComparison.Ordinal)
+                    && string.Equals(block.PrioCombo.SelectedItem?.ToString(), priority, StringComparison.Ordinal)
+                    && string.Equals(block.PolicyCombo.SelectedItem?.ToString(), policy, StringComparison.Ordinal)
+                    && block.AffinityMask == mask
+                    && block.RssBaseCore == 3
+                    && block.RssQueueBox?.Value == 2
+                    && string.Equals(block.NdisModeCombo?.SelectedItem?.ToString(), "BOTH", StringComparison.Ordinal);
+                failures += passed ? 0 : 1;
+                WriteLog(
+                    $"TEST.AUTO.POLICY.WIFI: status={(passed ? "PASS" : "FAIL")} id={block.Device.InstanceId} " +
+                    $"MSI={block.MsiCombo.SelectedItem}/{msi} limit={block.LimitBox.Text}/{limit} " +
+                    $"priority={block.PrioCombo.SelectedItem}/{priority} policy={block.PolicyCombo.SelectedItem}/{policy} " +
+                    $"mask=0x{block.AffinityMask:X}/0x{mask:X} rssBase={block.RssBaseCore}/3 " +
+                    $"rssQueues={block.RssQueueBox?.Value}/2 mode={block.NdisModeCombo?.SelectedItem}/BOTH");
+            }
+
+            foreach (DeviceBlock block in _blocks.Where(block => block.Kind == DeviceKind.STOR))
+            {
+                bool passed = string.Equals(block.MsiCombo.SelectedItem?.ToString(), "Enabled", StringComparison.Ordinal)
+                    && string.Equals(block.LimitBox.Text, "0", StringComparison.Ordinal)
+                    && string.Equals(block.PrioCombo.SelectedItem?.ToString(), "High", StringComparison.Ordinal)
+                    && block.AffinityMask == 0;
+                failures += passed ? 0 : 1;
+                WriteLog(
+                    $"TEST.AUTO.POLICY.STORAGE: status={(passed ? "PASS" : "FAIL")} id={block.Device.InstanceId} " +
+                    $"MSI={block.MsiCombo.SelectedItem} limit={block.LimitBox.Text} priority={block.PrioCombo.SelectedItem} " +
+                    $"mask=0x{block.AffinityMask:X}");
+            }
+
+            bool imodStatesPassed =
+                FormatAutoImodRequestState(optimizeUsbImod: false, hasUsbImodTarget: true) == "skipped: declined by user"
+                && FormatAutoImodRequestState(optimizeUsbImod: false, hasUsbImodTarget: false) == "skipped: no eligible XHCI controller"
+                && GetAutoImodSkipReason(hasUsbImodTarget: true) == "user-declined"
+                && GetAutoImodSkipReason(hasUsbImodTarget: false) == "no-eligible-xhci-controller";
+            failures += imodStatesPassed ? 0 : 1;
+            WriteLog($"TEST.AUTO.POLICY.IMOD-STATES: status={(imodStatesPassed ? "PASS" : "FAIL")}");
+
+            (string Text, int Value)[] affinityPolicies =
+            [
+                ("MachineDefault", 0),
+                ("AllClose", 1),
+                ("Single", 2),
+                ("All", 3),
+                ("SpecCPU", 4),
+                ("SpreadMessages", 5),
+            ];
+            bool affinityPoliciesPassed = affinityPolicies.All(policy =>
+                MapPolicyText(policy.Text) == policy.Value
+                && string.Equals(FormatPolicyValue(policy.Value), policy.Text, StringComparison.Ordinal));
+            failures += affinityPoliciesPassed ? 0 : 1;
+            WriteLog($"TEST.AUTO.POLICY.IRQ-MAP: status={(affinityPoliciesPassed ? "PASS" : "FAIL")}");
+
+            (string Text, bool Valid, bool Unlocked, int Value)[] msiLimits =
+            [
+                ("", true, true, 0),
+                ("0", true, true, 0),
+                ("unlocked", true, true, 0),
+                ("unlimited", true, true, 0),
+                ("1", true, false, 1),
+                ("16", true, false, 16),
+                ("2048", true, false, 2048),
+                ("-1", false, false, 0),
+                ("2049", false, false, 0),
+                ("1.5", false, false, 0),
+                ("invalid", false, false, 0),
+            ];
+            bool msiLimitsPassed = msiLimits.All(test =>
+            {
+                bool valid = TryParseMsiLimitInput(test.Text, out bool unlocked, out int value);
+                return valid == test.Valid
+                    && (!valid || (unlocked == test.Unlocked && value == test.Value));
+            });
+            failures += msiLimitsPassed ? 0 : 1;
+            WriteLog($"TEST.AUTO.POLICY.MSI-LIMIT: status={(msiLimitsPassed ? "PASS" : "FAIL")}");
+            WriteLog($"TEST.AUTO.POLICY.FINAL: status={(failures == 0 ? "PASS" : "FAIL")} failures={failures}");
+        }
+
         bool LoadSystemPreset()
         {
             string preset = systemPresetCombo.SelectedItem?.ToString() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(preset) || string.Equals(preset, "Manual / current", StringComparison.Ordinal))
+            if (string.IsNullOrWhiteSpace(preset)
+                || string.Equals(preset, "Manual (current)", StringComparison.Ordinal)
+                || string.Equals(preset, "Manual / current", StringComparison.Ordinal))
             {
                 return false;
             }
@@ -1388,6 +2330,7 @@ public sealed partial class MainForm
                 SystemPresetRyzen9950X3DNdis => "AMD Ryzen 9 7950X3D/9950X3D 16C/32T V-Cache CCD0",
                 SystemPresetRyzen9950X3D2 => "AMD Ryzen 9 9950X3D2 16C/32T dual V-Cache",
                 SystemPresetLaptopRyzen9955HX3D => "AMD Ryzen 9 9955HX3D 16C/32T V-Cache CCD0",
+                SystemPresetRyzen3500X => "AMD Ryzen 5 3500X Zen2 6C/6T SMT off 2 CCX",
                 SystemPresetRyzen3900X => "AMD Ryzen 9 3900X Zen2 12C/24T 4 CCX",
                 SystemPresetRyzen9950X => "AMD Ryzen 9 7950X/9950X 16C/32T",
                 _ => string.Empty,
@@ -1406,6 +2349,7 @@ public sealed partial class MainForm
                 SystemPresetRyzen9950X3DNdis => "AMD Ryzen 9 9950X3D",
                 SystemPresetRyzen9950X3D2 => "AMD Ryzen 9 9950X3D2",
                 SystemPresetLaptopRyzen9955HX3D => "AMD Ryzen 9 9955HX3D",
+                SystemPresetRyzen3500X => "AMD Ryzen 5 3500X 6-Core Processor",
                 SystemPresetRyzen3900X => "AMD Ryzen 9 3900X",
                 SystemPresetRyzen9950X => "AMD Ryzen 9 9950X",
                 _ => string.Empty,
@@ -1520,6 +2464,57 @@ public sealed partial class MainForm
                     AddSystemPresetDevice(DeviceKind.NET_CX, "Realtek RTL8126 5GbE Controller", @"PCI\VEN_10EC&DEV_8126\SYS_9950X3D2_RTL8126");
                     AddSystemStorage("Crucial T705 PCIe 5.0 NVMe Controller", @"PCI\VEN_C0A9&DEV_540A\SYS_9950X3D2_T705");
                     break;
+                case SystemPresetRyzen3500X:
+                    // Field log 2026-08-15: Gigabyte AM4, SMT off, VXE 1K mouse on CPU xHCI.
+                    AddSystemPresetDevice(
+                        DeviceKind.USB,
+                        "AMD USB 3.10 eXtensible Host Controller - 1.10",
+                        @"PCI\VEN_1022&DEV_149C\SYS_3500X_CPU_XHCI_MOUSE_1K",
+                        "Mouse 1K",
+                        testIrqCount: 7,
+                        testMsiStatus: "Enabled");
+                    AddSystemPresetDevice(
+                        DeviceKind.AUDIO,
+                        "High Definition Audio Controller",
+                        @"PCI\VEN_1022&DEV_1487\SYS_3500X_HDA_SPEAKERS",
+                        audioEndpoints: "Speakers",
+                        testIrqCount: 1,
+                        testMsiStatus: "Disabled");
+                    AddSystemPresetDevice(
+                        DeviceKind.GPU,
+                        "NVIDIA GeForce GTX 1660 SUPER",
+                        @"PCI\VEN_10DE&DEV_21C4\SYS_3500X_GTX1660S",
+                        testIrqCount: 1,
+                        testMsiStatus: "Enabled");
+                    AddSystemPresetDevice(
+                        DeviceKind.AUDIO,
+                        "High Definition Audio Controller",
+                        @"PCI\VEN_10DE&DEV_1AEB\SYS_3500X_HDMI_MUCAI",
+                        audioEndpoints: "Monitor - MUCAI",
+                        testIrqCount: 1,
+                        testMsiStatus: "Disabled");
+                    AddSystemPresetDevice(
+                        DeviceKind.NET_CX,
+                        "Realtek PCIe GbE Family Controller",
+                        @"PCI\VEN_10EC&DEV_8168\SYS_3500X_RTL8168",
+                        testIrqCount: 1,
+                        testMsiStatus: "Enabled",
+                        nicPowerSaving: "on");
+                    AddSystemPresetDevice(
+                        DeviceKind.STOR,
+                        "Standard NVM Express Controller",
+                        @"PCI\VEN_126F&DEV_2263\SYS_3500X_NVME",
+                        storageTag: "SSD",
+                        testIrqCount: 7,
+                        testMsiStatus: "Enabled");
+                    AddSystemPresetDevice(
+                        DeviceKind.STOR,
+                        "Standard SATA AHCI Controller",
+                        @"PCI\VEN_1022&DEV_43EB\SYS_3500X_AHCI",
+                        storageTag: string.Empty,
+                        testIrqCount: 1,
+                        testMsiStatus: "Enabled");
+                    break;
                 case SystemPresetRyzen3900X:
                     AddSystemPresetDevice(DeviceKind.USB, "AMD USB 3.10 eXtensible Host Controller - 1.10", @"PCI\VEN_1022&DEV_149C\SYS_AMD_X570_CPU_XHCI_MOUSE_1K", "Mouse 1K");
                     AddSystemPresetDevice(DeviceKind.USB, "AMD USB 3.10 eXtensible Host Controller - 1.20", @"PCI\VEN_1022&DEV_43D5\SYS_AMD_X570_CHIPSET_XHCI_KEYBOARD_AUDIO", "Keyboard 8K, Audio, Microphone");
@@ -1564,7 +2559,18 @@ public sealed partial class MainForm
             _initialDeviceViewportHeightAdjusted = false;
             RefreshBlocks();
             WriteLog($"TEST.SYSTEM.PRESET: loaded name=\"{preset}\" cpu=\"{cpuPreset}\" devices={_testDevices.Count} replacement=1");
-            InvokeAutoOptimization(optimizeUsbImod: true);
+            bool runAutoPolicyRegression = string.Equals(preset, SystemPresetRyzen3500X, StringComparison.Ordinal)
+                || string.Equals(preset, SystemPresetLaptopIntel285HX, StringComparison.Ordinal);
+            Dictionary<string, (string Msi, string Limit, string Priority, string Policy, ulong Mask)> preservedExpected =
+                runAutoPolicyRegression
+                    ? SeedAutoPolicyRegressionState()
+                    : new Dictionary<string, (string Msi, string Limit, string Priority, string Policy, ulong Mask)>(StringComparer.OrdinalIgnoreCase);
+            bool hasUsbImodTarget = _blocks.Any(block => IsUsbImodTarget(block.Device));
+            InvokeAutoOptimization(optimizeUsbImod: hasUsbImodTarget, hasUsbImodTarget: hasUsbImodTarget);
+            if (runAutoPolicyRegression)
+            {
+                ValidateAutoPolicyRegressionState(preservedExpected);
+            }
             WriteLog($"TEST.SYSTEM.PRESET.AUTO: dry-run preview complete blocks={_blocks.Count} optimizeUsbImod=1");
             LogGuiSnapshot("system-preset-auto");
             return true;
@@ -1833,6 +2839,7 @@ public sealed partial class MainForm
                 return false;
             }
 
+            updated.TestState = previous.TestState?.Clone() ?? EnsureTestDeviceState(previous).Clone();
             _testDevices[index] = updated;
             WriteLog($"TEST.DEV.UPDATE: old={previous.InstanceId} new={updated.InstanceId} Kind={updated.Kind} Name=\"{updated.Name}\"");
             RefreshTestDeviceList(index);
@@ -1859,6 +2866,7 @@ public sealed partial class MainForm
             suppressTestDeviceToggle = false;
 
             WriteLog($"TEST.DEVICES: enabled={_testDevicesEnabled}");
+            SyncSandboxDryRunLock("test-devices-enabled");
             _initialDeviceViewportHeightAdjusted = false;
             RefreshBlocks();
         };
@@ -1894,17 +2902,18 @@ public sealed partial class MainForm
 
         dryRunAutoCheck.CheckedChanged += (_, _) =>
         {
-            if (_testDevicesOnly)
+            if (_testDevicesEnabled || _testDevices.Count > 0)
             {
-                // Full replacement mode must stay write-safe.
+                // Any simulated device keeps the whole session write-safe.
                 if (!dryRunAutoCheck.Checked || !_testAutoDryRun)
                 {
                     dryRunAutoCheck.Checked = true;
                     _testAutoDryRun = true;
                 }
 
-                dryRunAutoCheck.Enabled = false;
-                WriteLog("TEST.AUTO.DRYRUN: forced enabled while test-only sandbox is active");
+                dryRunAutoCheck.AutoCheck = false;
+                dryRunAutoCheck.Enabled = true;
+                WriteLog("TEST.AUTO.DRYRUN: forced enabled while simulated devices are active");
                 NotifySandboxModeChanged("dry-run-locked");
                 return;
             }
@@ -2600,9 +3609,10 @@ public sealed partial class MainForm
             LoadSyntheticPreset(name, logicalCount, physicalCoreCount, 1, 1, pCoreHt, true, coreMap, ccdMap, ccxMap, eCoreMap, cppc);
         }
 
-        void LoadAmdPreset(string name, int physicalCores, int ccdCount, string cppcProfile, int ccxPerCcd = 1)
+        void LoadAmdPreset(string name, int physicalCores, int ccdCount, string cppcProfile, int ccxPerCcd = 1, bool smtEnabled = true)
         {
-            int logicalCount = Math.Min(MaxAffinityBits, physicalCores * 2);
+            int threadsPerCore = smtEnabled ? 2 : 1;
+            int logicalCount = Math.Min(MaxAffinityBits, physicalCores * threadsPerCore);
             int[] coreMap = new int[logicalCount];
             int[] ccdMap = new int[logicalCount];
             int[] ccxMap = new int[logicalCount];
@@ -2632,7 +3642,7 @@ public sealed partial class MainForm
                     _ => 120 - Math.Min(20, coreInCcd),
                 };
 
-                for (int t = 0; t < 2 && lp < logicalCount; t++)
+                for (int t = 0; t < threadsPerCore && lp < logicalCount; t++)
                 {
                     coreMap[lp] = core;
                     ccdMap[lp] = ccd;
@@ -2644,7 +3654,7 @@ public sealed partial class MainForm
                 }
             }
 
-            LoadSyntheticPreset(name, logicalCount, physicalCores, ccdCount, ccxCount, true, false, coreMap, ccdMap, ccxMap, eCoreMap, cppc);
+            LoadSyntheticPreset(name, logicalCount, physicalCores, ccdCount, ccxCount, smtEnabled, false, coreMap, ccdMap, ccxMap, eCoreMap, cppc);
         }
 
         void ApplySelectedCpuPreset()
@@ -2652,6 +3662,7 @@ public sealed partial class MainForm
             string preset = cpuPresetCombo.SelectedItem?.ToString() ?? string.Empty;
             switch (preset)
             {
+                case "Manual (current)":
                 case "Manual / current":
                     return;
                 case "Intel Core i7-10700K/11700K 8C/16T":
@@ -2680,6 +3691,30 @@ public sealed partial class MainForm
                     break;
                 case "AMD Ryzen 9 7950X/9950X 16C/32T":
                     LoadAmdPreset("AMD Ryzen 9 7950X/9950X 16C/32T", physicalCores: 16, ccdCount: 2, cppcProfile: "standard");
+                    break;
+                case "AMD Ryzen 5 3500X Zen2 6C/6T SMT off 2 CCX":
+                    // CPPC/CCX mirrored from DeviceTweaker_20260815_064357_362.log (Ryzen 5 3500X, SMT off).
+                    LoadSyntheticPreset(
+                        "AMD Ryzen 5 3500X 6-Core Processor",
+                        logicalCount: 6,
+                        physicalCoreCount: 6,
+                        ccdCount: 1,
+                        ccxCount: 2,
+                        smtEnabled: false,
+                        useHyperLabel: false,
+                        coreMap: [0, 1, 2, 3, 4, 5],
+                        ccdMap: [0, 0, 0, 0, 0, 0],
+                        ccxMap: [0, 0, 0, 1, 1, 1],
+                        eCoreMap: [false, false, false, false, false, false],
+                        cppcRatings: new Dictionary<int, int>
+                        {
+                            [0] = 121,
+                            [1] = 117,
+                            [2] = 114,
+                            [3] = 124,
+                            [4] = 128,
+                            [5] = 128,
+                        });
                     break;
                 case "AMD Ryzen 7 3700X/3800X Zen2 8C/16T 2 CCX":
                     LoadAmdPreset("AMD Ryzen 7 3700X/3800X Zen2 8C/16T 2 CCX", physicalCores: 8, ccdCount: 1, cppcProfile: "zen2", ccxPerCcd: 2);
@@ -2713,7 +3748,7 @@ public sealed partial class MainForm
             combo.Items.Clear();
             for (int i = 0; i < groupCount; i++)
             {
-                combo.Items.Add($"Group {i + 1}");
+                combo.Items.Add(UiLanguage.IsRussian ? $"Группа {i + 1}" : $"Group {i + 1}");
             }
             combo.Invalidate();
         }
@@ -2727,6 +3762,11 @@ public sealed partial class MainForm
 
             suppressAssignmentEvents = true;
             assignmentsTable.SuspendLayout();
+            foreach (Control control in assignmentsTable.Controls.Cast<Control>().ToArray())
+            {
+                control.Dispose();
+            }
+
             assignmentsTable.Controls.Clear();
             assignmentsTable.RowStyles.Clear();
 
@@ -2813,7 +3853,7 @@ public sealed partial class MainForm
                 {
                     Text = "E-Core",
                     AutoSize = true,
-                    BackColor = _bgForm,
+                    BackColor = _bgPanel,
                     ForeColor = _fgMain,
                     Margin = new Padding(8, 2, 0, 4),
                     Tag = i,
@@ -3052,23 +4092,36 @@ public sealed partial class MainForm
 
         BuildAssignmentRows();
 
-        TableLayoutPanel buttons = new()
+        FlowLayoutPanel buttons = new()
         {
             Dock = DockStyle.Bottom,
-            ColumnCount = 3,
-            RowCount = 1,
-            Padding = new Padding(20, 10, 20, 14),
-            BackColor = _bgForm,
+            Height = 62,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Padding = new Padding(24, 14, 24, 16),
+            BackColor = _bgPanel,
         };
-        buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F));
-        buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F));
-        buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F));
-        buttons.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        buttons.Paint += (_, e) =>
+        {
+            using Pen pen = new(Color.FromArgb(48, 48, 54));
+            e.Graphics.DrawLine(pen, 24, 0, Math.Max(24, buttons.ClientSize.Width - 24), 0);
+        };
 
-        Button applyButton = NewDialogButton("APPLY TEST");
-        applyButton.Size = new Size(170, 32);
-        applyButton.Anchor = AnchorStyles.None;
-        applyButton.Margin = new Padding(6, 0, 6, 0);
+        void RecenterFooterButtons()
+        {
+            Control[] visible = buttons.Controls.Cast<Control>().Where(control => control.Visible).ToArray();
+            int totalWidth = visible.Sum(control => control.Width + control.Margin.Horizontal);
+            int left = Math.Max(24, (buttons.ClientSize.Width - totalWidth) / 2);
+            buttons.Padding = new Padding(left, 14, 24, 16);
+        }
+
+        buttons.Resize += (_, _) => RecenterFooterButtons();
+
+        Button applyButton = NewDialogButton("APPLY CPU TOPOLOGY");
+        applyButton.Size = new Size(230, 32);
+        applyButton.Margin = new Padding(0, 0, 12, 0);
+        applyButton.FlatAppearance.BorderColor = _accent;
+        applyButton.VisibleChanged += (_, _) => RecenterFooterButtons();
         applyButton.Click += (_, _) =>
         {
             if (!TryParseTestCppcRatings(cppcRatingsBox.Text, (int)logicalUpDown.Value, out Dictionary<int, int> cppcRatings, out string cppcError))
@@ -3088,39 +4141,90 @@ public sealed partial class MainForm
             statusLabel.ForeColor = _statusActive;
         };
 
-        Button resetButton = NewDialogButton("RESET TO REAL");
-        resetButton.Size = new Size(170, 32);
-        resetButton.Anchor = AnchorStyles.None;
-        resetButton.Margin = new Padding(6, 0, 6, 0);
+        Button resetButton = NewDialogButton("DISABLE TEST MODE");
+        resetButton.Name = "TEST_ADMIN_DISABLE_MODE";
+        resetButton.Size = new Size(220, 32);
+        resetButton.Margin = new Padding(0, 0, 12, 0);
         resetButton.Click += (_, _) =>
         {
             ResetAdminPanelToRealState();
         };
 
         Button closeButton = NewDialogButton("CLOSE");
+        closeButton.Name = "TEST_ADMIN_CLOSE";
         closeButton.Size = new Size(170, 32);
-        closeButton.Anchor = AnchorStyles.None;
-        closeButton.Margin = new Padding(6, 0, 6, 0);
+        closeButton.Margin = new Padding(0, 0, 0, 0);
         closeButton.DialogResult = DialogResult.Cancel;
 
-        buttons.Controls.Add(applyButton, 0, 0);
-        buttons.Controls.Add(resetButton, 1, 0);
-        buttons.Controls.Add(closeButton, 2, 0);
+        buttons.Controls.Add(applyButton);
+        buttons.Controls.Add(resetButton);
+        buttons.Controls.Add(closeButton);
+        RecenterFooterButtons();
 
-        const int dialogScrollWidth = 13;
+        TableLayoutPanel navigation = new()
+        {
+            Dock = DockStyle.Top,
+            Height = 48,
+            ColumnCount = 4,
+            RowCount = 1,
+            Padding = new Padding(24, 8, 24, 8),
+            BackColor = _bgPanel,
+            TabStop = false,
+        };
+        for (int column = 0; column < navigation.ColumnCount; column++)
+        {
+            navigation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+        }
+        navigation.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        navigation.Paint += (_, e) =>
+        {
+            using Pen pen = new(Color.FromArgb(48, 48, 54));
+            int y = Math.Max(0, navigation.ClientSize.Height - 1);
+            e.Graphics.DrawLine(pen, 24, y, Math.Max(24, navigation.ClientSize.Width - 24), y);
+        };
+
+        Button NewNavigationButton(string name, string text)
+        {
+            Button button = NewDialogButton(text);
+            button.Name = name;
+            button.Dock = DockStyle.Fill;
+            button.Margin = new Padding(4, 0, 4, 0);
+            button.MinimumSize = new Size(0, 30);
+            button.FlatAppearance.BorderColor = Color.FromArgb(80, 80, 86);
+            button.AccessibleDescription = UiLanguage.Text("Jump to section");
+            return button;
+        }
+
+        Button cpuNavigationButton = NewNavigationButton("TEST_ADMIN_NAV_CPU", "CPU TOPOLOGY");
+        Button devicesNavigationButton = NewNavigationButton("TEST_ADMIN_NAV_DEVICES", "DEVICES");
+        Button scenarioNavigationButton = NewNavigationButton("TEST_ADMIN_NAV_SCENARIO", "SCENARIO LAB");
+        Button resultsNavigationButton = NewNavigationButton("TEST_ADMIN_NAV_RESULTS", "RESULT DIALOGS");
+        Button[] navigationButtons =
+        [
+            cpuNavigationButton,
+            devicesNavigationButton,
+            scenarioNavigationButton,
+            resultsNavigationButton,
+        ];
+        navigation.Controls.Add(cpuNavigationButton, 0, 0);
+        navigation.Controls.Add(devicesNavigationButton, 1, 0);
+        navigation.Controls.Add(scenarioNavigationButton, 2, 0);
+        navigation.Controls.Add(resultsNavigationButton, 3, 0);
+
+        const int dialogScrollWidth = 12;
         Panel contentHost = new()
         {
             Dock = DockStyle.Fill,
-            BackColor = _bgForm,
+            BackColor = _bgPanel,
             Padding = Padding.Empty,
         };
 
         Panel contentPanel = new()
         {
             Dock = DockStyle.None,
-            BackColor = _bgForm,
+            BackColor = _bgPanel,
             AutoScroll = false,
-            Padding = new Padding(0, 0, dialogScrollWidth + 2, 0),
+            Padding = Padding.Empty,
         };
         contentPanel.Location = new Point(0, 0);
         contentPanel.Controls.Add(layout);
@@ -3128,9 +4232,9 @@ public sealed partial class MainForm
         ThemedScrollBar dialogScroll = new()
         {
             Width = dialogScrollWidth,
-            BackColor = _bgForm,
-            TrackColor = _bgForm,
-            RailColor = _bgForm,
+            BackColor = _bgPanel,
+            TrackColor = _bgPanel,
+            RailColor = _bgPanel,
             ThumbColor = _accent,
             ThumbWidth = 9,
             RailWidth = 0,
@@ -3140,6 +4244,8 @@ public sealed partial class MainForm
         };
 
         bool syncingDialogScroll = false;
+        bool switchingAdminSection = false;
+        int activeAdminSection = 0;
 
         void UpdateDialogScrollLayout()
         {
@@ -3150,7 +4256,10 @@ public sealed partial class MainForm
 
         void UpdateDialogHostLayout()
         {
-            contentPanel.Width = contentHost.ClientSize.Width;
+            // Reserve a permanent lane for the scrollbar. Overlaying it on
+            // the content made the rightmost fields look clipped and changed
+            // their width when scrolling became necessary.
+            contentPanel.Width = Math.Max(UiScale(320), contentHost.ClientSize.Width - dialogScroll.Width - UiScale(4));
             if (contentPanel.Left != 0)
             {
                 contentPanel.Left = 0;
@@ -3171,9 +4280,88 @@ public sealed partial class MainForm
             contentPanel.Location = new Point(0, -next);
         }
 
+        int GetDialogContentY(Control control)
+        {
+            Point screenPoint = control.Parent?.PointToScreen(control.Location)
+                ?? control.PointToScreen(Point.Empty);
+            return contentPanel.PointToClient(screenPoint).Y;
+        }
+
+        void SetActiveNavigation(Button activeButton)
+        {
+            foreach (Button button in navigationButtons)
+            {
+                bool active = ReferenceEquals(button, activeButton);
+                button.FlatAppearance.BorderColor = active ? _accent : Color.FromArgb(80, 80, 86);
+                button.FlatAppearance.BorderSize = active ? 2 : 1;
+                button.AccessibleDescription = UiLanguage.Text(active ? "Current section" : "Jump to section");
+            }
+        }
+
+        Button GetNavigationButton(int section)
+        {
+            return section switch
+            {
+                1 => devicesNavigationButton,
+                2 => scenarioNavigationButton,
+                3 => resultsNavigationButton,
+                _ => cpuNavigationButton,
+            };
+        }
+
+        void ShowAdminSection(int section, string reason, bool validate = true)
+        {
+            section = Math.Max(0, Math.Min(3, section));
+            if (switchingAdminSection)
+            {
+                return;
+            }
+
+            switchingAdminSection = true;
+            layout.SuspendLayout();
+            foreach (Control control in layout.Controls)
+            {
+                int row = layout.GetRow(control);
+                control.Visible = section switch
+                {
+                    0 => row is >= 0 and <= 12,
+                    1 => row is >= 13 and <= 14,
+                    2 => row is >= 15 and <= 16,
+                    3 => row is >= 17 and <= 19,
+                    _ => false,
+                };
+            }
+            applyButton.Visible = section == 0;
+            activeAdminSection = section;
+            contentPanel.Location = Point.Empty;
+            layout.ResumeLayout(true);
+            switchingAdminSection = false;
+
+            SyncDialogScrollBar();
+            syncingDialogScroll = true;
+            dialogScroll.Value = 0;
+            syncingDialogScroll = false;
+            SetActiveNavigation(GetNavigationButton(section));
+            WriteLog($"TEST.ADMIN.NAV: section={section} reason={reason} offset=0");
+            if (validate && dialog.IsHandleCreated)
+            {
+                dialog.BeginInvoke(new Action(() => ValidateTestAdminLayout($"navigation-{section}-{reason}")));
+            }
+        }
+
+        cpuNavigationButton.Click += (_, _) => ShowAdminSection(0, "click");
+        devicesNavigationButton.Click += (_, _) => ShowAdminSection(1, "click");
+        scenarioNavigationButton.Click += (_, _) => ShowAdminSection(2, "click");
+        resultsNavigationButton.Click += (_, _) => ShowAdminSection(3, "click");
+
         void SyncDialogScrollBar()
         {
-            contentPanel.Width = contentHost.ClientSize.Width;
+            if (switchingAdminSection)
+            {
+                return;
+            }
+
+            contentPanel.Width = Math.Max(UiScale(320), contentHost.ClientSize.Width - dialogScroll.Width - UiScale(4));
             if (contentPanel.Left != 0)
             {
                 contentPanel.Left = 0;
@@ -3201,6 +4389,7 @@ public sealed partial class MainForm
             dialogScroll.ViewportSize = Math.Max(viewportHeight, 1);
             dialogScroll.Value = needsScroll ? offset : 0;
             syncingDialogScroll = false;
+            SetActiveNavigation(GetNavigationButton(activeAdminSection));
         }
 
         dialogScroll.ValueChanged += (_, _) =>
@@ -3235,10 +4424,142 @@ public sealed partial class MainForm
         contentHost.Controls.Add(dialogScroll);
 
         dialog.Controls.Add(contentHost);
+        dialog.Controls.Add(navigation);
         dialog.Controls.Add(buttons);
-        dialog.AcceptButton = applyButton;
+        dialog.AcceptButton = null;
         dialog.CancelButton = closeButton;
+        dialog.KeyPreview = true;
+        dialog.KeyDown += (_, e) =>
+        {
+            if (!e.Control)
+            {
+                return;
+            }
+
+            switch (e.KeyCode)
+            {
+                case Keys.D1:
+                case Keys.NumPad1:
+                    ShowAdminSection(0, "keyboard");
+                    break;
+                case Keys.D2:
+                case Keys.NumPad2:
+                    ShowAdminSection(1, "keyboard");
+                    break;
+                case Keys.D3:
+                case Keys.NumPad3:
+                    ShowAdminSection(2, "keyboard");
+                    break;
+                case Keys.D4:
+                case Keys.NumPad4:
+                    ShowAdminSection(3, "keyboard");
+                    break;
+                default:
+                    return;
+            }
+
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+        };
         dialog.HandleCreated += (_, _) => ApplyTitleBarTheme(dialog);
+
+        void ValidateTestAdminLayout(string reason)
+        {
+            List<string> layoutIssues = [];
+            int inspectedControls = 0;
+            int buttonCount = 0;
+
+            void InspectControls(Control parent)
+            {
+                Control[] visibleChildren = parent.Controls.Cast<Control>()
+                    .Where(control => control.Visible)
+                    .ToArray();
+                for (int first = 0; first < visibleChildren.Length; first++)
+                {
+                    for (int second = first + 1; second < visibleChildren.Length; second++)
+                    {
+                        Control left = visibleChildren[first];
+                        Control right = visibleChildren[second];
+                        if (left.Bounds.IntersectsWith(right.Bounds))
+                        {
+                            layoutIssues.Add(
+                                $"overlap:{left.GetType().Name}/{GetSourceControlText(left)}+" +
+                                $"{right.GetType().Name}/{GetSourceControlText(right)}");
+                        }
+                    }
+                }
+
+                foreach (Control child in visibleChildren)
+                {
+                    inspectedControls++;
+                    int tolerance = UiScale(2);
+                    bool scrollCanvas = ReferenceEquals(child, contentPanel);
+                    if (!scrollCanvas
+                        && (child.Left < -tolerance
+                            || child.Top < -tolerance
+                            || child.Right > parent.ClientSize.Width + tolerance
+                            || child.Bottom > parent.ClientSize.Height + tolerance))
+                    {
+                        layoutIssues.Add(
+                            $"bounds:{child.GetType().Name}/{GetSourceControlText(child)}=" +
+                            $"{child.Left},{child.Top},{child.Width}x{child.Height}>" +
+                            $"{parent.GetType().Name}:{parent.ClientSize.Width}x{parent.ClientSize.Height}");
+                    }
+
+                    if (child is Button button)
+                    {
+                        buttonCount++;
+                        int textWidth = TextRenderer.MeasureText(
+                            button.Text,
+                            button.Font,
+                            Size.Empty,
+                            TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width;
+                        if (textWidth + UiScale(24) > button.ClientSize.Width)
+                        {
+                            layoutIssues.Add($"button-text:{GetSourceControlText(button)}={button.ClientSize.Width}<{textWidth + UiScale(24)}");
+                        }
+                    }
+                    else if (child is Label label
+                             && !label.AutoSize
+                             && child is not ImodMapTextBox
+                             && child is not NicItrTableLabel
+                             && !string.IsNullOrWhiteSpace(label.Text)
+                             && !label.Text.Contains('\n'))
+                    {
+                        int textWidth = TextRenderer.MeasureText(
+                            label.Text,
+                            label.Font,
+                            Size.Empty,
+                            TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width;
+                        if (textWidth > label.ClientSize.Width + tolerance)
+                        {
+                            layoutIssues.Add($"label-text:{GetSourceControlText(label)}={label.ClientSize.Width}<{textWidth}");
+                        }
+                    }
+
+                    if (child is ListBox list && list.HorizontalScrollbar)
+                    {
+                        layoutIssues.Add("native-horizontal-list-scrollbar");
+                    }
+
+                    InspectControls(child);
+                }
+            }
+
+            dialog.PerformLayout();
+            SyncDialogScrollBar();
+            InspectControls(dialog);
+            int operationGap = scenarioImodCheck.Left - scenarioOperationCombo.Right;
+            if (operationGap < UiScale(12))
+            {
+                layoutIssues.Add($"scenario-operation-gap={operationGap}");
+            }
+
+            WriteLog(layoutIssues.Count == 0
+                ? $"TEST.ADMIN.LAYOUT: status=PASS reason={reason} language={UiLanguage.Current} controls={inspectedControls} buttons={buttonCount}"
+                : $"TEST.ADMIN.LAYOUT: status=FAIL reason={reason} language={UiLanguage.Current} issues=\"{SanitizeLogValue(string.Join("; ", layoutIssues.Take(30)))}\" total={layoutIssues.Count}");
+        }
+
         dialog.Shown += (_, _) =>
         {
             ApplyTitleBarTheme(dialog);
@@ -3247,6 +4568,8 @@ public sealed partial class MainForm
             {
                 adminToolTip.Hide(dialog);
                 adminToolTip.Active = true;
+
+                ValidateTestAdminLayout("shown");
             }));
 
             if (string.Equals(
@@ -3258,13 +4581,37 @@ public sealed partial class MainForm
                 {
                     try
                     {
+                        // Exercise a long multi-role IMOD map and the Wi-Fi
+                        // preservation contract first, then leave the compact
+                        // Ryzen preset loaded for the visible QA pass.
                         systemPresetCombo.SelectedItem = SystemPresetIntel14900K;
+                        WriteLog("TEST.QA.SANDBOX: multi-role IMOD layout preset completed");
+                        bool matrixPassed = RunCoreScenarioMatrix(showDialog: false);
+                        WriteLog($"TEST.QA.MATRIX: status={(matrixPassed ? "PASS" : "FAIL")}");
+                        bool localizationPassed = UiLanguage.ValidateRussianTranslationContract(out string localizationError);
+                        WriteLog(
+                            localizationPassed
+                                ? "TEST.QA.LOCALIZATION: status=PASS scope=imod-structured-text"
+                                : $"TEST.QA.LOCALIZATION.FAIL: status=FAIL detail=\"{SanitizeLogValue(localizationError)}\"");
+                        bool startupPassed = ValidateImodStartupPersistenceContract(out string startupError);
+                        WriteLog(
+                            startupPassed
+                                ? "TEST.QA.IMOD.STARTUP: status=PASS mechanism=hkcu-run-explicit-powershell"
+                                : $"TEST.QA.IMOD.STARTUP.FAIL: status=FAIL detail=\"{SanitizeLogValue(startupError)}\"");
+                        bool backupPersistencePassed = ValidateImodBackupPersistenceContract(out string backupPersistenceError);
+                        WriteLog(
+                            backupPersistencePassed
+                                ? "TEST.QA.BACKUP.IMOD: status=PASS scope=script-and-hkcu-run"
+                                : $"TEST.QA.BACKUP.IMOD.FAIL: status=FAIL detail=\"{SanitizeLogValue(backupPersistenceError)}\"");
+                        systemPresetCombo.SelectedItem = SystemPresetLaptopIntel285HX;
+                        WriteLog("TEST.QA.SANDBOX: Wi-Fi preservation preset completed");
+                        systemPresetCombo.SelectedItem = SystemPresetRyzen3500X;
                         if (!string.Equals(
                                 systemPresetCombo.SelectedItem?.ToString(),
-                                SystemPresetIntel14900K,
+                                SystemPresetRyzen3500X,
                                 StringComparison.Ordinal))
                         {
-                            WriteLog("TEST.QA.SANDBOX: failed to select Intel 14900K system preset");
+                            WriteLog("TEST.QA.SANDBOX: failed to select Ryzen 3500X regression preset");
                             return;
                         }
 
@@ -3282,7 +4629,8 @@ public sealed partial class MainForm
                         testDevicesOnlyCheck.Checked = true;
                         testDevicesOnlyCheck.Enabled = true;
                         dryRunAutoCheck.Checked = true;
-                        dryRunAutoCheck.Enabled = false;
+                        dryRunAutoCheck.AutoCheck = false;
+                        dryRunAutoCheck.Enabled = true;
                         suppressTestDeviceToggle = false;
 
                         _initialDeviceViewportHeightAdjusted = false;
@@ -3290,6 +4638,33 @@ public sealed partial class MainForm
                         NotifySandboxModeChanged("qa-sandbox");
                         WriteLog(
                             $"TEST.QA.SANDBOX: ready testDevices={_testDevices.Count} only={_testDevicesOnly} dryRun={_testAutoDryRun}");
+                        ShowAdminSection(1, "qa-lists", validate: false);
+                        int listsTargetOffset = Math.Max(0, GetDialogContentY(testListLabel) - UiScale(18));
+                        SetDialogScrollOffset(listsTargetOffset);
+                        SyncDialogScrollBar();
+                        ValidateTestAdminLayout("lists-ready");
+                        WriteLog($"TEST.QA.LISTS.VIEW: target={listsTargetOffset} actual={Math.Max(0, -contentPanel.Top)}");
+
+                        // Leave the device lists visible long enough for the
+                        // external QA harness to capture their custom scrollbars,
+                        // then move to Scenario Lab for its independent capture.
+                        dialog.BeginInvoke(new Action(() =>
+                        {
+                            System.Windows.Forms.Timer scenarioTimer = new() { Interval = 8000 };
+                            scenarioTimer.Tick += (_, _) =>
+                            {
+                                scenarioTimer.Stop();
+                                scenarioTimer.Dispose();
+                                ShowAdminSection(2, "qa-scenario", validate: false);
+                                SyncDialogScrollBar();
+                                int targetOffset = Math.Max(0, scenarioLabLabel.Top - UiScale(18));
+                                SetDialogScrollOffset(targetOffset);
+                                SyncDialogScrollBar();
+                                ValidateTestAdminLayout("scenario-ready");
+                                WriteLog($"TEST.QA.SCENARIO.VIEW: target={targetOffset} actual={Math.Max(0, -contentPanel.Top)}");
+                            };
+                            scenarioTimer.Start();
+                        }));
                     }
                     catch (Exception ex)
                     {
@@ -3302,19 +4677,21 @@ public sealed partial class MainForm
         // This dialog is constructed from explicit pixel coordinates. Scale
         // the complete tree once, after construction, so every test control
         // follows the same per-monitor DPI factor as the main window.
+        ShowAdminSection(0, "initial", validate: false);
         if (Math.Abs(_uiScale - 1f) > 0.01f)
         {
             dialog.Scale(new SizeF(_uiScale, _uiScale));
         }
 
         dialog.PerformLayout();
-        int desiredHeight = layout.PreferredSize.Height + buttons.Height + UiScale(12);
+        int desiredHeight = layout.PreferredSize.Height + navigation.Height + buttons.Height + UiScale(12);
         int maxHeight = Math.Min(UiScale(760), Screen.FromControl(dialog).WorkingArea.Height - UiScale(140));
         int targetHeight = Math.Min(maxHeight, Math.Max(UiScale(520), desiredHeight));
         dialog.ClientSize = new Size(dialog.ClientSize.Width, targetHeight);
         syncDialogScroll = SyncDialogScrollBar;
         SyncSandboxDryRunLock("dialog-open");
 
+        WireThemedTitleBar(dialog);
         ShowDialogDimmed(dialog);
     }
 
@@ -3324,16 +4701,16 @@ public sealed partial class MainForm
         {
             Text = text,
             Size = new Size(150, 32),
-            Margin = new Padding(8, 0, 0, 0),
+            Margin = new Padding(0, 0, 10, 0),
             FlatStyle = FlatStyle.Flat,
             Font = _buttonFont,
             UseVisualStyleBackColor = false,
             Cursor = Cursors.Hand,
-            BackColor = _bgForm,
+            BackColor = _bgPanel,
             ForeColor = _fgMain,
         };
         btn.FlatAppearance.BorderSize = 1;
-        btn.FlatAppearance.BorderColor = _accent;
+        btn.FlatAppearance.BorderColor = Color.FromArgb(80, 80, 86);
         btn.MouseEnter += (_, _) =>
         {
             btn.BackColor = _accent;
@@ -3341,7 +4718,7 @@ public sealed partial class MainForm
         };
         btn.MouseLeave += (_, _) =>
         {
-            btn.BackColor = _bgForm;
+            btn.BackColor = _bgPanel;
             btn.ForeColor = _fgMain;
         };
         return btn;
@@ -3353,10 +4730,10 @@ public sealed partial class MainForm
         {
             Text = text,
             AutoSize = true,
-            ForeColor = _fgMain,
+            ForeColor = _mutedText,
             TextAlign = ContentAlignment.MiddleLeft,
             Anchor = AnchorStyles.Left,
-            Margin = new Padding(0, 2, 12, 6),
+            Margin = new Padding(0, 4, 12, 6),
         };
     }
 
@@ -3368,7 +4745,7 @@ public sealed partial class MainForm
             AutoSize = true,
             ForeColor = _mutedText,
             TextAlign = ContentAlignment.MiddleLeft,
-            Margin = new Padding(8, 4, 6, 0),
+            Margin = new Padding(10, 4, 6, 0),
         };
     }
 
@@ -3379,8 +4756,8 @@ public sealed partial class MainForm
             Text = text,
             AutoSize = true,
             ForeColor = _mutedText,
-            Margin = new Padding(0, 0, 0, 6),
-            MaximumSize = new Size(560, 0),
+            Margin = new Padding(0, 4, 0, 8),
+            MaximumSize = new Size(780, 0),
         };
     }
 
@@ -3388,9 +4765,9 @@ public sealed partial class MainForm
     {
         Panel panel = new()
         {
-            BackColor = _bgForm,
+            BackColor = Color.FromArgb(16, 16, 19),
             ForeColor = _fgMain,
-            Padding = new Padding(6),
+            Padding = new Padding(10, 8, 10, 8),
             Margin = new Padding(0),
         };
         panel.Paint += (_, e) =>
@@ -3398,7 +4775,7 @@ public sealed partial class MainForm
             Rectangle rect = panel.ClientRectangle;
             rect.Width -= 1;
             rect.Height -= 1;
-            using Pen pen = new(_border);
+            using Pen pen = new(Color.FromArgb(70, 70, 76));
             e.Graphics.DrawRectangle(pen, rect);
         };
         return panel;
@@ -3452,7 +4829,7 @@ public sealed partial class MainForm
 
     private TextBox NewDialogTextBox(int width)
     {
-        return new TextBox
+        TextBox textBox = new()
         {
             BackColor = Color.FromArgb(18, 18, 22),
             ForeColor = _fgMain,
@@ -3460,6 +4837,23 @@ public sealed partial class MainForm
             Size = new Size(width, 24),
             Margin = new Padding(0, 0, 0, 6),
         };
+        textBox.TextChanged += (_, _) =>
+        {
+            if (textBox.Focused || textBox.TextLength == 0 || !textBox.IsHandleCreated)
+            {
+                return;
+            }
+
+            textBox.BeginInvoke(new Action(() =>
+            {
+                if (!textBox.IsDisposed && !textBox.Focused && textBox.TextLength > 0)
+                {
+                    textBox.Select(0, 0);
+                    textBox.ScrollToCaret();
+                }
+            }));
+        };
+        return textBox;
     }
 
     private DeviceInfo CreateTestDevice(
@@ -3507,7 +4901,7 @@ public sealed partial class MainForm
             ? (string.Equals(nicPowerSaving, "off", StringComparison.OrdinalIgnoreCase) ? "off" : "on")
             : null;
 
-        return new DeviceInfo
+        DeviceInfo device = new()
         {
             Name = displayName,
             InstanceId = id,
@@ -3529,6 +4923,20 @@ public sealed partial class MainForm
             TestIrqCount = testIrqCount,
             TestMsiStatus = string.IsNullOrWhiteSpace(testMsiStatus) ? "Auto" : testMsiStatus,
         };
+        device.TestState = new TestDeviceState
+        {
+            MsiEnabled = !string.Equals(testMsiStatus, "Disabled", StringComparison.OrdinalIgnoreCase),
+            PowerSavingEnabled = wifi ? null : isUsb
+                ? !string.Equals(suspend, "off", StringComparison.OrdinalIgnoreCase)
+                : isNet
+                    ? !string.Equals(nicPower, "off", StringComparison.OrdinalIgnoreCase)
+                    : null,
+            ImodValue = isUsb ? "0x0,0xC8,0xC8,0xC8,0xC8,0xC8,0xC8,0xC8" : "0x0",
+            NicItrValue = isNet && id.Contains("VEN_10EC&DEV_8125", StringComparison.OrdinalIgnoreCase)
+                ? "0x7E600958,0x0,0x7E600938,0x0"
+                : "default",
+        };
+        return device;
     }
 
     private void WarnTestUsbChipMismatch(string instanceId, UsbChipPathInfo chip)
@@ -3749,7 +5157,7 @@ public sealed partial class MainForm
         }
 
         _maxLogical = Math.Min(topo.Logical, MaxAffinityBits);
-        _grpHeight = UiScale(120) + (_maxLogical * UiScale(24)) + UiScale(160);
+        _grpHeight = UiScale(280);
 
         string smtPrefix = config.UseHyperThreadingLabel ? "Hyper-Threading" : "SMT";
         _smtText = config.SmtEnabled

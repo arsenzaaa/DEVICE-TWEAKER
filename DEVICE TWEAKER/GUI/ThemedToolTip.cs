@@ -27,7 +27,7 @@ internal sealed class ThemedToolTip : IDisposable
             _showTimer.Stop();
             if (_pendingTarget is not null && _registrations.TryGetValue(_pendingTarget, out Registration? registration))
             {
-                ShowPopup(registration.Text, _pendingTarget, Cursor.Position);
+                ShowPopup(FormatText(UiLanguage.Text(registration.Text)), _pendingTarget, Cursor.Position);
             }
         };
         _hideTimer.Tick += (_, _) =>
@@ -48,7 +48,7 @@ internal sealed class ThemedToolTip : IDisposable
         ThrowIfDisposed();
         RemoveRegistration(control);
 
-        string text = FormatText(caption);
+        string text = caption?.Trim() ?? string.Empty;
         if (text.Length == 0)
         {
             return;
@@ -89,7 +89,7 @@ internal sealed class ThemedToolTip : IDisposable
         }
 
         Point screenPoint = control.PointToScreen(point);
-        ShowPopup(FormatText(caption), control, screenPoint);
+        ShowPopup(FormatText(UiLanguage.Text(caption)), control, screenPoint);
         StartHideTimer(duration);
     }
 

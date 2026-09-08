@@ -24,6 +24,9 @@ public sealed partial class MainForm
         @"SYSTEM\CurrentControlSet\Control\DeviceGuard";
     private const string ImodDeviceGuardPolicyPath =
         @"SOFTWARE\Policies\Microsoft\Windows\DeviceGuard";
+    private const string ImodVulnerableDriverBlocklistPath =
+        @"SYSTEM\CurrentControlSet\Control\CI\Config";
+    private const string ImodVulnerableDriverBlocklistValueName = "VulnerableDriverBlocklistEnable";
 
     private void LogImodDriverLoadDiagnostics(string driverPath, string? loadError)
     {
@@ -67,7 +70,7 @@ public sealed partial class MainForm
         }
         catch (Exception ex)
         {
-            WriteLog($"IMOD.DRIVER.SIGNATURE: unavailable ({ex.GetType().Name}: {CompactImodLogValue(ex.Message)})");
+            WriteLog($"IMOD.DRIVER.SIGNATURE.WARN: unavailable ({ex.GetType().Name}: {CompactImodLogValue(ex.Message)})");
         }
     }
 
@@ -92,7 +95,7 @@ public sealed partial class MainForm
         }
         else
         {
-            WriteLog("IMOD.CI: options=unavailable");
+            WriteLog("IMOD.CI.WARN: options=unavailable");
         }
 
         string hvciRegistry = ReadImodRegistryDwordState(
@@ -113,6 +116,12 @@ public sealed partial class MainForm
             + $"hvci={hvciRegistry} "
             + $"hvciPolicy={hvciPolicy} "
             + $"vbs={vbsRegistry}");
+
+        string blocklistState = ReadImodRegistryDwordState(
+            RegistryHive.LocalMachine,
+            ImodVulnerableDriverBlocklistPath,
+            ImodVulnerableDriverBlocklistValueName);
+        WriteLog($"IMOD.BLOCKLIST: VulnerableDriverBlocklistEnable={blocklistState}");
 
         bool signatureRejected = IsImodSignatureRejectedError(loadError);
         if (signatureRejected && hasCiOptions && !testSigning && !testBuild)
@@ -270,9 +279,147 @@ public sealed partial class MainForm
             || error.Contains("digital", StringComparison.OrdinalIgnoreCase)
             || error.Contains("подпис", StringComparison.OrdinalIgnoreCase)
             || error.Contains("цифров", StringComparison.OrdinalIgnoreCase)
-            || error.Contains("подпис", StringComparison.OrdinalIgnoreCase)
-            || error.Contains("цифров", StringComparison.OrdinalIgnoreCase)
-            || error.Contains("577", StringComparison.OrdinalIgnoreCase);
+            || error.Contains("577", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("kernel CI", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("VulnerableDriverBlocklist", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("Vulnerable Driver Blocklist", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsImodDefenderBlockedError(string? error)
+    {
+        if (string.IsNullOrWhiteSpace(error))
+        {
+            return false;
+        }
+
+        return error.Contains("virus", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("potentially unwanted", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("PUA", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("Defender", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("quarantine", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string FormatImodUnavailableUserMessage(string? technicalDetails, bool includeNotChanged = true)
+    {
+        string suffix = includeNotChanged
+            ? " USB IMOD was not changed."
+            : string.Empty;
+
+        if (IsImodDefenderBlockedError(technicalDetails))
+        {
+            return "Windows Defender blocked DTIMOD." + suffix;
+        }
+
+        if (IsImodSignatureRejectedError(technicalDetails))
+        {
+            return "Windows blocked DTIMOD via Vulnerable Driver Blocklist." + suffix;
+        }
+
+        return includeNotChanged
+            ? "DTIMOD driver was unavailable. USB IMOD was not changed."
+            : "DTIMOD driver was unavailable.";
+    }
+
+    private static bool TryReadVulnerableDriverBlocklistEnabled(out bool enabled, out string stateText)
+    {
+        enabled = true;
+        stateText = ReadImodRegistryDwordState(
+            RegistryHive.LocalMachine,
+            ImodVulnerableDriverBlocklistPath,
+            ImodVulnerableDriverBlocklistValueName);
+
+        if (stateText.Equals("missing", StringComparison.OrdinalIgnoreCase))
+        {
+            // Windows defaults to enabled when the value is absent.
+            enabled = true;
+            return true;
+        }
+
+        if (stateText.StartsWith("error:", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        enabled = IsEnabledRegistryState(stateText);
+        return true;
+    }
+
+    private bool TryDisableVulnerableDriverBlocklist(out string? error)
+    {
+        error = null;
+        try
+        {
+            using RegistryKey baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+            using RegistryKey key = baseKey.CreateSubKey(ImodVulnerableDriverBlocklistPath, writable: true)
+                ?? throw new InvalidOperationException("Unable to open CI\\Config registry key.");
+            key.SetValue(ImodVulnerableDriverBlocklistValueName, 0, RegistryValueKind.DWord);
+            WriteLog("IMOD.BLOCKLIST: VulnerableDriverBlocklistEnable set to 0");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            WriteLog($"IMOD.BLOCKLIST.ERROR: failed to disable Vulnerable Driver Blocklist: {FlattenLogText(ex.ToString())}");
+            return false;
+        }
+    }
+
+    private static bool ReportHasImodSignatureBlock(OperationReport report)
+    {
+        return report.Issues.Any(issue =>
+            issue.Severity == OperationIssueSeverity.Error
+            && (issue.Component.Contains("IMOD", StringComparison.OrdinalIgnoreCase)
+                || issue.Component.Contains("NIC ITR", StringComparison.OrdinalIgnoreCase))
+            && IsImodSignatureRejectedError(
+                string.Join(" ", issue.UserMessage ?? string.Empty, issue.TechnicalDetails ?? string.Empty)));
+    }
+
+    private void MaybeOfferVulnerableDriverBlocklistDisable(OperationReport report)
+    {
+        if (!ReportHasImodSignatureBlock(report))
+        {
+            return;
+        }
+
+        if (!TryReadVulnerableDriverBlocklistEnabled(out bool enabled, out string stateText))
+        {
+            WriteLog($"IMOD.BLOCKLIST: state unavailable ({stateText}); disable prompt skipped");
+            return;
+        }
+
+        WriteLog($"IMOD.BLOCKLIST: state={stateText} enabled={enabled}");
+        if (!enabled)
+        {
+            WriteLog("IMOD.BLOCKLIST: already disabled; disable prompt skipped (signature/CI still blocked DTIMOD)");
+            return;
+        }
+
+        bool disable = ShowThemedConfirm(
+            "USB IMOD was blocked by Vulnerable Driver Blocklist.\n\n"
+            + "Disable Vulnerable Driver Blocklist so DTIMOD can load after reboot?\n\n"
+            + "Warning: this can break Faceit, The Finals, and similar anti-cheats.\n"
+            + "After reboot, run CHECK or AUTO-OPTIMIZATION again to apply IMOD.",
+            "VULNERABLE DRIVER BLOCKLIST",
+            UiLanguage.Text("DISABLE"),
+            UiLanguage.Text("KEEP"));
+        if (!disable)
+        {
+            WriteLog("IMOD.BLOCKLIST: user kept Vulnerable Driver Blocklist enabled");
+            return;
+        }
+
+        if (!TryDisableVulnerableDriverBlocklist(out string? error))
+        {
+            ShowThemedInfo(
+                string.IsNullOrWhiteSpace(error)
+                    ? "Failed to disable Vulnerable Driver Blocklist.\nSee the session log for details."
+                    : $"Failed to disable Vulnerable Driver Blocklist.\n{error}");
+            return;
+        }
+
+        ShowThemedInfo(
+            "Vulnerable Driver Blocklist was disabled.\n\n"
+            + "Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IMOD.");
     }
 
     private static string CompactImodLogValue(string? value)
@@ -283,7 +430,7 @@ public sealed partial class MainForm
         }
 
         string compact = value.Replace('\r', ' ').Replace('\n', ' ').Trim();
-        return compact.Length <= 240 ? compact : compact[..240] + "...";
+        return compact;
     }
 
     [DllImport("ntdll.dll")]

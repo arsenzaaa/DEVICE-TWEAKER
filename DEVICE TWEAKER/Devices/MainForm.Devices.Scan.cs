@@ -225,7 +225,7 @@ public sealed partial class MainForm
                 AdapterName: testBlock.Device.Name,
                 InterfaceDescription: testBlock.Device.Name,
                 Profile: "TEST",
-                Error: "test-device");
+                Error: string.Empty);
         }
 
         if (_ndisRssRuntimeCache.TryGetValue(normalized, out NdisRssRuntimeState? cached))
@@ -272,9 +272,13 @@ public sealed partial class MainForm
             process.StartInfo.ArgumentList.Add("-Command");
             process.StartInfo.ArgumentList.Add(script);
 
-            process.Start();
-            string output = process.StandardOutput.ReadToEnd();
-            string error = process.StandardError.ReadToEnd();
+            if (!process.Start())
+            {
+                return EmptyNdisRssRuntimeState("powershell-start-failed");
+            }
+
+            Task<string> stdout = process.StandardOutput.ReadToEndAsync();
+            Task<string> stderr = process.StandardError.ReadToEndAsync();
             if (!process.WaitForExit(3500))
             {
                 try
@@ -285,9 +289,35 @@ public sealed partial class MainForm
                 {
                 }
 
+                try
+                {
+                    _ = process.WaitForExit(1000);
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    _ = Task.WaitAll([stdout, stderr], 1000);
+                }
+                catch
+                {
+                }
+
                 return EmptyNdisRssRuntimeState("powershell-timeout");
             }
 
+            try
+            {
+                _ = Task.WaitAll([stdout, stderr], 1000);
+            }
+            catch
+            {
+            }
+
+            string output = stdout.IsCompletedSuccessfully ? stdout.Result : string.Empty;
+            string error = stderr.IsCompletedSuccessfully ? stderr.Result : string.Empty;
             string json = ExtractJsonObject(output);
             if (string.IsNullOrWhiteSpace(json))
             {
@@ -1388,6 +1418,7 @@ public sealed partial class MainForm
             using ManagementObjectSearcher searcher = new(
                 "root\\CIMV2",
                 "SELECT Antecedent, Dependent FROM Win32_PnPAllocatedResource");
+            searcher.Options.Timeout = TimeSpan.FromSeconds(10);
 
             foreach (ManagementObject mo in searcher.Get())
             {

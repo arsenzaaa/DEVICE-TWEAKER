@@ -31,8 +31,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Flavor both -Co
 - `bin\Publish\DEVICE TWEAKER (NET FRAMEWORK)\DEVICE TWEAKER (NET FRAMEWORK).exe` - автономная версия со встроенным .NET 8 Runtime.
 - `bin\ReleasePackages\v0.0.4-alpha.2\` - готовый набор для GitHub Releases.
 
-Несмотря на старое название `NET FRAMEWORK`, автономная версия использует .NET 8, а не классический .NET Framework.
-
 ## Обычная сборка через dotnet
 
 ```powershell
@@ -62,8 +60,8 @@ dotnet build .\DeviceTweakerCS.csproj -c Release -p:BuildImodDriver=false
 5. Запустите автономную версию от имени администратора.
 6. Проверьте загрузку устройств, интерфейс, подсказки и выпадающие списки.
 7. Убедитесь, что без кнопки `CHECK` драйвер не загружается.
-8. Добавьте в релиз оба EXE-файла, `DTIMOD.sys`, `RELEASE_NOTES.md`, `THIRD_PARTY_NOTICES.md` и `SHA256SUMS.txt`. Папку `logs` в релиз не включайте.
-9. Повторно проверьте все значения из `SHA256SUMS.txt`.
+8. Добавьте в GitHub Release только два EXE-файла из `bin\ReleasePackages\v0.0.4-alpha.2\`. Драйвер уже встроен в EXE; папки `logs` и `Backups` не публикуйте.
+9. Перед загрузкой повторно сверьте SHA-256 обоих EXE со значениями из локального `SHA256SUMS.txt`.
 
 Подробный чеклист публикации находится в [RELEASE.md](RELEASE.md).
 
@@ -71,6 +69,5 @@ dotnet build .\DeviceTweakerCS.csproj -c Release -p:BuildImodDriver=false
 
 - `bin`, `obj`, `build`, `.vs`, `*.log`, `*.tmp`, `.pdb` и кэши сборки не должны попадать в репозиторий.
 - Подробный лог приложения создается автоматически при запуске в папке `logs` рядом с EXE. Для каждого запуска используется отдельный файл `DeviceTweaker_дата_время.log`.
-- Автозапускной IMOD-скрипт сохраняет подробный журнал в `ApplyIMOD_дата.log` в той же папке.
 - При необработанной ошибке в папке `logs` создаются отдельный crash-файл и обновленный `last-crash.txt`.
 - Приватные сертификаты и локальные вспомогательные файлы не должны публиковаться в GitHub Releases.
