@@ -1,7 +1,5 @@
 # DEVICE TWEAKER
 
-> Каноничное описание репозитория — в [корневом README](../README.md).
-
 [![.NET](https://img.shields.io/badge/.NET-8.0--windows-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/8.0)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078D6?logo=windows&logoColor=white)](#требования)
 [![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
@@ -10,72 +8,74 @@
 
 ![DEVICE TWEAKER](./assets/DEVICE%20TWEAKER-wordmark.svg)
 
-**DEVICE TWEAKER** — утилита для Windows 10/11, объединяющая MSI Utility, Interrupt Affinity Policy Tool, ReservedCpuSets, RSS, NIC ITR, USB IMOD и авто-оптимизацию в одном интерфейсе.
+**DEVICE TWEAKER** — утилита для Windows 10 и Windows 11, объединяющая MSI Utility, Interrupt Affinity Policy Tool, ReservedCpuSets, RSS, NIC ITR и управление USB IMOD в одном интерфейсе с авто-оптимизацией.
 
 Текущая версия **v0.0.4-alpha.2** (pre-release): [Releases](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4-alpha.2).
 
 ## Возможности
 
-- Блоки устройств: USB-контроллеры, GPU, накопители, аудио и сетевые адаптеры.
-- MSI Mode / MSI Limit, IRQ Priority и политика распределения прерываний (Interrupt Affinity Policy).
-- Ручное назначение affinity по логическим процессорам.
-- `ReservedCpuSets` с отображением текущего значения.
-- RSS и ITR на поддерживаемых сетевых адаптерах.
-- IMOD через `DTIMOD.sys` на поддерживаемых USB-контроллерах.
-- Power Saving для USB-контроллеров и проводных NIC.
-- Классификация USB CHIP 0 / CHIP 1 и отображение Selective Suspend.
-- `AUTO-OPTIMIZATION` с учетом P/E-Core, SMT/Hyper-Threading, CPPC, CCD и CCX.
-- Резервные копии, восстановление и полный сброс (`RESET`).
-- Интерфейс EN/RU без перезапуска программы.
+- Отображение USB-контроллеров, видеокарт, накопителей, аудиоустройств и сетевых адаптеров отдельными блоками.
+- Настройка MSI Mode, MSI Limit, IRQ Priority и политики распределения прерываний.
+- Ручное распределение устройств по логическим процессорам.
+- Настройка `ReservedCpuSets` с отображением текущего значения.
+- Настройка RSS и ITR у поддерживаемых сетевых адаптеров.
+- Настройка IMOD у поддерживаемых USB-контроллеров через `DTIMOD.sys`.
+- Переключатель Power Saving для USB-контроллеров и проводных сетевых адаптеров.
+- Классификация USB-контроллеров CHIP 0 / CHIP 1 и отображение Selective Suspend.
+- Авто-оптимизация с учетом P-Core, E-Core, SMT/Hyper-Threading, CPPC, CCD и CCX.
+- Создание резервных копий, восстановление выбранного бекапа и полный сброс изменений.
+- Переключение интерфейса между английским и русским языками без перезапуска программы.
 
 ## Требования
 
 - Windows 10 или Windows 11 x64.
-- Права администратора.
-- Обычная сборка (`DEVICE.TWEAKER.exe`) — нужен .NET 8 Desktop Runtime или новее.
-- `DEVICE.TWEAKER.NET.FRAMEWORK.exe` — self-contained, отдельная установка .NET 8 не требуется.
+- `DEVICE.TWEAKER.exe` — нужен установленный [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) (или новее).
+- `DEVICE.TWEAKER.NET.FRAMEWORK.exe` — runtime уже внутри файла, отдельно .NET ставить не нужно.
 
 ## Важно
 
-Программа меняет параметры прерываний и значения в `HKLM`; при работе с IMOD загружает драйвер `DTIMOD.sys`.
+Программа изменяет параметры прерываний, значения в `HKLM` и при использовании IMOD загружает драйвер `DTIMOD.sys`.
 
-- Перед изменениями создавайте резервную копию.
-- Не задавайте случайные значения IMOD/ITR без понимания их смысла.
-- После серьезных изменений может потребоваться перезагрузка.
-- Логи пишутся автоматически в папку `logs` рядом с EXE.
-- `REFRESH` не загружает `DTIMOD.sys`. Для загрузки драйвера и чтения IMOD / NIC ITR используйте `CHECK`.
-- Драйвер, поднятый через KDU, остается в памяти до перезагрузки. Принудительная выгрузка не выполняется из‑за риска BSOD.
+- Перед применением настроек создавайте резервную копию.
+- Не используйте случайные IMOD/ITR-значения, если не понимаете их назначение.
+- После серьезных изменений может потребоваться перезагрузка Windows.
+- Подробное логирование включается автоматически при запуске. Для каждого запуска создается отдельный `DeviceTweaker`-лог в папке `logs` рядом с EXE.
+- `REFRESH` не загружает `DTIMOD.sys`. Для загрузки драйвера и чтения текущих значений IMOD или NIC ITR используется кнопка `CHECK`.
+- Загруженный через KDU драйвер `DTIMOD.sys` остается в памяти до перезагрузки Windows. Программа не выполняет его принудительную выгрузку из-за риска BSOD на отдельных системах.
 
 ## Запуск
 
-1. Скачайте EXE из [GitHub Releases](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases).
-2. При наличии `SHA256SUMS.txt` (в локальном пакете сборки он есть; на GitHub сейчас обычно только два EXE) сверьте контрольные суммы.
-3. Запустите от имени администратора.
-4. Проверьте устройства и параметры, настройте вручную или через `AUTO-OPTIMIZATION`.
-5. Перезагрузите ПК, если программа сообщит о необходимости перезагрузки.
+1. Скачайте один из EXE-файлов из [GitHub Releases](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases).
+2. При наличии `SHA256SUMS.txt` сверьте контрольные суммы.
+3. Запустите программу от имени администратора.
+4. Проверьте найденные устройства и предлагаемые параметры.
+5. Настройте устройства вручную или используйте `AUTO-OPTIMIZATION`.
+6. Перезагрузите компьютер, если программа сообщит о необходимости перезагрузки.
 
 ## Сборка
+
+Команда для сборки обеих версий с использованием готового `DTIMOD.sys`.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Flavor both -Configuration Release -SkipImodDriverBuild
 ```
 
-Пакет появится в `bin\ReleasePackages\<version>\`.
+После сборки пакет появится в `bin\ReleasePackages\<version>\`.
 
-Подробнее: [docs/BUILD.md](docs/BUILD.md). История изменений: [CHANGELOG.md](CHANGELOG.md).
+Подробная инструкция находится в [docs/BUILD.md](docs/BUILD.md). История изменений — в [CHANGELOG.md](CHANGELOG.md).
 
 ## Структура проекта
 
 - `Affinity` — CPU Affinity, RSS и ReservedCpuSets.
-- `Core` — основная логика, бекапы, Raw Input и IMOD.
-- `Devices` — обнаружение устройств, USB и NDIS топология.
+- `Core` — основная логика, резервные копии, Raw Input и IMOD.
+- `Devices` — поиск устройств и определение USB и NDIS топологии.
 - `GUI` — интерфейс WinForms.
-- `Localization` — строки EN/RU.
-- `Tweaks` — авто-оптимизация и сброс.
-- `IMOD` — `DTIMOD.sys`, KDU и загрузчики.
-- `assets` — иконка, wordmark и manifest.
+- `Localization` — строки интерфейса EN/RU.
+- `Tweaks` — авто-оптимизация и сброс настроек.
+- `IMOD` — драйвер `DTIMOD.sys`, KDU и необходимые загрузчики.
+- `assets` — иконка, wordmark и manifest приложения.
 - `Scripts` — сертификат драйвера, `Smoke-SafeGui.ps1` и вспомогательные тесты.
-- `docs` — сборка и релиз.
+- `docs` — инструкции по сборке и релизу.
 - `Models` / `Interop` — модели данных и P/Invoke.
 
 ## Разработчик
@@ -84,6 +84,6 @@ Telegram — [@arsenzaa](https://t.me/arsenzaa)
 
 ## Лицензия
 
-Проект — [GNU GPLv3](LICENSE).
+Проект распространяется по лицензии [GNU GPLv3](LICENSE).
 
-KDU в `IMOD/KDU` — MIT.
+Исходный код KDU находится в `IMOD/KDU` и распространяется по лицензии MIT.
