@@ -172,8 +172,30 @@ public sealed partial class MainForm
         LocalizeControlTree(this);
         UpdateLanguageSelectorStyle();
         UpdateCpuHeaderUi();
+        UpdateFilterToolbarLocalization();
+        UpdateApplyButtonDirtyCount();
         foreach (DeviceBlock block in _blocks)
         {
+            if (block.ModifiedBadge is not null)
+            {
+                block.ModifiedBadge.Text = UiLanguage.Text("[ MODIFIED ]");
+            }
+            if (block.Kind == DeviceKind.STOR)
+            {
+                _copyToolTip.SetToolTip(block.AffinityLabel, "NVMe/SATA storage uses Windows Multi-Queue steering. Pinned core affinity is intentionally disabled to ensure maximum SSD speed and low latency.");
+            }
+            else if (block.Kind == DeviceKind.AUDIO && (IsDisplayHdmiaudio(block.Device.InstanceId, block.Device.Name) || IsDisplayAudioEndpointsText(block.Device.AudioEndpoints)))
+            {
+                _copyToolTip.SetToolTip(block.AffinityLabel, "Display/HDMI audio shares PCIe bus with the GPU and uses Windows default interrupt steering (0x0).");
+            }
+            else
+            {
+                _copyToolTip.SetToolTip(block.AffinityLabel, "Interrupt Affinity Mask (AssignmentSetOverride). Strictly routes hardware interrupt service routines (ISRs) and deferred procedure calls (DPCs) to the selected CPU logical cores.");
+            }
+            if (block.InfoLabel is not null)
+            {
+                _copyToolTip.SetToolTip(block.InfoLabel, "Click to copy full registry path to clipboard");
+            }
             block.RelayoutAction?.Invoke();
             ResetHorizontalView(block.LimitBox);
             ResetHorizontalView(block.ImodBox);

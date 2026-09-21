@@ -6,7 +6,7 @@ namespace DeviceTweakerCS;
 
 public sealed partial class MainForm
 {
-    private enum NicItrTimingKind
+    internal enum NicItrTimingKind
     {
         None,
         IntelEitr,
@@ -15,7 +15,7 @@ public sealed partial class MainForm
         RealtekIntrMitV2,
     }
 
-    private sealed record NicItrProfile(
+    internal sealed record NicItrProfile(
         string FamilyName,
         string VendorId,
         string[] DeviceIds,
@@ -31,7 +31,7 @@ public sealed partial class MainForm
 
     private static readonly NicItrProfile[] NicItrProfiles =
     [
-        new("Intel I225/I226 (EITR)", "8086", ["15F2", "15F3", "0D9F", "5502", "125B", "125C", "125D", "5503"], 0x1680, 0x4, 5, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr, ["Other", "IRQ0", "IRQ1", "IRQ2", "IRQ3"]),
+        new("Intel I225/I226 (EITR)", "8086", ["15F2", "15F3", "15F7", "15F8", "0D9F", "5502", "125B", "125C", "125D", "5503"], 0x1680, 0x4, 5, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr, ["Other", "IRQ0", "IRQ1", "IRQ2", "IRQ3"]),
         new("Intel I210/I211 (EITR)", "8086", ["1533", "1536", "1537", "1538", "1539", "157B", "157C", "1F40", "1F41", "1F45"], 0x1680, 0x4, 5, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr, IntelEitrUnitUs: 1),
         new("Intel I350 (EITR)", "8086", ["1521", "1522", "1523", "1524"], 0x1680, 0x4, 25, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr, IntelEitrUnitUs: 1),
         new("Intel 82580 (EITR)", "8086", ["150E", "150F", "1510", "1511"], 0x1680, 0x4, 10, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr),
@@ -44,7 +44,7 @@ public sealed partial class MainForm
         new("Killer E2500/E2600", "10EC", ["2600", "2502", "2500"], 0x00E2, 0x0, 1, 16, 0xFFFF, 0, NicItrTimingKind.RealtekIntrMit),
     ];
 
-    private static NicItrProfile? TryGetNicItrProfile(string instanceId)
+    internal static NicItrProfile? TryGetNicItrProfile(string instanceId)
     {
         if (!TryGetPciVenDev(instanceId, out string ven, out string dev))
         {

@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -20,11 +20,18 @@ public sealed partial class MainForm
         block.AffinityMask = mask;
         if (block.Kind == DeviceKind.STOR)
         {
-            block.AffinityLabel.Text = $"Affinity Mask: 0x{mask:X} (locked)";
+            block.AffinityLabel.Text = "Affinity Mask: Windows Default";
+        }
+        else if (block.Kind == DeviceKind.AUDIO && (IsDisplayHdmiaudio(block.Device.InstanceId, block.Device.Name) || IsDisplayAudioEndpointsText(block.Device.AudioEndpoints)) && mask == 0)
+        {
+            block.AffinityLabel.Text = "Affinity Mask: 0x0 (Windows Default)";
         }
         else if (block.Kind == DeviceKind.NET_NDIS)
         {
-            block.AffinityLabel.Text = $"Affinity (RSS mask): 0x{mask:X}";
+            string ndisMode = block.NdisModeCombo?.SelectedItem?.ToString() ?? "RSS";
+            block.AffinityLabel.Text = string.Equals(ndisMode, "IRQ", StringComparison.OrdinalIgnoreCase)
+                ? $"Affinity Mask: 0x{mask:X}"
+                : $"Affinity (RSS mask): 0x{mask:X}";
         }
         else
         {
@@ -250,7 +257,7 @@ public sealed partial class MainForm
         block.NdisModeCombo.SelectedItem = text;
     }
 
-    private static ulong ReadAffinityMaskValue(object? rawOverride)
+    internal static ulong ReadAffinityMaskValue(object? rawOverride)
     {
         return rawOverride switch
         {
@@ -897,7 +904,21 @@ public sealed partial class MainForm
         else if (block.Device.Kind == DeviceKind.STOR)
         {
             info.AppendLine();
-            info.Append("Type: Storage controller");
+            bool isNvme = Regex.IsMatch(block.Device.Name ?? string.Empty, "(?i)NVM\\s*Express|NVMe")
+                || string.Equals(block.Device.StorageTag, "NVMe", StringComparison.OrdinalIgnoreCase);
+            bool isSata = Regex.IsMatch(block.Device.Name ?? string.Empty, "(?i)\\bSATA\\b|\\bAHCI\\b");
+            if (isNvme)
+            {
+                info.Append("Type: NVMe storage controller");
+            }
+            else if (isSata)
+            {
+                info.Append("Type: SATA/AHCI controller");
+            }
+            else
+            {
+                info.Append("Type: Storage controller");
+            }
         }
         else if (block.Device.Kind == DeviceKind.AUDIO && !string.IsNullOrWhiteSpace(block.Device.AudioEndpoints))
         {
@@ -1317,7 +1338,13 @@ public sealed partial class MainForm
             }
 
             block.AffinityMask = 0;
-            block.AffinityLabel.Text = "Affinity Mask: 0x0";
+            block.AffinityLabel.Text = block.Kind == DeviceKind.STOR
+                ? "Affinity Mask: Windows Default"
+                : (block.Kind == DeviceKind.AUDIO && (IsDisplayHdmiaudio(block.Device.InstanceId, block.Device.Name) || IsDisplayAudioEndpointsText(block.Device.AudioEndpoints)))
+                    ? "Affinity Mask: 0x0 (Windows Default)"
+                    : (block.Kind == DeviceKind.NET_NDIS && !string.Equals(block.NdisModeCombo?.SelectedItem?.ToString(), "IRQ", StringComparison.OrdinalIgnoreCase))
+                        ? "Affinity (RSS mask): 0x0"
+                        : "Affinity Mask: 0x0";
             block.PrioCombo.SelectedItem = "Undefined";
             if (block.Kind == DeviceKind.NET_NDIS)
             {

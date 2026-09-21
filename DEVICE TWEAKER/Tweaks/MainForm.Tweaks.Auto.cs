@@ -13,8 +13,9 @@ public sealed partial class MainForm
 
     private static bool IsAutoMsiOnlyDevice(DeviceBlock block)
     {
-        return (block.Kind == DeviceKind.GPU && block.Device.IsIntegratedGpu)
-            || IsAutoDisplayAudioMsiOnly(block);
+        // Integrated GPU is handled by AUTO (affinity cleared to Windows default + MSI).
+        // Only display/HDMI audio still uses the MSI-only apply short-circuit.
+        return IsAutoDisplayAudioMsiOnly(block);
     }
 
     private static string FormatAutoImodRequestState(bool optimizeUsbImod, bool hasUsbImodTarget)
@@ -423,6 +424,21 @@ public sealed partial class MainForm
             && Regex.IsMatch(roles, $@"(?i)\b{Regex.Escape(role)}\b");
     }
 
+    /// <summary>
+    /// Mouse / Gamepad / Keyboard on an XHCI controller → external gaming input, keep affinity.
+    /// Webcam / Audio-only controllers are treated as built-in and skipped.
+    /// </summary>
+    private static bool UsbRolesIndicateExternalInput(string roles)
+    {
+        return HasRoleText(roles, "Mouse")
+            || HasRoleText(roles, "Gamepad")
+            || HasRoleText(roles, "Controller")
+            || HasRoleText(roles, "Keyboard");
+    }
+
+    private static bool ShouldSkipBuiltInUsbAffinity(string roles)
+        => string.IsNullOrWhiteSpace(roles) || !UsbRolesIndicateExternalInput(roles);
+
     private static string FormatAutoResultRole(AutoAffinityRole role)
     {
         return role switch
@@ -553,7 +569,7 @@ public sealed partial class MainForm
 
         foreach (DeviceBlock block in _blocks.Where(block => msiOnlyGpuIds.Contains(block.Device.InstanceId)))
         {
-            WriteLog($"AUTO.RESULT.SKIPPED: role=\"Integrated GPU\" kind={FormatAutoResultKind(block.Kind)} {FormatAutoResultDeviceFields(block)} reason=\"affinity preserved, MSI only\"");
+            WriteLog($"AUTO.RESULT.SKIPPED: role=\"Integrated GPU\" kind={FormatAutoResultKind(block.Kind)} {FormatAutoResultDeviceFields(block)} reason=\"affinity cleared to Windows default, MSI only\"");
         }
 
         foreach (DeviceBlock block in _blocks.Where(block => skipReasons.ContainsKey(block.Device.InstanceId)))
@@ -795,11 +811,21 @@ public sealed partial class MainForm
 
         foreach (DeviceBlock usbBlock in usbBlocks)
         {
-            if (string.IsNullOrWhiteSpace(usbBlock.Device.UsbRoles))
+            string roles = usbBlock.Device.UsbRoles ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(roles))
             {
                 skipAutoIds.Add(usbBlock.Device.InstanceId);
                 skipReasons[usbBlock.Device.InstanceId] = "USB controller has no detected HID roles, left for manual/reset only";
                 WriteLog($"AUTO.SKIP.USB: {usbBlock.Device.InstanceId} no HID roles (manual/reset only)");
+            }
+            else if (ShouldSkipBuiltInUsbAffinity(roles))
+            {
+                skipAutoIds.Add(usbBlock.Device.InstanceId);
+                skipReasons[usbBlock.Device.InstanceId] =
+                    "built-in USB (no Mouse/Gamepad/Keyboard): affinity skipped; MSI/power still applied";
+                WriteLog(
+                    $"AUTO.SKIP.USB: {usbBlock.Device.InstanceId} built-in roles=\"{SanitizeLogValue(roles)}\" " +
+                    "reason=no-external-input-affinity-skip");
             }
         }
 
@@ -822,6 +848,10 @@ public sealed partial class MainForm
             bool isDisplay = IsDisplayHdmiaudio(pnpId, desc) || IsDisplayAudioEndpointsText(audioText);
             if (!isDisplay && !isSpdif)
             {
+                // Onboard HD Audio / Speakers / Mic — built-in, do not pin IRQ affinity.
+                skipAutoIds.Add(pnpId);
+                skipReasons[pnpId] = "built-in audio: affinity skipped; MSI/power still applied";
+                WriteLog($"AUTO.SKIP.AUDIO: {pnpId} built-in (name=\"{SanitizeLogValue(desc)}\" endpoints=\"{SanitizeLogValue(audioText)}\")");
                 continue;
             }
 
@@ -857,9 +887,33 @@ public sealed partial class MainForm
             if (isMsiOnlyGpu)
             {
                 string msiBefore = block.MsiCombo.SelectedItem?.ToString() ?? "(none)";
+                block.SuppressCpuEvents++;
+                try
+                {
+                    foreach (CheckBox cb in block.CpuBoxes)
+                    {
+                        cb.Checked = false;
+                    }
+                }
+                finally
+                {
+                    block.SuppressCpuEvents--;
+                }
+
+                block.AffinityMask = 0;
                 block.MsiCombo.SelectedItem = "Enabled";
+                block.LimitBox.Text = "0";
+                block.PrioCombo.SelectedItem = "Undefined";
+                if (block.PolicyCombo.Enabled)
+                {
+                    block.PolicyCombo.SelectedItem = "MachineDefault";
+                }
+
+                RecalcAffinityMask(block);
                 string msiAfter = block.MsiCombo.SelectedItem?.ToString() ?? "(none)";
-                WriteLog($"AUTO.SKIP.GPU: {block.Device.InstanceId} integrated=1 msiBefore={msiBefore} msiAfter={msiAfter} reason=integratedGpuAutoSkip");
+                WriteLog(
+                    $"AUTO.SKIP.GPU: {block.Device.InstanceId} integrated=1 msiBefore={msiBefore} msiAfter={msiAfter} " +
+                    "affinity=WindowsDefault reason=integratedGpuAutoSkip");
                 continue;
             }
 
@@ -951,8 +1005,10 @@ public sealed partial class MainForm
                 $"cpuAssignmentSkipped={isSkipAuto || block.Kind == DeviceKind.STOR}");
             if (isSkipAuto)
             {
-                string reason = IsSpdifAudioEndpointsText(block.Device.AudioEndpoints) ? "digital S/PDIF audio" : "display/HDMI audio";
-                WriteLog($"AUTO.RESET.SKIP: {block.Device.InstanceId} Kind={block.Kind} reason={reason}");
+                string reason = skipReasons.TryGetValue(block.Device.InstanceId, out string? skipReason)
+                    ? skipReason
+                    : "skipped by AUTO policy";
+                WriteLog($"AUTO.RESET.SKIP: {block.Device.InstanceId} Kind={block.Kind} reason=\"{SanitizeLogValue(reason)}\"");
             }
         }
 
@@ -1208,22 +1264,15 @@ public sealed partial class MainForm
 
             WriteLog($"AUTO.PLAN.GPU.PAIRS: candidates={pairs.Count} [{string.Join("; ", pairs.Select(FormatGpuPair))}]");
 
-            (AutoCpuUnit First, AutoCpuUnit Second) selectedPair = _cppcEnabled
-                ? pairs
-                    .OrderBy(pair => pair.First.Ccd == pair.Second.Ccd ? 0 : 1)
-                    .ThenBy(pair => !HasVisibleCcxSplit() || pair.First.Ccx == pair.Second.Ccx ? 0 : 1)
-                    .ThenByDescending(pair => Math.Min(pair.First.Rank, pair.Second.Rank))
-                    .ThenByDescending(pair => (long)pair.First.Rank + pair.Second.Rank)
-                    .ThenBy(pair => (long)pair.First.Rating + pair.Second.Rating)
-                    .ThenByDescending(pair => Math.Max(pair.First.PrimaryLp, pair.Second.PrimaryLp))
-                    .ThenByDescending(pair => Math.Min(pair.First.PrimaryLp, pair.Second.PrimaryLp))
-                    .First()
-                : pairs
-                    .OrderBy(pair => pair.First.Ccd == pair.Second.Ccd ? 0 : 1)
-                    .ThenBy(pair => !HasVisibleCcxSplit() || pair.First.Ccx == pair.Second.Ccx ? 0 : 1)
-                    .ThenByDescending(pair => Math.Max(pair.First.PrimaryLp, pair.Second.PrimaryLp))
-                    .ThenByDescending(pair => Math.Min(pair.First.PrimaryLp, pair.Second.PrimaryLp))
-                    .First();
+            // Always prefer the highest physical LP adjacent pair on the target CCD.
+            // CPPC rank must NOT steer GPU here: mid-rank pairs like [6,8] caused field
+            // FPS drops on Ryzen 8940HX + RTX 5060 Laptop; the working pair was [12,14].
+            (AutoCpuUnit First, AutoCpuUnit Second) selectedPair = pairs
+                .OrderBy(pair => pair.First.Ccd == pair.Second.Ccd ? 0 : 1)
+                .ThenBy(pair => !HasVisibleCcxSplit() || pair.First.Ccx == pair.Second.Ccx ? 0 : 1)
+                .ThenByDescending(pair => Math.Max(pair.First.PrimaryLp, pair.Second.PrimaryLp))
+                .ThenByDescending(pair => Math.Min(pair.First.PrimaryLp, pair.Second.PrimaryLp))
+                .First();
 
             WriteLog($"AUTO.PLAN.GPU.SELECT: {FormatGpuPair(selectedPair)} reason=irq-safe-tail-physical-pair");
             List<AutoCpuUnit> selected = [selectedPair.First, selectedPair.Second];
@@ -1356,9 +1405,15 @@ public sealed partial class MainForm
             }
 
             AssignSlot(slot, [unit], inputCcx.HasValue && unit.Ccx == inputCcx.Value ? "input-dedicated-unit-ccx-near" : "input-dedicated-unit");
-            if (slot.Lps.Count > 0)
+            // Do not burn spacing before GPU: spacing-after-input was reserving the
+            // high-LP tail (e.g. LP14), which blocked the irq-safe GPU pair [12,14].
+            if (slot.Lps.Count > 0 && gpuPreferredNeed <= 0)
             {
                 SkipSpacingUnitIfAvailable("input");
+            }
+            else if (slot.Lps.Count > 0 && gpuPreferredNeed > 0)
+            {
+                WriteLog("AUTO.PLAN.SPACING: after=input deferred reason=preserve-gpu-tail-pair");
             }
         }
 
@@ -1721,7 +1776,11 @@ public sealed partial class MainForm
                         }
 
                         b.AffinityMask = 0;
-                        b.AffinityLabel.Text = "Affinity Mask: 0x0";
+                        b.AffinityLabel.Text = b.Kind == DeviceKind.STOR
+                            ? "Affinity Mask: Windows Default"
+                            : (b.Kind == DeviceKind.AUDIO && (IsDisplayHdmiaudio(b.Device.InstanceId, b.Device.Name) || IsDisplayAudioEndpointsText(b.Device.AudioEndpoints)))
+                                ? "Affinity Mask: 0x0 (Windows Default)"
+                                : "Affinity Mask: 0x0";
                         b.PrioCombo.SelectedItem = "Undefined";
                         if (b.Kind == DeviceKind.NET_NDIS)
                         {

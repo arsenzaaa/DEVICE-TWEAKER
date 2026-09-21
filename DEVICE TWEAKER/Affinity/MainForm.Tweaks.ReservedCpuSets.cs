@@ -24,19 +24,7 @@ public sealed partial class MainForm
             if (key?.GetValue(valueName) is byte[] bytes)
             {
                 rawHex = string.Join(" ", bytes.Select(b => b.ToString("X2")));
-                int bitIndex = 0;
-                foreach (byte b in bytes)
-                {
-                    for (int i = 0; i < 8; i++)
-                    {
-                        if ((b & (1 << i)) != 0)
-                        {
-                            rawIds.Add(bitIndex);
-                        }
-
-                        bitIndex++;
-                    }
-                }
+                rawIds = DecodeReservedCpuSetsRawIds(bytes);
             }
         }
         catch (Exception ex)
@@ -110,24 +98,7 @@ public sealed partial class MainForm
             setBits.Add(i);
         }
 
-        int maxIndex = setBits.Count > 0 ? setBits.Max() : -1;
-        int byteCount = maxIndex >= 0 ? (maxIndex / 8) + 1 : 0;
-        byte[] bytes = new byte[byteCount];
-
-        foreach (int id in setBits)
-        {
-            if (id < 0)
-            {
-                continue;
-            }
-
-            int byteIndex = id / 8;
-            int bitIndex = id % 8;
-            if (byteIndex >= 0 && byteIndex < bytes.Length)
-            {
-                bytes[byteIndex] = (byte)(bytes[byteIndex] | (1 << bitIndex));
-            }
-        }
+        byte[] bytes = EncodeReservedCpuSetsBytes(bits);
 
         try
         {
@@ -151,6 +122,59 @@ public sealed partial class MainForm
             WriteLog($"RESERVED.ERROR: failed to write ReservedCpuSets: {ex.Message}");
             return false;
         }
+    }
+
+    internal static List<int> DecodeReservedCpuSetsRawIds(byte[] bytes)
+    {
+        List<int> rawIds = [];
+        int bitIndex = 0;
+        foreach (byte b in bytes)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                if ((b & (1 << i)) != 0)
+                {
+                    rawIds.Add(bitIndex);
+                }
+
+                bitIndex++;
+            }
+        }
+
+        return rawIds;
+    }
+
+    internal static byte[] EncodeReservedCpuSetsBytes(bool[] bits)
+    {
+        List<int> setBits = [];
+        for (int i = 0; i < bits.Length; i++)
+        {
+            if (bits[i])
+            {
+                setBits.Add(i);
+            }
+        }
+
+        int maxIndex = setBits.Count > 0 ? setBits.Max() : -1;
+        int byteCount = maxIndex >= 0 ? (maxIndex / 8) + 1 : 0;
+        byte[] bytes = new byte[byteCount];
+
+        foreach (int id in setBits)
+        {
+            if (id < 0)
+            {
+                continue;
+            }
+
+            int byteIndex = id / 8;
+            int bitIndex = id % 8;
+            if (byteIndex >= 0 && byteIndex < bytes.Length)
+            {
+                bytes[byteIndex] = (byte)(bytes[byteIndex] | (1 << bitIndex));
+            }
+        }
+
+        return bytes;
     }
 
     private void ResetReservedCpuSets(OperationReport? report = null)

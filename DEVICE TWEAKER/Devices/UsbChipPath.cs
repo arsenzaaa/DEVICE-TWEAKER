@@ -28,10 +28,12 @@ internal sealed record UsbChipPathInfo(
     string Vid,
     string Did)
 {
+    public int InstanceIndex { get; set; } = 0;
+
     public string CompactTag => BaseChipCount < 0
         ? "CHIP ?"
         : BaseChipCount == 0
-            ? "CHIP 0"
+            ? (InstanceIndex > 0 ? $"CHIP 0 (CPU-{InstanceIndex})" : "CHIP 0")
             : BaseChipCount == 1
                 ? "CHIP 1"
                 : $"CHIP {BaseChipCount}";

@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using System.Diagnostics;
 using System.Management;
 using System.Text.Json;
@@ -1169,6 +1169,16 @@ public sealed partial class MainForm
             if (kind == DeviceKind.STOR)
             {
                 storageTag = GetStorageTagForDevice(displayName, physicalDisks);
+                if (string.IsNullOrWhiteSpace(storageTag))
+                {
+                    if (!HasNonDefaultInterruptAffinity(regBase))
+                    {
+                        WriteLog($"SCAN: skipped storage controller (no attached drives) {d.InstanceId} name=\"{name}\"");
+                        continue;
+                    }
+
+                    WriteLog($"SCAN: keeping storage controller (no attached drives, custom affinity present) {d.InstanceId} name=\"{name}\"");
+                }
             }
 
             bool isIntegratedGpu = kind == DeviceKind.GPU && IsIntegratedGpuDevice(d.InstanceId, displayName);
@@ -1205,9 +1215,12 @@ public sealed partial class MainForm
             };
 
             devices.Add(devInfo);
-            string gpuTypeLog = isIntegratedGpu ? " gpuType=iGPU" : string.Empty;
+            string gpuTypeLog = isIntegratedGpu ? " gpuType=iGPU" : (kind == DeviceKind.GPU ? " gpuType=dGPU" : string.Empty);
             WriteLog($"SCAN: device {d.InstanceId} kind={kind} class={d.Class} name=\"{displayName}\"{gpuTypeLog} reg=HKLM\\{regBase} usbRoles=\"{usbText}\" usbPolling=\"{usbPollingText}\" audio=\"{audioText}\"");
         }
+
+        RefineIntegratedGpuFlags(devices);
+        RefineUsbChipPathIndices(devices);
 
         devices = devices
             .ToList();
@@ -1215,6 +1228,7 @@ public sealed partial class MainForm
         if (_testDevicesEnabled && _testDevices.Count > 0)
         {
             devices.AddRange(_testDevices);
+            RefineUsbChipPathIndices(devices);
             WriteLog($"SCAN.TEST: appended test devices count={_testDevices.Count}");
         }
 
@@ -1222,6 +1236,67 @@ public sealed partial class MainForm
 
         WriteLog($"SCAN: Get-DeviceList done, count={devices.Count}");
         return devices;
+    }
+
+    private static void RefineUsbChipPathIndices(List<DeviceInfo> devices)
+    {
+        List<DeviceInfo> cpuDirectUsb = devices
+            .Where(d => d.Kind == DeviceKind.USB && d.UsbChipPath is { BaseChipCount: 0 })
+            .ToList();
+
+        if (cpuDirectUsb.Count > 1)
+        {
+            for (int i = 0; i < cpuDirectUsb.Count; i++)
+            {
+                if (cpuDirectUsb[i].UsbChipPath is { } path)
+                {
+                    path.InstanceIndex = i + 1;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Hybrid laptops often expose an unnamed/odd APU adapter next to NVIDIA.
+    /// If a discrete NVIDIA/Intel dGPU is present, mark remaining AMD Radeon
+    /// adapters (non-RX / non-Pro) as integrated.
+    /// </summary>
+    private void RefineIntegratedGpuFlags(List<DeviceInfo> devices)
+    {
+        List<DeviceInfo> gpus = devices.Where(d => d.Kind == DeviceKind.GPU).ToList();
+        if (gpus.Count < 2)
+        {
+            return;
+        }
+
+        bool hasDiscrete = gpus.Any(g =>
+            !g.IsIntegratedGpu
+            && Regex.IsMatch(
+                $"{g.InstanceId} {g.Name}",
+                "(?i)\\bGeForce\\b|\\bRTX\\b|\\bGTX\\b|\\bQuadro\\b|Laptop\\s+GPU\\b|Intel\\s*(?:\\(R\\))?\\s*Arc(?:\\(TM\\))?\\s+A\\d{3,}"));
+        if (!hasDiscrete)
+        {
+            return;
+        }
+
+        foreach (DeviceInfo gpu in gpus)
+        {
+            if (gpu.IsIntegratedGpu)
+            {
+                continue;
+            }
+
+            string text = $"{gpu.InstanceId} {gpu.Name}";
+            bool amdRadeon = Regex.IsMatch(text, "(?i)VEN_1002|\\bRadeon\\b");
+            bool discreteAmd = Regex.IsMatch(text, "(?i)\\bRadeon\\s+RX\\b|\\bRadeon\\s+Pro\\b");
+            if (!amdRadeon || discreteAmd)
+            {
+                continue;
+            }
+
+            gpu.IsIntegratedGpu = true;
+            WriteLog($"SCAN.GPU.REFINE: {gpu.InstanceId} name=\"{SanitizeLogValue(gpu.Name)}\" -> iGPU reason=hybrid-with-discrete");
+        }
     }
 
     private static string GetStorageTagForDevice(string deviceName, IReadOnlyList<WmiPhysicalDisk> physicalDisks)
@@ -1236,7 +1311,7 @@ public sealed partial class MainForm
 
         if (physicalDisks.Count == 0)
         {
-            return isNvme ? "SSD" : string.Empty;
+            return isNvme ? "NVMe" : string.Empty;
         }
 
         List<ushort> busTypes = [];
@@ -1252,7 +1327,7 @@ public sealed partial class MainForm
 
         if (busTypes.Count == 0)
         {
-            return isNvme ? "SSD" : string.Empty;
+            return isNvme ? "NVMe" : string.Empty;
         }
 
         bool anySsd = false;
@@ -1270,7 +1345,7 @@ public sealed partial class MainForm
 
         if (anySsd && !anyHdd)
         {
-            return "SSD";
+            return isNvme ? "NVMe" : "SSD";
         }
 
         if (anyHdd && !anySsd)
@@ -1283,7 +1358,7 @@ public sealed partial class MainForm
             return "SSD+HDD";
         }
 
-        return isNvme ? "SSD" : string.Empty;
+        return isNvme ? "NVMe" : string.Empty;
     }
 
     private static string NormalizeIrqLookupPath(string idOrPath)

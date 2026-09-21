@@ -27,6 +27,12 @@ internal static class NativeUser32
     internal const int EcLeftMargin = 0x0001;
     internal const int EcRightMargin = 0x0002;
 
+    internal const int WmNcLButtonDown = 0x00A1;
+    internal const int HtCaption = 2;
+
+    [DllImport("user32.dll")]
+    internal static extern bool ReleaseCapture();
+
     [StructLayout(LayoutKind.Sequential)]
     internal struct Rect
     {

@@ -16,6 +16,25 @@ internal sealed class ThemedTextBox : Panel
 
     public TextBox Inner => _edit;
 
+    public Color BorderColor
+    {
+        get => _borderColor;
+        set
+        {
+            if (_borderColor != value)
+            {
+                _borderColor = value;
+                Invalidate();
+            }
+        }
+    }
+
+    public string PlaceholderText
+    {
+        get => _edit.PlaceholderText;
+        set => _edit.PlaceholderText = value ?? string.Empty;
+    }
+
     public ThemedTextBox()
     {
         SetStyle(

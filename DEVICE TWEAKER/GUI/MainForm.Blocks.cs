@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 namespace DeviceTweakerCS;
 
@@ -120,9 +121,19 @@ public sealed partial class MainForm
         {
             title = $"{device.Name} [NetAdapterCx]";
         }
-        else if (device.Kind == DeviceKind.STOR && !string.IsNullOrWhiteSpace(device.StorageTag))
+        else if (device.Kind == DeviceKind.STOR)
         {
-            title = $"{device.Name} [{device.StorageTag}]";
+            if (string.Equals(device.StorageTag, "SSD+HDD", StringComparison.OrdinalIgnoreCase))
+            {
+                title = $"{device.Name} [SSD+HDD]";
+            }
+            else if (!string.IsNullOrWhiteSpace(device.StorageTag) &&
+                     !string.Equals(device.StorageTag, "NVMe", StringComparison.OrdinalIgnoreCase) &&
+                     !string.Equals(device.StorageTag, "SSD", StringComparison.OrdinalIgnoreCase) &&
+                     !string.Equals(device.StorageTag, "HDD", StringComparison.OrdinalIgnoreCase))
+            {
+                title = $"{device.Name} [{device.StorageTag}]";
+            }
         }
         else if (device.Kind == DeviceKind.AUDIO && !string.IsNullOrWhiteSpace(device.AudioEndpoints))
         {
@@ -137,11 +148,39 @@ public sealed partial class MainForm
         return title;
     }
 
+    private static (string kindText, Color kindColor) GetStorageKindBadge(DeviceInfo device)
+    {
+        bool isNvme = Regex.IsMatch(device.Name ?? string.Empty, "(?i)NVM\\s*Express|NVMe")
+            || string.Equals(device.StorageTag, "NVMe", StringComparison.OrdinalIgnoreCase);
+        if (isNvme)
+        {
+            return ("[NVMe]", Color.FromArgb(140, 200, 255));
+        }
+
+        if (string.Equals(device.StorageTag, "SSD", StringComparison.OrdinalIgnoreCase))
+        {
+            return ("[SSD]", Color.FromArgb(120, 220, 200));
+        }
+
+        if (string.Equals(device.StorageTag, "HDD", StringComparison.OrdinalIgnoreCase))
+        {
+            return ("[HDD]", Color.FromArgb(180, 180, 190));
+        }
+
+        if (Regex.IsMatch(device.Name ?? string.Empty, "(?i)\\bSATA\\b|\\bAHCI\\b"))
+        {
+            return ("[SATA]", Color.FromArgb(160, 200, 220));
+        }
+
+        return ("[STORAGE]", Color.FromArgb(190, 190, 200));
+    }
+
     private void NewDeviceBlock(
         DeviceInfo device,
         int index,
         IReadOnlyDictionary<string, string>? priorImodStatuses = null)
     {
+        DeviceBlock? createdBlock = null;
         DeviceCardPanel grp = new()
         {
             BorderColor = _border,
@@ -173,6 +212,26 @@ public sealed partial class MainForm
             BackColor = Color.Transparent,
         };
 
+        (string kindText, Color kindColor) = device.Kind switch
+        {
+            DeviceKind.USB => ("[USB]", Color.FromArgb(120, 210, 255)),
+            DeviceKind.GPU => ("[GPU]", Color.FromArgb(195, 150, 255)),
+            DeviceKind.NET_NDIS or DeviceKind.NET_CX => ("[NET]", Color.FromArgb(100, 225, 155)),
+            DeviceKind.AUDIO => ("[AUDIO]", Color.FromArgb(255, 155, 125)),
+            DeviceKind.STOR => GetStorageKindBadge(device),
+            _ => ("[DEV]", _statusPrefix)
+        };
+
+        Label kindBadge = new()
+        {
+            Text = kindText,
+            Font = _blockTitleFont,
+            ForeColor = kindColor,
+            AutoSize = true,
+            Margin = new Padding(0, 0, UiScale(6), 0),
+        };
+        headerPanel.Controls.Add(kindBadge);
+
         Label headerLabel = new HighlightLabel
         {
             Text = title,
@@ -190,18 +249,17 @@ public sealed partial class MainForm
         }
 
         Label? headerNote = null;
-        if (device.Kind == DeviceKind.STOR)
+
+        Label modifiedBadge = new()
         {
-            headerNote = new Label
-            {
-                Text = StorageAffinityNoteText,
-                Font = _blockFont,
-                ForeColor = _mutedWarn,
-                AutoSize = true,
-                Margin = new Padding(UiScale(6), UiScale(2), 0, 0),
-            };
-            headerPanel.Controls.Add(headerNote);
-        }
+            Text = UiLanguage.Text("[ MODIFIED ]"),
+            Font = _blockTitleFont,
+            ForeColor = _statusWarn,
+            AutoSize = true,
+            Visible = false,
+            Margin = new Padding(UiScale(8), 0, 0, 0),
+        };
+        headerPanel.Controls.Add(modifiedBadge);
 
         Panel divider = new()
         {
@@ -239,11 +297,15 @@ public sealed partial class MainForm
             grp.Width - UiScale(16) - settingsSideGap - settingsMinimumWidth - UiScale(24));
         int cpuPanelMaximumWidth = cpuPanelSideMaximumWidth;
         int cpuPanelWidth = cpuPanelMinimumWidth;
-        Panel cpuPanel = new()
+        // Dual-CCD affinity lists are wide; a plain Panel + AutoScroll paints overlapping
+        // checkbox columns. BufferedPanel keeps the scroll viewport clean.
+        bool affinitySettingsStacked = false;
+        BufferedPanel cpuPanel = new()
         {
             Location = new Point(UiScale(16), cpuPanelTop),
             Size = new Size(cpuPanelWidth, cpuPanelHeight),
             BackColor = _bgForm,
+            Font = _blockFont,
             Padding = new Padding(UiScale(8), UiScale(6), UiScale(8), UiScale(6)),
         };
         cpuPanel.Paint += (_, e) =>
@@ -264,6 +326,7 @@ public sealed partial class MainForm
             CheckBox cb = new()
             {
                 Text = $"CPU {i}",
+                Font = _blockFont,
                 AutoSize = true,
                 ForeColor = _fgMain,
                 BackColor = _bgForm,
@@ -293,6 +356,145 @@ public sealed partial class MainForm
             ccdKeys.Add(0);
         }
 
+        FlowLayoutPanel? affinityQuickPanel = null;
+        if (device.Kind != DeviceKind.STOR && device.Kind != DeviceKind.NET_NDIS)
+        {
+            affinityQuickPanel = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                BackColor = Color.Transparent,
+                Location = new Point(cpuLabel.Right + UiScale(12), contentTop - UiScale(2)),
+                Margin = Padding.Empty,
+                Padding = Padding.Empty,
+            };
+
+            Button NewAffinityQuickBtn(string text, string tip, Action onClick)
+            {
+                Button btn = new ThemedButton
+                {
+                    Text = text,
+                    Font = _blockFont,
+                    Height = UiScale(20),
+                    AutoSize = true,
+                    FlatStyle = FlatStyle.Flat,
+                    BackColor = _bgGroup,
+                    ForeColor = _statusInactive,
+                    Cursor = Cursors.Hand,
+                    TabStop = false,
+                    Margin = new Padding(UiScale(4), 0, 0, 0),
+                };
+                btn.FlatAppearance.BorderSize = 1;
+                btn.FlatAppearance.BorderColor = Color.FromArgb(65, 65, 75);
+                btn.MouseEnter += (_, _) =>
+                {
+                    btn.ForeColor = _fgMain;
+                    btn.FlatAppearance.BorderColor = _accent;
+                };
+                btn.MouseLeave += (_, _) =>
+                {
+                    btn.ForeColor = _statusInactive;
+                    btn.FlatAppearance.BorderColor = Color.FromArgb(65, 65, 75);
+                };
+                btn.Click += (_, _) => onClick();
+                _copyToolTip.SetToolTip(btn, tip);
+                return btn;
+            }
+
+            affinityQuickPanel.Controls.Add(NewAffinityQuickBtn(
+                UiLanguage.Text("[ ALL ]"),
+                UiLanguage.Text("Select all logical cores"),
+                () =>
+                {
+                    if (createdBlock is null) return;
+                    createdBlock.SuppressCpuEvents++;
+                    try
+                    {
+                        foreach (CheckBox cb in cpuBoxes) cb.Checked = true;
+                    }
+                    finally
+                    {
+                        createdBlock.SuppressCpuEvents--;
+                    }
+                    RecalcAffinityMask(createdBlock);
+                    OnBlockSettingChanged(createdBlock);
+                    WriteLog($"UI: Affinity quick-select ALL device={device.InstanceId} mask=0x{createdBlock.AffinityMask:X}");
+                }));
+
+            affinityQuickPanel.Controls.Add(NewAffinityQuickBtn(
+                UiLanguage.Text("[ NONE ]"),
+                UiLanguage.Text("Clear all cores"),
+                () =>
+                {
+                    if (createdBlock is null) return;
+                    createdBlock.SuppressCpuEvents++;
+                    try
+                    {
+                        foreach (CheckBox cb in cpuBoxes) cb.Checked = false;
+                    }
+                    finally
+                    {
+                        createdBlock.SuppressCpuEvents--;
+                    }
+                    RecalcAffinityMask(createdBlock);
+                    OnBlockSettingChanged(createdBlock);
+                    WriteLog($"UI: Affinity quick-select NONE device={device.InstanceId} mask=0x{createdBlock.AffinityMask:X}");
+                }));
+
+            if (_effClassP.Count > 0)
+            {
+                affinityQuickPanel.Controls.Add(NewAffinityQuickBtn(
+                    UiLanguage.Text("[ P-CORES ]"),
+                    UiLanguage.Text("Select physical P-cores only"),
+                    () =>
+                    {
+                        if (createdBlock is null) return;
+                        createdBlock.SuppressCpuEvents++;
+                        try
+                        {
+                            foreach ((int lp, CheckBox cb, _, int eff) in lpMeta)
+                            {
+                                cb.Checked = _effClassP.Contains(eff);
+                            }
+                        }
+                        finally
+                        {
+                            createdBlock.SuppressCpuEvents--;
+                        }
+                        RecalcAffinityMask(createdBlock);
+                        OnBlockSettingChanged(createdBlock);
+                        WriteLog($"UI: Affinity quick-select P-CORES device={device.InstanceId} mask=0x{createdBlock.AffinityMask:X}");
+                    }));
+            }
+
+            if (ccdKeys.Count > 1)
+            {
+                affinityQuickPanel.Controls.Add(NewAffinityQuickBtn(
+                    "[ CCD0 ]",
+                    UiLanguage.Text("Select CCD0 cores only"),
+                    () =>
+                    {
+                        if (createdBlock is null) return;
+                        createdBlock.SuppressCpuEvents++;
+                        try
+                        {
+                            foreach ((int _, CheckBox cb, int ccd, _) in lpMeta)
+                            {
+                                cb.Checked = (ccd == 0);
+                            }
+                        }
+                        finally
+                        {
+                            createdBlock.SuppressCpuEvents--;
+                        }
+                        RecalcAffinityMask(createdBlock);
+                        OnBlockSettingChanged(createdBlock);
+                        WriteLog($"UI: Affinity quick-select CCD0 device={device.InstanceId} mask=0x{createdBlock.AffinityMask:X}");
+                    }));
+            }
+        }
+
         List<List<(int Lp, CheckBox Control, int Ccd, int Eff)>> columns = [];
         foreach (int cid in ccdKeys)
         {
@@ -307,10 +509,9 @@ public sealed partial class MainForm
         int columnGap = UiScale(16);
         int startX = UiScale(10);
         int minColumnWidth = UiScale(160);
-        // Before its HWND exists WinForms under-reports the preferred width of a
-        // Standard CheckBox. This covers the native glyph, internal margins and
-        // DPI rounding; the post-layout audit verifies the resulting client width.
-        int checkboxTextSafety = UiScale(112);
+        // Text-only MeasureText misses the native glyph; add the system check size
+        // plus a small DPI gutter instead of a huge fixed pad that forces H-scroll.
+        int checkboxGlyphGutter = SystemInformation.MenuCheckSize.Width + UiScale(20);
 
         int runningX = startX;
         int maxColumnCount = 0;
@@ -338,7 +539,7 @@ public sealed partial class MainForm
                         new Size(int.MaxValue, int.MaxValue),
                         TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
                     int preferred = o.Control.GetPreferredSize(Size.Empty).Width;
-                    return Math.Max(preferred, measured.Width + checkboxTextSafety);
+                    return Math.Max(preferred, measured.Width + checkboxGlyphGutter);
                 });
                 if (w > 0)
                 {
@@ -346,7 +547,7 @@ public sealed partial class MainForm
                     // core-type token when its client width is only a few pixels
                     // below the native preferred width. Two-digit CPU labels expose
                     // that native rendering behavior, so retain a measured gutter.
-                    maxWidth = Math.Max(minColumnWidth, w + UiScale(12));
+                    maxWidth = Math.Max(minColumnWidth, w + UiScale(28));
                 }
             }
 
@@ -384,6 +585,7 @@ public sealed partial class MainForm
         int cpuContentRight = columns.Count == 0 ? 0 : runningX - columnGap;
         int requiredWidth = columns.Count == 0 ? cpuPanel.Width : cpuContentRight + startX + UiScale(18);
         int cpuPanelHorizontalSlack = UiScale(30);
+        int cpuContentHeight = Math.Max((maxColumnCount * checkSpacing) + UiScale(18), UiScale(150));
         int sideSettingsX = 0;
         int sideSettingsWidth = 0;
         int settingsX = UiScale(18);
@@ -393,50 +595,73 @@ public sealed partial class MainForm
             settingsSideMinimumWidth = Math.Min(desiredSettingsSideWidth, Math.Max(UiScale(440), grp.Width - UiScale(48)));
             settingsMinimumWidth = Math.Min(UiScale(420), Math.Max(UiScale(320), grp.Width - UiScale(48)));
             cpuPanelFullMaximumWidth = Math.Max(cpuPanelMinimumWidth, grp.Width - cpuPanel.Left - UiScale(24));
-
-            cpuPanelFullMaximumWidth = Math.Max(cpuPanelMinimumWidth, grp.Width - cpuPanel.Left - UiScale(24));
             cpuPanelSideMaximumWidth = Math.Max(
                 cpuPanelMinimumWidth,
                 grp.Width - cpuPanel.Left - settingsSideGap - settingsSideMinimumWidth - UiScale(24));
 
-            cpuPanelMaximumWidth = cpuPanelSideMaximumWidth;
-            int targetCpuPanelWidth = Math.Min(
-                cpuPanelMaximumWidth,
-                Math.Max(cpuPanelMinimumWidth, requiredWidth + cpuPanelHorizontalSlack));
+            int neededCpuWidth = Math.Max(cpuPanelMinimumWidth, requiredWidth + cpuPanelHorizontalSlack);
+            // Dual-CCD / long CPPC labels: if two columns cannot sit beside MSI/IRQ
+            // settings without a horizontal scrollbar, stack settings under the list.
+            affinitySettingsStacked = neededCpuWidth > cpuPanelSideMaximumWidth + UiScale(4);
+            cpuPanelMaximumWidth = affinitySettingsStacked
+                ? cpuPanelFullMaximumWidth
+                : cpuPanelSideMaximumWidth;
+            int targetCpuPanelWidth = Math.Min(cpuPanelMaximumWidth, neededCpuWidth);
             if (cpuPanel.Width != targetCpuPanelWidth)
             {
                 cpuPanel.Width = targetCpuPanelWidth;
             }
 
-            if (cpuContentRight > cpuPanel.ClientSize.Width + UiScale(2))
+            if (cpuPanel.Height != cpuContentHeight)
+            {
+                cpuPanel.Height = cpuContentHeight;
+            }
+
+            bool needsHorizontalScroll = cpuContentRight > cpuPanel.ClientSize.Width + UiScale(2);
+            if (needsHorizontalScroll)
             {
                 cpuPanel.AutoScroll = true;
-                cpuPanel.AutoScrollMinSize = new Size(requiredWidth + cpuPanelHorizontalSlack, cpuPanel.Height);
+                cpuPanel.AutoScrollMinSize = new Size(
+                    requiredWidth + cpuPanelHorizontalSlack,
+                    Math.Max(cpuContentHeight, cpuPanel.ClientSize.Height));
             }
             else
             {
                 cpuPanel.AutoScroll = false;
                 cpuPanel.AutoScrollMinSize = Size.Empty;
+                cpuPanel.HorizontalScroll.Visible = false;
+                cpuPanel.VerticalScroll.Visible = false;
             }
 
-            sideSettingsX = cpuPanel.Right + settingsSideGap;
-            sideSettingsWidth = grp.Width - sideSettingsX - UiScale(24);
-            settingsX = sideSettingsX;
-            availableSettingsWidth = Math.Max(UiScale(260), grp.Width - settingsX - UiScale(24));
+            if (affinitySettingsStacked)
+            {
+                settingsX = cpuPanel.Left;
+                sideSettingsX = settingsX;
+                sideSettingsWidth = cpuPanelFullMaximumWidth;
+                availableSettingsWidth = Math.Max(UiScale(260), cpuPanelFullMaximumWidth);
+            }
+            else
+            {
+                sideSettingsX = cpuPanel.Right + settingsSideGap;
+                sideSettingsWidth = grp.Width - sideSettingsX - UiScale(24);
+                settingsX = sideSettingsX;
+                availableSettingsWidth = Math.Max(UiScale(260), grp.Width - settingsX - UiScale(24));
+            }
         }
 
         UpdateResponsivePlacement();
 
-        int desiredHeight = Math.Max((maxColumnCount * checkSpacing) + UiScale(18), UiScale(150));
-        if (cpuPanel.Height != desiredHeight)
-        {
-            cpuPanel.Height = desiredHeight;
-        }
-
         int maskY = cpuPanel.Bottom + UiScale(10);
+        string defaultMaskText = device.Kind == DeviceKind.STOR
+            ? "Affinity Mask: Windows Default"
+            : (device.Kind == DeviceKind.AUDIO && (IsDisplayHdmiaudio(device.InstanceId, device.Name) || IsDisplayAudioEndpointsText(device.AudioEndpoints)))
+                ? "Affinity Mask: 0x0 (Windows Default)"
+                : "Affinity Mask: 0x0";
+
         Label lblMask = new()
         {
-            Text = "Affinity Mask: 0x0",
+            Text = defaultMaskText,
+            Font = _blockFont,
             AutoSize = true,
             ForeColor = _accent,
             Location = new Point(UiScale(18), maskY),
@@ -444,15 +669,27 @@ public sealed partial class MainForm
         if (device.Kind == DeviceKind.STOR)
         {
             lblMask.ForeColor = _mutedText;
+            _copyToolTip.SetToolTip(lblMask, "NVMe/SATA storage uses Windows Multi-Queue steering. Pinned core affinity is intentionally disabled to ensure maximum SSD speed and low latency.");
+        }
+        else if (device.Kind == DeviceKind.AUDIO && (IsDisplayHdmiaudio(device.InstanceId, device.Name) || IsDisplayAudioEndpointsText(device.AudioEndpoints)))
+        {
+            lblMask.ForeColor = _mutedText;
+            _copyToolTip.SetToolTip(lblMask, "Display/HDMI audio shares PCIe bus with the GPU and uses Windows default interrupt steering (0x0).");
+        }
+        else
+        {
+            _copyToolTip.SetToolTip(lblMask, "Interrupt Affinity Mask (AssignmentSetOverride). Strictly routes hardware interrupt service routines (ISRs) and deferred procedure calls (DPCs) to the selected CPU logical cores.");
         }
 
         Label lblIrq = new()
         {
             Text = "IRQ Count: reading...",
+            Font = _blockFont,
             AutoSize = true,
             ForeColor = _mutedText,
             Location = new Point(UiScale(18), maskY + UiScale(20)),
         };
+        _copyToolTip.SetToolTip(lblIrq, "Shows the number of allocated interrupt vectors and current interrupt delivery mode. MSI/MSI-X indicates a modern dedicated interrupt vector. Line-based indicates legacy INTx sharing with other PCI devices.");
 
         // Longest common left labels: "Mouse Throttle:", "IRQ Priority:", "Power Saving:".
         int valueX = UiScale(140);
@@ -485,6 +722,10 @@ public sealed partial class MainForm
         cmbMsi.DropDownWidth = cmbMsi.Width;
         cmbMsi.MaxDropDownItems = 2;
 
+        const string msiTip = "Message Signaled Interrupts (MSI/MSI-X). Replaces legacy pin-based line IRQs with direct in-band PCIe memory writes to the local APIC. Eliminates interrupt sharing, lowers latency to sub-microsecond levels, and prevents DPC spikes in games.";
+        _copyToolTip.SetToolTip(lblMsi, msiTip);
+        _copyToolTip.SetToolTip(cmbMsi, msiTip);
+
         settingsPanel.Controls.AddRange([lblMsi, cmbMsi]);
         rowTop = cmbMsi.Bottom + rowGap;
 
@@ -515,6 +756,11 @@ public sealed partial class MainForm
             Location = new Point(txtLimit.Right + UiScale(8), txtLimit.Top + UiScale(4)),
         };
 
+        const string limitTip = "MessageNumberLimit (registry: MessageSignaledInterruptProperties). Controls the maximum number of MSI-X interrupt vectors the device driver can allocate. 0 = unlimited (hardware default). Recommended: 0 for GPUs and modern NICs.";
+        _copyToolTip.SetToolTip(lblLimit, limitTip);
+        _copyToolTip.SetToolTip(txtLimit, limitTip);
+        _copyToolTip.SetToolTip(lblLimitHint, limitTip);
+
         settingsPanel.Controls.AddRange([lblLimit, txtLimit, lblLimitHint]);
         rowTop = txtLimit.Bottom + rowGap;
 
@@ -534,6 +780,10 @@ public sealed partial class MainForm
         cmbPrio.Items.AddRange(new object[] { "Undefined", "Low", "Normal", "High" });
         cmbPrio.DropDownWidth = cmbPrio.Width;
         cmbPrio.MaxDropDownItems = 4;
+
+        const string prioTip = "DevicePriority (registry: Affinity Policy). Controls Windows kernel interrupt servicing priority relative to other hardware devices. Setting High ensures that critical gaming inputs (mouse, keyboard) and GPU interrupts are processed ahead of secondary devices during heavy CPU load.";
+        _copyToolTip.SetToolTip(lblPrio, prioTip);
+        _copyToolTip.SetToolTip(cmbPrio, prioTip);
 
         settingsPanel.Controls.AddRange([lblPrio, cmbPrio]);
         rowTop = cmbPrio.Bottom + rowGap;
@@ -558,6 +808,10 @@ public sealed partial class MainForm
             lblPolicy.ForeColor = _mutedText;
             cmbPolicy.Enabled = false;
         }
+
+        const string policyTip = "DevicePolicy (registry: Affinity Policy). Defines how the Windows HAL routes device interrupts across processors:\n• SpecifiedProcessors: strictly binds interrupts to the selected Affinity Mask\n• MachineDefault: default Windows steering via BIOS/ACPI tables\n• AllCloseProcessors / OneCloseProcessor: routes to near NUMA node cores\n• SpreadMessagesAcrossAllProcessors: distributes MSI-X messages across all cores.";
+        _copyToolTip.SetToolTip(lblPolicy, policyTip);
+        _copyToolTip.SetToolTip(cmbPolicy, policyTip);
 
         if (device.Kind != DeviceKind.NET_NDIS)
         {
@@ -1249,7 +1503,6 @@ public sealed partial class MainForm
         txtImod.TextChanged += (_, _) => SyncImodDeviceEditorFromText();
         SyncImodDeviceEditorFromText();
 
-        DeviceBlock? createdBlock = null;
         Button btnImodApply = new()
         {
             Text = "SET",
@@ -1552,20 +1805,29 @@ public sealed partial class MainForm
             Math.Max(settingsContentBottom + UiScale(8), UiScale(24)));
         settingsPanel.Size = settingsSize;
 
-        // Top-align settings with the CPU list. Keep Mask/IRQ under the affinity
-        // box; park PNP info under the taller of the two columns.
+        // Top-align settings with the CPU list when they fit beside dual-CCD
+        // columns. Otherwise stack settings under Mask/IRQ so affinity never
+        // depends on a horizontal AutoScroll viewport.
         void PlaceAffinityChrome()
         {
-            settingsPanel.Location = new Point(settingsX, cpuPanel.Top);
-
             int maskY = cpuPanel.Bottom + UiScale(12);
             lblMask.Location = new Point(lblMask.Left, maskY);
             lblIrq.Location = new Point(lblIrq.Left, maskY + UiScale(20));
+
+            if (affinitySettingsStacked)
+            {
+                settingsPanel.Location = new Point(settingsX, lblIrq.Bottom + UiScale(12));
+            }
+            else
+            {
+                settingsPanel.Location = new Point(settingsX, cpuPanel.Top);
+            }
         }
 
         PlaceAffinityChrome();
 
         int infoY = Math.Max(lblIrq.Bottom, settingsPanel.Bottom) + UiScale(12);
+
         InfoTextBox lblInfo = new()
         {
             Text = "PNP ID: -",
@@ -1589,8 +1851,10 @@ public sealed partial class MainForm
             {
                 Clipboard.SetText(txt);
                 ShowCopiedToolTip(lblInfo);
+                WriteLog($"UI: Copied registry path: {txt}");
             }
         };
+        _copyToolTip.SetToolTip(lblInfo, "Click to copy full registry path to clipboard");
 
         void RelayoutDeviceBlockChrome()
         {
@@ -1669,6 +1933,10 @@ public sealed partial class MainForm
             settingsPanel,
             lblInfo,
         ];
+        if (affinityQuickPanel is not null)
+        {
+            chrome.Add(affinityQuickPanel);
+        }
         grp.Controls.AddRange(chrome.ToArray());
         WireDevicesMouseWheelForwarding(grp);
 
@@ -1717,6 +1985,8 @@ public sealed partial class MainForm
             RelayoutAction = RelayoutDeviceBlockChrome,
             AffinityMask = 0,
             IrqCount = null,
+            ModifiedBadge = modifiedBadge,
+            HeaderNote = headerNote,
         };
         createdBlock = block;
 
@@ -1734,6 +2004,7 @@ public sealed partial class MainForm
                     {
                         RecalcAffinityMask(block);
                     }
+                    OnBlockSettingChanged(block);
                 }
             };
         }
@@ -1755,7 +2026,11 @@ public sealed partial class MainForm
 
         if (block.NdisModeCombo is not null)
         {
-            block.NdisModeCombo.SelectedIndexChanged += (_, _) => UpdateBlockInfoText(block);
+            block.NdisModeCombo.SelectedIndexChanged += (_, _) =>
+            {
+                RecalcAffinityMask(block);
+                UpdateBlockInfoText(block);
+            };
         }
 
         if (block.RawMouseThrottleCheck is not null && block.RawMouseThrottleCombo is not null)
@@ -1824,6 +2099,44 @@ public sealed partial class MainForm
             RelayoutDeviceBlockChrome();
         }
 
+        block.MsiCombo.SelectedIndexChanged += (_, _) => OnBlockSettingChanged(block);
+        if (block.LimitBox is not null)
+        {
+            block.LimitBox.TextChanged += (_, _) => OnBlockSettingChanged(block);
+        }
+        block.PrioCombo.SelectedIndexChanged += (_, _) => OnBlockSettingChanged(block);
+        block.PolicyCombo.SelectedIndexChanged += (_, _) => OnBlockSettingChanged(block);
+        if (block.PowerSavingCheck is not null)
+        {
+            block.PowerSavingCheck.CheckedChanged += (_, _) => OnBlockSettingChanged(block);
+        }
+        if (block.NdisModeCombo is not null)
+        {
+            block.NdisModeCombo.SelectedIndexChanged += (_, _) => OnBlockSettingChanged(block);
+        }
+        if (block.RssQueueBox is not null)
+        {
+            block.RssQueueBox.ValueChanged += (_, _) => OnBlockSettingChanged(block);
+        }
+        if (block.RawMouseThrottleCheck is not null)
+        {
+            block.RawMouseThrottleCheck.CheckedChanged += (_, _) => OnBlockSettingChanged(block);
+        }
+        if (block.RawMouseThrottleCombo is not null)
+        {
+            block.RawMouseThrottleCombo.SelectedIndexChanged += (_, _) => OnBlockSettingChanged(block);
+        }
+        if (showImod)
+        {
+            block.ImodAutoCheck.CheckedChanged += (_, _) => OnBlockSettingChanged(block);
+            if (block.ImodBox is not null)
+            {
+                block.ImodBox.TextChanged += (_, _) => OnBlockSettingChanged(block);
+            }
+        }
+
+        block.CaptureInitialState();
+
         _devicesPanel.Controls.Add(grp);
         _blocks.Add(block);
         if (showImod && block.Device.IsTestDevice)
@@ -1840,10 +2153,17 @@ public sealed partial class MainForm
     {
         int paddingX = UiScale(24);
         int gapY = UiScale(18);
-        int y = UiScale(12);
+        int y = UiScale(18);
         bool firstPlaced = true;
 
-        Panel? reserved = _reservedCpuPanel;
+        bool showReserved = _reservedCpuPanel is not null
+            && string.Equals(_activeCategoryFilter, "ALL", StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrWhiteSpace(_searchFilterText);
+        if (_reservedCpuPanel is not null)
+        {
+            _reservedCpuPanel.Visible = showReserved;
+        }
+        Panel? reserved = showReserved ? _reservedCpuPanel : null;
         bool reservedInserted = false;
 
         DeviceBlock? lastStorBlock = null;
@@ -1872,6 +2192,10 @@ public sealed partial class MainForm
 
         foreach (DeviceBlock b in _blocks)
         {
+            if (!b.Group.Visible)
+            {
+                continue;
+            }
             int width = GetDevicesViewportWidth() - paddingX - UiScale(12);
             if (width < UiScale(360))
             {
@@ -1880,14 +2204,6 @@ public sealed partial class MainForm
 
             b.Group.Width = width;
             RelayoutDeviceBlockChrome(b);
-            if (firstPlaced && _devicesHost is not null)
-            {
-                int maxFirstY = _devicesHost.ClientSize.Height - b.Group.Height - UiScale(2);
-                if (maxFirstY < y)
-                {
-                    y = Math.Max(UiScale(6), maxFirstY);
-                }
-            }
 
             int currentHeight = b.InfoLabel.Height > 0 ? b.InfoLabel.Height : UiScale(60);
             int infoWidth = Math.Max(UiScale(140), b.Group.Width - b.InfoLabel.Left - UiScale(24));
@@ -1933,6 +2249,15 @@ public sealed partial class MainForm
         if (_devicesPanel.Height != contentHeight)
         {
             _devicesPanel.Height = contentHeight;
+        }
+
+        if (_noMatchesLabel is not null)
+        {
+            _noMatchesLabel.Visible = firstPlaced && _blocks.Count > 0;
+            if (_noMatchesLabel.Visible)
+            {
+                _noMatchesLabel.BringToFront();
+            }
         }
 
         SyncDevicesScrollBar();
@@ -2122,36 +2447,64 @@ public sealed partial class MainForm
         }
 
         Task all = Task.WhenAll(tasks);
-        Stopwatch timeout = Stopwatch.StartNew();
-        while (!all.IsCompleted)
+        if (all.IsCompleted)
         {
-            if (timeout.Elapsed >= TimeSpan.FromSeconds(20))
-            {
-                // Both asynchronous readers validate their generation before touching
-                // controls. Invalidate late results and keep the main window usable if
-                // a WMI/provider call gets stuck inside Windows.
-                Interlocked.Increment(ref _irqRefreshGeneration);
-                Interlocked.Increment(ref _imodReadbackGeneration);
-                WriteLog($"UI.BACKGROUND.TIMEOUT: tasks={tasks.Length} elapsedMs={timeout.ElapsedMilliseconds} late results invalidated");
-                _ = all.ContinueWith(
-                    completed =>
-                    {
-                        if (completed.Exception is not null)
-                        {
-                            WriteLog($"UI.BACKGROUND.LATE.ERROR: {FlattenLogText(completed.Exception.ToString())}");
-                        }
-                    },
-                    CancellationToken.None,
-                    TaskContinuationOptions.ExecuteSynchronously,
-                    TaskScheduler.Default);
-                return;
-            }
-
-            Application.DoEvents();
-            Thread.Sleep(10);
+            all.GetAwaiter().GetResult();
+            return;
         }
 
-        all.GetAwaiter().GetResult();
+        bool wasButtonsEnabled = _operationButtons.Length > 0 && _operationButtons[0].Enabled;
+        if (wasButtonsEnabled)
+        {
+            SetOperationButtonsEnabled(false);
+        }
+        _devicesBusyDepth++;
+
+        Stopwatch timeout = Stopwatch.StartNew();
+        try
+        {
+            while (!all.IsCompleted)
+            {
+                if (timeout.Elapsed >= TimeSpan.FromSeconds(20))
+                {
+                    // Both asynchronous readers validate their generation before touching
+                    // controls. Invalidate late results and keep the main window usable if
+                    // a WMI/provider call gets stuck inside Windows.
+                    Interlocked.Increment(ref _irqRefreshGeneration);
+                    Interlocked.Increment(ref _imodReadbackGeneration);
+                    WriteLog($"UI.BACKGROUND.TIMEOUT: tasks={tasks.Length} elapsedMs={timeout.ElapsedMilliseconds} late results invalidated");
+                    _ = all.ContinueWith(
+                        completed =>
+                        {
+                            if (completed.Exception is not null)
+                            {
+                                WriteLog($"UI.BACKGROUND.LATE.ERROR: {FlattenLogText(completed.Exception.ToString())}");
+                            }
+                        },
+                        CancellationToken.None,
+                        TaskContinuationOptions.ExecuteSynchronously,
+                        TaskScheduler.Default);
+                    return;
+                }
+
+                Application.DoEvents();
+                Thread.Sleep(10);
+            }
+
+            all.GetAwaiter().GetResult();
+        }
+        finally
+        {
+            if (_devicesBusyDepth > 0)
+            {
+                _devicesBusyDepth--;
+            }
+
+            if (wasButtonsEnabled && _devicesBusyDepth == 0)
+            {
+                SetOperationButtonsEnabled(true);
+            }
+        }
     }
 
     private void RefreshBlocks(bool includeImodReadback = true)
@@ -2313,6 +2666,11 @@ public sealed partial class MainForm
                 _devicesBusyDone = _devicesBusyTotal;
                 UpdateDevicesBusy("Ready", 100);
             }
+
+            UpdateAllBlocksInitialState();
+            RebuildFilterCategoryButtons();
+            ApplyDeviceFilter();
+            UpdateApplyButtonDirtyCount();
 
             WriteLog(
                 $"REFRESH.DONE: includeImodReadback={includeImodReadback} blocks={_blocks.Count} " +

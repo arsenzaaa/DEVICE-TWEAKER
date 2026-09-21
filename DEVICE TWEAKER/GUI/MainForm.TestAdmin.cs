@@ -21,11 +21,37 @@ public sealed partial class MainForm
     }
 
 
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        if (_testDevicesOnly && _testAutoDryRun
+            && _devicesScroll is not null
+            && _devicesScroll.Visible
+            && (keyData is Keys.Home or Keys.End or Keys.PageUp or Keys.PageDown))
+        {
+            int before = _devicesScroll.Value;
+            int page = Math.Max(_devicesScroll.SmallChange, _devicesScroll.ViewportSize - UiScale(40));
+            int target = (keyData & Keys.KeyCode) switch
+            {
+                Keys.Home => 0,
+                Keys.End => _devicesScroll.Maximum,
+                Keys.PageUp => before - page,
+                Keys.PageDown => before + page,
+                _ => before
+            };
+
+            _devicesScroll.Value = target;
+            WriteLog(
+                $"TEST.QA.SCROLL: key={keyData & Keys.KeyCode} before={before} after={_devicesScroll.Value} " +
+                $"page={page} maximum={_devicesScroll.Maximum} viewport={_devicesScroll.ViewportSize}");
+            return true;
+        }
+
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
+
     private void OnMainFormKeyDown(object? sender, KeyEventArgs e)
     {
-        if (_testDevicesOnly
-            && _testAutoDryRun
-            && _devicesScroll is not null
+        if (_devicesScroll is not null
             && _devicesScroll.Visible
             && e.Modifiers == Keys.None
             && e.KeyCode is Keys.Home or Keys.End or Keys.PageUp or Keys.PageDown)
@@ -44,10 +70,71 @@ public sealed partial class MainForm
             _devicesScroll.Value = target;
             e.Handled = true;
             e.SuppressKeyPress = true;
-            WriteLog(
-                $"TEST.QA.SCROLL: key={e.KeyCode} before={before} after={_devicesScroll.Value} " +
-                $"page={page} maximum={_devicesScroll.Maximum} viewport={_devicesScroll.ViewportSize}");
+            if (_testDevicesOnly && _testAutoDryRun)
+            {
+                WriteLog(
+                    $"TEST.QA.SCROLL: key={e.KeyCode} before={before} after={_devicesScroll.Value} " +
+                    $"page={page} maximum={_devicesScroll.Maximum} viewport={_devicesScroll.ViewportSize}");
+            }
             return;
+        }
+
+        if ((e.KeyCode == Keys.F5 && e.Modifiers == Keys.None)
+            || (e.Control && !e.Alt && !e.Shift && e.KeyCode == Keys.R))
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            WriteLog("UI: Shortcut F5 / Ctrl+R triggered REFRESH");
+            _btnScanRef?.PerformClick();
+            return;
+        }
+
+        if (e.Control && !e.Alt && !e.Shift && e.KeyCode == Keys.S)
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            WriteLog("UI: Shortcut Ctrl+S triggered APPLY");
+            _btnApplyRef?.PerformClick();
+            return;
+        }
+
+        if (e.Control && !e.Alt && !e.Shift && e.KeyCode == Keys.O)
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            WriteLog("UI: Shortcut Ctrl+O triggered AUTO-OPTIMIZATION");
+            _btnAutoRef?.PerformClick();
+            return;
+        }
+
+        if (e.Control && !e.Alt && !e.Shift && e.KeyCode == Keys.Z)
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            WriteLog("UI: Shortcut Ctrl+Z triggered RESTORE");
+            _btnRestoreRef?.PerformClick();
+            return;
+        }
+
+        if (e.Control && !e.Alt && !e.Shift && e.KeyCode == Keys.F)
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            WriteLog("UI: Shortcut Ctrl+F triggered filter search");
+            FocusFilterBox();
+            return;
+        }
+
+        if (e.KeyCode == Keys.Escape && e.Modifiers == Keys.None)
+        {
+            if (!string.IsNullOrEmpty(_searchFilterText) || (_searchFilterBox?.Inner.Focused == true))
+            {
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                WriteLog("UI: Shortcut Escape triggered filter clear");
+                ClearFilterBox();
+                return;
+            }
         }
 
         if (e.Control && e.Alt && e.Shift && e.KeyCode == Keys.T)
@@ -219,6 +306,7 @@ public sealed partial class MainForm
         dialog.ShowInTaskbar = false;
         dialog.AutoScaleMode = AutoScaleMode.None;
         StyleThemedDialogSurface(dialog);
+        WireThemedTitleBar(dialog);
         dialog.BackColor = _bgPanel;
         dialog.Font = _baseFont;
         dialog.Icon = Icon;
@@ -385,6 +473,7 @@ public sealed partial class MainForm
             "AMD Ryzen 9 7900X3D/9900X3D 12C/24T V-Cache CCD0",
             "AMD Ryzen 9 7950X3D/9950X3D 16C/32T V-Cache CCD0",
             "AMD Ryzen 9 9955HX3D 16C/32T V-Cache CCD0",
+            "AMD Ryzen 9 8940HX 16C/32T Dual-CCD",
             "AMD Ryzen 9 9950X3D2 16C/32T dual V-Cache",
         });
         cpuPresetLabel.Text = $"CPU preset ({cpuPresetCombo.Items.Count}):";
@@ -401,6 +490,7 @@ public sealed partial class MainForm
         const string SystemPresetIntel285K5090 = "Full PC | Z890 | Core Ultra 9 285K | RTX 5090 | I226-V + BE200";
         const string SystemPresetRyzen7800X3D = "Full PC | B650E | Ryzen 7 7800X3D | RTX 4080 SUPER | I225-V";
         const string SystemPresetRyzen9800X3D5090 = "Full PC | X870E | Ryzen 7 9800X3D | RTX 5090 | Realtek 5G";
+        const string SystemPresetRyzen9850X3DClient = "Client PC | B850 | Ryzen 7 9850X3D | RTX 5070 | Killer 2.5G";
         const string SystemPresetRyzen9800X3DRx = "Full PC | X870E | Ryzen 7 9800X3D | RX 9070 XT | Intel I225-V";
         const string SystemPresetRyzen9950X3DNetCx = "Full PC | X870E | Ryzen 9 9950X3D | RTX 5090 | Realtek 5G";
         const string SystemPresetRyzen9950X3DNdis = "Full PC | X870E | Ryzen 9 9950X3D | RTX 5090 | Intel I226-V";
@@ -410,6 +500,9 @@ public sealed partial class MainForm
         const string SystemPresetRyzen9950X = "Full PC | X670E | Ryzen 9 9950X | RTX 4090 | Intel X550 10G";
         const string SystemPresetLaptopIntel285HX = "Laptop | Core Ultra 9 285HX | RTX 5080 Laptop | BE200 Wi-Fi";
         const string SystemPresetLaptopRyzen9955HX3D = "Laptop | Ryzen 9 9955HX3D | RTX 5090 Laptop | Wi-Fi 7";
+        const string SystemPresetLaptopRyzen8940HX = "Laptop | Ryzen 9 8940HX | RTX 5060 Laptop | Realtek 1G";
+        const string SystemPresetLaptopRyzen8940HXMouse = "Laptop | Ryzen 9 8940HX | Mouse + Keyboard | RTX 5060 Laptop";
+        const string SystemPresetMultiControllerInput = "Full PC | Multi-xHCI | Mouse + Gamepad + Keyboard | RTX 5090";
 
         Label systemPresetLabel = NewDialogLabel("System preset:");
         ThemedDropDownPicker systemPresetCombo = NewDialogCombo(460);
@@ -423,6 +516,7 @@ public sealed partial class MainForm
             SystemPresetIntel285K5090,
             SystemPresetRyzen7800X3D,
             SystemPresetRyzen9800X3D5090,
+            SystemPresetRyzen9850X3DClient,
             SystemPresetRyzen9800X3DRx,
             SystemPresetRyzen9950X3DNetCx,
             SystemPresetRyzen9950X3DNdis,
@@ -432,6 +526,9 @@ public sealed partial class MainForm
             SystemPresetRyzen9950X,
             SystemPresetLaptopIntel285HX,
             SystemPresetLaptopRyzen9955HX3D,
+            SystemPresetLaptopRyzen8940HX,
+            SystemPresetLaptopRyzen8940HXMouse,
+            SystemPresetMultiControllerInput,
         });
         systemPresetLabel.Text = $"System preset ({systemPresetCombo.Items.Count}):";
         systemPresetCombo.SelectedIndex = 0;
@@ -1692,6 +1789,24 @@ public sealed partial class MainForm
                 operationName: "AUTO-OPTIMIZATION");
         };
 
+        Button resultWarningsButton = NewDialogButton("RESULT: WARNINGS");
+        resultWarningsButton.Size = new Size(168, 32);
+        resultWarningsButton.Margin = new Padding(0, 0, 10, 8);
+        resultWarningsButton.Click += (_, _) =>
+        {
+            CloseDevicesBusyOverlay();
+            OperationReport preview = new();
+            preview.AddSuccess("DEVICE SETTINGS", "10 processed");
+            preview.AddWarning("HPET TIMER", "Platform timer was already disabled.");
+            preview.AddWarning("NETWORK STACK", "QoS packet scheduler restart deferred until next reboot.");
+            AttachPreviewBackupPath(preview);
+            ShowOperationResult(
+                preview,
+                "Applied with warnings. Core settings were successfully configured.",
+                string.Empty,
+                operationName: "APPLY");
+        };
+
         Button resultPartialButton = NewDialogButton("RESULT: PARTIAL");
         resultPartialButton.Size = new Size(168, 32);
         resultPartialButton.Margin = new Padding(0, 0, 10, 8);
@@ -1717,6 +1832,25 @@ public sealed partial class MainForm
             MaybeOfferVulnerableDriverBlocklistDisable(preview);
         };
 
+        Button resultPartialMultiButton = NewDialogButton("RESULT: PARTIAL (3x)");
+        resultPartialMultiButton.Size = new Size(168, 32);
+        resultPartialMultiButton.Margin = new Padding(0, 0, 10, 8);
+        resultPartialMultiButton.Click += (_, _) =>
+        {
+            CloseDevicesBusyOverlay();
+            OperationReport preview = new();
+            preview.AddSuccess("DEVICE SETTINGS", "5 processed");
+            preview.AddWarning("CPU AFFINITY", "SMT thread balancing kept at default.");
+            preview.AddError("USB IMOD", "Kernel CI blocked driver execution (code 577).", "Simulated driver block details.");
+            preview.AddError("NETWORK TCP", "Registry access denied for TcpAckFrequency.", "Access is denied (5).");
+            AttachPreviewBackupPath(preview);
+            ShowOperationResult(
+                preview,
+                "Applied steps were saved.",
+                "Partially applied (5/8 successful, 3 skipped or failed).",
+                operationName: "AUTO-OPTIMIZATION");
+        };
+
         Button resultFailedButton = NewDialogButton("RESULT: FAILED");
         resultFailedButton.Size = new Size(168, 32);
         resultFailedButton.Margin = new Padding(0, 0, 10, 8);
@@ -1739,7 +1873,7 @@ public sealed partial class MainForm
 
         Button resultStressButton = NewDialogButton("RESULT: STRESS");
         resultStressButton.Size = new Size(168, 32);
-        resultStressButton.Margin = new Padding(0, 0, 0, 8);
+        resultStressButton.Margin = new Padding(0, 0, 10, 8);
         resultStressButton.Click += (_, _) =>
         {
             CloseDevicesBusyOverlay();
@@ -1760,10 +1894,109 @@ public sealed partial class MainForm
                 operationName: "GUI STRESS TEST");
         };
 
+        Button promptImodButton = NewDialogButton("PROMPT: IMOD");
+        promptImodButton.Size = new Size(168, 32);
+        promptImodButton.Margin = new Padding(0, 0, 10, 8);
+        promptImodButton.Click += (_, _) =>
+        {
+            CloseDevicesBusyOverlay();
+            ShowThemedConfirm(
+                "USB IMOD tuning is available for detected XHCI controller(s).\n\nDTIMOD can be blocked by Vulnerable Driver Blocklist, Windows driver signature protection, antivirus, or anti-cheats.\n\nApply it during AUTO-OPTIMIZATION?",
+                "USB IMOD TUNING",
+                "APPLY",
+                "SKIP");
+        };
+
+        Button promptConfirmButton = NewDialogButton("PROMPT: CONFIRM");
+        promptConfirmButton.Size = new Size(168, 32);
+        promptConfirmButton.Margin = new Padding(0, 0, 10, 8);
+        promptConfirmButton.Click += (_, _) =>
+        {
+            CloseDevicesBusyOverlay();
+            ShowThemedConfirm(
+                "Reset all active network tweaks and restore default Windows adapter parameters?\n\nThis will re-enable interrupt moderation and standard RSS ring buffers.",
+                "RESET ADAPTER SETTINGS",
+                "RESET",
+                "CANCEL");
+        };
+
+        Button promptBackupButton = NewDialogButton("PROMPT: BACKUP");
+        promptBackupButton.Size = new Size(168, 32);
+        promptBackupButton.Margin = new Padding(0, 0, 10, 8);
+        promptBackupButton.Click += (_, _) =>
+        {
+            CloseDevicesBusyOverlay();
+            ShowAutoBackupChoiceDialog();
+        };
+
+        Button promptRestoreButton = NewDialogButton("PROMPT: RESTORE");
+        promptRestoreButton.Size = new Size(168, 32);
+        promptRestoreButton.Margin = new Padding(0, 0, 10, 8);
+        promptRestoreButton.Click += (_, _) =>
+        {
+            CloseDevicesBusyOverlay();
+            string backupDir = EnumerateBackupDirectories().FirstOrDefault(Directory.Exists)
+                ?? GetBackupDirectory(BackupLocation.Local);
+            List<BackupSnapshotInfo> testBackups =
+            [
+                new BackupSnapshotInfo
+                {
+                    Path = Path.Combine(backupDir, "DeviceTweakerBackup_20260920_180000.json"),
+                    Location = "EXE",
+                    LastWriteUtc = DateTime.UtcNow.AddHours(-2),
+                    CreatedAt = DateTime.Now.AddHours(-2),
+                    Reason = "pre-auto",
+                    IsOriginal = false,
+                },
+                new BackupSnapshotInfo
+                {
+                    Path = Path.Combine(backupDir, "DeviceTweakerBackup_ORIGINAL.json"),
+                    Location = "EXE",
+                    LastWriteUtc = DateTime.UtcNow.AddDays(-7),
+                    CreatedAt = DateTime.Now.AddDays(-7),
+                    Reason = "original-state",
+                    IsOriginal = true,
+                },
+            ];
+            ShowRestoreChoiceDialog(testBackups, out _);
+        };
+
+        Button promptRestoreEmptyButton = NewDialogButton("PROMPT: RESTORE (0)");
+        promptRestoreEmptyButton.Size = new Size(168, 32);
+        promptRestoreEmptyButton.Margin = new Padding(0, 0, 10, 8);
+        promptRestoreEmptyButton.Click += (_, _) =>
+        {
+            CloseDevicesBusyOverlay();
+            List<BackupSnapshotInfo> emptyBackups = [];
+            ShowRestoreChoiceDialog(emptyBackups, out _);
+        };
+
+        Button promptInfoButton = NewDialogButton("PROMPT: INFO");
+        promptInfoButton.Size = new Size(168, 32);
+        promptInfoButton.Margin = new Padding(0, 0, 0, 8);
+        promptInfoButton.Click += (_, _) =>
+        {
+            CloseDevicesBusyOverlay();
+            ShowThemedInfo(
+                "DEVICE TWEAKER is running in TEST ADMIN mode.\n\nAll hardware adjustments and registry modifications are simulated and completely safe.",
+                "TEST MODE INFO");
+        };
+
         resultGalleryPanel.Controls.Add(resultSuccessButton);
+        resultGalleryPanel.Controls.Add(resultWarningsButton);
         resultGalleryPanel.Controls.Add(resultPartialButton);
+        resultGalleryPanel.SetFlowBreak(resultPartialButton, true);
+        resultGalleryPanel.Controls.Add(resultPartialMultiButton);
         resultGalleryPanel.Controls.Add(resultFailedButton);
         resultGalleryPanel.Controls.Add(resultStressButton);
+        resultGalleryPanel.SetFlowBreak(resultStressButton, true);
+        resultGalleryPanel.Controls.Add(promptImodButton);
+        resultGalleryPanel.Controls.Add(promptConfirmButton);
+        resultGalleryPanel.Controls.Add(promptBackupButton);
+        resultGalleryPanel.SetFlowBreak(promptBackupButton, true);
+        resultGalleryPanel.Controls.Add(promptRestoreButton);
+        resultGalleryPanel.Controls.Add(promptRestoreEmptyButton);
+        resultGalleryPanel.Controls.Add(promptInfoButton);
         layout.Controls.Add(resultGalleryPanel, 0, 19);
         layout.SetColumnSpan(resultGalleryPanel, 2);
 
@@ -2325,11 +2558,15 @@ public sealed partial class MainForm
                 SystemPresetLaptopIntel285HX => "Intel Core Ultra 9 285HX 8P+16E/24T",
                 SystemPresetRyzen7800X3D => "AMD Ryzen 7 7800X3D/9800X3D 8C/16T V-Cache",
                 SystemPresetRyzen9800X3D5090 => "AMD Ryzen 7 7800X3D/9800X3D 8C/16T V-Cache",
+                SystemPresetRyzen9850X3DClient => "AMD Ryzen 7 7800X3D/9800X3D 8C/16T V-Cache",
                 SystemPresetRyzen9800X3DRx => "AMD Ryzen 7 7800X3D/9800X3D 8C/16T V-Cache",
                 SystemPresetRyzen9950X3DNetCx => "AMD Ryzen 9 7950X3D/9950X3D 16C/32T V-Cache CCD0",
                 SystemPresetRyzen9950X3DNdis => "AMD Ryzen 9 7950X3D/9950X3D 16C/32T V-Cache CCD0",
                 SystemPresetRyzen9950X3D2 => "AMD Ryzen 9 9950X3D2 16C/32T dual V-Cache",
                 SystemPresetLaptopRyzen9955HX3D => "AMD Ryzen 9 9955HX3D 16C/32T V-Cache CCD0",
+                SystemPresetLaptopRyzen8940HX => "AMD Ryzen 9 8940HX 16C/32T Dual-CCD",
+                SystemPresetLaptopRyzen8940HXMouse => "AMD Ryzen 9 8940HX 16C/32T Dual-CCD",
+                SystemPresetMultiControllerInput => "AMD Ryzen 9 7950X/9950X 16C/32T",
                 SystemPresetRyzen3500X => "AMD Ryzen 5 3500X Zen2 6C/6T SMT off 2 CCX",
                 SystemPresetRyzen3900X => "AMD Ryzen 9 3900X Zen2 12C/24T 4 CCX",
                 SystemPresetRyzen9950X => "AMD Ryzen 9 7950X/9950X 16C/32T",
@@ -2344,11 +2581,15 @@ public sealed partial class MainForm
                 SystemPresetLaptopIntel285HX => "Intel Core Ultra 9 285HX",
                 SystemPresetRyzen7800X3D => "AMD Ryzen 7 7800X3D",
                 SystemPresetRyzen9800X3D5090 => "AMD Ryzen 7 9800X3D",
+                SystemPresetRyzen9850X3DClient => "AMD Ryzen 7 9850X3D",
                 SystemPresetRyzen9800X3DRx => "AMD Ryzen 7 9800X3D",
                 SystemPresetRyzen9950X3DNetCx => "AMD Ryzen 9 9950X3D",
                 SystemPresetRyzen9950X3DNdis => "AMD Ryzen 9 9950X3D",
                 SystemPresetRyzen9950X3D2 => "AMD Ryzen 9 9950X3D2",
                 SystemPresetLaptopRyzen9955HX3D => "AMD Ryzen 9 9955HX3D",
+                SystemPresetLaptopRyzen8940HX => "AMD Ryzen 9 8940HX with Radeon Graphics",
+                SystemPresetLaptopRyzen8940HXMouse => "AMD Ryzen 9 8940HX with Radeon Graphics",
+                SystemPresetMultiControllerInput => "AMD Ryzen 9 9950X",
                 SystemPresetRyzen3500X => "AMD Ryzen 5 3500X 6-Core Processor",
                 SystemPresetRyzen3900X => "AMD Ryzen 9 3900X",
                 SystemPresetRyzen9950X => "AMD Ryzen 9 9950X",
@@ -2424,6 +2665,15 @@ public sealed partial class MainForm
                     AddNvidiaDisplayAudio("SYS_X870E_RTX5090_AUDIO");
                     AddSystemPresetDevice(DeviceKind.NET_CX, "Realtek RTL8126 5GbE Controller", @"PCI\VEN_10EC&DEV_8126\SYS_REALTEK_RTL8126");
                     AddSystemStorage("Crucial T705 PCIe 5.0 NVMe Controller", @"PCI\VEN_C0A9&DEV_540A\SYS_X870E_T705");
+                    break;
+                case SystemPresetRyzen9850X3DClient:
+                    AddSystemPresetDevice(DeviceKind.USB, "AMD USB 3.10 eXtensible Host Controller - 1.20", @"PCI\VEN_1022&DEV_15B6\SYS_B850_CPU_XHCI_AUDIO", "Audio");
+                    AddSystemPresetDevice(DeviceKind.USB, "AMD USB 3.10 eXtensible Host Controller - 1.20", @"PCI\VEN_1022&DEV_15B7\SYS_B850_CPU_XHCI_MOUSE_8K", "Mouse 8K");
+                    AddSystemPresetDevice(DeviceKind.USB, "AMD USB 3.20 eXtensible Host Controller - 1.10", @"PCI\VEN_1022&DEV_43FC\SYS_B850_CHIPSET_XHCI_KEYBOARD_1K", "Audio, Keyboard 1K");
+                    AddSystemPresetDevice(DeviceKind.GPU, "NVIDIA GeForce RTX 5070", @"PCI\VEN_10DE&DEV_2F04\SYS_RTX5070");
+                    AddNvidiaDisplayAudio("SYS_B850_RTX5070_AUDIO");
+                    AddSystemPresetDevice(DeviceKind.NET_NDIS, "Killer 2.5 Gigabit Ethernet Controller", @"PCI\VEN_10EC&DEV_3000\SYS_B850_KILLER_25G");
+                    AddSystemStorage("Standard NVM Express Controller", @"PCI\VEN_15B7&DEV_5030\SYS_B850_WD_SN850X");
                     break;
                 case SystemPresetRyzen9800X3DRx:
                     AddSystemPresetDevice(DeviceKind.USB, "AMD USB 3.20 eXtensible Host Controller - 1.10", @"PCI\VEN_1022&DEV_15B6\SYS_AMD_X870E_CPU_USB4_MOUSE_8K", "Mouse 8K");
@@ -2553,6 +2803,132 @@ public sealed partial class MainForm
                     AddSystemPresetDevice(DeviceKind.NET_NDIS, "Qualcomm FastConnect 7800 Wi-Fi 7 Adapter", @"PCI\VEN_17CB&DEV_1107\SYS_9955HX3D_WIFI7", wifi: true);
                     AddSystemStorage("WD Black SN8100 NVMe Controller", @"PCI\VEN_15B7&DEV_5041\SYS_9955HX3D_SN8100");
                     break;
+                case SystemPresetLaptopRyzen8940HX:
+                    // Field log 2026-09-10: Dual-CCD 16C/32T, Radeon 610M iGPU + RTX 5060 dGPU.
+                    AddSystemPresetDevice(
+                        DeviceKind.USB,
+                        "AMD USB 2.0 eXtensible Host Controller - 1.20",
+                        @"PCI\VEN_1022&DEV_15B8&SUBSYS_15B61022&REV_00\4&2C288D56&0&0043",
+                        "Webcam",
+                        testIrqCount: 8,
+                        testMsiStatus: "Enabled");
+                    AddSystemPresetDevice(
+                        DeviceKind.USB,
+                        "AMD USB 3.10 eXtensible Host Controller - 1.20",
+                        @"PCI\VEN_1022&DEV_15B7&SUBSYS_201F1043&REV_00\4&16012499&0&0441",
+                        "Keyboard 100Hz",
+                        testIrqCount: 8,
+                        testMsiStatus: "Enabled");
+                    AddSystemAudio(
+                        "High Definition Audio Controller",
+                        @"PCI\VEN_1022&DEV_15E3&SUBSYS_11C41043&REV_00\4&16012499&0&0641",
+                        "Microphone");
+                    AddSystemPresetDevice(
+                        DeviceKind.GPU,
+                        "AMD Radeon(TM) 610M",
+                        @"PCI\VEN_1002&DEV_164E&SUBSYS_11C41043&REV_D8\4&16012499&0&0041",
+                        integratedGpu: true,
+                        testIrqCount: 1,
+                        testMsiStatus: "Enabled");
+                    AddSystemPresetDevice(
+                        DeviceKind.GPU,
+                        "NVIDIA GeForce RTX 5060 Laptop GPU",
+                        @"PCI\VEN_10DE&DEV_2D59&SUBSYS_11C41043&REV_A1\612BE8CAB32DB04800",
+                        testIrqCount: 1,
+                        testMsiStatus: "Enabled");
+                    AddNvidiaDisplayAudio("SYS_8940HX_RTX5060_LAPTOP_AUDIO");
+                    AddSystemPresetDevice(
+                        DeviceKind.NET_CX,
+                        "Realtek PCIe GbE Family Controller",
+                        @"PCI\VEN_10EC&DEV_8168&SUBSYS_208F1043&REV_15\01000000684CE00000",
+                        testIrqCount: 1,
+                        testMsiStatus: "Enabled");
+                    AddSystemStorage(
+                        "Standard NVM Express Controller",
+                        @"PCI\VEN_15B7&DEV_5036&SUBSYS_503615B7&REV_00\4&218BD16B&0&000A");
+                    break;
+                case SystemPresetLaptopRyzen8940HXMouse:
+                    AddSystemPresetDevice(
+                        DeviceKind.USB,
+                        "AMD USB 2.0 eXtensible Host Controller - 1.20",
+                        @"PCI\VEN_1022&DEV_15B8&SUBSYS_15B61022&REV_00\4&2C288D56&0&0043",
+                        "Webcam",
+                        testIrqCount: 8,
+                        testMsiStatus: "Enabled");
+                    AddSystemPresetDevice(
+                        DeviceKind.USB,
+                        "AMD USB 3.10 eXtensible Host Controller - 1.20",
+                        @"PCI\VEN_1022&DEV_15B7&SUBSYS_201F1043&REV_00\4&16012499&0&0441",
+                        "Mouse 1K, Keyboard 100Hz",
+                        testIrqCount: 8,
+                        testMsiStatus: "Enabled");
+                    AddSystemAudio(
+                        "High Definition Audio Controller",
+                        @"PCI\VEN_1022&DEV_15E3&SUBSYS_11C41043&REV_00\4&16012499&0&0641",
+                        "Microphone");
+                    AddSystemPresetDevice(
+                        DeviceKind.GPU,
+                        "AMD Radeon(TM) 610M",
+                        @"PCI\VEN_1002&DEV_164E&SUBSYS_11C41043&REV_D8\4&16012499&0&0041",
+                        integratedGpu: true,
+                        testIrqCount: 1,
+                        testMsiStatus: "Enabled");
+                    AddSystemPresetDevice(
+                        DeviceKind.GPU,
+                        "NVIDIA GeForce RTX 5060 Laptop GPU",
+                        @"PCI\VEN_10DE&DEV_2D59&SUBSYS_11C41043&REV_A1\612BE8CAB32DB04800",
+                        testIrqCount: 1,
+                        testMsiStatus: "Enabled");
+                    AddNvidiaDisplayAudio("SYS_8940HX_RTX5060_LAPTOP_AUDIO");
+                    AddSystemPresetDevice(
+                        DeviceKind.NET_CX,
+                        "Realtek PCIe GbE Family Controller",
+                        @"PCI\VEN_10EC&DEV_8168&SUBSYS_208F1043&REV_15\01000000684CE00000",
+                        testIrqCount: 1,
+                        testMsiStatus: "Enabled");
+                    AddSystemStorage(
+                        "Standard NVM Express Controller",
+                        @"PCI\VEN_15B7&DEV_5036&SUBSYS_503615B7&REV_00\4&218BD16B&0&000A");
+                    break;
+                case SystemPresetMultiControllerInput:
+                    AddSystemPresetDevice(
+                        DeviceKind.USB,
+                        "Intel(R) USB 3.20 eXtensible Host Controller - 1.20 (CPU)",
+                        @"PCI\VEN_8086&DEV_7F6E\SYS_MULTI_XHCI_MOUSE",
+                        "Mouse 8K",
+                        testIrqCount: 8,
+                        testMsiStatus: "Enabled");
+                    AddSystemPresetDevice(
+                        DeviceKind.USB,
+                        "Intel(R) USB 3.10 eXtensible Host Controller - 1.20 (PCH)",
+                        @"PCI\VEN_8086&DEV_7AE0\SYS_MULTI_XHCI_GAMEPAD",
+                        "Gamepad",
+                        testIrqCount: 8,
+                        testMsiStatus: "Enabled");
+                    AddSystemPresetDevice(
+                        DeviceKind.USB,
+                        "ASMedia USB3.1 eXtensible Host Controller (PCIe)",
+                        @"PCI\VEN_1B21&DEV_2142\SYS_MULTI_XHCI_KEYBOARD",
+                        "Keyboard 8K",
+                        testIrqCount: 8,
+                        testMsiStatus: "Enabled");
+                    AddSystemPresetDevice(
+                        DeviceKind.GPU,
+                        "NVIDIA GeForce RTX 5090",
+                        @"PCI\VEN_10DE&DEV_2B85\SYS_RTX5090",
+                        testIrqCount: 1,
+                        testMsiStatus: "Enabled");
+                    AddNvidiaDisplayAudio("SYS_RTX5090_AUDIO");
+                    AddSystemPresetDevice(
+                        DeviceKind.NET_NDIS,
+                        "Intel Ethernet Controller I226-V",
+                        @"PCI\VEN_8086&DEV_125C\SYS_Z890_I226_V",
+                        testIrqCount: 1,
+                        testMsiStatus: "Enabled");
+                    AddSystemStorage(
+                        "Crucial T705 PCIe 5.0 NVMe Controller",
+                        @"PCI\VEN_C0A9&DEV_540A\SYS_Z890_T705");
+                    break;
             }
 
             RefreshTestDeviceList();
@@ -2574,6 +2950,111 @@ public sealed partial class MainForm
             WriteLog($"TEST.SYSTEM.PRESET.AUTO: dry-run preview complete blocks={_blocks.Count} optimizeUsbImod=1");
             LogGuiSnapshot("system-preset-auto");
             return true;
+        }
+
+        bool ValidateQaAffinity8940HxLayout()
+        {
+            List<string> issues = [];
+            int ccdCount = _cpuInfo?.CcdMap.Values.Distinct().Count() ?? 0;
+            if (_maxLogical < 32 || ccdCount < 2)
+            {
+                issues.Add($"topology maxLogical={_maxLogical} ccd={ccdCount}");
+            }
+
+            int usbIndex = 0;
+            foreach (DeviceBlock block in _blocks.Where(static b => b.Kind == DeviceKind.USB))
+            {
+                if (block.CpuPanel is ScrollableControl scrollable
+                    && scrollable.AutoScroll
+                    && scrollable.HorizontalScroll.Visible)
+                {
+                    issues.Add($"usb[{usbIndex}] cpuHorizontalScroll=1");
+                }
+
+                if (block.CpuPanel is not null && block.SettingsPanel is not null)
+                {
+                    Rectangle cpu = block.CpuPanel.Bounds;
+                    Rectangle settings = block.SettingsPanel.Bounds;
+                    if (settings.IntersectsWith(cpu))
+                    {
+                        bool stacked = settings.Top >= cpu.Bottom - UiScale(4);
+                        if (!stacked)
+                        {
+                            issues.Add($"usb[{usbIndex}] settingsOverlap=1");
+                        }
+                    }
+                }
+
+                if (ShouldSkipBuiltInUsbAffinity(block.Device.UsbRoles) && block.AffinityMask != 0)
+                {
+                    issues.Add($"usb[{usbIndex}] builtInAffinity=0x{block.AffinityMask:X}");
+                }
+
+                usbIndex++;
+            }
+
+            DeviceBlock? igpu = _blocks.FirstOrDefault(b => b.Kind == DeviceKind.GPU && b.Device.IsIntegratedGpu);
+            DeviceBlock? dgpu = _blocks.FirstOrDefault(b => b.Kind == DeviceKind.GPU && !b.Device.IsIntegratedGpu);
+            if (igpu is null)
+            {
+                issues.Add("igpu-missing");
+            }
+            else if (igpu.AffinityMask != 0)
+            {
+                issues.Add($"igpuAffinity=0x{igpu.AffinityMask:X}");
+            }
+
+            if (dgpu is null)
+            {
+                issues.Add("dgpu-missing");
+            }
+            else if (dgpu.AffinityMask == 0)
+            {
+                issues.Add("dgpuAffinity=0");
+            }
+            else if (dgpu.AffinityMask != 0x5000UL)
+            {
+                // Field-proven irq-safe tail pair on 8940HX CCD0 is [12,14] / 0x5000.
+                issues.Add($"dgpuAffinity=0x{dgpu.AffinityMask:X} expected=0x5000");
+            }
+
+            int usbBlocks = _blocks.Count(static b => b.Kind == DeviceKind.USB);
+            bool pass = issues.Count == 0;
+            WriteLog(
+                pass
+                    ? $"TEST.QA.AFFINITY.8940HX: status=PASS maxLogical={_maxLogical} ccd={ccdCount} usbBlocks={usbBlocks} igpu=1 dgpu=1"
+                    : $"TEST.QA.AFFINITY.8940HX: status=FAIL maxLogical={_maxLogical} ccd={ccdCount} usbBlocks={usbBlocks} issues=\"{SanitizeLogValue(string.Join("; ", issues))}\"");
+            return pass;
+        }
+
+        bool ValidateQaMultiControllerAffinity()
+        {
+            List<string> issues = [];
+            DeviceBlock? mouse = _blocks.FirstOrDefault(static b => b.Kind == DeviceKind.USB && HasRoleText(b.Device.UsbRoles, "Mouse"));
+            DeviceBlock? gamepad = _blocks.FirstOrDefault(static b => b.Kind == DeviceKind.USB && HasRoleText(b.Device.UsbRoles, "Gamepad"));
+            DeviceBlock? keyboard = _blocks.FirstOrDefault(static b => b.Kind == DeviceKind.USB && HasRoleText(b.Device.UsbRoles, "Keyboard"));
+
+            if (mouse is null || mouse.AffinityMask == 0)
+            {
+                issues.Add("mouse-affinity-missing");
+            }
+
+            if (gamepad is null || gamepad.AffinityMask == 0)
+            {
+                issues.Add("gamepad-affinity-missing");
+            }
+
+            if (keyboard is null || keyboard.AffinityMask == 0)
+            {
+                issues.Add("keyboard-affinity-missing");
+            }
+
+            bool pass = issues.Count == 0;
+            WriteLog(
+                pass
+                    ? $"TEST.QA.MULTI_CONTROLLER: status=PASS mouseMask=0x{mouse?.AffinityMask:X} gamepadMask=0x{gamepad?.AffinityMask:X} keyboardMask=0x{keyboard?.AffinityMask:X}"
+                    : $"TEST.QA.MULTI_CONTROLLER: status=FAIL issues=\"{SanitizeLogValue(string.Join("; ", issues))}\"");
+            return pass;
         }
 
         bool LoadTestDevicePresetToFields()
@@ -2702,10 +3183,10 @@ public sealed partial class MainForm
                     SetTestDeviceFields(DeviceKind.AUDIO, "NVIDIA High Definition Audio", @"HDAUDIO\FUNC_01&VEN_10DE&DEV_00A1\TEST_DISPLAY_AUDIO", audioEndpoints: "Monitor DisplayPort");
                     return true;
                 case "Storage - Samsung 990 PRO NVMe":
-                    SetTestDeviceFields(DeviceKind.STOR, "Samsung 990 PRO NVMe Controller", @"PCI\VEN_144D&DEV_A80C\TEST_990PRO_NVME", storageTag: "SSD");
+                    SetTestDeviceFields(DeviceKind.STOR, "Samsung 990 PRO NVMe Controller", @"PCI\VEN_144D&DEV_A80C\TEST_990PRO_NVME", storageTag: "NVMe");
                     return true;
                 case "Storage - Crucial T705 PCIe 5.0 NVMe":
-                    SetTestDeviceFields(DeviceKind.STOR, "Crucial T705 PCIe 5.0 NVMe Controller", @"PCI\VEN_C0A9&DEV_540A\TEST_T705_NVME", storageTag: "SSD");
+                    SetTestDeviceFields(DeviceKind.STOR, "Crucial T705 PCIe 5.0 NVMe Controller", @"PCI\VEN_C0A9&DEV_540A\TEST_T705_NVME", storageTag: "NVMe");
                     return true;
                 case "Storage - SATA AHCI SSD":
                     SetTestDeviceFields(DeviceKind.STOR, "Standard SATA AHCI Controller", @"PCI\VEN_8086&DEV_7AE2\TEST_SATA_AHCI", storageTag: "SSD");
@@ -3737,6 +4218,44 @@ public sealed partial class MainForm
                 case "AMD Ryzen 9 9955HX3D 16C/32T V-Cache CCD0":
                     LoadAmdPreset("AMD Ryzen 9 9955HX3D 16C/32T V-Cache CCD0", physicalCores: 16, ccdCount: 2, cppcProfile: "x3d-cache");
                     break;
+                case "AMD Ryzen 9 8940HX 16C/32T Dual-CCD":
+                    // CPPC/CCD mirrored from DeviceTweaker_20260909_182154_688.log (Ryzen 9 8940HX Dual-CCD).
+                    LoadSyntheticPreset(
+                        "AMD Ryzen 9 8940HX with Radeon Graphics",
+                        logicalCount: 32,
+                        physicalCoreCount: 16,
+                        ccdCount: 2,
+                        ccxCount: 2,
+                        smtEnabled: true,
+                        useHyperLabel: false,
+                        coreMap:
+                        [
+                            0, 0, 2, 2, 4, 4, 6, 6, 8, 8, 10, 10, 12, 12, 14, 14,
+                            16, 16, 18, 18, 20, 20, 22, 22, 24, 24, 26, 26, 28, 28, 30, 30,
+                        ],
+                        ccdMap:
+                        [
+                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                        ],
+                        ccxMap:
+                        [
+                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                        ],
+                        eCoreMap: new bool[32],
+                        cppcRatings: new Dictionary<int, int>
+                        {
+                            [0] = 318, [1] = 318, [2] = 318, [3] = 318,
+                            [4] = 291, [5] = 291, [6] = 298, [7] = 298,
+                            [8] = 285, [9] = 285, [10] = 305, [11] = 305,
+                            [12] = 278, [13] = 278, [14] = 312, [15] = 312,
+                            [16] = 264, [17] = 264, [18] = 271, [19] = 271,
+                            [20] = 244, [21] = 244, [22] = 258, [23] = 258,
+                            [24] = 231, [25] = 231, [26] = 251, [27] = 251,
+                            [28] = 224, [29] = 224, [30] = 237, [31] = 237,
+                        });
+                    break;
                 case "AMD Ryzen 9 9950X3D2 16C/32T dual V-Cache":
                     LoadAmdPreset("AMD Ryzen 9 9950X3D2 16C/32T dual V-Cache", physicalCores: 16, ccdCount: 2, cppcProfile: "x3d-dual-cache");
                     break;
@@ -4165,16 +4684,17 @@ public sealed partial class MainForm
         {
             Dock = DockStyle.Top,
             Height = 48,
-            ColumnCount = 4,
+            ColumnCount = 5,
             RowCount = 1,
             Padding = new Padding(24, 8, 24, 8),
             BackColor = _bgPanel,
             TabStop = false,
         };
-        for (int column = 0; column < navigation.ColumnCount; column++)
+        for (int column = 0; column < 4; column++)
         {
             navigation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
         }
+        navigation.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiScale(102)));
         navigation.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         navigation.Paint += (_, e) =>
         {
@@ -4210,6 +4730,93 @@ public sealed partial class MainForm
         navigation.Controls.Add(devicesNavigationButton, 1, 0);
         navigation.Controls.Add(scenarioNavigationButton, 2, 0);
         navigation.Controls.Add(resultsNavigationButton, 3, 0);
+
+        Panel langPanel = new()
+        {
+            Dock = DockStyle.Fill,
+            BackColor = _bgPanel,
+            Margin = new Padding(UiScale(6), 0, 0, 0),
+            TabStop = false,
+            Tag = LocalizationIgnoreTag,
+        };
+
+        Size langBtnSize = new(UiScale(44), UiScale(28));
+        int btnY = (UiScale(32) - langBtnSize.Height) / 2;
+        LanguageSelectorButton adminLangEn = new()
+        {
+            Name = "TEST_ADMIN_LANG_EN",
+            Text = "EN",
+            AutoSize = false,
+            Location = new Point(0, btnY),
+            Size = langBtnSize,
+            MinimumSize = langBtnSize,
+            MaximumSize = langBtnSize,
+            BackColor = _bgPanel,
+            ForeColor = _mutedText,
+            Font = _baseFont,
+            Cursor = Cursors.Hand,
+            TabStop = true,
+            Tag = LocalizationIgnoreTag,
+            UseMnemonic = false,
+        };
+
+        LanguageSelectorButton adminLangRu = new()
+        {
+            Name = "TEST_ADMIN_LANG_RU",
+            Text = "RU",
+            AutoSize = false,
+            Location = new Point(langBtnSize.Width + UiScale(6), btnY),
+            Size = langBtnSize,
+            MinimumSize = langBtnSize,
+            MaximumSize = langBtnSize,
+            BackColor = _bgPanel,
+            ForeColor = _mutedText,
+            Font = _baseFont,
+            Cursor = Cursors.Hand,
+            TabStop = true,
+            Tag = LocalizationIgnoreTag,
+            UseMnemonic = false,
+        };
+
+        void UpdateAdminLangStyle()
+        {
+            StyleLanguageButton(adminLangEn, UiLanguage.Current == UiLanguageCode.English, "English");
+            StyleLanguageButton(adminLangRu, UiLanguage.Current == UiLanguageCode.Russian, "Русский");
+        }
+
+        adminLangEn.Click += (_, _) =>
+        {
+            SetUiLanguage(UiLanguageCode.English);
+            UpdateAdminLangStyle();
+            LocalizeControlTree(dialog);
+            syncDialogScroll?.Invoke();
+            dialog.Invalidate(true);
+        };
+
+        adminLangRu.Click += (_, _) =>
+        {
+            SetUiLanguage(UiLanguageCode.Russian);
+            UpdateAdminLangStyle();
+            LocalizeControlTree(dialog);
+            syncDialogScroll?.Invoke();
+            dialog.Invalidate(true);
+        };
+
+        EventHandler langSyncHandler = (_, _) =>
+        {
+            if (dialog.IsDisposed) return;
+            UpdateAdminLangStyle();
+            LocalizeControlTree(dialog);
+            syncDialogScroll?.Invoke();
+            dialog.Invalidate(true);
+        };
+        UiLanguage.Changed += langSyncHandler;
+        dialog.FormClosed += (_, _) => UiLanguage.Changed -= langSyncHandler;
+
+        UpdateAdminLangStyle();
+        langPanel.Controls.Add(adminLangEn);
+        langPanel.Controls.Add(adminLangRu);
+        navigation.Controls.Add(langPanel, 4, 0);
 
         const int dialogScrollWidth = 12;
         Panel contentHost = new()
@@ -4605,6 +5212,12 @@ public sealed partial class MainForm
                                 : $"TEST.QA.BACKUP.IMOD.FAIL: status=FAIL detail=\"{SanitizeLogValue(backupPersistenceError)}\"");
                         systemPresetCombo.SelectedItem = SystemPresetLaptopIntel285HX;
                         WriteLog("TEST.QA.SANDBOX: Wi-Fi preservation preset completed");
+                        systemPresetCombo.SelectedItem = SystemPresetLaptopRyzen8940HX;
+                        ValidateQaAffinity8940HxLayout();
+                        WriteLog("TEST.QA.SANDBOX: 8940HX Dual-CCD affinity preset completed");
+                        systemPresetCombo.SelectedItem = SystemPresetMultiControllerInput;
+                        ValidateQaMultiControllerAffinity();
+                        WriteLog("TEST.QA.SANDBOX: Multi-controller affinity preset completed");
                         systemPresetCombo.SelectedItem = SystemPresetRyzen3500X;
                         if (!string.Equals(
                                 systemPresetCombo.SelectedItem?.ToString(),

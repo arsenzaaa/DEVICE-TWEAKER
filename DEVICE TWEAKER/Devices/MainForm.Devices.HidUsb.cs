@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 
 using System.Globalization;
 
@@ -280,14 +280,9 @@ public sealed partial class MainForm
             return role;
         }
 
-        if (isMouse)
-        {
-            return $"{role} scanning";
-        }
-
         if (pollingRateLookup.Count == 0)
         {
-            return role;
+            return isMouse ? $"{role} scanning" : role;
         }
 
         UsbPollingRateInfo? info = null;
@@ -300,7 +295,7 @@ public sealed partial class MainForm
             && !pollingRateLookup.TryGetValue($"{vidPid}:{role}", out info)
             && !pollingRateLookup.TryGetValue(vidPid, out info))
         {
-            return role;
+            return isMouse ? $"{role} scanning" : role;
         }
 
         string tag = FormatStaticPollingTag(role, info.Tag);
@@ -327,7 +322,9 @@ public sealed partial class MainForm
 
     private static string FormatStaticPollingTag(string role, string tag)
     {
-        return IsUsbRoleText(role, "Mouse") ? "scanning" : tag;
+        return string.IsNullOrWhiteSpace(tag)
+            ? (IsUsbRoleText(role, "Mouse") ? "scanning" : string.Empty)
+            : tag;
     }
 
     private static string FormatUsbPollingRoleSummary(IEnumerable<string> roles)
@@ -392,6 +389,11 @@ public sealed partial class MainForm
         }
 
         string name = productName.ToLowerInvariant();
+        if (name == "<none>" || name == "none" || name == "usb device" || name == "usb input device")
+        {
+            return null;
+        }
+
         if (Regex.IsMatch(name, "(?i)headset|headphone|earbud|earphone|microphone|\\bmic\\b|usb audio|audio|sound card|soundcard|speaker|speakers|dac|surround\\s*sound|virtual\\s*surround|blackshark|kraken|barracuda|nari|seiren|hammerhead|tiamat|thresher|manowar|opus", RegexOptions.CultureInvariant))
         {
             return null;
@@ -406,11 +408,6 @@ public sealed partial class MainForm
             return "Mouse";
         }
 
-        if (name == "usb device" || name == "<none>")
-        {
-            return "Keyboard";
-        }
-
         if (name == "wireless-receiver")
         {
             return "Mouse";
@@ -423,7 +420,7 @@ public sealed partial class MainForm
 
         string[] keyboardPatterns =
         [
-            "keyboard", "kbd", "kb", "he", "68", "75", "80", "63", "irok", "87", "96", "104", "820", "none",
+            "keyboard", "kbd", "kb", "he", "68", "75", "80", "63", "irok", "87", "96", "104", "820",
             "60%", "65%", "tkl", "varmilo", "blackwidow", "keypad", "mechanical", "comard", "ak820",
             "cherry mx", "gateron", "keychron", "ducky", "leopold", "filco", "akko", "85",
             "gmmk", "iqunix", "nuphy", "apex pro", "k70", "k95", "optical switch", "rs",

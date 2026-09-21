@@ -231,6 +231,10 @@ public sealed partial class MainForm
         Button btnApply = NewTopButton("APPLY");
         Button btnAuto = NewTopButton("AUTO-OPTIMIZATION");
         Button btnRestore = NewTopButton("RESTORE");
+        _btnScanRef = btnScan;
+        _btnApplyRef = btnApply;
+        _btnAutoRef = btnAuto;
+        _btnRestoreRef = btnRestore;
         _operationButtons = [btnScan, btnApply, btnAuto, btnRestore];
         int buttonGap = UiScale(8);
         btnApply.Margin = Padding.Empty;
@@ -291,6 +295,13 @@ public sealed partial class MainForm
             BackColor = _accent,
         };
 
+        Panel filterDivider = new()
+        {
+            Dock = DockStyle.Top,
+            Height = UiScale(1),
+            BackColor = _accent,
+        };
+
         _devicesHost = new BufferedPanel
         {
             Dock = DockStyle.Fill,
@@ -299,13 +310,13 @@ public sealed partial class MainForm
             Margin = Padding.Empty,
         };
 
-        int scrollWidth = UiScale(12);
+        int scrollWidth = UiScale(14);
         _devicesPanel = new BufferedPanel
         {
             Dock = DockStyle.None,
             BackColor = _bgForm,
             AutoScroll = false,
-            Padding = new Padding(UiScale(24), UiScale(12), UiScale(24), UiScale(32)),
+            Padding = new Padding(UiScale(24), UiScale(18), UiScale(24), UiScale(24)),
         };
         _devicesPanel.Location = new Point(0, 0);
         _devicesPanel.SizeChanged += (_, _) => SyncDevicesScrollBar();
@@ -316,9 +327,11 @@ public sealed partial class MainForm
             BackColor = _bgForm,
             TrackColor = _bgForm,
             RailColor = _bgForm,
-            ThumbColor = _accent,
-            ThumbWidth = UiScale(9),
             RailWidth = 0,
+            ThumbColor = _accent,
+            ThumbHoverColor = Color.White,
+            ThumbDragColor = Color.FromArgb(210, 210, 210),
+            ThumbWidth = UiScale(10),
             ThumbCornerRadius = UiScale(7),
             Visible = false,
             Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right,
@@ -347,7 +360,23 @@ public sealed partial class MainForm
         _devicesHost.MouseWheel += (_, e) => HandleDevicesMouseWheel(e);
         _devicesHost.TabStop = true;
 
+        _noMatchesLabel = new Label
+        {
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleCenter,
+            Font = _dialogFont,
+            ForeColor = _statusInactive,
+            BackColor = _bgForm,
+            Text = $"{UiLanguage.Text("NO MATCHING DEVICES")}\n{UiLanguage.Text("No devices match the current filter criteria.")}",
+            Visible = false,
+        };
+        _devicesHost.Controls.Add(_noMatchesLabel);
+
+        InitializeFilterToolbar();
+
         Controls.Add(_devicesHost);
+        Controls.Add(filterDivider);
+        Controls.Add(_filterPanel);
         Controls.Add(accentStrip);
         Controls.Add(buttonPanel);
         Controls.Add(statusPanel);
@@ -364,6 +393,7 @@ public sealed partial class MainForm
             InitialDelay = 400,
             ReshowDelay = 200,
         };
+        UpdateFilterToolbarLocalization();
         _layoutRefreshTimer = new System.Windows.Forms.Timer
         {
             Interval = 220,
@@ -499,6 +529,12 @@ public sealed partial class MainForm
             finally
             {
                 EndDevicesBusy();
+            }
+
+            if (!sandboxDryRun)
+            {
+                UpdateAllBlocksInitialState();
+                UpdateApplyButtonDirtyCount();
             }
 
             if (sandboxDryRun)
@@ -980,6 +1016,26 @@ public sealed partial class MainForm
         _devicesPanel.Location = new Point(0, -next);
     }
 
+    private void ResetDevicesScroll()
+    {
+        if (_devicesHost is null || _devicesPanel is null)
+        {
+            return;
+        }
+
+        _devicesPanel.Location = new Point(0, 0);
+        if (_devicesScroll is not null)
+        {
+            _syncingScroll = true;
+            _devicesScroll.Value = 0;
+            _syncingScroll = false;
+        }
+
+        SyncDevicesScrollBar();
+        _devicesPanel.Invalidate();
+        _devicesHost.Invalidate();
+    }
+
     private void HandleDevicesMouseWheel(MouseEventArgs e)
     {
         if (_devicesScroll is null || !_devicesScroll.Visible)
@@ -1051,7 +1107,14 @@ public sealed partial class MainForm
         btn.FlatAppearance.BorderSize = 1;
         btn.BackColor = _bgForm;
         btn.ForeColor = _fgMain;
-        btn.FlatAppearance.BorderColor = isPrimary ? _accent : Color.FromArgb(150, 150, 158);
+        if (btn == _btnApplyRef && _blocks.Any(b => b.IsDirty))
+        {
+            btn.FlatAppearance.BorderColor = _statusWarn;
+        }
+        else
+        {
+            btn.FlatAppearance.BorderColor = isPrimary ? _accent : Color.FromArgb(150, 150, 158);
+        }
     }
 
     /// <summary>Configure padding on a ThemedTextBox host panel.</summary>
@@ -1105,6 +1168,362 @@ public sealed partial class MainForm
         catch (Exception ex)
         {
             WriteLog($"UI.URL.ERROR: url=\"{url}\" error=\"{FlattenLogText(ex.ToString())}\"");
+        }
+    }
+
+    private void InitializeFilterToolbar()
+    {
+        _filterPanel = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = UiScale(54),
+            BackColor = _bgPanel,
+            Padding = new Padding(UiScale(24), UiScale(12), UiScale(24), UiScale(12)),
+            Margin = Padding.Empty,
+        };
+
+        FlowLayoutPanel searchHost = new()
+        {
+            Dock = DockStyle.Left,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            BackColor = _bgPanel,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty,
+        };
+
+        _searchFilterBox = new ThemedTextBox
+        {
+            Width = UiScale(240),
+            Height = UiScale(30),
+            PlaceholderText = UiLanguage.Text("Filter devices... (Ctrl+F)"),
+            Font = _baseFont,
+            Margin = Padding.Empty,
+        };
+        _searchFilterBox.TextChanged += (_, _) =>
+        {
+            string newQuery = _searchFilterBox.Text.Trim();
+            if (string.Equals(_searchFilterText, newQuery, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _searchFilterText = newQuery;
+            _btnFilterClear.Visible = !string.IsNullOrEmpty(_searchFilterText);
+            ResetDevicesScroll();
+            ApplyDeviceFilter();
+            int visibleCount = _blocks.Count(b => b.Group.Visible);
+            WriteLog($"UI: Filter search text=\"{_searchFilterText}\" visibleDevices={visibleCount}/{_blocks.Count}");
+        };
+
+        _btnFilterClear = new ThemedButton
+        {
+            Text = "✕",
+            Size = new Size(UiScale(24), UiScale(30)),
+            Visible = false,
+            FlatStyle = FlatStyle.Flat,
+            Font = _baseFont,
+            ForeColor = _statusInactive,
+            BackColor = _bgPanel,
+            Cursor = Cursors.Hand,
+            TabStop = false,
+            Margin = new Padding(UiScale(2), 0, 0, 0),
+        };
+        _btnFilterClear.FlatAppearance.BorderSize = 0;
+        _btnFilterClear.Click += (_, _) => ClearFilterBox();
+
+        searchHost.Controls.Add(_searchFilterBox);
+        searchHost.Controls.Add(_btnFilterClear);
+
+        _filterCategoriesHost = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Right,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            BackColor = _bgPanel,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty,
+        };
+
+        _filterPanel.Controls.Add(_filterCategoriesHost);
+        _filterPanel.Controls.Add(searchHost);
+
+        RebuildFilterCategoryButtons();
+    }
+
+    private void UpdateCategoryButtonSize(Button btn)
+    {
+        int textWidth = TextRenderer.MeasureText(btn.Text, btn.Font).Width;
+        btn.Size = new Size(textWidth + UiScale(16), UiScale(30));
+    }
+
+    private void RebuildFilterCategoryButtons()
+    {
+        if (_filterCategoriesHost == null)
+        {
+            return;
+        }
+
+        _filterCategoriesHost.SuspendLayout();
+        _filterCategoriesHost.Controls.Clear();
+        _filterCategoryButtons.Clear();
+
+        List<string> availableCategories = ["ALL"];
+        string[] candidates = ["MOUSE", "KEYBOARD", "GAMEPAD", "USB", "GPU", "NETWORK", "AUDIO", "STORAGE"];
+        foreach (string candidate in candidates)
+        {
+            if (_blocks.Any(b => MatchesCategory(b, candidate)))
+            {
+                availableCategories.Add(candidate);
+            }
+        }
+
+        if (!availableCategories.Contains(_activeCategoryFilter, StringComparer.OrdinalIgnoreCase))
+        {
+            _activeCategoryFilter = "ALL";
+        }
+
+        foreach (string cat in availableCategories)
+        {
+            Button btnCat = new ThemedButton
+            {
+                Name = $"FILTER_{cat}",
+                Text = UiLanguage.Text($"[ {cat} ]"),
+                Tag = cat,
+                AutoSize = false,
+                Height = UiScale(30),
+                FlatStyle = FlatStyle.Flat,
+                Font = _headerFont,
+                Cursor = Cursors.Hand,
+                TabStop = false,
+                Margin = new Padding(UiScale(4), 0, 0, 0),
+            };
+            UpdateCategoryButtonSize(btnCat);
+            btnCat.Click += (_, _) => SetCategoryFilter(cat);
+            _filterCategoryButtons.Add(btnCat);
+            _filterCategoriesHost.Controls.Add(btnCat);
+        }
+
+        _filterCategoriesHost.ResumeLayout(true);
+        UpdateCategoryButtonsStyle();
+        WriteLog($"UI: Filter categories available=[{string.Join(", ", availableCategories)}] active=\"{_activeCategoryFilter}\"");
+    }
+
+    private void SetCategoryFilter(string category)
+    {
+        if (string.Equals(_activeCategoryFilter, category, StringComparison.OrdinalIgnoreCase))
+        {
+            ResetDevicesScroll();
+            return;
+        }
+
+        string prev = _activeCategoryFilter;
+        _activeCategoryFilter = category;
+        UpdateCategoryButtonsStyle();
+        ResetDevicesScroll();
+        ApplyDeviceFilter();
+        int visibleCount = _blocks.Count(b => b.Group.Visible);
+        WriteLog($"UI: Filter category selected: {category} (previous={prev}) visibleDevices={visibleCount}/{_blocks.Count}");
+    }
+
+    private void UpdateCategoryButtonsStyle()
+    {
+        foreach (Button btn in _filterCategoryButtons)
+        {
+            bool isActive = string.Equals(btn.Tag as string, _activeCategoryFilter, StringComparison.OrdinalIgnoreCase);
+            btn.BackColor = isActive ? Color.FromArgb(42, 42, 52) : _bgPanel;
+            btn.ForeColor = isActive ? _fgMain : _statusInactive;
+            btn.FlatAppearance.BorderColor = isActive ? _accent : Color.FromArgb(60, 60, 72);
+            btn.FlatAppearance.BorderSize = 1;
+        }
+    }
+
+    private void ApplyDeviceFilter()
+    {
+        ResetDevicesScroll();
+
+        bool anyVisible = false;
+        foreach (DeviceBlock b in _blocks)
+        {
+            bool catMatch = MatchesCategory(b, _activeCategoryFilter);
+            bool searchMatch = MatchesSearchText(b, _searchFilterText);
+            bool visible = catMatch && searchMatch;
+            b.Group.Visible = visible;
+            if (visible)
+            {
+                anyVisible = true;
+            }
+        }
+
+        if (_noMatchesLabel != null)
+        {
+            _noMatchesLabel.Visible = !anyVisible && _blocks.Count > 0;
+            if (_noMatchesLabel.Visible)
+            {
+                _noMatchesLabel.BringToFront();
+            }
+        }
+
+        LayoutBlocks();
+    }
+
+    private static bool MatchesCategory(DeviceBlock b, string cat)
+    {
+        if (string.Equals(cat, "ALL", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        DeviceInfo info = b.Device;
+        if (string.Equals(cat, "MOUSE", StringComparison.OrdinalIgnoreCase))
+        {
+            return info.Kind == DeviceKind.USB && info.UsbRoles.Contains("Mouse", StringComparison.OrdinalIgnoreCase);
+        }
+        if (string.Equals(cat, "KEYBOARD", StringComparison.OrdinalIgnoreCase))
+        {
+            return info.Kind == DeviceKind.USB && info.UsbRoles.Contains("Keyboard", StringComparison.OrdinalIgnoreCase);
+        }
+        if (string.Equals(cat, "GAMEPAD", StringComparison.OrdinalIgnoreCase))
+        {
+            return info.Kind == DeviceKind.USB && (
+                info.UsbRoles.Contains("Gamepad", StringComparison.OrdinalIgnoreCase) ||
+                info.UsbRoles.Contains("Controller", StringComparison.OrdinalIgnoreCase) ||
+                info.UsbRoles.Contains("Joystick", StringComparison.OrdinalIgnoreCase));
+        }
+        if (string.Equals(cat, "USB", StringComparison.OrdinalIgnoreCase))
+        {
+            return info.Kind == DeviceKind.USB;
+        }
+        if (string.Equals(cat, "GPU", StringComparison.OrdinalIgnoreCase))
+        {
+            return info.Kind == DeviceKind.GPU;
+        }
+        if (string.Equals(cat, "NETWORK", StringComparison.OrdinalIgnoreCase))
+        {
+            return info.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX;
+        }
+        if (string.Equals(cat, "AUDIO", StringComparison.OrdinalIgnoreCase))
+        {
+            return info.Kind == DeviceKind.AUDIO;
+        }
+        if (string.Equals(cat, "STORAGE", StringComparison.OrdinalIgnoreCase))
+        {
+            return info.Kind == DeviceKind.STOR;
+        }
+
+        return true;
+    }
+
+    private static bool MatchesSearchText(DeviceBlock b, string search)
+    {
+        if (string.IsNullOrWhiteSpace(search))
+        {
+            return true;
+        }
+
+        DeviceInfo info = b.Device;
+        return (info.Name?.Contains(search, StringComparison.OrdinalIgnoreCase) == true)
+            || (info.InstanceId?.Contains(search, StringComparison.OrdinalIgnoreCase) == true)
+            || (info.Class?.Contains(search, StringComparison.OrdinalIgnoreCase) == true)
+            || (info.RegBase?.Contains(search, StringComparison.OrdinalIgnoreCase) == true)
+            || (info.UsbRoles?.Contains(search, StringComparison.OrdinalIgnoreCase) == true)
+            || (info.AudioEndpoints?.Contains(search, StringComparison.OrdinalIgnoreCase) == true)
+            || (info.StorageTag?.Contains(search, StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    private void FocusFilterBox()
+    {
+        _searchFilterBox?.Inner.Focus();
+        _searchFilterBox?.Inner.SelectAll();
+        WriteLog("UI: Filter search box focused");
+    }
+
+    private void ClearFilterBox()
+    {
+        if (_searchFilterBox != null)
+        {
+            _searchFilterBox.Text = string.Empty;
+        }
+        _searchFilterText = string.Empty;
+        _btnFilterClear.Visible = false;
+        ResetDevicesScroll();
+        ApplyDeviceFilter();
+        int visibleCount = _blocks.Count(b => b.Group.Visible);
+        WriteLog($"UI: Filter search cleared visibleDevices={visibleCount}/{_blocks.Count}");
+    }
+
+    private void UpdateApplyButtonDirtyCount()
+    {
+        if (_btnApplyRef == null)
+        {
+            return;
+        }
+
+        int dirtyCount = _blocks.Count(b => b.IsDirty);
+        _btnApplyRef.Text = UiLanguage.Text("APPLY");
+        SetTopButtonBaseStyle(_btnApplyRef);
+
+        if (dirtyCount > 0)
+        {
+            _copyToolTip.SetToolTip(_btnApplyRef, $"Apply changes (Ctrl+S) — modified: {dirtyCount}");
+        }
+        else
+        {
+            _copyToolTip.SetToolTip(_btnApplyRef, "Apply changes (Ctrl+S)");
+        }
+    }
+
+    private void UpdateAllBlocksInitialState()
+    {
+        foreach (DeviceBlock b in _blocks)
+        {
+            b.CaptureInitialState();
+        }
+    }
+
+    private void OnBlockSettingChanged(DeviceBlock block)
+    {
+        block.CheckIsDirty();
+        UpdateApplyButtonDirtyCount();
+    }
+
+    private void UpdateFilterToolbarLocalization()
+    {
+        if (_searchFilterBox != null)
+        {
+            _searchFilterBox.PlaceholderText = UiLanguage.Text("Filter devices... (Ctrl+F)");
+        }
+        foreach (Button btn in _filterCategoryButtons)
+        {
+            if (btn.Tag is string cat)
+            {
+                btn.Text = UiLanguage.Text($"[ {cat} ]");
+                UpdateCategoryButtonSize(btn);
+            }
+        }
+        if (_noMatchesLabel != null)
+        {
+            _noMatchesLabel.Text = $"{UiLanguage.Text("NO MATCHING DEVICES")}\n{UiLanguage.Text("No devices match the current filter criteria.")}";
+        }
+        if (_btnScanRef != null)
+        {
+            _copyToolTip.SetToolTip(_btnScanRef, "Refresh devices (F5 / Ctrl+R)");
+        }
+        if (_btnApplyRef != null)
+        {
+            UpdateApplyButtonDirtyCount();
+        }
+        if (_btnAutoRef != null)
+        {
+            _copyToolTip.SetToolTip(_btnAutoRef, "Auto-optimization (Ctrl+O)");
+        }
+        if (_btnRestoreRef != null)
+        {
+            _copyToolTip.SetToolTip(_btnRestoreRef, "Restore settings (Ctrl+Z)");
         }
     }
 }

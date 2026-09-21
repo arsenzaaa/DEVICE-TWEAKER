@@ -1,5 +1,6 @@
-﻿using System.Management;
+using System.Management;
 using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics.X86;
@@ -108,8 +109,8 @@ public sealed partial class MainForm
 
         try
         {
-            string xmlText = QueryKernelProcessorPowerEvents(Math.Max(topology.Logical * 4, 16));
-            if (string.IsNullOrWhiteSpace(xmlText))
+            List<(int Group, int Number, int Performance)> events = QueryKernelProcessorPowerEvents(Math.Max(topology.Logical * 4, 16));
+            if (events.Count == 0)
             {
                 WriteLog("CPU.CPPC: no Event ID 55 data");
                 return;
@@ -120,16 +121,8 @@ public sealed partial class MainForm
                 .GroupBy(lp => (lp.Group, lp.LocalIndex))
                 .ToDictionary(group => group.Key, group => group.First().LP);
             Dictionary<int, int> collected = [];
-            foreach (Match eventMatch in Regex.Matches(xmlText, "<Event\\b.*?</Event>", RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+            foreach (var (group, processor, performance) in events)
             {
-                string eventXml = eventMatch.Value;
-                if (!TryReadEventDataInt(eventXml, "Number", out int processor)
-                    || !TryReadEventDataInt(eventXml, "MaximumPerformancePercent", out int performance))
-                {
-                    continue;
-                }
-
-                int group = TryReadEventDataInt(eventXml, "Group", out int parsedGroup) ? parsedGroup : 0;
                 if (lpByGroupAndNumber.TryGetValue((group, processor), out int globalLp))
                 {
                     collected.TryAdd(globalLp, performance);
@@ -242,7 +235,70 @@ public sealed partial class MainForm
                 .Any());
     }
 
-    private static string QueryKernelProcessorPowerEvents(int maxEvents)
+    private static List<(int Group, int Number, int Performance)> QueryKernelProcessorPowerEvents(int maxEvents)
+    {
+        List<(int Group, int Number, int Performance)> events = [];
+        try
+        {
+            string query = "*[System[Provider[@Name='Microsoft-Windows-Kernel-Processor-Power'] and EventID=55]]";
+            EventLogQuery logQuery = new("System", PathType.LogName, query)
+            {
+                ReverseDirection = true,
+            };
+
+            using EventLogReader reader = new(logQuery);
+            for (int i = 0; i < maxEvents; i++)
+            {
+                using EventRecord? record = reader.ReadEvent();
+                if (record is null)
+                {
+                    break;
+                }
+
+                string xml = record.ToXml();
+                if (TryReadEventDataInt(xml, "Number", out int processor)
+                    && TryReadEventDataInt(xml, "MaximumPerformancePercent", out int performance))
+                {
+                    int group = TryReadEventDataInt(xml, "Group", out int parsedGroup) ? parsedGroup : 0;
+                    events.Add((group, processor, performance));
+                }
+            }
+
+            if (events.Count > 0)
+            {
+                return events;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"CPU.CPPC: native EventLogReader unavailable, falling back to wevtutil: {ex.Message}");
+        }
+
+        try
+        {
+            string xmlText = QueryKernelProcessorPowerEventsViaWevtutil(maxEvents);
+            if (!string.IsNullOrWhiteSpace(xmlText))
+            {
+                foreach (Match eventMatch in Regex.Matches(xmlText, "<Event\\b.*?</Event>", RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+                {
+                    string eventXml = eventMatch.Value;
+                    if (TryReadEventDataInt(eventXml, "Number", out int processor)
+                        && TryReadEventDataInt(eventXml, "MaximumPerformancePercent", out int performance))
+                    {
+                        int group = TryReadEventDataInt(eventXml, "Group", out int parsedGroup) ? parsedGroup : 0;
+                        events.Add((group, processor, performance));
+                    }
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return events;
+    }
+
+    private static string QueryKernelProcessorPowerEventsViaWevtutil(int maxEvents)
     {
         using Process process = new();
         process.StartInfo = new ProcessStartInfo
@@ -1011,6 +1067,7 @@ public sealed partial class MainForm
         }
 
         cb.Text = $"CPU {lpIndex} ({string.Join(", ", cpuLabelParts)})";
+        cb.Font = _blockFont;
         cb.AutoSize = true;
         cb.FlatStyle = FlatStyle.Standard;
         cb.UseVisualStyleBackColor = false;

@@ -78,8 +78,10 @@ function Get-MainWindow([int]$processId, [int]$timeoutSec = 30) {
         $rootEl = [System.Windows.Automation.AutomationElement]::RootElement
         $cond = New-Object System.Windows.Automation.PropertyCondition(
             [System.Windows.Automation.AutomationElement]::ProcessIdProperty, $processId)
-        $win = $rootEl.FindFirst([System.Windows.Automation.TreeScope]::Children, $cond)
-        if ($win -and [string]$win.Current.Name -like '*DEVICE TWEAKER*') { return $win }
+        $wins = $rootEl.FindAll([System.Windows.Automation.TreeScope]::Children, $cond)
+        foreach ($win in $wins) {
+            if ($win -and [string]$win.Current.Name -like '*DEVICE TWEAKER*') { return $win }
+        }
         Start-Sleep -Milliseconds 250
     }
     return $null
@@ -146,12 +148,14 @@ function Find-DescNamePattern(
     $deadline = (Get-Date).AddSeconds($timeoutSec)
     do {
         if ($null -eq $scope) { return $null }
-        $match = $scope.FindAll(
-            [System.Windows.Automation.TreeScope]::Descendants,
-            [System.Windows.Automation.Condition]::TrueCondition) |
-            Where-Object { [string]$_.Current.Name -match $pattern } |
-            Select-Object -First 1
-        if ($match) { return $match }
+        try {
+            $match = $scope.FindAll(
+                [System.Windows.Automation.TreeScope]::Descendants,
+                [System.Windows.Automation.Condition]::TrueCondition) |
+                Where-Object { [string]$_.Current.Name -match $pattern } |
+                Select-Object -First 1
+            if ($match) { return $match }
+        } catch {}
         Start-Sleep -Milliseconds 100
     } while ((Get-Date) -le $deadline)
     return $null
@@ -481,6 +485,7 @@ if ($null -eq $russianApply -or $russianApply.Current.Name -eq 'APPLY') {
 } else {
     Write-Report 'PASS: runtime language switch EN -> RU'
 }
+Start-Sleep -Milliseconds 600
 $ruVisibleNames = @(
     $normalMain.FindAll(
         [System.Windows.Automation.TreeScope]::Descendants,
@@ -506,13 +511,13 @@ if ($canonicalUiTerms.Count -lt 6) {
     Write-Report "PASS: canonical technical labels preserved in Russian UI count=$($canonicalUiTerms.Count)"
 }
 $storageNoteRu = @($ruVisibleNames | Where-Object {
-    $_ -cmatch '^\(affinity masks .+ SSD/HDD\)$' -and $_ -notmatch '(?i)not supported'
+    $_ -match '(?i)^Affinity Mask:\s*(\u041F\u043E\s+\u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E|По умолчанию)\s+Windows'
 })
 if ($storageNoteRu.Count -lt 1) {
     $smokeFailed = $true
-    Write-Report 'FAIL: SSD/HDD affinity note typography is not exact in Russian'
+    Write-Report 'FAIL: Storage affinity mask text is not exact in Russian'
 } else {
-    Write-Report 'PASS: SSD/HDD affinity note preserves exact lowercase plural typography'
+    Write-Report 'PASS: Storage affinity mask preserves natural Russian typography'
 }
 Capture-Window (Join-Path $outDir '11_normal_ru.png') $normalMain
 $refreshButtonRu = Find-AutomationId $normalMain 'REFRESH' 5
@@ -586,9 +591,10 @@ if ($null -eq $englishApply) {
 }
 if (-not $normalProc.HasExited) {
     Stop-Process -Id $normalProc.Id -Force
+    $normalProc.WaitForExit(5000)
     Write-Report "STOP NORMAL pid=$($normalProc.Id)"
 }
-Start-Sleep -Seconds 1
+Start-Sleep -Seconds 2
 
 $env:DEVICE_TWEAKER_QA_TEST_ADMIN = '1'
 $env:DEVICE_TWEAKER_QA_SANDBOX = '1'
@@ -774,9 +780,17 @@ Capture-Window (Join-Path $outDir '21_test_admin_armed.png') $admin
 # Release UI gate: exercise every operation-result state without touching hardware.
 $resultPreviews = @(
     @{ Button = 'RESULT: SUCCESS'; Title = 'AUTO-OPTIMIZATION'; File = '21_result_success.png'; Details = $false },
+    @{ Button = 'RESULT: WARNINGS'; Title = 'APPLY'; File = '21_result_warnings.png'; Details = $false },
     @{ Button = 'RESULT: PARTIAL'; Title = 'AUTO-OPTIMIZATION'; File = '21_result_partial.png'; Details = $true },
+    @{ Button = 'RESULT: PARTIAL (3x)'; Title = 'AUTO-OPTIMIZATION'; File = '21_result_partial_3x.png'; Details = $false },
     @{ Button = 'RESULT: FAILED'; Title = 'APPLY'; File = '21_result_failed.png'; Details = $true },
-    @{ Button = 'RESULT: STRESS'; Title = 'GUI STRESS TEST'; File = '21_result_stress.png'; Details = $true }
+    @{ Button = 'RESULT: STRESS'; Title = 'GUI STRESS TEST'; File = '21_result_stress.png'; Details = $true },
+    @{ Button = 'PROMPT: IMOD'; Title = 'USB IMOD TUNING'; File = '21_prompt_imod.png'; Details = $false; Dismiss = 'SKIP' },
+    @{ Button = 'PROMPT: CONFIRM'; Title = 'RESET ADAPTER SETTINGS'; File = '21_prompt_confirm.png'; Details = $false; Dismiss = 'CANCEL' },
+    @{ Button = 'PROMPT: BACKUP'; Title = 'AUTO BACKUP'; File = '21_prompt_backup.png'; Details = $false; Dismiss = 'SKIP' },
+    @{ Button = 'PROMPT: RESTORE'; Title = 'RESTORE'; File = '21_prompt_restore.png'; Details = $false; Dismiss = 'CANCEL' },
+    @{ Button = 'PROMPT: RESTORE (0)'; Title = 'RESTORE'; File = '21_prompt_restore_empty.png'; Details = $false; Dismiss = 'CANCEL' },
+    @{ Button = 'PROMPT: INFO'; Title = 'TEST MODE INFO'; File = '21_prompt_info.png'; Details = $false; Dismiss = 'OK' }
 )
 foreach ($preview in $resultPreviews) {
     $admin = Find-Desc $main 'TEST ADMIN' 'Window' 5
@@ -793,7 +807,8 @@ foreach ($preview in $resultPreviews) {
         Invoke-Click (Find-Desc $resultWindow 'DETAILS' 'Button' 3) "$($preview.Title)/DETAILS"
         Capture-Window (Join-Path $outDir ($preview.File -replace '\.png$', '_details.png')) $resultWindow
     }
-    Invoke-Click (Find-Desc $resultWindow 'OK' 'Button' 3) "$($preview.Title)/OK"
+    $dismissName = if ($preview.Dismiss) { $preview.Dismiss } else { 'OK' }
+    Invoke-Click (Find-Desc $resultWindow $dismissName 'Button' 3) "$($preview.Title)/$dismissName"
     Start-Sleep -Milliseconds 500
 }
 
@@ -923,6 +938,8 @@ if ($latestLog) {
         'TEST.QA.IMOD.STARTUP',
         'TEST.QA.BACKUP.IMOD',
         'TEST.QA.SCROLL',
+        'TEST.QA.AFFINITY.8940HX',
+        'TEST.QA.MULTI_CONTROLLER',
         'TEST.SCENARIO.END',
         'autoDryRun=True',
         'testDevicesOnly=True',
@@ -971,6 +988,10 @@ if ($latestLog) {
     $imodBackupPass = @(Select-String -LiteralPath $latestLog.FullName -Pattern 'TEST.QA.BACKUP.IMOD: status=PASS' -SimpleMatch -ErrorAction SilentlyContinue)
     $imodBackupFail = @(Select-String -LiteralPath $latestLog.FullName -Pattern 'TEST.QA.BACKUP.IMOD.FAIL:' -SimpleMatch -ErrorAction SilentlyContinue)
     $qaScroll = @(Select-String -LiteralPath $latestLog.FullName -Pattern 'TEST.QA.SCROLL:' -SimpleMatch -ErrorAction SilentlyContinue)
+    $affinity8940Pass = @(Select-String -LiteralPath $latestLog.FullName -Pattern 'TEST.QA.AFFINITY.8940HX: status=PASS' -SimpleMatch -ErrorAction SilentlyContinue)
+    $affinity8940Fail = @(Select-String -LiteralPath $latestLog.FullName -Pattern 'TEST.QA.AFFINITY.8940HX: status=FAIL' -SimpleMatch -ErrorAction SilentlyContinue)
+    $multiControllerPass = @(Select-String -LiteralPath $latestLog.FullName -Pattern 'TEST.QA.MULTI_CONTROLLER: status=PASS' -SimpleMatch -ErrorAction SilentlyContinue)
+    $multiControllerFail = @(Select-String -LiteralPath $latestLog.FullName -Pattern 'TEST.QA.MULTI_CONTROLLER: status=FAIL' -SimpleMatch -ErrorAction SilentlyContinue)
     $adminNavigationHits = @(Select-String -LiteralPath $latestLog.FullName -Pattern 'TEST.ADMIN.NAV:' -SimpleMatch -ErrorAction SilentlyContinue)
     if ($policyPass.Count -eq 0 -or $policyFail.Count -gt 0) {
         $smokeFailed = $true
@@ -1026,6 +1047,18 @@ if ($latestLog) {
     } else {
         Write-Report "PASS: IMOD backup persistence contract completed=$($imodBackupPass.Count)"
     }
+    if ($affinity8940Pass.Count -eq 0 -or $affinity8940Fail.Count -gt 0) {
+        $smokeFailed = $true
+        Write-Report "FAIL: 8940HX Dual-CCD affinity layout pass=$($affinity8940Pass.Count) fail=$($affinity8940Fail.Count)"
+    } else {
+        Write-Report "PASS: 8940HX Dual-CCD affinity layout completed=$($affinity8940Pass.Count)"
+    }
+    if ($multiControllerPass.Count -eq 0 -or $multiControllerFail.Count -gt 0) {
+        $smokeFailed = $true
+        Write-Report "FAIL: Multi-controller affinity pass=$($multiControllerPass.Count) fail=$($multiControllerFail.Count)"
+    } else {
+        Write-Report "PASS: Multi-controller affinity completed=$($multiControllerPass.Count)"
+    }
     if ($qaScroll.Count -lt 6) {
         $smokeFailed = $true
         Write-Report "FAIL: deterministic device-list navigation was not fully exercised entries=$($qaScroll.Count)"
@@ -1062,7 +1095,7 @@ try {
         Write-Report 'FAIL: Russian TEST ADMIN dialog did not open'
     } else {
         $ruListsReady = $false
-        for ($attempt = 0; $attempt -lt 40; $attempt++) {
+        for ($attempt = 0; $attempt -lt 80; $attempt++) {
             $ruLog = Get-ChildItem -LiteralPath (Join-Path (Split-Path $exe) 'logs') -Filter 'DeviceTweaker_*.log' -ErrorAction SilentlyContinue |
                 Where-Object { $_.LastWriteTime -ge $ruAdminStartedAt.AddSeconds(-1) } |
                 Sort-Object LastWriteTime -Descending | Select-Object -First 1

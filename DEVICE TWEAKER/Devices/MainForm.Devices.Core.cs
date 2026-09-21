@@ -27,6 +27,19 @@ public sealed partial class MainForm
             return false;
         }
 
+        // Discrete adapters first — never treat as iGPU.
+        if (Regex.IsMatch(
+                text,
+                "(?i)\\bGeForce\\b|\\bRTX\\b|\\bGTX\\b|\\bQuadro\\b|\\bTesla\\b|\\bRadeon\\s+RX\\b|\\bRadeon\\s+Pro\\b|Laptop\\s+GPU\\b"))
+        {
+            return false;
+        }
+
+        if (Regex.IsMatch(text, "(?i)Intel\\s*(?:\\(R\\))?\\s*Arc(?:\\(TM\\))?\\s+A\\d{3,}"))
+        {
+            return false;
+        }
+
         if (Regex.IsMatch(text, "(?i)Intel\\s*(?:\\(R\\))?\\s*(?:UHD|HD|Iris(?:\\s+Xe)?)(?:\\s+Graphics)?\\b"))
         {
             return true;
@@ -37,7 +50,15 @@ public sealed partial class MainForm
             return true;
         }
 
-        if (Regex.IsMatch(text, "(?i)AMD\\s+Radeon(?:\\(TM\\))?(?:\\s+[A-Z0-9-]+)*\\s+Graphics\\b"))
+        // "AMD Radeon(TM) Graphics", "AMD Radeon Graphics", optional vendor prefix.
+        if (Regex.IsMatch(text, "(?i)(?:AMD\\s+)?Radeon(?:\\(TM\\))?\\s+Graphics\\b"))
+        {
+            return true;
+        }
+
+        // APU mobile iGPU marketing names: Radeon 610M / 680M / 760M / 780M / 890M …
+        // (no "Graphics" suffix — this is what broke Ryzen 8940HX Radeon 610M detection).
+        if (Regex.IsMatch(text, "(?i)(?:AMD\\s+)?Radeon(?:\\(TM\\))?\\s+\\d{3,4}M\\b"))
         {
             return true;
         }

@@ -164,6 +164,7 @@ internal static partial class UiLanguage
             ("interrupters 0-1: intr0 0x0 0 ns", "interrupters"),
             ("devices: fallback controller roles assigned to active interrupters", "interrupters"),
             ("Note: UI and affinity masks are capped at 64 LPs.", "affinity masks"),
+            ("CPU 0: P-core, CCD 0, Group 0, Core 0, Local 0. CPPC: rating 120, preferred rank #1", "CPU 0: P-ядро, CCD 0, Группа 0, Ядро 0, Локальный индекс 0. CPPC: рейтинг 120, приоритетный ранг #1"),
         ];
         foreach ((string source, string requiredToken) in generatedTerminologySamples)
         {
@@ -310,7 +311,7 @@ internal static partial class UiLanguage
         Match match = AffinityMaskRegex().Match(source);
         if (match.Success)
         {
-            return $"Affinity Mask: {match.Groups[1].Value}";
+            return $"Affinity Mask: {TranslateInlineStatus(match.Groups[1].Value)}";
         }
 
         match = RssAffinityRegex().Match(source);
@@ -447,6 +448,18 @@ internal static partial class UiLanguage
         if (match.Success)
         {
             return $"Значение: ReservedCpuSets = {match.Groups[1].Value} | CPU: {match.Groups[2].Value}";
+        }
+
+        match = ApplyChangesDirtyRegex().Match(source);
+        if (match.Success)
+        {
+            return $"Применить настройки (Ctrl+S) — изменено: {match.Groups[1].Value}";
+        }
+
+        match = CpuTooltipRegex().Match(source);
+        if (match.Success)
+        {
+            return TranslateCpuTooltip(match);
         }
 
         string result = source;
@@ -799,10 +812,15 @@ internal static partial class UiLanguage
             ["APPLIED WITH WARNINGS"] = "ПРИМЕНЕНО С ПРЕДУПРЕЖДЕНИЯМИ",
             ["NOT APPLIED"] = "НЕ ПРИМЕНЕНО",
             ["PARTIALLY APPLIED"] = "ПРИМЕНЕНО ЧАСТИЧНО",
+            ["SKIPPED"] = "ПРОПУЩЕНО",
             ["FAILED"] = "ОШИБКА",
             ["SUCCESS"] = "УСПЕШНО",
             ["WARNING"] = "ПРЕДУПРЕЖДЕНИЕ",
             ["ERROR"] = "ОШИБКА",
+            ["DIAGNOSTICS & SYSTEM LOG"] = "ДИАГНОСТИКА И СИСТЕМНЫЙ ЛОГ",
+            ["RESTORE SYSTEM SETTINGS"] = "ВОССТАНОВЛЕНИЕ НАСТРОЕК",
+            ["CONFIRMATION"] = "ПОДТВЕРЖДЕНИЕ",
+            ["INFORMATION"] = "ИНФОРМАЦИЯ",
             ["Enabled"] = "Включено",
             ["Disabled"] = "Выключено",
             ["On"] = "Вкл",
@@ -823,6 +841,10 @@ internal static partial class UiLanguage
             ["OneCloseProcessor"] = "OneCloseProcessor",
             ["AllProcessorsInMachine"] = "AllProcessorsInMachine",
             ["SpecifiedProcessors"] = "SpecifiedProcessors",
+            ["Windows Default"] = "По умолчанию Windows",
+            ["0x0 (Windows Default)"] = "0x0 (По умолчанию Windows)",
+            ["NVMe/SATA storage uses Windows Multi-Queue steering. Pinned core affinity is intentionally disabled to ensure maximum SSD speed and low latency."] = "Дисковые контроллеры NVMe/SATA управляются стеком Windows Multi-Queue. Фиксация на ядрах отключена для сохранения максимальной скорости и низкой задержки.",
+            ["Display/HDMI audio shares PCIe bus with the GPU and uses Windows default interrupt steering (0x0)."] = "Звук HDMI/DisplayPort делит шину PCIe с видеокартой и использует стандартную маршрутизацию прерываний Windows (0x0).",
             ["SpreadMessagesAcrossAllProcessors"] = "SpreadMessagesAcrossAllProcessors",
             ["High"] = "Высокий",
             ["Normal"] = "Обычный",
@@ -833,6 +855,41 @@ internal static partial class UiLanguage
             ["RSS"] = "RSS",
             ["IRQ"] = "IRQ",
             ["CPU Affinity"] = "CPU Affinity",
+            ["ALL"] = "ВСЕ",
+            ["MOUSE"] = "МЫШЬ",
+            ["KEYBOARD"] = "КЛАВИАТУРА",
+            ["GAMEPAD"] = "ГЕЙМПАД",
+            ["NETWORK"] = "СЕТЬ",
+            ["AUDIO"] = "ЗВУК",
+            ["STORAGE"] = "НАКОПИТЕЛИ",
+            ["NONE"] = "СНЯТЬ ВСЁ",
+            ["P-CORES"] = "P-ЯДРА",
+            ["MODIFIED"] = "ИЗМЕНЕНО",
+            ["[ ALL ]"] = "[ ВСЕ ]",
+            ["[ MOUSE ]"] = "[ МЫШЬ ]",
+            ["[ KEYBOARD ]"] = "[ КЛАВИАТУРА ]",
+            ["[ GAMEPAD ]"] = "[ ГЕЙМПАД ]",
+            ["[ USB ]"] = "[ USB ]",
+            ["[ GPU ]"] = "[ GPU ]",
+            ["[ NETWORK ]"] = "[ СЕТЬ ]",
+            ["[ AUDIO ]"] = "[ ЗВУК ]",
+            ["[ STORAGE ]"] = "[ НАКОПИТЕЛИ ]",
+            ["[ NONE ]"] = "[ СНЯТЬ ВСЁ ]",
+            ["[ P-CORES ]"] = "[ P-ЯДРА ]",
+            ["[ CCD0 ]"] = "[ CCD0 ]",
+            ["[ CCD1 ]"] = "[ CCD1 ]",
+            ["[ MODIFIED ]"] = "[ ИЗМЕНЕНО ]",
+            ["[ COPY REGISTRY ]"] = "[ СКОПИРОВАТЬ РЕЕСТР ]",
+            ["Filter devices... (Ctrl+F)"] = "Фильтр устройств... (Ctrl+F)",
+            ["NO MATCHING DEVICES"] = "УСТРОЙСТВА НЕ НАЙДЕНЫ",
+            ["No devices match the current filter criteria."] = "Нет устройств, соответствующих заданному фильтру.",
+            ["COPY REGISTRY"] = "СКОПИРОВАТЬ РЕЕСТР",
+            ["Click to copy full registry path to clipboard"] = "Нажмите, чтобы скопировать путь в реестре в буфер обмена",
+            ["Registry path copied to clipboard."] = "Путь в реестре скопирован в буфер обмена.",
+            ["Select all logical cores"] = "Выбрать все логические ядра",
+            ["Clear all cores"] = "Снять выбор со всех ядер",
+            ["Select physical P-cores only"] = "Выбрать только физические P-ядра",
+            ["Select CCD0 cores only"] = "Выбрать только ядра CCD0",
             ["MSI Mode:"] = "MSI Mode:",
             ["MSI Limit:"] = "MSI Limit:",
             ["IRQ Priority:"] = "IRQ Priority:",
@@ -878,7 +935,7 @@ internal static partial class UiLanguage
             ["CCX group"] = "CCX group",
             ["E-core"] = "E-core",
             ["E-Core"] = "E-Core",
-            ["How to use: set group counts, then assign each LP to Core/CCD/CCX groups. Tick E-core where needed."] = "Укажите количество групп, затем назначьте каждый LP в Core/CCD/CCX groups. При необходимости отметьте E-core.",
+            ["How to use: set group counts, then assign each LP to Core/CCD/CCX groups. Tick E-core where needed."] = "Укажите количество групп, затем назначьте логические процессоры (LP) в группы Core/CCD/CCX. При необходимости отметьте E-core.",
             ["Tip: full PC presets are above. This section is for adding/removing individual fake devices and temporarily hiding real devices."] = "Подсказка: готовые пресеты ПК находятся выше. В этом разделе можно добавлять и удалять тестовые устройства, а также временно скрывать реальные.",
             ["Test Devices"] = "Тестовые устройства",
             ["Test options"] = "Параметры тестирования",
@@ -938,6 +995,13 @@ internal static partial class UiLanguage
             ["RESULT: PARTIAL"] = "РЕЗУЛЬТАТ: ЧАСТИЧНО",
             ["RESULT: FAILED"] = "РЕЗУЛЬТАТ: ОШИБКА",
             ["RESULT: STRESS"] = "РЕЗУЛЬТАТ: СТРЕСС-ТЕСТ",
+            ["PROMPT: IMOD"] = "ДИАЛОГ: IMOD",
+            ["PROMPT: BACKUP"] = "ДИАЛОГ: БЭКАП",
+            ["PROMPT: RESTORE"] = "ДИАЛОГ: ВОССТАНОВЛЕНИЕ",
+            ["PROMPT: INFO"] = "ДИАЛОГ: ИНФО",
+            ["TEST MODE INFO"] = "ИНФО ТЕСТОВОГО РЕЖИМА",
+            ["DEVICE TWEAKER is running in TEST ADMIN mode.\n\nAll hardware adjustments and registry modifications are simulated and completely safe."] =
+                "DEVICE TWEAKER запущен в тестовом режиме администратора.\n\nВсе аппаратные настройки и изменения реестра симулируются и полностью безопасны.",
             ["RESET TO REAL"] = "ВЕРНУТЬ РЕАЛЬНЫЕ ДАННЫЕ",
             ["DISABLE TEST MODE"] = "ОТКЛЮЧИТЬ ТЕСТОВЫЙ РЕЖИМ",
             ["Required while simulated devices are active."] = "Обязательно при активной эмуляции устройств.",
@@ -952,7 +1016,7 @@ internal static partial class UiLanguage
             ["Manual (custom)"] = "Вручную (своё)",
             ["Manual / custom"] = "Вручную (своё)",
             ["Preview the production result dialogs without running APPLY or AUTO-OPTIMIZATION. Partial also exercises the Vulnerable Driver Blocklist confirm when the blocklist is enabled."] =
-                "Превью боевых result-диалогов без APPLY и АВТООПТИМИЗАЦИИ. PARTIAL также показывает confirm Vulnerable Driver Blocklist, если blocklist включён.",
+                "Предпросмотр рабочих диалогов результатов без вызова ПРИМЕНИТЬ или АВТООПТИМИЗАЦИИ. Вариант ЧАСТИЧНО также открывает подтверждение для отключения Vulnerable Driver Blocklist, если список блокировки включён.",
             ["Release regression"] = "Регрессия релиза",
             ["Apply"] = "Применение",
             ["SafeReset"] = "SafeReset",
@@ -1017,6 +1081,7 @@ internal static partial class UiLanguage
             ["Built"] = "Сформирован",
             ["Selected settings were applied and saved."] = "Выбранные настройки применены и сохранены.",
             ["Please reboot your PC to finish applying the changes."] = "Перезагрузите компьютер, чтобы завершить применение изменений.",
+            ["Applied steps were saved."] = "Применённые шаги сохранены.",
             ["Applied steps were saved. One optional step was not completed."] = "Выполненные изменения сохранены. Один необязательный этап не завершён.",
             ["DTIMOD was unavailable. USB IMOD was not changed."] = "DTIMOD недоступен. Значение USB IMOD не изменено.",
             ["Windows blocked DTIMOD via Vulnerable Driver Blocklist. USB IMOD was not changed."] =
@@ -1143,6 +1208,24 @@ internal static partial class UiLanguage
             ["TEST DEVICE (no registry writes)"] = "ТЕСТОВОЕ УСТРОЙСТВО (без записи в реестр)",
             ["Protection: Wi-Fi settings preserved (no changes)"] = "Защита: настройки Wi-Fi не изменяются",
             ["Type: Storage controller"] = "Тип: контроллер накопителя",
+            ["Type: NVMe storage controller"] = "Тип: контроллер NVMe-накопителя",
+            ["Type: SATA/AHCI controller"] = "Тип: контроллер SATA/AHCI",
+            ["Refresh devices (F5 / Ctrl+R)"] = "Обновить устройства (F5 / Ctrl+R)",
+            ["Apply changes (Ctrl+S)"] = "Применить настройки (Ctrl+S)",
+            ["Auto-optimization (Ctrl+O)"] = "Автооптимизация (Ctrl+O)",
+            ["Restore settings (Ctrl+Z)"] = "Восстановить настройки (Ctrl+Z)",
+            ["Message Signaled Interrupts (MSI/MSI-X). Replaces legacy pin-based line IRQs with direct in-band PCIe memory writes to the local APIC. Eliminates interrupt sharing, lowers latency to sub-microsecond levels, and prevents DPC spikes in games."] =
+                "Режим Message Signaled Interrupts (MSI/MSI-X). Заменяет устаревшие строчные прерывания (line-based IRQ) на прямую запись в память контроллера прерываний (APIC) через шину PCIe. Устраняет разделение IRQ между устройствами, снижает задержку прерываний до субмикросекунд и предотвращает DPC-статтеры в играх.",
+            ["MessageNumberLimit (registry: MessageSignaledInterruptProperties). Controls the maximum number of MSI-X interrupt vectors the device driver can allocate. 0 = unlimited (hardware default). Recommended: 0 for GPUs and modern NICs."] =
+                "Параметр MessageNumberLimit (в реестре: MessageSignaledInterruptProperties). Задаёт максимальное количество векторов прерываний MSI-X, доступных драйверу устройства. 0 = без ограничений (аппаратное значение по умолчанию). Рекомендуется: 0 для видеокарт и современных сетевых карт.",
+            ["DevicePriority (registry: Affinity Policy). Controls Windows kernel interrupt servicing priority relative to other hardware devices. Setting High ensures that critical gaming inputs (mouse, keyboard) and GPU interrupts are processed ahead of secondary devices during heavy CPU load."] =
+                "Параметр DevicePriority (в реестре: Affinity Policy). Определяет приоритет обработки прерываний устройства ядром Windows относительно другого оборудования. Значение «Высокий» (High) гарантирует, что прерывания мыши, клавиатуры и видеокарты обрабатываются в первую очередь даже при высокой нагрузке на систему.",
+            ["DevicePolicy (registry: Affinity Policy). Defines how the Windows HAL routes device interrupts across processors:\n• SpecifiedProcessors: strictly binds interrupts to the selected Affinity Mask\n• MachineDefault: default Windows steering via BIOS/ACPI tables\n• AllCloseProcessors / OneCloseProcessor: routes to near NUMA node cores\n• SpreadMessagesAcrossAllProcessors: distributes MSI-X messages across all cores."] =
+                "Параметр DevicePolicy (в реестре: Affinity Policy). Определяет политику маршрутизации прерываний устройства ядром Windows HAL:\n• SpecifiedProcessors: строгая привязка прерываний к выбранной Affinity Mask\n• MachineDefault: стандартное распределение Windows на основе таблиц BIOS/ACPI\n• AllCloseProcessors / OneCloseProcessor: маршрутизация по ядрам текущего NUMA-узла\n• SpreadMessagesAcrossAllProcessors: распределение сообщений MSI-X по всем ядрам.",
+            ["Interrupt Affinity Mask (AssignmentSetOverride). Strictly routes hardware interrupt service routines (ISRs) and deferred procedure calls (DPCs) to the selected CPU logical cores."] =
+                "Маска привязки прерываний Affinity Mask (AssignmentSetOverride). Направляет обработчики аппаратных прерываний (ISR) и отложенные вызовы (DPC) строго на выбранные логические процессоры (ядра).",
+            ["Shows the number of allocated interrupt vectors and current interrupt delivery mode. MSI/MSI-X indicates a modern dedicated interrupt vector. Line-based indicates legacy INTx sharing with other PCI devices."] =
+                "Отображает количество выделенных векторов прерываний и текущий режим доставки. MSI/MSI-X указывает на современный выделенный вектор без коллизий. Строчный режим (Line-based) указывает на устаревший общий IRQ INTx, делящий линию с другими устройствами.",
             ["Net type: NetAdapterCx"] = "Тип сети: NetAdapterCx",
             ["Copied"] = "Скопировано",
             ["RSS assigns receive queues to CPUs. IRQ writes interrupt-affinity policy. BOTH writes both settings when the adapter and driver support RSS."] = "RSS распределяет receive queues по CPU. IRQ задаёт interrupt-affinity policy. BOTH применяет обе настройки, если сетевой адаптер и драйвер поддерживают RSS.",
@@ -1205,7 +1288,7 @@ internal static partial class UiLanguage
             ["Disable sandbox dry-run to perform a real RESET WINDOWS DEFAULT."] = "Отключите тестовый режим, чтобы выполнить настоящий СБРОС WINDOWS.",
             ["RESET WINDOWS DEFAULT preview finished with errors."] = "Предпросмотр сброса Windows завершён с ошибками.",
             ["RESET WINDOWS DEFAULT PREVIEW"] = "ПРЕДПРОСМОТР СБРОСА WINDOWS",
-            ["(affinity masks not supported on SSD/HDD)"] = "(affinity masks не поддерживаются для SSD/HDD)",
+            ["(affinity masks not supported on SSD/HDD)"] = "(affinity masks не поддерживаются для накопителей)",
             ["Scanning devices..."] = "Сканирование устройств...",
             ["Clearing device list..."] = "Очистка списка устройств...",
             ["Enumerating devices..."] = "Поиск устройств...",
@@ -1291,6 +1374,12 @@ internal static partial class UiLanguage
         ("no changes", "нет изменений"),
         ("processed", "обработано"),
         ("reading...", "чтение..."),
+        ("Windows Default", "По умолчанию Windows"),
+        ("NVMe storage controller", "контроллер NVMe-накопителя"),
+        ("SATA/AHCI controller", "контроллер SATA/AHCI"),
+        ("Storage controller", "контроллер накопителя"),
+        ("Mouse:", "Мышь:"),
+        ("Keyboard:", "Клавиатура:"),
     ];
 
     [GeneratedRegex("^Affinity Mask: (.+)$", RegexOptions.CultureInvariant)]
@@ -1358,4 +1447,66 @@ internal static partial class UiLanguage
 
     [GeneratedRegex("^Value: ReservedCpuSets = (.+) \\| CPUs: (.+)$", RegexOptions.CultureInvariant)]
     private static partial Regex CpuValueRegex();
+
+    [GeneratedRegex(@"^Apply changes \(Ctrl\+S\) — modified: (\d+)$", RegexOptions.CultureInvariant)]
+    private static partial Regex ApplyChangesDirtyRegex();
+
+    [GeneratedRegex(@"^CPU (\d+): (P-core SMT sibling|P-core|E-core)(, CCD \d+)?(, CCX \d+)?, Group (\d+), Core (\d+), Local (\d+)\. CPPC: (.+)$", RegexOptions.CultureInvariant)]
+    private static partial Regex CpuTooltipRegex();
+
+    [GeneratedRegex(@"^rating (\d+), (preferred rank #1|rank #\d+)$", RegexOptions.CultureInvariant)]
+    private static partial Regex CppcRatingRankRegex();
+
+    [GeneratedRegex(@"^(preferred rank #1|rank #(\d+))$", RegexOptions.CultureInvariant)]
+    private static partial Regex CppcRankOnlyRegex();
+
+    private static string TranslateCpuTooltip(Match match)
+    {
+        string lp = match.Groups[1].Value;
+        string coreType = match.Groups[2].Value switch
+        {
+            "P-core SMT sibling" => "Поток SMT (P-ядро)",
+            "E-core" => "E-ядро",
+            _ => "P-ядро",
+        };
+        string ccd = match.Groups[3].Value;
+        string ccx = match.Groups[4].Value;
+        string group = match.Groups[5].Value;
+        string core = match.Groups[6].Value;
+        string local = match.Groups[7].Value;
+        string cppcRaw = match.Groups[8].Value;
+
+        string cppcTranslated;
+        if (cppcRaw == "unavailable")
+        {
+            cppcTranslated = "недоступно";
+        }
+        else
+        {
+            Match cppcFull = CppcRatingRankRegex().Match(cppcRaw);
+            if (cppcFull.Success)
+            {
+                string rankText = cppcFull.Groups[2].Value == "preferred rank #1"
+                    ? "приоритетный ранг #1"
+                    : $"ранг #{cppcFull.Groups[2].Value.Replace("rank #", "", StringComparison.Ordinal)}";
+                cppcTranslated = $"рейтинг {cppcFull.Groups[1].Value}, {rankText}";
+            }
+            else
+            {
+                Match cppcRankOnly = CppcRankOnlyRegex().Match(cppcRaw);
+                if (cppcRankOnly.Success)
+                {
+                    cppcTranslated = cppcRankOnly.Groups[1].Value == "preferred rank #1"
+                        ? "приоритетный ранг #1"
+                        : $"ранг #{cppcRankOnly.Groups[2].Value}";
+                }
+                else
+                {
+                    cppcTranslated = cppcRaw;
+                }
+            }
+        }
+
+        return $"CPU {lp}: {coreType}{ccd}{ccx}, Группа {group}, Ядро {core}, Локальный индекс {local}. CPPC: {cppcTranslated}";
+    }
 }

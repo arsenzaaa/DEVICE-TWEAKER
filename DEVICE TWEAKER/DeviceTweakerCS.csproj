@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -15,7 +15,7 @@
     <ApplicationManifest>assets\app.manifest</ApplicationManifest>
     <ApplicationIcon>assets\DEVICE TWEAKER.ico</ApplicationIcon>
     <!-- Local full-tree backups must not enter the compile graph. -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);DEVICE TWEAKER — копия\**;_handoff*\**;_compare\**;bin\SmokeSafe\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);DEVICE TWEAKER — копия\**;_handoff*\**;_compare\**;bin\SmokeSafe\**;tests\**</DefaultItemExcludes>
 
     <AssemblyName>DEVICE TWEAKER</AssemblyName>
     <RootNamespace>DeviceTweakerCS</RootNamespace>
@@ -37,6 +37,7 @@
 
   <ItemGroup>
     <PackageReference Include="System.Management" Version="8.0.0" />
+    <InternalsVisibleTo Include="DeviceTweaker.Tests" />
   </ItemGroup>
 
   <ItemGroup>

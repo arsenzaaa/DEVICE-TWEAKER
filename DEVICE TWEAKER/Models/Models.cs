@@ -135,7 +135,7 @@ internal sealed class DeviceInfo
     public string UsbPollingRates { get; init; } = string.Empty;
     public string AudioEndpoints { get; init; } = string.Empty;
     public string StorageTag { get; init; } = string.Empty;
-    public bool IsIntegratedGpu { get; init; }
+    public bool IsIntegratedGpu { get; set; }
     public bool Wifi { get; init; }
     public bool UsbIsXhci { get; init; }
     public bool UsbHasDevices { get; init; }
@@ -156,6 +156,7 @@ internal sealed class DeviceBlock
     public required DeviceKind Kind { get; init; }
     public required Panel Group { get; init; }
     public Panel? HeaderPanel { get; init; }
+    public Label? HeaderNote { get; init; }
     public Control? Divider { get; init; }
     public Label? CpuTitleLabel { get; init; }
     public Panel? CpuPanel { get; init; }
@@ -200,6 +201,55 @@ internal sealed class DeviceBlock
     public int? RssBaseCore { get; set; }
     public int NicItrOperationGeneration { get; set; }
     public NdisRssRuntimeState? NdisRssRuntime { get; set; }
+
+    public bool IsDirty { get; set; }
+    public Label? ModifiedBadge { get; set; }
+    public ulong InitialAffinityMask { get; set; }
+    public int InitialMsiIndex { get; set; }
+    public string InitialLimitText { get; set; } = string.Empty;
+    public int InitialPrioIndex { get; set; }
+    public int InitialPolicyIndex { get; set; }
+    public bool? InitialPowerSaving { get; set; }
+    public string InitialImodText { get; set; } = string.Empty;
+    public bool InitialImodChecked { get; set; }
+
+    public void CaptureInitialState()
+    {
+        InitialAffinityMask = AffinityMask;
+        InitialMsiIndex = MsiCombo.SelectedIndex;
+        InitialLimitText = LimitBox.Text ?? string.Empty;
+        InitialPrioIndex = PrioCombo.SelectedIndex;
+        InitialPolicyIndex = PolicyCombo.SelectedIndex;
+        InitialPowerSaving = PowerSavingCheck?.Checked;
+        InitialImodText = ImodBox.Text ?? string.Empty;
+        InitialImodChecked = ImodAutoCheck.Checked;
+        IsDirty = false;
+        UpdateModifiedBadge();
+    }
+
+    public bool CheckIsDirty()
+    {
+        bool dirty = AffinityMask != InitialAffinityMask
+            || MsiCombo.SelectedIndex != InitialMsiIndex
+            || !string.Equals(LimitBox.Text?.Trim(), InitialLimitText.Trim(), StringComparison.Ordinal)
+            || PrioCombo.SelectedIndex != InitialPrioIndex
+            || (PolicyCombo.Enabled && PolicyCombo.SelectedIndex != InitialPolicyIndex)
+            || (PowerSavingCheck is not null && PowerSavingCheck.Checked != InitialPowerSaving)
+            || (ImodAutoCheck.Visible && ImodAutoCheck.Checked != InitialImodChecked)
+            || (ImodBox.Visible && !string.Equals(ImodBox.Text?.Trim(), InitialImodText.Trim(), StringComparison.Ordinal));
+
+        IsDirty = dirty;
+        UpdateModifiedBadge();
+        return dirty;
+    }
+
+    public void UpdateModifiedBadge()
+    {
+        if (ModifiedBadge is not null)
+        {
+            ModifiedBadge.Visible = IsDirty;
+        }
+    }
 }
 
 internal sealed record UsbControllerInfo(string ControllerPNPID, string ControllerName);

@@ -21,8 +21,20 @@ public sealed partial class MainForm : Form
     private Label? _devicesBusyLabel;
     private int _devicesBusyDepth;
     private int _devicesBusyDone;
-    private int _devicesBusyTotal = 1;
+    private int _devicesBusyTotal;
     private Button[] _operationButtons = [];
+    private Button? _btnScanRef;
+    private Button? _btnApplyRef;
+    private Button? _btnAutoRef;
+    private Button? _btnRestoreRef;
+    private Panel _filterPanel = null!;
+    private FlowLayoutPanel? _filterCategoriesHost;
+    private string _activeCategoryFilter = "ALL";
+    private string _searchFilterText = string.Empty;
+    private ThemedTextBox _searchFilterBox = null!;
+    private Button _btnFilterClear = null!;
+    private readonly List<Button> _filterCategoryButtons = [];
+    private Label? _noMatchesLabel;
 
     private int _suppressReservedCpuEvents;
     private bool _testCpuActive;
@@ -1575,7 +1587,7 @@ public sealed partial class MainForm : Form
         return lines;
     }
 
-    private static (int Count, int MaxOverflow) GetCpuTextClipStats(DeviceBlock block)
+    private (int Count, int MaxOverflow) GetCpuTextClipStats(DeviceBlock block)
     {
         int count = 0;
         int maxOverflow = 0;
@@ -1586,7 +1598,7 @@ public sealed partial class MainForm : Form
                 continue;
             }
 
-            int overflow = box.GetPreferredSize(Size.Empty).Width - box.ClientSize.Width;
+            int overflow = box.GetPreferredSize(Size.Empty).Width - (box.ClientSize.Width + UiScale(2));
             if (overflow > 0)
             {
                 count++;
