@@ -31,7 +31,7 @@
 ## Why Interrupt Optimization Matters
 
 - **Game Thread Preemption (ISR / DPC Latency):**  
-  Interrupt Service Routines (ISR) and Deferred Procedure Calls (DPC) execute at kernel level with highest CPU priority (`DISPATCH_LEVEL`). If interrupts from high-polling mice (1000–8000 Hz) or network cards execute on the same physical core running the game's primary render thread, the render thread is forcibly preempted. This causes micro-stutters, irregular frame times, and 0.1% low FPS drops.
+  Interrupt Service Routines (ISR) and Deferred Procedure Calls (DPC) execute at kernel level with highest CPU priority (`DISPATCH_LEVEL`). If interrupts from high-polling mice (1000–8000 Hz) or network cards execute on the same physical core running the game's primary render thread, the render thread is forcibly preempted. This causes micro-stutters, timing variance, and irregular frame times (frame time jitter).
 - **Relieving CPU 0:**  
   By default, Windows routes the system timer, disk I/O, and general device interrupts to logical core 0. Steering high-load peripherals and GPU interrupts away from CPU 0 prevents DPC queue congestion.
 - **Hardware USB Moderation (xHCI IMOD):**  
