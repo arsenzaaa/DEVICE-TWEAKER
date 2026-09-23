@@ -1,125 +1,190 @@
 <div align="center">
 
-# DEVICE TWEAKER
+<img src="./DEVICE%20TWEAKER/assets/banner.svg" alt="DEVICE TWEAKER Banner" width="900">
 
-[![Telegram](https://img.shields.io/badge/Telegram-arsenzaa-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/arsenzaa)
+<br><br>
+
 [![Release](https://img.shields.io/github/v/release/arsenzaaa/DEVICE-TWEAKER?include_prereleases&style=for-the-badge&color=007acc&label=Release)](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases)
+[![Unit Tests](https://img.shields.io/badge/Unit%20Tests-21%20Passed-2ea44f?style=for-the-badge&logo=dotnet)](https://github.com/arsenzaaa/DEVICE-TWEAKER)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20x64-0078d4?style=for-the-badge&logo=windows)](https://github.com/arsenzaaa/DEVICE-TWEAKER)
 [![License](https://img.shields.io/badge/License-GPLv3-2ea44f?style=for-the-badge)](LICENSE)
+[![Telegram](https://img.shields.io/badge/Telegram-@arsenzaa-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/arsenzaa)
+
+<p align="center">
+  <a href="./README.md">Русский</a> • <b>English</b>
+</p>
+
+---
 
 <br>
 
-<img src="./assets/DEVICE%20TWEAKER-wordmark.svg" alt="DEVICE TWEAKER" width="460">
+<img src="./DEVICE%20TWEAKER/assets/screenshots/main_interface_en.png" alt="DEVICE TWEAKER Main Interface" width="900">
+
+</div>
 
 <br>
 
-[Русский](./README.md) | **English**
-
-</div>
+**DEVICE TWEAKER** is a low-level Windows 10 and 11 utility combining Message Signaled Interrupts (MSI / MSI-X) management, CPU interrupt affinity routing with hardware topology awareness, kernel core isolation (ReservedCpuSets), network stack tuning (RSS, NIC ITR), and direct physical register manipulation of USB xHCI IMOD (at a 250 ns quantum via a custom kernel driver) in a single unified interface with 1-click automatic optimization.
 
 ---
 
-<div align="center">
-  <img src="./assets/screenshots/main_interface_en.png" alt="DEVICE TWEAKER GUI" width="850">
-</div>
+## Why Interrupt Optimization Matters
+
+- **Game Thread Preemption (ISR / DPC Latency):**  
+  Interrupt Service Routines (ISR) and Deferred Procedure Calls (DPC) execute at kernel level with highest CPU priority (`DISPATCH_LEVEL`). If interrupts from high-polling mice (1000–8000 Hz) or network cards execute on the same physical core running the game's primary render thread, the render thread is forcibly preempted. This causes micro-stutters, irregular frame times, and 0.1% low FPS drops.
+- **Relieving CPU 0:**  
+  By default, Windows routes the system timer, disk I/O, and general device interrupts to logical core 0. Steering high-load peripherals and GPU interrupts away from CPU 0 prevents DPC queue congestion.
+- **Hardware USB Moderation (xHCI IMOD):**  
+  xHCI USB controllers enable interrupt moderation (~50 μs) by default, batching incoming packets before signaling the CPU. Setting this register to `0 μs` via the custom `DTIMOD.sys` kernel driver disables moderation entirely, delivering mouse movement packets to the CPU with zero hardware delay.
+- **Topological Routing (CCD & Hybrid Cores):**  
+  Bypassing Intel efficiency cores (E-Cores) and pinning latency-critical device interrupts to the 3D V-Cache chiplet (CCD0) on AMD Ryzen processors avoids cross-CCX penalties and Infinity Fabric interconnect latency.
 
 ---
 
-**DEVICE TWEAKER** is a Windows 10 and 11 utility combining MSI Mode configuration, CPU Affinity interrupt steering, ReservedCpuSets core isolation, network stack optimization (RSS, NIC ITR), and direct USB xHCI IMOD register tuning in a unified interface with smart CPU topology auto-optimization.
+## Key Features
+
+- **Categorized Device Monitoring:** GPUs, USB controllers, network adapters, storage controllers, and audio endpoints organized into discrete blocks with real-time parameter inspection.
+- **MSI / MSI-X & IRQ Priority:** Enable Message Signaled Interrupts, remove vector limits (`MessageNumberLimit`), and enforce `IRQ Priority = High`.
+- **CPU Affinity Engine:** Manual and automatic routing with hardware topology awareness:
+  - Intel Hybrid Architecture (P-Core / E-Core separation).
+  - Hyper-Threading / SMT logical pairs.
+  - AMD Ryzen Chiplets (CCD0 with 3D V-Cache vs CCD1).
+  - CCX clusters and Windows CPPC processor core energy/performance ratings.
+- **Direct USB xHCI IMOD Control via `DTIMOD.sys`:** Read and write physical interrupt moderation registers (MMIO) with 250 ns precision. Configure `0 μs` for zero-delay mouse operation or set individual per-interrupter timings.
+- **Network Stack Optimization (RSS & NIC ITR):** Complete disabling of network interrupt throttling (`ITR = 0 / Off` for supported Intel and Realtek NICs), Receive Side Scaling (RSS) queue tuning, and Energy Efficient Ethernet (EEE) disabling.
+- **Kernel-Level Core Isolation (`ReservedCpuSets`):** Configure the Windows scheduler isolation mask so background OS tasks and worker threads avoid dedicated gaming cores.
+- **1-Click Auto-Optimization Engine:**
+  - Offloads `CPU 0` completely from peripherals and graphics controllers.
+  - Pins the GPU to a dedicated adjacent pair of physical performance cores.
+  - Separates high-frequency mouse and NIC interrupts to prevent DPC queue collisions.
+  - Restricts device interrupts to CCD0 on AMD Ryzen X3D processors.
+- **Power Management Control:** Fast toggling of selective suspend and bus power-saving policies for USB controllers and Ethernet NICs.
+- **State Protection & Safe Rollback:** Automatic snapshot creation before any changes, write-protected Windows factory snapshot (`ORIGINAL STATE`), and comprehensive one-click restore.
+- **Bilingual Interface:** Real-time on-the-fly switching between English and Russian without application restart.
 
 ---
 
-## Why Interrupt Tuning Matters
+<details>
+<summary><b>📸 Visual Showcase & Topology Previews (Click to expand)</b></summary>
+<br>
 
-- **Interrupt Preemption Over Game Threads:** Hardware Interrupt Service Routines (ISR) and Deferred Procedure Calls (DPC) execute with highest Windows kernel priority. When network cards or high-polling mice (1000–8000 Hz) process interrupts on the same core executing your game, the game thread is preempted, causing micro-stutters and uneven frametimes.
-- **Offloading CPU 0:** By default, Windows routes the system timer, disk queues, and device interrupts to logical core 0, bottlenecking DPC queues.
-- **Disabling USB Moderation Delay (xHCI IMOD):** xHCI controllers default to ~50 µs interrupt moderation, buffering mouse packets in batches. Setting IMOD to `0 µs` via the custom `DTIMOD.sys` driver disables this buffering entirely — mouse interrupts reach the CPU instantly.
-- **CPU Silicon Topology Awareness:** Prevents device interrupts from landing on slow Intel E-cores and locks game traffic to the 3D V-Cache chiplet (CCD0) on AMD Ryzen processors, avoiding high-latency Infinity Fabric data transfers.
+### 1. AMD Ryzen Dual-CCD Topology (CCD0 with 3D V-Cache vs CCD1)
+<p align="center">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_dual_ccd_en.png" alt="AMD Dual-CCD Topology" width="850">
+</p>
 
----
+### 2. Intel Hybrid Architecture Topology (P-Cores & E-Cores)
+<p align="center">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_intel_hybrid_ru.png" alt="Intel Hybrid Topology" width="850">
+</p>
 
-## Features
+### 3. USB xHCI IMOD Register Table (250 ns quantum)
+<p align="center">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_imod_table_en.png" alt="xHCI IMOD Table" width="850">
+</p>
 
-- **Device Categorization & Monitoring:** graphics cards, USB controllers, network adapters, NVMe storage, and audio devices organized in separate categories with their active interrupt settings.
-- **MSI / MSI-X & IRQ Priority:** enable Message Signaled Interrupts (MSI), remove message vector caps (`MessageNumberLimit`), and set high interrupt priority (`IRQ Priority = High`).
-- **CPU Affinity Steering:** manual and automatic device-to-core binding with a visual map: P-Core / E-Core separation, Hyper-Threading / SMT pairs, AMD chiplets (CCD0 / CCD1), CCX blocks, and CPPC core performance rankings.
-- **Direct USB xHCI IMOD Control via `DTIMOD.sys`:** read and write physical MMIO interrupt moderation registers with 250 ns granularity. Set `0 µs` (unmoderated) for mouse ports or tune custom intervals per interrupter.
-- **Network Stack Optimization (RSS & NIC ITR):** disable NIC interrupt moderation (`ITR = 0 / Off` on Intel and Realtek), configure Receive Side Scaling (RSS) queues, and disable Energy Efficient Ethernet (EEE).
-- **Core Isolation via `ReservedCpuSets`:** set the kernel-level `ReservedCpuSets` bitmask. Reserved cores are exempt from general Windows background threads and services.
-- **1-Click CPU Topology Auto-Optimization:**
-  - Offloads `CPU 0` from peripheral and device interrupts.
-  - Binds the GPU to a dedicated pair of physical P-cores.
-  - Isolates mouse and network queues onto separate cores to prevent DPC contention.
-  - Pins interrupts to the 3D V-Cache chiplet (CCD0) on AMD Ryzen X3D processors.
-- **Power Management:** easily disable power-saving states and Selective Suspend on USB controllers and network adapters.
-- **USB Controller Classification:** CHIP 0 / CHIP 1 detection by PCI ID and refined filtering for NVIDIA USB controllers.
-- **Safety & Backups:** automatic snapshot before applying any change, protected original baseline (ORIGINAL STATE), and one-click rollback.
-- **Localization:** native Russian and English interface with instant on-the-fly switching.
+### 4. Safety: Automated Backups & Factory Snapshot (ORIGINAL STATE)
+<p align="center">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/backup_choice_dialog.png" alt="Backup Dialog" width="850">
+</p>
 
----
+### 5. Topology Simulation Engine (Test Admin Panel)
+<p align="center">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/test_admin_panel.png" alt="Test Admin Panel" width="850">
+</p>
 
-## Important
-
-- The program modifies registry settings (`HKLM`) and uses the low-level `DTIMOD.sys` driver when working with IMOD.
-- The **REFRESH** button queries devices through standard SetupAPI and registry without loading kernel drivers.
-- The `DTIMOD.sys` driver is only loaded when clicking **CHECK** or applying IMOD settings. Loaded via KDU, it remains in memory until reboot to avoid kernel instability on unload.
-- A system restart is required after applying settings for kernel and registry changes to take effect.
-- Diagnostics logs are automatically written on each launch in the `logs` folder next to the executable.
+</details>
 
 ---
 
-## Requirements
+## Safety & Driver Architecture
 
-- Windows 10 or Windows 11 (64-bit).
-- Build variants:
-  - `DEVICE.TWEAKER.exe` (~4 MB) — standard executable, requires [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0).
-  - `DEVICE.TWEAKER.NET.FRAMEWORK.exe` (~150 MB) — standalone build with embedded .NET 8 runtime (runs out of the box on clean Windows).
+- **Driver-Free Polling:** The **REFRESH** button queries hardware through Windows SetupAPI and registry keys without loading any kernel driver.
+- **Isolated Kernel Driver (`DTIMOD.sys`):** Loaded only upon explicit **CHECK** or when writing IMOD registers. Loaded via KDU, the driver remains resident until system reboot to prevent kernel instability from dynamic driver unloading.
+- **System Reboot:** A system reboot is required for registry interrupt changes and hardware parameters to take effect.
+- **Diagnostic Logging:** Structured logs are automatically generated on every launch inside the `logs` directory alongside the executable.
 
 ---
 
-## Usage Guide
+## System Requirements
+
+- **Operating System:** Windows 10 or Windows 11 (64-bit, all editions).
+- **Available Builds:**
+  - `DEVICE.TWEAKER.exe` (~4 MB) — standard build, requires [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0).
+  - `DEVICE.TWEAKER.NET.FRAMEWORK.exe` (~150 MB) — standalone self-contained build with bundled .NET 8 runtime (runs out of the box on clean Windows installations).
+
+---
+
+## Quick Start
 
 1. Download the latest release from [GitHub Releases](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases).
-2. Run the executable as **Administrator**.
-3. Review detected devices and current core assignments.
-4. Click **AUTO-OPTIMIZATION** for automatic CPU layout or adjust affinities manually.
-5. Click **APPLY**.
-6. Restart your computer.
+2. Run the application as **Administrator**.
+3. Click **AUTO-OPTIMIZATION** for automated topology-aware matching, or configure affinities manually.
+4. Click **APPLY**.
+5. Restart your computer.
+
+For full version history, see [CHANGELOG.md](./DEVICE%20TWEAKER/CHANGELOG.md).
 
 ---
 
 ## Building from Source
 
-Requires the [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
+Compilation requires the [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
 
-Build both flavors with a single command:
+Build both application variants and generate SHA-256 checksums with a single command from the repository root:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Flavor both -Configuration Release -SkipImodDriverBuild
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\DEVICE TWEAKER\build.ps1" -Flavor both -Configuration Release -SkipImodDriverBuild
 ```
 
-Binaries and SHA-256 hashes will be placed in `bin\ReleasePackages\<version>\`.
+Compiled binaries and checksums are placed into `DEVICE TWEAKER\bin\ReleasePackages\<version>\`.
 
 ---
 
-## Project Structure
+## Automated Test Suite
 
-- `Affinity` — CPU Affinity, interrupt steering, RSS queues, and ReservedCpuSets mask.
-- `Core` — system services, backup creation, restore logic, and IMOD implementation.
-- `Devices` — detection of PCI/PCI-e devices, USB hosts, and NDIS network adapters.
-- `GUI` — WinForms user interface, custom controls, and modal dialogs.
-- `IMOD` — `DTIMOD.sys` kernel driver and KDU loader.
-- `Localization` — Russian and English UI strings.
-- `Tweaks` — CPU topology auto-optimization and reset logic.
+The repository includes a suite of **21 unit tests (xUnit)** validating processor topology parsing, affinity bitmasks, `ReservedCpuSets` formatting, and IMOD hardware tables:
+
+```powershell
+dotnet test ".\DEVICE TWEAKER\tests\DeviceTweaker.Tests\DeviceTweaker.Tests.csproj" -c Release -p:BuildImodDriver=false
+```
 
 ---
 
-## Developer
+## Repository Layout
 
-- **Telegram:** [@arsenzaa](https://t.me/arsenzaa)
+```
+DEVICE-TWEAKER/
+├── .gitignore
+├── LICENSE
+├── README.md                      # Primary Russian documentation
+├── README.en.md                   # English documentation
+└── DEVICE TWEAKER/                # Application source code & assets
+    ├── Core/                      # Services, backup and restore engine
+    ├── Devices/                   # PCI, USB controller, and NDIS discovery
+    ├── GUI/                       # WinForms interface and dialog forms
+    ├── IMOD/                      # DTIMOD.sys physical MMIO driver and KDU
+    ├── Interop/                   # Low-level Win32 P/Invoke declarations
+    ├── Localization/              # Interface language catalogs (RU / EN)
+    ├── Models/                    # Data models, topologies, and reports
+    ├── Tweaks/                    # Topology-aware auto-tuning heuristics
+    ├── Scripts/                   # Automation and validation scripts
+    ├── tests/                     # DeviceTweaker.Tests xUnit test suite
+    ├── assets/                    # Graphical assets, icons, and screenshots
+    ├── docs/                      # Technical documentation & release archives
+    ├── DeviceTweakerCS.csproj     # .NET 8 project definition
+    └── build.ps1                  # Multi-target automated build script
+```
+
+---
+
+## Author & Community
+
+- **Author:** [@arsenzaa](https://t.me/arsenzaa)
 - **GitHub:** [arsenzaaa](https://github.com/arsenzaaa)
 - **Repository:** [DEVICE-TWEAKER](https://github.com/arsenzaaa/DEVICE-TWEAKER)
 
 ## License
 
 This project is licensed under the [GNU General Public License v3.0](LICENSE).  
-KDU components in `IMOD/KDU` are licensed under the MIT License.
+KDU components in `IMOD/KDU` are distributed under the MIT license.
