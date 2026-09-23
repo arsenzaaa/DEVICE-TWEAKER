@@ -24,28 +24,56 @@
 
 <br>
 
-**DEVICE TWEAKER** is a Windows 10 and 11 utility for configuring device interrupts (MSI), core affinity routing (CPU Affinity), direct USB interrupt moderation (xHCI IMOD), and network stack tuning.
+**DEVICE TWEAKER** is a Windows 10 and 11 utility for comprehensive configuration of device interrupts (MSI), core affinity routing (CPU Affinity), direct USB interrupt moderation (xHCI IMOD), and network stack tuning.
 
 It combines into a single interface everything that previously required scattered tools and manual registry edits: switching devices to MSI / MSI-X mode, removing vector limits, pinning interrupts to specific cores according to CPU architecture, reading and writing USB IMOD registers directly via our custom kernel driver `DTIMOD.sys`, configuring network queues (RSS / NIC ITR), and reserving CPU cores via `ReservedCpuSets`.
 
 ---
 
-## Why Configure Interrupts
+## Comparison: Default Windows vs DEVICE TWEAKER
 
-In Windows, device hardware signals follow a specific processing chain:
-1. A device (mouse, keyboard, network card, GPU) fires a hardware interrupt (**IRQ**).
-2. The CPU pauses current work and executes a fast Interrupt Service Routine (**ISR**).
-3. The driver places the primary processing into a Deferred Procedure Call (**DPC**) queue, executing at the highest priority (`DISPATCH_LEVEL`).
-4. Data is delivered to OS input subsystem threads (in Windows 10 — `CSRSS`, in Windows 11 — `DWM`), which then forward it to the game (`GameThread`, `RenderThread`).
+| Parameter | Default Windows Configuration | With DEVICE TWEAKER Optimization |
+| :--- | :--- | :--- |
+| **Interrupt Queues** | Congested on `CPU 0` alongside the system timer and disk I/O | GPU, mouse, and network partitioned across dedicated physical cores without collisions |
+| **USB IMOD (Moderation)** | Controller delays interrupts by ~50 μs, batching packets in buffers | **`0 μs` (Zero Moderation)** — mouse reports delivered to the CPU immediately |
+| **Network Stack** | Network interrupts compete with mouse input inside shared `WDF01000.sys` | Dedicated **RSS** queues on isolated cores and disabled **`NIC ITR = 0`** |
+| **AMD Ryzen X3D CPUs** | Device interrupts arbitrarily land on CCD1, incurring Infinity Fabric latency | All latency-sensitive devices pinned to the fast **CCD0 (3D V-Cache)** |
+| **Intel Hybrid CPUs** | Interrupts can execute on slower efficiency cores (E-Cores) | Complete E-Core exclusion, interrupts pinned to dedicated **P-Cores** |
+| **Background OS Services** | Windows scheduler assigns background tasks to any free core | **`ReservedCpuSets`** shields optimized cores from background operating system noise |
+
+---
+
+## Interrupt & Latency Pipeline
+
+```mermaid
+flowchart TD
+    DEV["Hardware Device\n(Mouse / NIC / GPU)"] -->|Hardware IRQ| ISR["ISR Handler (DIRQL)\nFast kernel interception"]
+    ISR -->|Queues procedure| DPC["DPC Queue (DISPATCH_LEVEL)\nExecutes with highest priority"]
+    DPC -->|Signals input thread| INPUT["Windows Input Subsystem\n(CSRSS in Win 10 / DWM in Win 11)"]
+    INPUT -->|Delivers raw input| GAME["Game Process\n(RenderThread / GameThread)"]
+    DPC -.->|Core collision:\npreempts render loop| GAME
+
+    classDef devNode fill:#111620,stroke:#3b82f6,stroke-width:1.5px,color:#fff;
+    classDef isrNode fill:#18181b,stroke:#8b5cf6,stroke-width:1.5px,color:#fff;
+    classDef dpcNode fill:#26181b,stroke:#ef4444,stroke-width:1.5px,color:#fff;
+    classDef inputNode fill:#18181b,stroke:#06b6d4,stroke-width:1.5px,color:#fff;
+    classDef gameNode fill:#142419,stroke:#22c55e,stroke-width:1.5px,color:#fff;
+
+    class DEV devNode;
+    class ISR isrNode;
+    class DPC dpcNode;
+    class INPUT inputNode;
+    class GAME gameNode;
+```
 
 ### Why Micro-Stutters Happen Without Proper Configuration:
 
 - **Game Thread Preemption:**  
-  DPC queues execute with higher priority than games. When interrupts from a high-polling mouse (1000–8000 Hz) or network adapter are handled on the same core where the game renders frames, the game thread is forcibly preempted. This causes micro-stutters and uneven frame pacing.
+  DPC queues execute at `DISPATCH_LEVEL`, which strictly supersedes user-mode game execution. When interrupts from a high-polling mouse (1000–8000 Hz) or network card are processed on the same core where the game renders frames, the game thread is forcibly preempted, creating micro-stutters and irregular frame times.
 - **CPU 0 Overload:**  
-  By default, Windows routes the system timer, disk operations, and most device interrupts to core 0. Leaving graphics or input controllers on CPU 0 creates congestion in the shared system DPC queue.
-- **Hardware USB Delay (xHCI IMOD):**  
-  USB host controllers enable interrupt moderation (~50 μs) by default. The controller intentionally delays interrupts and batches packets instead of delivering them immediately. For high-rate gaming mice, this introduces latency and jitter. `DTIMOD.sys` writes directly to physical controller registers to set moderation to `0 μs` (zero delay).
+  By default, Windows directs system timers, disk operations, and general device interrupts to core 0. Leaving graphics or input controllers on CPU 0 forces their queues into shared system traffic.
+- **Hardware USB Moderation (xHCI IMOD):**  
+  USB host controllers enable interrupt moderation (~50 μs) by default. The controller intentionally holds back interrupts to batch incoming packets. For high-polling gaming mice, this introduces delivery jitter. `DTIMOD.sys` writes directly to physical controller registers to set moderation to `0 μs` (zero delay).
 - **Cross-CCD Latency on AMD (Infinity Fabric):**  
   On AMD Ryzen dual-CCD processors (such as 7950X3D, 9950X3D), the game runs on CCD0 with the fast 3D V-Cache. If GPU or peripheral interrupts execute on CCD1, data is constantly routed through the Infinity Fabric interconnect, adding 60–80 ns of round-trip latency.
 - **Slow E-Cores on Intel:**  
@@ -57,34 +85,40 @@ In Windows, device hardware signals follow a specific processing chain:
 
 ---
 
-## Features
+## Core Capabilities
 
-- **Categorized Device Layout:** GPUs, USB controllers (with CHIP 0 / CHIP 1 chipset path detection via PCI ID), network adapters, storage, and audio grouped into clear categories.
-- **MSI / MSI-X & IRQ Priority:** Switch devices to Message Signaled Interrupts, remove message limits (`MessageNumberLimit`), and set high priority (`IRQ Priority = High`).
-- **CPU Affinity Routing:**
-  - Physical core and Hyper-Threading / SMT pair mapping.
-  - AMD Ryzen chiplet separation (CCD0 with 3D V-Cache vs CCD1) and CCX clusters.
-  - Intel Performance (P-Core) and Efficiency (E-Core) core separation.
-  - Core priority (CPPC) detection via Windows ETW kernel events (Event ID 53) in under 60 ms.
-- **Direct USB IMOD Control via `DTIMOD.sys`:**
-  - Direct access to xHCI controller registers with 250 ns precision.
-  - Zero moderation (`0 μs`) for mouse controllers.
-  - Per-interrupter tuning (e.g. increase moderation for USB audio to reduce CPU overhead).
-- **Network Adapter Optimization:**
-  - Receive Side Scaling queue tuning (`*NumRssQueues`, `*RssBaseProcNumber`).
-  - Disabling interrupt moderation (`NIC ITR = 0 / Off`) on Intel (I210, I211, I225, I226, I350) and Realtek NICs.
-  - Disabling Energy Efficient Ethernet (EEE).
-- **1-Click Topology Auto-Optimization:**
-  - Moves GPU and mouse interrupts off congested `CPU 0`.
-  - Pins the GPU to an adjacent pair of physical P-Cores.
-  - Separates mouse and network interrupts to dedicated cores to prevent DPC queue collisions.
-  - Pins latency-sensitive devices to CCD0 on AMD Ryzen X3D processors.
-- **Power Management:** Quickly disable Selective Suspend and Power Saving for USB controllers and network adapters.
-- **Backups & Safety:**
-  - Automatic backup creation before applying any changes.
-  - Write-protected factory snapshot (**ORIGINAL STATE**) that is never overwritten.
-  - Parameter validation before writing and automatic rollback on failure.
-- **Bilingual Interface:** Real-time on-the-fly switching between English and Russian without restarting.
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>⚡ MSI / MSI-X Mode</h3>
+      <p>Transition devices from legacy line-based interrupts to Message Signaled Interrupts, remove message vector limits (<code>MessageNumberLimit</code>), and enforce <code>IRQ Priority = High</code>.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>🎯 CPU Affinity Routing</h3>
+      <p>Topology-aware physical core routing respecting SMT / Hyper-Threading pairs, AMD chiplets (CCD0 with 3D V-Cache vs CCD1), and Intel Performance (P-Core) vs Efficiency (E-Core) cores.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>⏱ Direct USB IMOD Control</h3>
+      <p>Zero moderation (<code>0 μs</code>) configuration via the custom <code>DTIMOD.sys</code> kernel driver at 250 ns precision. Per-interrupter tuning for mouse controllers and audio stability.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>🌐 Network Stack Tuning</h3>
+      <p>Partition Receive Side Scaling queues across dedicated cores (<code>*NumRssQueues</code>, <code>*RssBaseProcNumber</code>) and disable interrupt moderation (<code>NIC ITR = 0 / Off</code> for Intel and Realtek).</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>🚀 1-Click Auto-Optimization</h3>
+      <p>Automated heuristic configuration: unburdening <code>CPU 0</code>, separating mouse and network queues, pinning the GPU to adjacent P-Cores, and locking interrupts to CCD0 on AMD X3D.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>🛡 State Protection & Safety</h3>
+      <p>Mandatory automated backup generation before any write, write-protected factory snapshot (<strong>ORIGINAL STATE</strong>) that is never overwritten, and instant atomic rollback on write failures.</p>
+    </td>
+  </tr>
+</table>
 
 ---
 
@@ -113,6 +147,16 @@ In Windows, device hardware signals follow a specific processing chain:
 </p>
 
 </details>
+
+---
+
+## Hardware Compatibility
+
+| Component | Tested & Supported Hardware |
+| :--- | :--- |
+| **Processors** | • **AMD Ryzen:** Zen 2 / 3 / 4 / 5 (including 3D V-Cache models: 7800X3D, 7900X3D, 7950X3D, 9800X3D, 9950X3D)<br>• **Intel Core:** 10th through 14th Gen (Core i5 / i7 / i9 with heterogeneous P-Core / E-Core layouts) |
+| **Network Adapters** | • **Intel Ethernet:** I210, I211, I225-V, I225-LM, I225-K, I225-I, I226-V, I226-LM, I350<br>• **Realtek:** PCIe GbE Family Controller, 2.5GbE Gaming Family Controller |
+| **USB Controllers** | xHCI compliant controllers for USB 3.0 / 3.1 / 3.2 / USB4 (AMD B450, B550, X570, B650, X670, X870 and Intel B660, Z690, B760, Z790 chipsets) |
 
 ---
 
