@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 180" width="100%" height="180" role="img" aria-labelledby="title desc">
-  <title id="title">DEVICE TWEAKER Banner</title>
-  <desc id="desc">DEVICE TWEAKER — Low-Latency Windows Device and Interrupt Optimization Suite</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 170" width="100%" height="170" role="img" aria-labelledby="title desc">
+  <title id="title">DEVICE TWEAKER</title>
+  <desc id="desc">DEVICE TWEAKER — MSI, CPU Affinity, USB IMOD, RSS &amp; NIC ITR</desc>
   <defs>
     <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#0a0c10"/>
@@ -15,10 +15,10 @@
       <stop offset="100%" stop-color="#0052cc" stop-opacity="0"/>
     </linearGradient>
   </defs>
-  <rect width="960" height="180" rx="12" fill="url(#bgGrad)" stroke="#1e2533" stroke-width="1.5"/>
-  <rect x="180" y="112" width="600" height="2" fill="url(#accentGrad)"/>
+  <rect width="960" height="170" rx="12" fill="url(#bgGrad)" stroke="#1e2533" stroke-width="1.5"/>
+  <rect x="220" y="106" width="520" height="2" fill="url(#accentGrad)"/>
   <g fill="#ffffff" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Bahnschrift', Roboto, Helvetica, Arial, sans-serif">
-    <text x="480" y="86" font-size="46" font-weight="800" letter-spacing="12">DEVICE TWEAKER</text>
-    <text x="480" y="142" font-size="12" font-weight="600" letter-spacing="5" fill="#7d8b9e">LOW-LATENCY WINDOWS DEVICE &amp; INTERRUPT OPTIMIZATION SUITE</text>
+    <text x="480" y="82" font-size="44" font-weight="800" letter-spacing="12">DEVICE TWEAKER</text>
+    <text x="480" y="136" font-size="12" font-weight="600" letter-spacing="4" fill="#8898aa">MSI · CPU AFFINITY · USB IMOD · RSS &amp; NIC ITR</text>
   </g>
 </svg>

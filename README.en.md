@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./DEVICE%20TWEAKER/assets/banner.svg" alt="DEVICE TWEAKER Banner" width="900">
+<img src="./DEVICE%20TWEAKER/assets/banner.svg" alt="DEVICE TWEAKER" width="900">
 
 <br><br>
 
@@ -24,104 +24,82 @@
 
 <br>
 
-**DEVICE TWEAKER** is a low-level Windows 10 and 11 utility engineered for deterministic device interrupt management, input pipeline arbitration, and Windows NT kernel latency optimization.
+**DEVICE TWEAKER** is a Windows 10 and 11 utility for configuring device interrupts (MSI), core affinity routing (CPU Affinity), direct USB interrupt moderation (xHCI IMOD), and network stack tuning.
 
-The tool provides Message Signaled Interrupts configuration (**MSI / MSI-X**), hardware topology-aware core affinity routing (**CPU Affinity**), kernel core isolation via **`ReservedCpuSets`**, network stack queue partitioning (**RSS**, **NIC ITR**), and direct physical MMIO programming of USB interrupt moderation registers (**xHCI IMOD** at a 250 ns quantum via a custom `DTIMOD.sys` kernel driver).
-
----
-
-## Windows Kernel Latency & Interrupt Architecture
-
-In the Windows NT architecture, hardware interrupt dispatching operates on a strict priority hierarchy of Interrupt Request Levels (**IRQL**):
-
-```
-[ Hardware Device: USB / GPU / NIC ]
-                  │
-                  ▼  (Hardware IRQ)
-    [ Interrupt Service Routine (ISR) ]  ──►  Executes at DIRQL (disables core interrupts)
-                  │
-                  ▼  (Queues deferred call)
-    [ DPC Queue (WDF01000.sys) ]         ──►  Executes at DISPATCH_LEVEL
-                  │
-                  ▼  (Signals OS input subsystem thread)
-    [ Subsystem Input Thread ]
-       ├─ Windows 10: CSRSS (Win32k Raw Input Thread)
-       └─ Windows 11: DWM   (Kernel Sensor Thread / Master Input Thread)
-                  │
-                  ▼  (Delivers raw input via buffer or IPI)
-    [ Game / User-Mode Process ]
-       ├─ GameThread / App Input Thread
-       └─ RenderThread / RHIThread
-```
-
-### 1. Render Thread Preemption (Execution Preemption)
-Interrupt Service Routines (**ISR**) and Deferred Procedure Calls (**DPC**) execute at `DIRQL` and `DISPATCH_LEVEL`, which strictly supersede all user-mode execution (`PASSIVE_LEVEL`).
-
-When interrupts from a high-polling mouse (1000–8000 Hz), Ethernet controller, or GPU are scheduled on the same physical core running the game's critical loop (`RenderThread` or `GameThread`), the scheduler forcibly preempts game execution to drain driver DPC queues. This stalls the frame delivery pipeline, producing severe frame time variance (**Frame Time jitter**) and irregular pacing.
-
-### 2. Queue Congestion on CPU 0
-By default, the Windows scheduler directs system timers, storage NVMe/SATA I/O, system bus interrupts, and standard PnP controllers to logical core 0. Leaving graphics controllers and gaming peripherals on `CPU 0` forces their ISR/DPC handlers into a shared system queue, introducing unpredictable dispatch delays.
-
-### 3. Hardware USB Moderation (xHCI IMOD)
-The Intel xHCI specification implements hardware interrupt moderation (**IMOD**, controlled by `IMODI` / `IMODC` registers) inside USB host controllers. By default, Windows configures an interval of ~50 μs (200 units at a 250 ns quantum) per interrupter. The controller deliberately holds back interrupts to batch incoming data packets.
-
-For high-rate gaming mice (1000–8000 Hz), this batching introduces artificial delivery jitter. **DEVICE TWEAKER** communicates through `DTIMOD.sys` directly with the controller's physical MMIO space, writing `IMODI = 0 μs` (Zero Moderation) for immediate interrupt dispatch upon packet arrival. Conversely, audio endpoints can receive calibrated moderation intervals to reduce overall DPC load without buffer underruns.
-
-### 4. Topology Penalties (CCD0 3D V-Cache vs E-Cores)
-- **AMD Ryzen Dual-CCD (X3D):** CCD0 features a high-density 3D V-Cache slice with low access latency, while CCD1 provides standard cache at higher boost clocks. Inter-CCD communication via the Infinity Fabric interconnect incurs a 60–80 ns round-trip latency and invalidates L3 cache lines. Routing device interrupts to CCD1 while a game executes on CCD0 causes constant cross-die memory synchronization.
-- **Intel Hybrid Architecture (12–14th Gen):** Efficiency cores (E-Cores) lack Hyper-Threading, feature narrower execution pipelines, and exhibit higher C-state exit latencies. Handling real-time hardware interrupts on E-Cores introduces dispatch latency spikes.
-
-### 5. Network Stack: RSS, NIC ITR & NetAdapterCx
-High-throughput Ethernet controllers generate massive interrupt rates. Without explicit **Receive Side Scaling (RSS)** partitioning, incoming network packets share `WDF01000.sys` execution time with mouse input. Disabling network moderation (`NIC ITR = 0 / Off` on supported Intel and Realtek controllers) and deactivating **Energy Efficient Ethernet (EEE)** prevents PHY sleep states and eliminates packet buffering delays.
-
-### 6. Kernel Core Isolation (ReservedCpuSets)
-The `ReservedCpuSets` registry value in `HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\kernel` configures a CPU bitmask instructing the Windows NT scheduler to withhold unpinned threads and background system services from designated cores. Binding critical hardware interrupts to reserved cores insulates driver execution from background operating system noise.
+It combines into a single interface everything that previously required scattered tools and manual registry edits: switching devices to MSI / MSI-X mode, removing vector limits, pinning interrupts to specific cores according to CPU architecture, reading and writing USB IMOD registers directly via our custom kernel driver `DTIMOD.sys`, configuring network queues (RSS / NIC ITR), and reserving CPU cores via `ReservedCpuSets`.
 
 ---
 
-## Core Features
+## Why Configure Interrupts
 
-- **Bus-Level Device Classification:** Dedicated management blocks for GPUs, USB host controllers (with CHIP 0 / CHIP 1 hardware pathing via PCI ID), network adapters, storage controllers, and audio endpoints.
-- **MSI / MSI-X & IRQ Priority:** Transition devices from legacy line-based interrupts to Message Signaled Interrupts (MSI), eliminate message limits (`MessageNumberLimit`), and enforce `IRQ Priority = High`.
-- **Hardware-Aware Affinity Engine:**
-  - Physical core identification and SMT / Hyper-Threading logical pair mapping.
-  - AMD Ryzen chiplet awareness (CCD0 with 3D V-Cache vs CCD1) and CCX cluster grouping.
-  - Intel Performance (P-Core) and Efficiency (E-Core) segregation.
-  - Direct hardware core performance rating queries via kernel ETW events (`EventLogReader`, Event ID 53) in <60 ms without WMI overhead.
-- **Low-Level Kernel Driver `DTIMOD.sys`:**
-  - Direct physical MMIO reading and writing with 250 ns precision.
-  - PCI BAR boundary checking and operational register bounds verification.
-  - Zero Moderation configuration (`0 μs`) for mouse controllers.
-- **Network Stack Arbitration:**
+In Windows, device hardware signals follow a specific processing chain:
+1. A device (mouse, keyboard, network card, GPU) fires a hardware interrupt (**IRQ**).
+2. The CPU pauses current work and executes a fast Interrupt Service Routine (**ISR**).
+3. The driver places the primary processing into a Deferred Procedure Call (**DPC**) queue, executing at the highest priority (`DISPATCH_LEVEL`).
+4. Data is delivered to OS input subsystem threads (in Windows 10 — `CSRSS`, in Windows 11 — `DWM`), which then forward it to the game (`GameThread`, `RenderThread`).
+
+### Why Micro-Stutters Happen Without Proper Configuration:
+
+- **Game Thread Preemption:**  
+  DPC queues execute with higher priority than games. When interrupts from a high-polling mouse (1000–8000 Hz) or network adapter are handled on the same core where the game renders frames, the game thread is forcibly preempted. This causes micro-stutters and uneven frame pacing.
+- **CPU 0 Overload:**  
+  By default, Windows routes the system timer, disk operations, and most device interrupts to core 0. Leaving graphics or input controllers on CPU 0 creates congestion in the shared system DPC queue.
+- **Hardware USB Delay (xHCI IMOD):**  
+  USB host controllers enable interrupt moderation (~50 μs) by default. The controller intentionally delays interrupts and batches packets instead of delivering them immediately. For high-rate gaming mice, this introduces latency and jitter. `DTIMOD.sys` writes directly to physical controller registers to set moderation to `0 μs` (zero delay).
+- **Cross-CCD Latency on AMD (Infinity Fabric):**  
+  On AMD Ryzen dual-CCD processors (such as 7950X3D, 9950X3D), the game runs on CCD0 with the fast 3D V-Cache. If GPU or peripheral interrupts execute on CCD1, data is constantly routed through the Infinity Fabric interconnect, adding 60–80 ns of round-trip latency.
+- **Slow E-Cores on Intel:**  
+  On Intel 12–14th Gen processors, latency-critical interrupts should not be assigned to efficiency cores (E-Cores) due to their narrower pipeline and slower wake-up times.
+- **Mouse and Network Collisions:**  
+  When the network card and mouse share the same core, heavy network traffic saturates the `WDF01000.sys` DPC queue, causing mouse packets to wait in line. Network traffic should be moved to separate cores via RSS queues, with network moderation disabled (`NIC ITR = 0`).
+- **Why `ReservedCpuSets` Matters:**  
+  This is a Windows registry setting (`HKLM\...\Session Manager\kernel`) that instructs the OS scheduler not to schedule background services and unpinned threads on selected cores. We reserve cores to shield them from background system noise.
+
+---
+
+## Features
+
+- **Categorized Device Layout:** GPUs, USB controllers (with CHIP 0 / CHIP 1 chipset path detection via PCI ID), network adapters, storage, and audio grouped into clear categories.
+- **MSI / MSI-X & IRQ Priority:** Switch devices to Message Signaled Interrupts, remove message limits (`MessageNumberLimit`), and set high priority (`IRQ Priority = High`).
+- **CPU Affinity Routing:**
+  - Physical core and Hyper-Threading / SMT pair mapping.
+  - AMD Ryzen chiplet separation (CCD0 with 3D V-Cache vs CCD1) and CCX clusters.
+  - Intel Performance (P-Core) and Efficiency (E-Core) core separation.
+  - Core priority (CPPC) detection via Windows ETW kernel events (Event ID 53) in under 60 ms.
+- **Direct USB IMOD Control via `DTIMOD.sys`:**
+  - Direct access to xHCI controller registers with 250 ns precision.
+  - Zero moderation (`0 μs`) for mouse controllers.
+  - Per-interrupter tuning (e.g. increase moderation for USB audio to reduce CPU overhead).
+- **Network Adapter Optimization:**
   - Receive Side Scaling queue tuning (`*NumRssQueues`, `*RssBaseProcNumber`).
-  - Direct hardware throttle rate disabling (`NIC ITR = 0 / Off`) for Intel (I210, I211, I225, I226, I350) and Realtek NICs.
+  - Disabling interrupt moderation (`NIC ITR = 0 / Off`) on Intel (I210, I211, I225, I226, I350) and Realtek NICs.
   - Disabling Energy Efficient Ethernet (EEE).
 - **1-Click Topology Auto-Optimization:**
-  - Complete offloading of graphics and input peripherals from congested `CPU 0`.
-  - Pinning the GPU to an adjacent pair of dedicated physical P-Cores.
-  - Core separation between mouse and network interrupts to prevent DPC queue collisions.
-  - Restricting latency-sensitive devices to CCD0 on AMD Ryzen X3D processors.
-- **Bus Power Policy Control:** Fast toggling of selective suspend and device power-saving states for USB controllers and NDIS network adapters.
-- **State Protection & Rollback:**
-  - Mandatory automated backup generation before applying any registry or hardware modifications.
-  - Write-protected factory snapshot (**ORIGINAL STATE**).
-  - Pre-write parameter validation and automatic atomic rollback on write failures.
-- **Live Bilingual Localization:** Instant English / Russian switching without application restart.
+  - Moves GPU and mouse interrupts off congested `CPU 0`.
+  - Pins the GPU to an adjacent pair of physical P-Cores.
+  - Separates mouse and network interrupts to dedicated cores to prevent DPC queue collisions.
+  - Pins latency-sensitive devices to CCD0 on AMD Ryzen X3D processors.
+- **Power Management:** Quickly disable Selective Suspend and Power Saving for USB controllers and network adapters.
+- **Backups & Safety:**
+  - Automatic backup creation before applying any changes.
+  - Write-protected factory snapshot (**ORIGINAL STATE**) that is never overwritten.
+  - Parameter validation before writing and automatic rollback on failure.
+- **Bilingual Interface:** Real-time on-the-fly switching between English and Russian without restarting.
 
 ---
 
 <details>
-<summary><b>📸 Visual Showcase & Topology Previews (Click to expand)</b></summary>
+<summary><b>📸 Screenshots & Core Affinity Layouts (Click to expand)</b></summary>
 <br>
 
-### 1. AMD Ryzen Dual-CCD Topology (CCD0 with 3D V-Cache vs CCD1)
+### 1. Core Allocation: AMD Ryzen Dual-CCD (CCD0 with 3D V-Cache vs CCD1)
 <p align="center">
-  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_dual_ccd_en.png" alt="AMD Dual-CCD Topology" width="850">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_9950x3d_dual_ccd_ru.png" alt="AMD Dual-CCD Topology" width="850">
 </p>
 
-### 2. Intel Hybrid Architecture Topology (P-Cores & E-Cores)
+### 2. Core Allocation: Intel Hybrid (P-Core / E-Core)
 <p align="center">
-  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_intel_hybrid_ru.png" alt="Intel Hybrid Topology" width="850">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_intel_14900k_hybrid_ru.png" alt="Intel Hybrid Topology" width="850">
 </p>
 
 ### 3. USB xHCI IMOD Register Table (250 ns quantum)
@@ -129,34 +107,29 @@ The `ReservedCpuSets` registry value in `HKLM\SYSTEM\CurrentControlSet\Control\S
   <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_imod_table_en.png" alt="xHCI IMOD Table" width="850">
 </p>
 
-### 4. Safety: Automated Backups & Factory Snapshot (ORIGINAL STATE)
+### 4. Backups and Factory Snapshot Restore (ORIGINAL STATE)
 <p align="center">
-  <img src="./DEVICE%20TWEAKER/assets/screenshots/backup_choice_dialog.png" alt="Backup Dialog" width="850">
-</p>
-
-### 5. Topology Simulation Engine (Test Admin Panel)
-<p align="center">
-  <img src="./DEVICE%20TWEAKER/assets/screenshots/test_admin_panel.png" alt="Test Admin Panel" width="850">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/restore_dialog_ru.png" alt="Backups and Restore" width="850">
 </p>
 
 </details>
 
 ---
 
-## Driver Architecture & Kernel Safety
+## Driver & Safety Architecture
 
-- **Driverless Hardware Discovery:** The **REFRESH** action queries device status strictly through Windows SetupAPI and registry hives without loading any kernel modules.
-- **Isolated Kernel Driver (`DTIMOD.sys`):** Loaded on-demand via KDU exclusively when clicking **CHECK** or writing IMOD register values. The driver remains resident until reboot to prevent kernel instability from dynamic driver unloading.
-- **Parameter Application:** PCI/MSI interrupt routing and NDIS driver parameters are parsed by the OS kernel during device initialization, requiring a system reboot for changes to take full effect.
-- **Structured Logging:** Detailed diagnostic execution logs are recorded on every run in the `logs` folder next to the executable.
+- **Driver-Free Polling:** The **REFRESH** button queries devices using standard Windows SetupAPI and registry hives without loading the kernel driver.
+- **Kernel Driver `DTIMOD.sys`:** Loaded via KDU only when clicking **CHECK** or writing IMOD values. The driver remains resident until reboot to prevent kernel instability from dynamic driver unloading.
+- **Reboot:** Interrupt parameters are read by Windows during device initialization, so a system reboot is required after clicking **APPLY**.
+- **Logging:** Structured logs are written to the `logs` folder alongside the executable on every launch.
 
 ---
 
-## Build Variants & System Requirements
+## Build Variants & Requirements
 
-- **Operating System:** Windows 10 or Windows 11 (64-bit, Home, Pro, Enterprise, LTSC).
+- **OS:** Windows 10 or Windows 11 (64-bit, all editions).
 - **Available Builds:**
-  - `DEVICE.TWEAKER.exe` (~4 MB) — standard build, requires [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0).
+  - `DEVICE.TWEAKER.exe` (~4 MB) — standard version, requires [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0).
   - `DEVICE.TWEAKER.NET.FRAMEWORK.exe` (~150 MB) — standalone self-contained build with embedded .NET 8 runtime (runs out of the box on clean Windows installations).
 
 ---
@@ -171,7 +144,7 @@ Build both application variants and generate SHA-256 checksums with a single com
 powershell -NoProfile -ExecutionPolicy Bypass -File ".\DEVICE TWEAKER\build.ps1" -Flavor both -Configuration Release -SkipImodDriverBuild
 ```
 
-Compiled binaries and checksum files are generated in `DEVICE TWEAKER\bin\ReleasePackages\<version>\`.
+Compiled binaries and checksum files will be in `DEVICE TWEAKER\bin\ReleasePackages\<version>\`.
 
 ---
 
@@ -191,23 +164,23 @@ dotnet test ".\DEVICE TWEAKER\tests\DeviceTweaker.Tests\DeviceTweaker.Tests.cspr
 DEVICE-TWEAKER/
 ├── .gitignore
 ├── LICENSE
-├── README.md                      # Primary Russian documentation
-├── README.en.md                   # English documentation
+├── README.md                      # Documentation (Russian)
+├── README.en.md                   # Documentation (English)
 └── DEVICE TWEAKER/                # Application source code & assets
     ├── Core/                      # Services, backup and restore engine
     ├── Devices/                   # PCI, USB controller, and NDIS discovery
     ├── GUI/                       # WinForms interface and dialog forms
     ├── IMOD/                      # DTIMOD.sys physical MMIO driver and KDU
-    ├── Interop/                   # Low-level Win32 P/Invoke declarations
+    ├── Interop/                   # P/Invoke wrappers for Win32 API
     ├── Localization/              # Interface language catalogs (RU / EN)
     ├── Models/                    # Data models, topologies, and reports
-    ├── Tweaks/                    # Topology-aware auto-tuning heuristics
+    ├── Tweaks/                    # Auto-tuning heuristics
     ├── Scripts/                   # Automation and validation scripts
     ├── tests/                     # DeviceTweaker.Tests xUnit test suite
     ├── assets/                    # Graphical assets, icons, and screenshots
-    ├── docs/                      # Technical documentation & release archives
+    ├── docs/                      # Documentation & release archives
     ├── DeviceTweakerCS.csproj     # .NET 8 project definition
-    └── build.ps1                  # Multi-target automated build script
+    └── build.ps1                  # Automated build script
 ```
 
 ---
