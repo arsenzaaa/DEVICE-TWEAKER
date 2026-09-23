@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">DEVICE TWEAKER wordmark</title>
+  <desc id="desc">Refined two-line white DEVICE TWEAKER wordmark on black.</desc>
+  <rect width="1024" height="1024" fill="#000"/>
+  <g fill="#fff" text-anchor="middle" font-family="Bahnschrift, Arial, sans-serif">
+    <text x="512" y="460" font-size="176" font-weight="600" letter-spacing="18">DEVICE</text>
+    <text x="512" y="638" font-size="184" font-weight="700" letter-spacing="3">TWEAKER</text>
+  </g>
+</svg>

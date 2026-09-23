@@ -227,7 +227,8 @@ public sealed partial class MainForm
             : "SMT";
         bool hasHybridCpu = HasHybridCpu();
         bool hasDualCcdCpu = HasDualCcdCpu();
-        bool sandboxOn = IsSandboxDryRunActive();
+        bool sandboxOn = IsSandboxDryRunActive()
+            && !string.Equals(Environment.GetEnvironmentVariable("DEVICE_TWEAKER_QA_HIDE_SANDBOX_HEADER"), "1", StringComparison.Ordinal);
 
         SetHeaderFlag(_htPrefixLabel, _htStatusLabel, threadingName, OnOff(smtEnabled), smtEnabled);
         SetHeaderFlag(_hybridCpuPrefixLabel, _hybridCpuStatusLabel, "Hybrid CPU", OnOff(hasHybridCpu), hasHybridCpu);
@@ -5218,13 +5219,25 @@ public sealed partial class MainForm
                         systemPresetCombo.SelectedItem = SystemPresetMultiControllerInput;
                         ValidateQaMultiControllerAffinity();
                         WriteLog("TEST.QA.SANDBOX: Multi-controller affinity preset completed");
-                        systemPresetCombo.SelectedItem = SystemPresetRyzen3500X;
+                        string? targetFinalPreset = Environment.GetEnvironmentVariable("DEVICE_TWEAKER_QA_FINAL_PRESET");
+                        string selectedFinalPreset = targetFinalPreset switch
+                        {
+                            "Intel14900K" => SystemPresetIntel14900K,
+                            "Intel14600K" => SystemPresetIntel14600K,
+                            "Intel285K" => SystemPresetIntel285K5090,
+                            "Ryzen9950X3D" => SystemPresetRyzen9950X3DNdis,
+                            "Ryzen9950X3DNetCx" => SystemPresetRyzen9950X3DNetCx,
+                            "Ryzen9950X" => SystemPresetRyzen9950X,
+                            "Ryzen7800X3D" => SystemPresetRyzen7800X3D,
+                            _ => SystemPresetRyzen3500X
+                        };
+                        systemPresetCombo.SelectedItem = selectedFinalPreset;
                         if (!string.Equals(
                                 systemPresetCombo.SelectedItem?.ToString(),
-                                SystemPresetRyzen3500X,
+                                selectedFinalPreset,
                                 StringComparison.Ordinal))
                         {
-                            WriteLog("TEST.QA.SANDBOX: failed to select Ryzen 3500X regression preset");
+                            WriteLog($"TEST.QA.SANDBOX: failed to select {selectedFinalPreset} regression preset");
                             return;
                         }
 

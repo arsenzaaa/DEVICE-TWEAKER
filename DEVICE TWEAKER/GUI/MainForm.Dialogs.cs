@@ -122,7 +122,6 @@ public sealed partial class MainForm
             UseMnemonic = false,
             TextAlign = hasMultipleLines ? ContentAlignment.TopLeft : ContentAlignment.MiddleCenter,
             Font = _dialogFont,
-            UseCompatibleTextRendering = true,
         };
 
         Size textSize = messageLabel.GetPreferredSize(new Size(maxTextWidth, 0));
@@ -899,7 +898,6 @@ public sealed partial class MainForm
                 UseMnemonic = false,
                 TextAlign = hasMultipleLines ? ContentAlignment.TopLeft : ContentAlignment.MiddleCenter,
                 Font = _dialogFont,
-                UseCompatibleTextRendering = true,
             };
 
             Size textSize = msgLabel.GetPreferredSize(new Size(innerWidth, 0));
@@ -1747,15 +1745,42 @@ public sealed partial class MainForm
             return string.Empty;
         }
 
-        // Non-breaking hyphen \u2011 prevents ugly line-breaks splitting technical compound words across lines
-        return text
+        // 1. Non-breaking hyphen \u2011 prevents ugly line-breaks splitting technical compound words across lines
+        string result = text
             .Replace("anti-cheats", "anti\u2011cheats")
             .Replace("anti-cheat", "anti\u2011cheat")
             .Replace("анти-читами", "анти\u2011читами")
             .Replace("анти-читы", "анти\u2011читы")
             .Replace("анти-чит", "анти\u2011чит")
             .Replace("XHCI-", "XHCI\u2011")
-            .Replace("USB-", "USB\u2011");
+            .Replace("USB-", "USB\u2011")
+            .Replace("P-Core", "P\u2011Core")
+            .Replace("E-Core", "E\u2011Core")
+            .Replace("P-ядра", "P\u2011ядра")
+            .Replace("E-ядра", "E\u2011ядра")
+            .Replace("MSI-X", "MSI\u2011X")
+            .Replace("pre-auto", "pre\u2011auto")
+            .Replace("SHA-256", "SHA\u2011256");
+
+        // 2. Non-breaking space \u00A0 prevents technical acronyms, units, and short Russian prepositions from dangling at line ends
+        result = result
+            .Replace("USB IMOD", "USB\u00A0IMOD")
+            .Replace("8000 Гц", "8000\u00A0Гц")
+            .Replace("1000 Гц", "1000\u00A0Гц")
+            .Replace("0 мкс", "0\u00A0мкс")
+            .Replace("50 мкс", "50\u00A0мкс")
+            .Replace("250 нс", "250\u00A0нс")
+            .Replace("перезагрузите ПК", "перезагрузите\u00A0ПК")
+            .Replace("сброса Windows", "сброса\u00A0Windows")
+            .Replace("сброс Windows", "сброс\u00A0Windows");
+
+        // Bind short Russian prepositions (в, во, на, с, со, к, по, для, не, или, и, от, до, за, из, о, об) to the next word
+        result = System.Text.RegularExpressions.Regex.Replace(
+            result,
+            @"(?<=(?:^|[\s(«""]))([вВ][оО]?|[нН][аА]|[сС][оО]?|[кК]|[пП][оО]|[дД][лЛ][яЯ]|[нН][еЕ]|[иИ][лЛ][иИ]|[иИ]|[оО][тТ]|[дД][оО]|[зЗ][аА]|[иИ][зЗ]|[оО][бБ]?)\s+",
+            "$1\u00A0");
+
+        return result;
     }
 
     private static string NormalizeDialogMessage(string message)
