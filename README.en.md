@@ -89,14 +89,14 @@ In Windows, device hardware signals follow a specific processing chain:
 GPU, USB controllers, and mouse interrupts are pinned to physical cores on CCD0 with the fast 3D V-Cache. The second chiplet (CCD1) is completely freed from latency-critical device interrupts, eliminating Infinity Fabric interconnect latency.
 
 <p align="center">
-  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_9950x3d_dual_ccd_ru.png" alt="AMD Ryzen 9950X3D Core Allocation" width="850">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_dual_ccd_en.png" alt="AMD Ryzen 9950X3D Core Allocation" width="850">
 </p>
 
 ### 2. Core Allocation: Intel Core i9-14900K (P-Core / E-Core)
 The GPU and input controllers are separated across adjacent physical performance cores (P-Cores). Efficiency cores (E-Cores) are completely excluded from real-time interrupt processing.
 
 <p align="center">
-  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_intel_14900k_hybrid_ru.png" alt="Intel Core i9-14900K Core Allocation" width="850">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_intel_hybrid_en.png" alt="Intel Core i9-14900K Core Allocation" width="850">
 </p>
 
 ### 3. Direct USB xHCI IMOD Register Table

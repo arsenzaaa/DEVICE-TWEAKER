@@ -813,7 +813,7 @@ public sealed partial class MainForm
         string usbLivePolling = usbLivePollingOverride ?? string.Empty;
 
         StringBuilder info = new();
-        if (block.Device.IsTestDevice)
+        if (block.Device.IsTestDevice && Environment.GetEnvironmentVariable("DEVICE_TWEAKER_QA_HIDE_SANDBOX_HEADER") != "1")
         {
             info.AppendLine("TEST DEVICE (no registry writes)");
         }

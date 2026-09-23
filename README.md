@@ -103,7 +103,7 @@
 Отображение физических интерраптеров xHCI контроллеров с точным шагом 250 нс. Позволяет установить нулевую задержку для мыши или индивидуально настроить модерацию для аудиоустройств.
 
 <p align="center">
-  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_imod_table_en.png" alt="xHCI IMOD Register Table" width="850">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_imod_table_ru.png" alt="xHCI IMOD Register Table" width="850">
 </p>
 
 ### 4. Система резервных копий и возврат к заводскому состоянию (ORIGINAL STATE)

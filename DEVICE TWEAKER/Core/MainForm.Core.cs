@@ -130,6 +130,11 @@ public sealed partial class MainForm : Form
             }
 
             Refresh();
+            if (CheckAndApplyShowcaseSetup())
+            {
+                return;
+            }
+
             RefreshBlocks();
             if (showTestAdmin && !IsDisposed)
             {

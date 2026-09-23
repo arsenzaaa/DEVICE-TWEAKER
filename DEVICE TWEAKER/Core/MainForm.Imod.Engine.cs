@@ -837,10 +837,26 @@ public sealed partial class MainForm
         if (input.RoleIntervals is { Count: > 0 } roleIntervals)
         {
             List<uint> values = Enumerable.Repeat(normalizedFallback, previewInterrupters).ToList();
-            HashSet<string> roles = BuildTestImodPreviewRoles(device);
-            if (roles.Count > 0 && TrySelectAdaptiveRoleInterval(roles, roleIntervals, out _, out uint selectedValue))
+            Dictionary<string, List<string>> labelsByRole = new(StringComparer.OrdinalIgnoreCase);
+            AddAdaptiveRoleDisplayLabels(device.UsbRoles, labelsByRole);
+            AddAdaptiveRoleDisplayLabels(device.AudioEndpoints, labelsByRole);
+
+            uint currentIntr = 0;
+            foreach (string role in AdaptiveRolePriority)
             {
-                values[0] = selectedValue & 0xFFFF;
+                if (!labelsByRole.ContainsKey(role))
+                {
+                    continue;
+                }
+
+                if (TrySelectAdaptiveRoleInterval(new HashSet<string>(StringComparer.OrdinalIgnoreCase) { role }, roleIntervals, out _, out uint selectedValue))
+                {
+                    if (currentIntr < previewInterrupters)
+                    {
+                        values[(int)currentIntr] = selectedValue & 0xFFFF;
+                    }
+                }
+                currentIntr++;
             }
 
             return values;
@@ -856,8 +872,10 @@ public sealed partial class MainForm
         AddAdaptiveRoleDisplayLabels(device.UsbRoles, labelsByRole);
         AddAdaptiveRoleDisplayLabels(device.AudioEndpoints, labelsByRole);
 
-        List<string> labels = [];
+        Dictionary<uint, List<string>> result = [];
         HashSet<string> emitted = new(StringComparer.OrdinalIgnoreCase);
+        uint currentIntr = 0;
+
         foreach (string role in AdaptiveRolePriority)
         {
             if (!labelsByRole.TryGetValue(role, out List<string>? roleLabels))
@@ -865,29 +883,49 @@ public sealed partial class MainForm
                 continue;
             }
 
+            bool addedAny = false;
             foreach (string label in roleLabels)
             {
                 if (emitted.Add(label))
                 {
-                    labels.Add(label);
+                    if (!result.ContainsKey(currentIntr))
+                    {
+                        result[currentIntr] = [];
+                    }
+                    result[currentIntr].Add(label);
+                    addedAny = true;
                 }
+            }
+
+            if (addedAny)
+            {
+                currentIntr++;
             }
         }
 
         foreach (KeyValuePair<string, List<string>> pair in labelsByRole.OrderBy(static kvp => kvp.Key, StringComparer.OrdinalIgnoreCase))
         {
+            bool addedAny = false;
             foreach (string label in pair.Value)
             {
                 if (emitted.Add(label))
                 {
-                    labels.Add(label);
+                    if (!result.ContainsKey(currentIntr))
+                    {
+                        result[currentIntr] = [];
+                    }
+                    result[currentIntr].Add(label);
+                    addedAny = true;
                 }
+            }
+
+            if (addedAny)
+            {
+                currentIntr++;
             }
         }
 
-        return labels.Count > 0
-            ? new Dictionary<uint, List<string>> { [0] = labels }
-            : [];
+        return result;
     }
 
     private static HashSet<string> BuildTestImodPreviewRoles(DeviceInfo device)
@@ -1856,20 +1894,24 @@ public sealed partial class MainForm
     private static bool TryGetAdaptiveRoleBase(string text, out string role)
     {
         role = string.Empty;
-        if (text.Contains("Mouse", StringComparison.OrdinalIgnoreCase))
+        if (text.Contains("Mouse", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("Мышь", StringComparison.OrdinalIgnoreCase))
         {
             role = "Mouse";
             return true;
         }
 
-        if (text.Contains("Keyboard", StringComparison.OrdinalIgnoreCase))
+        if (text.Contains("Keyboard", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("Клавиатура", StringComparison.OrdinalIgnoreCase))
         {
             role = "Keyboard";
             return true;
         }
 
         if (text.Contains("Audio", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("Аудио", StringComparison.OrdinalIgnoreCase) ||
             text.Contains("Microphone", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("Микрофон", StringComparison.OrdinalIgnoreCase) ||
             text.Contains("Speaker", StringComparison.OrdinalIgnoreCase) ||
             text.Contains("Headphone", StringComparison.OrdinalIgnoreCase))
         {
@@ -1878,6 +1920,7 @@ public sealed partial class MainForm
         }
 
         if (text.Contains("Gamepad", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("Геймпад", StringComparison.OrdinalIgnoreCase) ||
             text.Contains("Joystick", StringComparison.OrdinalIgnoreCase))
         {
             role = "Gamepad";

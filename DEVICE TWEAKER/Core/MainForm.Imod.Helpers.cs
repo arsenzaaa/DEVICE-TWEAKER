@@ -14,7 +14,10 @@ public sealed partial class MainForm
     {
         return HasUsbRole(device, "Keyboard")
             || HasUsbRole(device, "Mouse")
-            || HasUsbRole(device, "Gamepad");
+            || HasUsbRole(device, "Gamepad")
+            || HasUsbRole(device, "Клавиатура")
+            || HasUsbRole(device, "Мышь")
+            || HasUsbRole(device, "Геймпад");
     }
 
     private static bool HasUsbRole(DeviceInfo device, string role)

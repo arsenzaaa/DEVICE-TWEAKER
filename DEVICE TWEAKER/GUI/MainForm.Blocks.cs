@@ -140,7 +140,7 @@ public sealed partial class MainForm
             title = $"{device.Name} [{device.AudioEndpoints}]";
         }
 
-        if (device.IsTestDevice)
+        if (device.IsTestDevice && Environment.GetEnvironmentVariable("DEVICE_TWEAKER_QA_HIDE_SANDBOX_HEADER") != "1")
         {
             title = $"[TEST] {title}";
         }
@@ -284,8 +284,9 @@ public sealed partial class MainForm
 
         int cpuPanelTop = cpuLabel.Bottom + UiScale(6);
         int cpuPanelHeight = UiScale(150);
-        int settingsMinimumWidth = Math.Min(UiScale(420), Math.Max(UiScale(320), grp.Width - UiScale(48)));
-        int desiredSettingsSideWidth = UiScale(600);
+        bool hasImod = ShouldShowImod(device);
+        int desiredSettingsSideWidth = hasImod ? UiScale(560) : UiScale(360);
+        int settingsMinimumWidth = Math.Min(UiScale(360), Math.Max(UiScale(280), grp.Width - UiScale(48)));
         int settingsSideMinimumWidth = desiredSettingsSideWidth;
         int cpuPanelMinimumWidth = UiScale(320);
         int settingsSideGap = UiScale(40);
@@ -547,7 +548,7 @@ public sealed partial class MainForm
                     // core-type token when its client width is only a few pixels
                     // below the native preferred width. Two-digit CPU labels expose
                     // that native rendering behavior, so retain a measured gutter.
-                    maxWidth = Math.Max(minColumnWidth, w + UiScale(28));
+                    maxWidth = Math.Max(minColumnWidth, w + UiScale(12));
                 }
             }
 
@@ -583,8 +584,8 @@ public sealed partial class MainForm
         }
 
         int cpuContentRight = columns.Count == 0 ? 0 : runningX - columnGap;
-        int requiredWidth = columns.Count == 0 ? cpuPanel.Width : cpuContentRight + startX + UiScale(18);
-        int cpuPanelHorizontalSlack = UiScale(30);
+        int requiredWidth = columns.Count == 0 ? cpuPanel.Width : cpuContentRight + startX + UiScale(12);
+        int cpuPanelHorizontalSlack = UiScale(12);
         int cpuContentHeight = Math.Max((maxColumnCount * checkSpacing) + UiScale(18), UiScale(150));
         int sideSettingsX = 0;
         int sideSettingsWidth = 0;
@@ -592,8 +593,8 @@ public sealed partial class MainForm
         int availableSettingsWidth = Math.Max(UiScale(260), grp.Width - settingsX - UiScale(24));
         void UpdateResponsivePlacement()
         {
-            settingsSideMinimumWidth = Math.Min(desiredSettingsSideWidth, Math.Max(UiScale(440), grp.Width - UiScale(48)));
-            settingsMinimumWidth = Math.Min(UiScale(420), Math.Max(UiScale(320), grp.Width - UiScale(48)));
+            settingsSideMinimumWidth = Math.Min(desiredSettingsSideWidth, Math.Max(UiScale(320), grp.Width - UiScale(48)));
+            settingsMinimumWidth = Math.Min(UiScale(360), Math.Max(UiScale(280), grp.Width - UiScale(48)));
             cpuPanelFullMaximumWidth = Math.Max(cpuPanelMinimumWidth, grp.Width - cpuPanel.Left - UiScale(24));
             cpuPanelSideMaximumWidth = Math.Max(
                 cpuPanelMinimumWidth,
@@ -1792,16 +1793,22 @@ public sealed partial class MainForm
                 continue;
             }
 
+            if (child == lblImodMap || child == lblImodModeHint || (showPowerSaving && chkPowerSaving != null && child == chkPowerSaving))
+            {
+                settingsContentBottom = Math.Max(settingsContentBottom, child.Bottom);
+                continue;
+            }
+
             settingsContentRight = Math.Max(settingsContentRight, child.Right);
             settingsContentBottom = Math.Max(settingsContentBottom, child.Bottom);
         }
 
-        desiredSettingsSideWidth = Math.Max(UiScale(600), settingsContentRight + UiScale(8));
+        desiredSettingsSideWidth = showImod ? UiScale(540) : UiScale(360);
         UpdateResponsivePlacement();
 
-        int settingsMinWidth = Math.Min(UiScale(420), availableSettingsWidth);
+        int settingsMinWidth = Math.Min(UiScale(360), availableSettingsWidth);
         Size settingsSize = new(
-            Math.Min(Math.Max(settingsContentRight + UiScale(8), settingsMinWidth), availableSettingsWidth),
+            availableSettingsWidth,
             Math.Max(settingsContentBottom + UiScale(8), UiScale(24)));
         settingsPanel.Size = settingsSize;
 
@@ -1890,6 +1897,12 @@ public sealed partial class MainForm
                         continue;
                     }
 
+                    if (child == lblImodMap || child == lblImodModeHint || (showPowerSaving && chkPowerSaving != null && child == chkPowerSaving))
+                    {
+                        bottom = Math.Max(bottom, child.Bottom);
+                        continue;
+                    }
+
                     right = Math.Max(right, child.Right);
                     bottom = Math.Max(bottom, child.Bottom);
                 }
@@ -1897,18 +1910,17 @@ public sealed partial class MainForm
                 return bottom;
             }
 
-            MeasureVisibleSettings(out int visibleSettingsRight, out _);
-            desiredSettingsSideWidth = Math.Max(UiScale(600), visibleSettingsRight + UiScale(8));
+            desiredSettingsSideWidth = showImod ? UiScale(540) : UiScale(360);
             UpdateResponsivePlacement();
+            LayoutNicItrRow();
             LayoutImodRow();
             FitCurrentImodMap();
 
-            MeasureVisibleSettings(out visibleSettingsRight, out int visibleSettingsBottom);
+            MeasureVisibleSettings(out _, out int visibleSettingsBottom);
 
             int currentAvailableSettingsWidth = Math.Max(UiScale(260), grp.Width - settingsX - UiScale(24));
-            int currentSettingsMinWidth = Math.Min(UiScale(420), currentAvailableSettingsWidth);
             Size currentSettingsSize = new(
-                Math.Min(Math.Max(visibleSettingsRight + UiScale(8), currentSettingsMinWidth), currentAvailableSettingsWidth),
+                currentAvailableSettingsWidth,
                 Math.Max(visibleSettingsBottom + UiScale(8), UiScale(24)));
             settingsPanel.Size = currentSettingsSize;
 
