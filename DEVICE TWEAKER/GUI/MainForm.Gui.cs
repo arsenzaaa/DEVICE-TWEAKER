@@ -1201,7 +1201,9 @@ public sealed partial class MainForm
             PlaceholderText = UiLanguage.Text("Filter devices... (Ctrl+F)"),
             Font = _baseFont,
             Margin = Padding.Empty,
+            TabStop = false,
         };
+        _searchFilterBox.Inner.TabStop = false;
         _searchFilterBox.TextChanged += (_, _) =>
         {
             string newQuery = _searchFilterBox.Text.Trim();
@@ -1261,6 +1263,23 @@ public sealed partial class MainForm
         btn.Size = new Size(textWidth + UiScale(16), UiScale(30));
     }
 
+    private static Color GetCategoryAccentColor(string category)
+    {
+        return category?.ToUpperInvariant() switch
+        {
+            "ALL" => Color.FromArgb(0, 150, 255),          // Modern Azure
+            "MOUSE" => Color.FromArgb(64, 215, 240),        // Precision Cyan
+            "KEYBOARD" => Color.FromArgb(245, 185, 75),     // Mechanical Gold
+            "GAMEPAD" => Color.FromArgb(185, 135, 255),     // Controller Violet
+            "USB" => Color.FromArgb(110, 195, 255),         // USB Sky Blue
+            "GPU" => Color.FromArgb(120, 225, 100),         // GPU Neon Green
+            "NETWORK" or "NET" => Color.FromArgb(70, 220, 145), // Network Emerald
+            "AUDIO" => Color.FromArgb(255, 140, 105),       // Audio Coral
+            "STORAGE" or "STOR" => Color.FromArgb(145, 205, 235), // Storage Ice Silver
+            _ => Color.FromArgb(180, 185, 195),
+        };
+    }
+
     private void RebuildFilterCategoryButtons()
     {
         if (_filterCategoriesHost == null)
@@ -1302,6 +1321,24 @@ public sealed partial class MainForm
                 TabStop = false,
                 Margin = new Padding(UiScale(4), 0, 0, 0),
             };
+            btnCat.MouseEnter += (_, _) =>
+            {
+                if (!string.Equals(btnCat.Tag as string, _activeCategoryFilter, StringComparison.OrdinalIgnoreCase))
+                {
+                    btnCat.BackColor = Color.FromArgb(28, 30, 38);
+                    btnCat.ForeColor = Color.FromArgb(220, 225, 235);
+                    btnCat.FlatAppearance.BorderColor = Color.FromArgb(75, 80, 95);
+                }
+            };
+            btnCat.MouseLeave += (_, _) =>
+            {
+                if (!string.Equals(btnCat.Tag as string, _activeCategoryFilter, StringComparison.OrdinalIgnoreCase))
+                {
+                    btnCat.BackColor = _bgPanel;
+                    btnCat.ForeColor = Color.FromArgb(140, 145, 155);
+                    btnCat.FlatAppearance.BorderColor = Color.FromArgb(50, 52, 62);
+                }
+            };
             UpdateCategoryButtonSize(btnCat);
             btnCat.Click += (_, _) => SetCategoryFilter(cat);
             _filterCategoryButtons.Add(btnCat);
@@ -1334,11 +1371,24 @@ public sealed partial class MainForm
     {
         foreach (Button btn in _filterCategoryButtons)
         {
-            bool isActive = string.Equals(btn.Tag as string, _activeCategoryFilter, StringComparison.OrdinalIgnoreCase);
-            btn.BackColor = isActive ? Color.FromArgb(42, 42, 52) : _bgPanel;
-            btn.ForeColor = isActive ? _fgMain : _statusInactive;
-            btn.FlatAppearance.BorderColor = isActive ? _accent : Color.FromArgb(60, 60, 72);
-            btn.FlatAppearance.BorderSize = 1;
+            string cat = btn.Tag as string ?? string.Empty;
+            bool isActive = string.Equals(cat, _activeCategoryFilter, StringComparison.OrdinalIgnoreCase);
+            Color catAccent = GetCategoryAccentColor(cat);
+
+            if (isActive)
+            {
+                btn.BackColor = Color.FromArgb(32, 35, 46);
+                btn.ForeColor = catAccent;
+                btn.FlatAppearance.BorderColor = catAccent;
+                btn.FlatAppearance.BorderSize = 1;
+            }
+            else
+            {
+                btn.BackColor = _bgPanel;
+                btn.ForeColor = Color.FromArgb(140, 145, 155);
+                btn.FlatAppearance.BorderColor = Color.FromArgb(50, 52, 62);
+                btn.FlatAppearance.BorderSize = 1;
+            }
         }
     }
 
@@ -1378,6 +1428,12 @@ public sealed partial class MainForm
             return true;
         }
 
+        if (cat.Contains(',') || cat.Contains(';'))
+        {
+            string[] parts = cat.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return parts.Any(p => MatchesCategory(b, p));
+        }
+
         DeviceInfo info = b.Device;
         if (string.Equals(cat, "MOUSE", StringComparison.OrdinalIgnoreCase))
         {
@@ -1402,7 +1458,7 @@ public sealed partial class MainForm
         {
             return info.Kind == DeviceKind.GPU;
         }
-        if (string.Equals(cat, "NETWORK", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(cat, "NETWORK", StringComparison.OrdinalIgnoreCase) || string.Equals(cat, "NET", StringComparison.OrdinalIgnoreCase))
         {
             return info.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX;
         }
@@ -1410,7 +1466,7 @@ public sealed partial class MainForm
         {
             return info.Kind == DeviceKind.AUDIO;
         }
-        if (string.Equals(cat, "STORAGE", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(cat, "STORAGE", StringComparison.OrdinalIgnoreCase) || string.Equals(cat, "STOR", StringComparison.OrdinalIgnoreCase))
         {
             return info.Kind == DeviceKind.STOR;
         }

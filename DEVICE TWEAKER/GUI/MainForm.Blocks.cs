@@ -175,6 +175,40 @@ public sealed partial class MainForm
         return ("[STORAGE]", Color.FromArgb(190, 190, 200));
     }
 
+    private static (string kindText, Color kindColor) GetGpuKindBadge(DeviceInfo device)
+    {
+        string id = device.InstanceId ?? string.Empty;
+        string name = device.Name ?? string.Empty;
+
+        // NVIDIA: VEN_10DE or NVIDIA/GeForce/RTX/GTX -> signature green
+        if (id.Contains("VEN_10DE", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("GeForce", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("RTX", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("GTX", StringComparison.OrdinalIgnoreCase))
+        {
+            return ("[GPU]", Color.FromArgb(118, 185, 0));
+        }
+
+        // AMD: VEN_1002 or AMD/Radeon -> signature red
+        if (id.Contains("VEN_1002", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("AMD", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Radeon", StringComparison.OrdinalIgnoreCase))
+        {
+            return ("[GPU]", Color.FromArgb(235, 60, 60));
+        }
+
+        // Intel: VEN_8086 or Intel/Arc -> signature blue
+        if (id.Contains("VEN_8086", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Intel", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Arc", StringComparison.OrdinalIgnoreCase))
+        {
+            return ("[GPU]", Color.FromArgb(45, 155, 255));
+        }
+
+        return ("[GPU]", Color.FromArgb(195, 150, 255));
+    }
+
     private void NewDeviceBlock(
         DeviceInfo device,
         int index,
@@ -215,7 +249,7 @@ public sealed partial class MainForm
         (string kindText, Color kindColor) = device.Kind switch
         {
             DeviceKind.USB => ("[USB]", Color.FromArgb(120, 210, 255)),
-            DeviceKind.GPU => ("[GPU]", Color.FromArgb(195, 150, 255)),
+            DeviceKind.GPU => GetGpuKindBadge(device),
             DeviceKind.NET_NDIS or DeviceKind.NET_CX => ("[NET]", Color.FromArgb(100, 225, 155)),
             DeviceKind.AUDIO => ("[AUDIO]", Color.FromArgb(255, 155, 125)),
             DeviceKind.STOR => GetStorageKindBadge(device),
@@ -503,8 +537,24 @@ public sealed partial class MainForm
             List<(int Lp, CheckBox Control, int Ccd, int Eff)> pItems = items.Where(m => !IsEfficiencyClass(m.Eff)).ToList();
             List<(int Lp, CheckBox Control, int Ccd, int Eff)> eItems = items.Where(m => IsEfficiencyClass(m.Eff)).ToList();
             List<(int Lp, CheckBox Control, int Ccd, int Eff)> other = items.Except(pItems).Except(eItems).ToList();
-            List<(int Lp, CheckBox Control, int Ccd, int Eff)> ordered = [.. pItems, .. eItems, .. other];
-            columns.Add(ordered);
+            if (ccdKeys.Count == 1 && pItems.Count > 0 && eItems.Count > 0)
+            {
+                // Intel Hybrid: place P-Cores and E-Cores into dedicated side-by-side columns
+                columns.Add(pItems);
+                columns.Add([.. eItems, .. other]);
+            }
+            else if (ccdKeys.Count == 1 && items.Count > 16)
+            {
+                // Large single-CCD: split into two balanced columns to prevent clipping
+                int mid = (items.Count + 1) / 2;
+                columns.Add(items.Take(mid).ToList());
+                columns.Add(items.Skip(mid).ToList());
+            }
+            else
+            {
+                List<(int Lp, CheckBox Control, int Ccd, int Eff)> ordered = [.. pItems, .. eItems, .. other];
+                columns.Add(ordered);
+            }
         }
 
         int columnGap = UiScale(16);

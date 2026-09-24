@@ -43,24 +43,26 @@ public sealed partial class MainForm
         {
             SetCategoryFilter(filter);
         }
+        else if (showcase.StartsWith("Imod", StringComparison.OrdinalIgnoreCase))
+        {
+            SetCategoryFilter("USB");
+        }
 
         UpdateAllBlocksInitialState();
         UpdateApplyButtonDirtyCount();
+        CloseDevicesBusyOverlay();
         if (_devicesBusyOverlay is not null)
         {
             _devicesBusyOverlay.Visible = false;
         }
-        _devicesBusyDepth = 0;
-        _devicesBusyDone = 0;
         SetOperationButtonsEnabled(true);
         if (_devicesScroll is not null)
         {
             _devicesScroll.Value = 0;
         }
-        _devicesPanel.Location = new Point(0, 0);
-        _devicesPanel.Invalidate(true);
-        _devicesHost.Invalidate(true);
-        Invalidate(true);
+        _searchFilterBox?.Inner.Select(0, 0);
+        _btnScanRef?.Focus();
+        ActiveControl = _btnScanRef;
 
         WriteLog($"SHOWCASE: initialized mode={showcase} language={(isRu ? "ru" : "en")} blocks={_blocks.Count}");
         return true;
@@ -68,7 +70,7 @@ public sealed partial class MainForm
 
     private void SetupRyzen9950X3DShowcase(bool isRu)
     {
-        // 16 cores, 32 threads, 2 CCDs (8 cores CCD0, 8 cores CCD1)
+        // 16 cores, 32 threads, 2 CCDs (8 cores CCD0 with 3D V-Cache, 8 cores CCD1 frequency)
         TestCpuConfig config = new()
         {
             LogicalCount = 32,
@@ -85,7 +87,6 @@ public sealed partial class MainForm
             int ccd = lp < 16 ? 0 : 1;
             config.CcdMap[lp] = ccd;
             config.CcxMap[lp] = ccd;
-            // CCD0 (3D V-Cache): high rating, CCD1: frequency
             config.CppcRatings[lp] = lp < 16 ? 140 - (lp / 2) : 112 - ((lp - 16) / 2);
         }
 
@@ -102,12 +103,32 @@ public sealed partial class MainForm
             usbIsXhci: false, usbHasDevices: false, integratedGpu: false,
             testIrqCount: 1, testMsiStatus: "Enabled"));
 
-        // USB: AMD USB 3.20 (CHIP 0, CPU-direct)
+        // USB 1 (CPU-direct, CHIP 0): Dedicated to Mouse 8K
         _testDevices.Add(CreateTestDevice(
             DeviceKind.USB,
             "AMD USB 3.20 eXtensible Host Controller - 1.20",
             @"PCI\VEN_1022&DEV_15B6&SUBSYS_14620000\4&2BA2BF07&0&0010",
-            usbRoles: isRu ? "Мышь 8K, Клавиатура 8K" : "Mouse 8K, Keyboard 8K",
+            usbRoles: isRu ? "Мышь 8K" : "Mouse 8K",
+            audioEndpoints: "", storageTag: "", wifi: false,
+            usbIsXhci: true, usbHasDevices: true, integratedGpu: false,
+            testIrqCount: 2, testMsiStatus: "Enabled", usbSelectiveSuspend: "off"));
+
+        // USB 2 (Chipset, CHIP 1): Dedicated to Keyboard 8K
+        _testDevices.Add(CreateTestDevice(
+            DeviceKind.USB,
+            "AMD USB 3.10 eXtensible Host Controller - 1.10",
+            @"PCI\VEN_1022&DEV_43F7&SUBSYS_14620000\4&2BA2BF07&0&0012",
+            usbRoles: isRu ? "Клавиатура 8K" : "Keyboard 8K",
+            audioEndpoints: "", storageTag: "", wifi: false,
+            usbIsXhci: true, usbHasDevices: true, integratedGpu: false,
+            testIrqCount: 2, testMsiStatus: "Enabled", usbSelectiveSuspend: "off"));
+
+        // USB 3 (ASMedia Addon, CHIP 1+): Dedicated to Audio DAC & Microphone
+        _testDevices.Add(CreateTestDevice(
+            DeviceKind.USB,
+            "ASMedia USB 3.1 eXtensible Host Controller - 1.10",
+            @"PCI\VEN_1B21&DEV_1242&SUBSYS_14620000\4&2BA2BF07&0&0014",
+            usbRoles: isRu ? "Аудио ЦАП, Микрофон" : "Audio DAC, Microphone",
             audioEndpoints: "", storageTag: "", wifi: false,
             usbIsXhci: true, usbHasDevices: true, integratedGpu: false,
             testIrqCount: 2, testMsiStatus: "Enabled", usbSelectiveSuspend: "off"));
@@ -121,7 +142,7 @@ public sealed partial class MainForm
             usbIsXhci: false, usbHasDevices: false, integratedGpu: false,
             testIrqCount: 4, testMsiStatus: "Enabled", nicPowerSaving: "off"));
 
-        // Storage: Samsung 990 PRO
+        // Storage: Samsung 990 PRO NVMe
         _testDevices.Add(CreateTestDevice(
             DeviceKind.STOR,
             "Samsung 990 PRO NVMe Controller",
@@ -160,18 +181,64 @@ public sealed partial class MainForm
                 block.SuppressCpuEvents++;
                 try
                 {
-                    // Assign to CCD0 physical core 6 (LP 6)
+                    int targetLp = block.Device.UsbRoles.Contains("Мышь", StringComparison.OrdinalIgnoreCase)
+                        || block.Device.UsbRoles.Contains("Mouse", StringComparison.OrdinalIgnoreCase)
+                        ? 6
+                        : (block.Device.UsbRoles.Contains("Клавиатура", StringComparison.OrdinalIgnoreCase)
+                            || block.Device.UsbRoles.Contains("Keyboard", StringComparison.OrdinalIgnoreCase)
+                            ? 8
+                            : 10);
+
                     for (int i = 0; i < block.CpuBoxes.Count; i++)
                     {
-                        block.CpuBoxes[i].Checked = i == 6;
+                        block.CpuBoxes[i].Checked = i == targetLp;
                     }
                 }
                 finally { block.SuppressCpuEvents--; }
 
                 block.MsiCombo.SelectedItem = "Enabled";
                 block.LimitBox.Text = "0";
-                block.PrioCombo.SelectedItem = "High";
                 block.PolicyCombo.SelectedItem = "SpecCPU";
+
+                if (block.Device.UsbRoles.Contains("Мышь", StringComparison.OrdinalIgnoreCase)
+                    || block.Device.UsbRoles.Contains("Mouse", StringComparison.OrdinalIgnoreCase))
+                {
+                    block.PrioCombo.SelectedItem = "High";
+                    block.ImodAutoCheck.Checked = true;
+                    block.ImodBox.Text = "0x0";
+                    if (block.RawMouseThrottleCheck is not null)
+                    {
+                        block.RawMouseThrottleCheck.Enabled = true;
+                        block.RawMouseThrottleCheck.Checked = true;
+                    }
+                    if (block.RawMouseThrottleCombo is not null)
+                    {
+                        block.RawMouseThrottleCombo.Enabled = true;
+                        block.RawMouseThrottleCombo.SelectedItem = GetRawMouseThrottlePreset(20);
+                    }
+                    if (block.RawMouseThrottleStatusLabel is not null)
+                    {
+                        block.RawMouseThrottleStatusLabel.Text = "current: 50Hz (DWORD=20)";
+                        block.RawMouseThrottleStatusLabel.ForeColor = _statusActive;
+                    }
+                    RefreshTestImodPreview(block, "test-imod-set");
+                }
+                else if (block.Device.UsbRoles.Contains("Клавиатура", StringComparison.OrdinalIgnoreCase)
+                    || block.Device.UsbRoles.Contains("Keyboard", StringComparison.OrdinalIgnoreCase))
+                {
+                    block.PrioCombo.SelectedItem = "High";
+                    block.ImodAutoCheck.Checked = true;
+                    block.ImodBox.Text = "0x0";
+                    RefreshTestImodPreview(block, "test-imod-set");
+                }
+                else
+                {
+                    block.PrioCombo.SelectedItem = "Normal";
+                    block.ImodAutoCheck.Checked = true;
+                    block.ImodBox.Text = "0xFA0";
+                    RefreshTestImodPreview(block, "test-imod-set");
+                }
+
                 RecalcAffinityMask(block);
                 OnBlockSettingChanged(block);
             }
@@ -180,16 +247,17 @@ public sealed partial class MainForm
                 block.SuppressCpuEvents++;
                 try
                 {
-                    // Assign to CCD0 physical core 8 (LP 8)
+                    // Assign to CCD0 physical core 12 (LP 12)
                     for (int i = 0; i < block.CpuBoxes.Count; i++)
                     {
-                        block.CpuBoxes[i].Checked = i == 8;
+                        block.CpuBoxes[i].Checked = i == 12;
                     }
                 }
                 finally { block.SuppressCpuEvents--; }
 
                 block.MsiCombo.SelectedItem = "Enabled";
                 block.PrioCombo.SelectedItem = "High";
+                block.PolicyCombo.SelectedItem = "SpecCPU";
                 if (block.RssQueueBox is not null) block.RssQueueBox.Value = 4;
                 RecalcAffinityMask(block);
                 OnBlockSettingChanged(block);
@@ -242,12 +310,32 @@ public sealed partial class MainForm
             usbIsXhci: false, usbHasDevices: false, integratedGpu: false,
             testIrqCount: 1, testMsiStatus: "Enabled"));
 
-        // USB: Intel USB 3.20 (CHIP 1, PCH)
+        // USB 1 (CPU-direct, CHIP 0): Dedicated to Mouse 8K
         _testDevices.Add(CreateTestDevice(
             DeviceKind.USB,
             "Intel(R) USB 3.20 eXtensible Host Controller - 1.20",
-            @"PCI\VEN_8086&DEV_7AE0&SUBSYS_14620000\4&2BA2BF07&0&0010",
-            usbRoles: isRu ? "Мышь 8K, Клавиатура 8K, Аудио, Микрофон" : "Mouse 8K, Keyboard 8K, Audio, Microphone",
+            @"PCI\VEN_8086&DEV_461E&SUBSYS_14620000\4&2BA2BF07&0&0010",
+            usbRoles: isRu ? "Мышь 8K" : "Mouse 8K",
+            audioEndpoints: "", storageTag: "", wifi: false,
+            usbIsXhci: true, usbHasDevices: true, integratedGpu: false,
+            testIrqCount: 2, testMsiStatus: "Enabled", usbSelectiveSuspend: "off"));
+
+        // USB 2 (Chipset PCH, CHIP 1): Dedicated to Keyboard 8K
+        _testDevices.Add(CreateTestDevice(
+            DeviceKind.USB,
+            "Intel(R) USB 3.20 eXtensible Host Controller - 1.20",
+            @"PCI\VEN_8086&DEV_7A60&SUBSYS_14620000\4&2BA2BF07&0&0012",
+            usbRoles: isRu ? "Клавиатура 8K" : "Keyboard 8K",
+            audioEndpoints: "", storageTag: "", wifi: false,
+            usbIsXhci: true, usbHasDevices: true, integratedGpu: false,
+            testIrqCount: 2, testMsiStatus: "Enabled", usbSelectiveSuspend: "off"));
+
+        // USB 3 (ASMedia Addon, CHIP 1+): Dedicated to Audio DAC & Microphone
+        _testDevices.Add(CreateTestDevice(
+            DeviceKind.USB,
+            "ASMedia USB 3.1 eXtensible Host Controller - 1.10",
+            @"PCI\VEN_1B21&DEV_1242&SUBSYS_14620000\4&2BA2BF07&0&0014",
+            usbRoles: isRu ? "Аудио ЦАП, Микрофон" : "Audio DAC, Microphone",
             audioEndpoints: "", storageTag: "", wifi: false,
             usbIsXhci: true, usbHasDevices: true, integratedGpu: false,
             testIrqCount: 2, testMsiStatus: "Enabled", usbSelectiveSuspend: "off"));
@@ -261,7 +349,7 @@ public sealed partial class MainForm
             usbIsXhci: false, usbHasDevices: false, integratedGpu: false,
             testIrqCount: 4, testMsiStatus: "Enabled", nicPowerSaving: "off"));
 
-        // Storage: Samsung 990 PRO
+        // Storage: Samsung 990 PRO NVMe
         _testDevices.Add(CreateTestDevice(
             DeviceKind.STOR,
             "Samsung 990 PRO NVMe Controller",
@@ -300,18 +388,64 @@ public sealed partial class MainForm
                 block.SuppressCpuEvents++;
                 try
                 {
-                    // Assign to P-Core 6 (LP 6)
+                    int targetLp = block.Device.UsbRoles.Contains("Мышь", StringComparison.OrdinalIgnoreCase)
+                        || block.Device.UsbRoles.Contains("Mouse", StringComparison.OrdinalIgnoreCase)
+                        ? 6
+                        : (block.Device.UsbRoles.Contains("Клавиатура", StringComparison.OrdinalIgnoreCase)
+                            || block.Device.UsbRoles.Contains("Keyboard", StringComparison.OrdinalIgnoreCase)
+                            ? 8
+                            : 10);
+
                     for (int i = 0; i < block.CpuBoxes.Count; i++)
                     {
-                        block.CpuBoxes[i].Checked = i == 6;
+                        block.CpuBoxes[i].Checked = i == targetLp;
                     }
                 }
                 finally { block.SuppressCpuEvents--; }
 
                 block.MsiCombo.SelectedItem = "Enabled";
                 block.LimitBox.Text = "0";
-                block.PrioCombo.SelectedItem = "High";
                 block.PolicyCombo.SelectedItem = "SpecCPU";
+
+                if (block.Device.UsbRoles.Contains("Мышь", StringComparison.OrdinalIgnoreCase)
+                    || block.Device.UsbRoles.Contains("Mouse", StringComparison.OrdinalIgnoreCase))
+                {
+                    block.PrioCombo.SelectedItem = "High";
+                    block.ImodAutoCheck.Checked = true;
+                    block.ImodBox.Text = "0x0";
+                    if (block.RawMouseThrottleCheck is not null)
+                    {
+                        block.RawMouseThrottleCheck.Enabled = true;
+                        block.RawMouseThrottleCheck.Checked = true;
+                    }
+                    if (block.RawMouseThrottleCombo is not null)
+                    {
+                        block.RawMouseThrottleCombo.Enabled = true;
+                        block.RawMouseThrottleCombo.SelectedItem = GetRawMouseThrottlePreset(20);
+                    }
+                    if (block.RawMouseThrottleStatusLabel is not null)
+                    {
+                        block.RawMouseThrottleStatusLabel.Text = "current: 50Hz (DWORD=20)";
+                        block.RawMouseThrottleStatusLabel.ForeColor = _statusActive;
+                    }
+                    RefreshTestImodPreview(block, "test-imod-set");
+                }
+                else if (block.Device.UsbRoles.Contains("Клавиатура", StringComparison.OrdinalIgnoreCase)
+                    || block.Device.UsbRoles.Contains("Keyboard", StringComparison.OrdinalIgnoreCase))
+                {
+                    block.PrioCombo.SelectedItem = "High";
+                    block.ImodAutoCheck.Checked = true;
+                    block.ImodBox.Text = "0x0";
+                    RefreshTestImodPreview(block, "test-imod-set");
+                }
+                else
+                {
+                    block.PrioCombo.SelectedItem = "Normal";
+                    block.ImodAutoCheck.Checked = true;
+                    block.ImodBox.Text = "0xFA0";
+                    RefreshTestImodPreview(block, "test-imod-set");
+                }
+
                 RecalcAffinityMask(block);
                 OnBlockSettingChanged(block);
             }
@@ -320,16 +454,17 @@ public sealed partial class MainForm
                 block.SuppressCpuEvents++;
                 try
                 {
-                    // Assign to P-Core 8 (LP 8)
+                    // Assign to P-Core 12 (LP 12)
                     for (int i = 0; i < block.CpuBoxes.Count; i++)
                     {
-                        block.CpuBoxes[i].Checked = i == 8;
+                        block.CpuBoxes[i].Checked = i == 12;
                     }
                 }
                 finally { block.SuppressCpuEvents--; }
 
                 block.MsiCombo.SelectedItem = "Enabled";
                 block.PrioCombo.SelectedItem = "High";
+                block.PolicyCombo.SelectedItem = "SpecCPU";
                 if (block.RssQueueBox is not null) block.RssQueueBox.Value = 4;
                 RecalcAffinityMask(block);
                 OnBlockSettingChanged(block);
@@ -364,44 +499,100 @@ public sealed partial class MainForm
 
         _testDevices.Clear();
 
-        // USB Controller with IMOD targets
+        // Controller 1: Dedicated Mouse 8K Controller (CPU-Direct, CHIP 0)
         _testDevices.Add(CreateTestDevice(
             DeviceKind.USB,
             "AMD USB 3.20 eXtensible Host Controller - 1.20",
             @"PCI\VEN_1022&DEV_15B6&SUBSYS_14620000\4&2BA2BF07&0&0010",
-            usbRoles: isRu ? "Мышь 8K, Клавиатура 8K, Аудио, Микрофон" : "Mouse 8K, Keyboard 8K, Audio, Microphone",
+            usbRoles: isRu ? "Мышь 8K" : "Mouse 8K",
+            audioEndpoints: "", storageTag: "", wifi: false,
+            usbIsXhci: true, usbHasDevices: true, integratedGpu: false,
+            testIrqCount: 2, testMsiStatus: "Enabled", usbSelectiveSuspend: "off"));
+
+        // Controller 2: Dedicated Keyboard 8K Controller (Chipset, CHIP 1)
+        _testDevices.Add(CreateTestDevice(
+            DeviceKind.USB,
+            "AMD USB 3.10 eXtensible Host Controller - 1.10",
+            @"PCI\VEN_1022&DEV_43F7&SUBSYS_14620000\4&2BA2BF07&0&0012",
+            usbRoles: isRu ? "Клавиатура 8K" : "Keyboard 8K",
+            audioEndpoints: "", storageTag: "", wifi: false,
+            usbIsXhci: true, usbHasDevices: true, integratedGpu: false,
+            testIrqCount: 2, testMsiStatus: "Enabled", usbSelectiveSuspend: "off"));
+
+        // Controller 3: Dedicated Audio Controller (ASMedia Addon, CHIP 1+)
+        _testDevices.Add(CreateTestDevice(
+            DeviceKind.USB,
+            "ASMedia USB 3.1 eXtensible Host Controller - 1.10",
+            @"PCI\VEN_1B21&DEV_1242&SUBSYS_14620000\4&2BA2BF07&0&0014",
+            usbRoles: isRu ? "Аудио ЦАП, Микрофон" : "Audio DAC, Microphone",
             audioEndpoints: "", storageTag: "", wifi: false,
             usbIsXhci: true, usbHasDevices: true, integratedGpu: false,
             testIrqCount: 2, testMsiStatus: "Enabled", usbSelectiveSuspend: "off"));
 
         RefreshBlocks();
 
-        DeviceBlock? usbBlock = _blocks.FirstOrDefault(b => b.Kind == DeviceKind.USB);
-        if (usbBlock is not null)
+        foreach (DeviceBlock usbBlock in _blocks.Where(b => b.Kind == DeviceKind.USB))
         {
             usbBlock.SuppressCpuEvents++;
             try
             {
+                int targetLp = usbBlock.Device.UsbRoles.Contains("Мышь", StringComparison.OrdinalIgnoreCase)
+                    || usbBlock.Device.UsbRoles.Contains("Mouse", StringComparison.OrdinalIgnoreCase)
+                    ? 6
+                    : (usbBlock.Device.UsbRoles.Contains("Клавиатура", StringComparison.OrdinalIgnoreCase)
+                        || usbBlock.Device.UsbRoles.Contains("Keyboard", StringComparison.OrdinalIgnoreCase)
+                        ? 8
+                        : 10);
+
                 for (int i = 0; i < usbBlock.CpuBoxes.Count; i++)
                 {
-                    usbBlock.CpuBoxes[i].Checked = i == 4;
+                    usbBlock.CpuBoxes[i].Checked = i == targetLp;
                 }
             }
             finally { usbBlock.SuppressCpuEvents--; }
 
             usbBlock.MsiCombo.SelectedItem = "Enabled";
             usbBlock.LimitBox.Text = "0";
-            usbBlock.PrioCombo.SelectedItem = "High";
             usbBlock.PolicyCombo.SelectedItem = "SpecCPU";
             usbBlock.ImodAutoCheck.Checked = true;
-            usbBlock.ImodBox.Text = "Mouse=0x0, Keyboard=0xC8, Audio=0xFA0";
-            if (usbBlock.ImodModeCombo is not null)
+
+            if (usbBlock.Device.UsbRoles.Contains("Мышь", StringComparison.OrdinalIgnoreCase)
+                || usbBlock.Device.UsbRoles.Contains("Mouse", StringComparison.OrdinalIgnoreCase))
             {
-                usbBlock.ImodModeCombo.SelectedItem = ImodModeRoles;
+                usbBlock.PrioCombo.SelectedItem = "High";
+                usbBlock.ImodBox.Text = "0x0";
+                if (usbBlock.RawMouseThrottleCheck is not null)
+                {
+                    usbBlock.RawMouseThrottleCheck.Enabled = true;
+                    usbBlock.RawMouseThrottleCheck.Checked = true;
+                }
+                if (usbBlock.RawMouseThrottleCombo is not null)
+                {
+                    usbBlock.RawMouseThrottleCombo.Enabled = true;
+                    usbBlock.RawMouseThrottleCombo.SelectedItem = GetRawMouseThrottlePreset(20);
+                }
+                if (usbBlock.RawMouseThrottleStatusLabel is not null)
+                {
+                    usbBlock.RawMouseThrottleStatusLabel.Text = "current: 50Hz (DWORD=20)";
+                    usbBlock.RawMouseThrottleStatusLabel.ForeColor = _statusActive;
+                }
+                RefreshTestImodPreview(usbBlock, "test-imod-set");
+            }
+            else if (usbBlock.Device.UsbRoles.Contains("Клавиатура", StringComparison.OrdinalIgnoreCase)
+                || usbBlock.Device.UsbRoles.Contains("Keyboard", StringComparison.OrdinalIgnoreCase))
+            {
+                usbBlock.PrioCombo.SelectedItem = "High";
+                usbBlock.ImodBox.Text = "0x0";
+                RefreshTestImodPreview(usbBlock, "test-imod-set");
+            }
+            else
+            {
+                usbBlock.PrioCombo.SelectedItem = "Normal";
+                usbBlock.ImodBox.Text = "0xFA0";
+                RefreshTestImodPreview(usbBlock, "test-imod-set");
             }
 
             RecalcAffinityMask(usbBlock);
-            RefreshTestImodPreview(usbBlock, "test-imod-set");
             OnBlockSettingChanged(usbBlock);
         }
 

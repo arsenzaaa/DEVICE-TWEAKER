@@ -32,7 +32,8 @@
     <FileDescription>MADE BY ARSENZA</FileDescription>
     <Copyright>Copyright (c) arsenza</Copyright>
 
-    <BuildImodDriver Condition="'$(BuildImodDriver)' == ''">true</BuildImodDriver>
+    <BuildImodDriver Condition="'$(BuildImodDriver)' == '' and !Exists('IMOD\DTIMOD.sys')">true</BuildImodDriver>
+    <BuildImodDriver Condition="'$(BuildImodDriver)' == ''">false</BuildImodDriver>
   </PropertyGroup>
 
   <ItemGroup>

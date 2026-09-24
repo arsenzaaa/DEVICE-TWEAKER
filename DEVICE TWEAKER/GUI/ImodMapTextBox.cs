@@ -245,20 +245,27 @@ internal sealed partial class ImodMapTextBox : ScrollableControl
 
     private static (int Name, int Irq, int Value, int Delay) DeviceColumns(int width)
     {
-        int irq = Math.Max(120, (int)(width * 0.36));
-        int value = Math.Max(irq + 54, (int)(width * 0.55));
-        int delay = Math.Max(value + 62, (int)(width * 0.75));
+        int irq = Math.Max(120, (int)(width * 0.34));
+        int value = Math.Max(irq + 48, (int)(width * 0.50));
+        int delay = Math.Min(width - 86, Math.Max(value + 84, (int)(width * 0.70)));
         return (0, irq, value, Math.Min(delay, Math.Max(value + 1, width - 1)));
     }
 
     private static (int Irq1, int Value1, int Delay1, int Irq2, int Value2, int Delay2) InterruptColumns(int width)
     {
-        int value1 = Math.Max(54, (int)(width * 0.13));
-        int delay1 = Math.Max(value1 + 62, (int)(width * 0.28));
-        int irq2 = Math.Min(width - 3, Math.Max(210, (int)(width * 0.52)));
-        int value2 = Math.Min(width - 2, Math.Max(irq2 + 54, (int)(width * 0.65)));
-        int delay2 = Math.Min(width - 1, Math.Max(value2 + 62, (int)(width * 0.80)));
-        return (0, value1, delay1, irq2, value2, delay2);
+        int colWidth = width / 2;
+        int valueOffset = Math.Max(38, (int)(colWidth * 0.16));
+        int delayOffset = Math.Max(valueOffset + 78, (int)(colWidth * 0.50));
+
+        int irq1 = 0;
+        int value1 = valueOffset;
+        int delay1 = delayOffset;
+
+        int irq2 = colWidth;
+        int value2 = colWidth + valueOffset;
+        int delay2 = colWidth + delayOffset;
+
+        return (irq1, value1, delay1, irq2, value2, delay2);
     }
 
     private void DrawCell(Graphics graphics, string text, int x, int y, int width, Color color, TextFormatFlags flags)

@@ -859,6 +859,14 @@ public sealed partial class MainForm
                     DeviceKind.STOR => 5,
                     _ => 6,
                 })
+                .ThenBy(d => d.Kind == DeviceKind.USB ? (d.UsbChipPath?.Origin switch
+                {
+                    UsbChipOrigin.CpuDirect => 1,
+                    UsbChipOrigin.Thunderbolt => 2,
+                    UsbChipOrigin.Chipset => 3,
+                    UsbChipOrigin.Addon => 4,
+                    _ => 5,
+                }) : 0)
                 .ThenBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
