@@ -29,9 +29,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Flavor both -Co
 На GitHub Release (как в alpha.1) прикрепляются **только**:
 
 - `DEVICE.TWEAKER.exe`
-- `DEVICE.TWEAKER.NET.FRAMEWORK.exe`
+- `DEVICE.TWEAKER.SelfContained.exe`
 
-Остальные файлы (`DTIMOD.sys`, notes и т.п.) в assets релиза не загружать — драйвер уже встроен в EXE. Локальный `bin\ReleasePackages\` содержит только два EXE и `SHA256SUMS.txt`.
+Остальные файлы (`DTIMOD.sys`, notes и т.п.) в assets релиза не загружать - драйвер уже встроен в EXE. Локальный `bin\ReleasePackages\` содержит только два EXE и `SHA256SUMS.txt`.
 
 ## Публикация
 

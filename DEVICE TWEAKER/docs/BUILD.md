@@ -28,8 +28,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Flavor both -Co
 После сборки файлы находятся по следующим путям.
 
 - `bin\Publish\DEVICE TWEAKER\DEVICE TWEAKER.exe` - обычная версия.
-- `bin\Publish\DEVICE TWEAKER (NET FRAMEWORK)\DEVICE TWEAKER (NET FRAMEWORK).exe` - автономная версия со встроенным .NET 8 Runtime.
-- `bin\ReleasePackages\v0.0.4-alpha.2\` - готовый набор для GitHub Releases.
+- `bin\Publish\DEVICE TWEAKER (SELF-CONTAINED)\DEVICE TWEAKER (SELF-CONTAINED).exe` - автономная версия со встроенным .NET 8 Runtime.
+- `bin\ReleasePackages\v0.0.4-alpha.2\` - готовый набор для GitHub Releases (`DEVICE.TWEAKER.exe` и `DEVICE.TWEAKER.SelfContained.exe`).
 
 ## Обычная сборка через dotnet
 

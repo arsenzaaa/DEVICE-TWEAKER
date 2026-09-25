@@ -24,11 +24,11 @@ $driverOutPath = Join-Path $driverOutDir "DTIMOD.sys"
 $driverHashPath = "$driverOutPath.sha256"
 $driverCertPath = Join-Path $driverOutDir "DTIMOD.cer"
 $publishRoot = Join-Path $PSScriptRoot "bin\Publish"
-$selfContainedDisplayName = "DEVICE TWEAKER (NET FRAMEWORK)"
+$selfContainedDisplayName = "DEVICE TWEAKER (SELF-CONTAINED)"
 $frameworkDependentDisplayName = "DEVICE TWEAKER"
 $withNetOut = Join-Path $publishRoot $selfContainedDisplayName
 $withoutNetOut = Join-Path $publishRoot $frameworkDependentDisplayName
-$legacySelfContainedOut = Join-Path $publishRoot "DEVICE TWEAKER (SELF-CONTAINED)"
+$legacyNetFrameworkOut = Join-Path $publishRoot "DEVICE TWEAKER (NET FRAMEWORK)"
 
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -592,7 +592,7 @@ function New-ReleasePackage {
 
     $targets = @(
         @{ Source = $FrameworkDependentExe; Name = "DEVICE.TWEAKER.exe" },
-        @{ Source = $SelfContainedExe; Name = "DEVICE.TWEAKER.NET.FRAMEWORK.exe" }
+        @{ Source = $SelfContainedExe; Name = "DEVICE.TWEAKER.SelfContained.exe" }
     )
 
     foreach ($target in $targets) {
@@ -605,7 +605,7 @@ function New-ReleasePackage {
 
     $sumNames = @(
         "DEVICE.TWEAKER.exe",
-        "DEVICE.TWEAKER.NET.FRAMEWORK.exe"
+        "DEVICE.TWEAKER.SelfContained.exe"
     )
     $sumsPath = Join-Path $packageDir "SHA256SUMS.txt"
     $sumLines = foreach ($name in $sumNames) {
@@ -637,8 +637,8 @@ if (-not $SkipImodDriverBuild) {
     Invoke-ImodDriverBuild
 }
 
-if ($Clean -and (Test-Path -LiteralPath $legacySelfContainedOut)) {
-    $resolvedLegacy = [System.IO.Path]::GetFullPath($legacySelfContainedOut)
+if ($Clean -and (Test-Path -LiteralPath $legacyNetFrameworkOut)) {
+    $resolvedLegacy = [System.IO.Path]::GetFullPath($legacyNetFrameworkOut)
     $resolvedPublishRoot = [System.IO.Path]::GetFullPath($publishRoot).TrimEnd('\') + '\'
     if (-not $resolvedLegacy.StartsWith($resolvedPublishRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
         throw "Refusing to remove legacy publish directory outside publish root: $resolvedLegacy"

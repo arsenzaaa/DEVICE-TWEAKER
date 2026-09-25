@@ -7,7 +7,7 @@ param(
     [switch]$SkipImodDriverBuild,
     [switch]$TrustImodDriverCert,
     [string]$MsBuildPath,
-    [string]$ImodDriverCertThumbprint = "9CE4C30CD75905786774B1DDFAC126329ACAEA8D",
+    [string]$ImodDriverCertThumbprint = "B263CA124676681D028FFD7A3D605F5733E991B5",
     [string]$ImodDriverCertSubject = "MADE BY ARSENZA"
 )
 
@@ -15,7 +15,7 @@ $ErrorActionPreference = "Stop"
 
 $root = $PSScriptRoot
 $publishScript = Join-Path $root "publish-variants.ps1"
-$withNetExe = Join-Path $root "bin\Publish\DEVICE TWEAKER (NET FRAMEWORK)\DEVICE TWEAKER (NET FRAMEWORK).exe"
+$withNetExe = Join-Path $root "bin\Publish\DEVICE TWEAKER (SELF-CONTAINED)\DEVICE TWEAKER (SELF-CONTAINED).exe"
 $withoutNetExe = Join-Path $root "bin\Publish\DEVICE TWEAKER\DEVICE TWEAKER.exe"
 $driverPath = Join-Path $root "IMOD\DTIMOD.sys"
 
