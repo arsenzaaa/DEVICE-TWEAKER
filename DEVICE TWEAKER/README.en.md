@@ -40,6 +40,19 @@ DEVICE TWEAKER replaces the fragmented ecosystem of legacy utilities, such as **
   - **Hyper-Threading / SMT Thread Exclusion:** Bypassing sibling logical threads on active physical cores to prevent hardware execution unit contention (ALU, AGU, FPU) and L1/L2 cache evictions.
   - **ACPI CPPC v2 Core Performance Ratings:** Reading hardware performance rankings (ETW Event ID 55 from `Microsoft-Windows-Kernel-Processor-Power`, `MaximumPerformancePercent`) to prioritize the highest-performing physical cores on the die (AMD Preferred Cores / Intel Turbo Boost Max 3.0).
 
+<p align="center">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_9950x3d_dual_ccd_en.png" alt="Automated Interrupt Allocation on AMD Ryzen 9 9950X3D" width="850">
+</p>
+
+<details>
+<summary>Example: Interrupt Allocation on Hybrid Intel Core i9-14900K (P/E Cores)</summary>
+
+<p align="center">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_intel_14900k_hybrid_en.png" alt="Queue Allocation on Intel Core i9-14900K" width="850">
+</p>
+
+</details>
+
 ### 3. System-Wide Core Isolation via ReservedCpuSets
 - **Shielding Cores from Background Noise:** Configuring the Windows kernel setting `[HKLM\System\CurrentControlSet\Control\Session Manager\kernel] ReservedCpuSets`.
 - **Operating Principle:** Removes selected logical processors from the generic Windows thread scheduler pool. System services, background processes, and unpinned DPCs (ntoskrnl, symcryptk, tcpip) are barred from executing on reserved cores, preserving dedicated compute cycles for latency-critical tasks and deterministic interrupt handling.
@@ -52,6 +65,10 @@ DEVICE TWEAKER replaces the fragmented ecosystem of legacy utilities, such as **
 - **Custom Signed Kernel Driver:** Unlike deprecated tools (such as RWEverything) that require disabling Windows Vulnerable Driver Blocklists and trigger modern game anti-cheat flags, DEVICE TWEAKER loads its own custom signed driver `DTIMOD.sys` on demand to map physical controller memory via `MmMapIoSpace`.
 - **Granular Interrupter Tuning:** Full zero-moderation mode (`0x0`, 0 ns) for mice, alongside optimized moderation (`0xFA0`, 1 ms) for USB audio interfaces to save CPU cycles without buffer dropouts.
 - **Physical USB Topology Mapping:** Identifies physical hardware paths: CPU Root Complex (CHIP 0 / Direct CPU) versus chipset hubs (CHIP 1 / CHIP 1+), enabling clean separation of mice and keyboards across distinct physical controllers.
+
+<p align="center">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_imod_table_en.png" alt="xHCI IMOD Hardware Register Table" width="850">
+</p>
 
 ### 5. Network Stack Optimization (NIC ITR and RSS)
 - **Network Interrupt Throttle Rate (ITR / EITR / IntrMit):** Direct inspection and disabling of hardware moderation registers on Intel (I210, I211, I225, I226, I350, I219) and Realtek (RTL8111, RTL8125, RTL8126) controllers.
@@ -72,33 +89,9 @@ DEVICE TWEAKER replaces the fragmented ecosystem of legacy utilities, such as **
 - **Differential Checkpoints:** Creates safe registry rollback points prior to any write operation.
 - **One-Click Restoration:** Allows seamless step-by-step undo or full reversion to factory Windows defaults.
 
----
-
-## Hardware Configuration Showcase & Optimization Scenarios
-
-### Architecture Comparison: AMD Dual-CCD vs Intel Hybrid
-
-| AMD Ryzen 9 9950X3D (Dual-CCD with 3D V-Cache) | Intel Core i9-14900K (P/E Hybrid Architecture) |
-| :---: | :---: |
-| <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_9950x3d_dual_ccd_en.png" width="410" alt="AMD Ryzen 9 9950X3D Dual-CCD"> | <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_intel_14900k_hybrid_en.png" width="410" alt="Intel Core i9-14900K Hybrid"> |
-| **CCD0 Die Localization**<br>AUTO mode anchors graphics stack and mouse USB controller interrupts to physical cores on the CCD0 die with 3D V-Cache. The secondary compute die (CCD1) is completely evacuated of peripheral interrupts, eliminating cross-CCD Infinity Fabric transit penalties (~20 ns intra-CCD vs 70-90 ns inter-CCD). | **E-Core and SMT Exclusion**<br>Interrupts are routed strictly to high-IPC Performance cores (P-Cores). Efficient E-Cores and sibling Hyper-Threading threads are excluded from real-time queues, eliminating scheduler latency and pipeline starvation. |
-
-### Low-Level Hardware Control & System Safety
-
-| xHCI IMOD Register Table (DTIMOD.sys Ring 0) | Checkpoint Manager & Safe Rollback |
-| :---: | :---: |
-| <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_imod_table_en.png" width="410" alt="xHCI IMOD Register Table"> | <img src="./DEVICE%20TWEAKER/assets/screenshots/restore_dialog.png" width="410" alt="Checkpoint Manager"> |
-| **Direct Hardware Access**<br>The driver maps physical controller memory and identifies bus hierarchy (CHIP 0 direct CPU root complex vs CHIP 1 chipset hub). Mice run at zero moderation (0 ns / interval 0) while audio interfaces receive an optimized 1 ms interval to prevent buffer dropouts. | **Single-Click Recovery**<br>An immutable initial system snapshot is captured prior to applying tweaks. Automatic differential checkpoint creation before every APPLY ensures safe, immediate reversion to pristine Windows defaults. |
-
-<div align="center">
-
-### Deterministic GPU Queue Allocation (CPU Affinity)
-
-Pinning graphics stack interrupts to dedicated physical CPU cores with dynamic vendor badge color accents (GeForce green for NVIDIA, Radeon red for AMD, Intel blue for Arc).
-
-<img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_gpu_affinity_en.png" width="760" alt="GPU Core Allocation">
-
-</div>
+<p align="center">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/restore_dialog.png" alt="Backup and Restore Checkpoints" width="700">
+</p>
 
 ---
 
