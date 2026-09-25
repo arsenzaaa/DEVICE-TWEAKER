@@ -12,9 +12,9 @@
 
 **DEVICE TWEAKER** is a low-level tuning utility for Windows 10 and Windows 11 engineered for fine-grained configuration of Message Signaled Interrupts (MSI / MSI-X), deterministic interrupt routing (CPU Affinity), direct hardware register manipulation of USB interrupt moderation (xHCI IMOD) via a custom kernel driver, and network stack optimization (RSS / NIC ITR).
 
-By default, the Windows kernel thread scheduler and HAL balance interrupts and Deferred Procedure Calls (DPCs) for overall throughput and energy efficiency. Under high-frequency peripheral workloads (1000-8000 Hz polling rates), default interrupt steering policies concentrate execution on CPU 0 or route mouse, graphics, and network queues across shared physical cores. This causes hardware execution pipeline contention, inter-core cache bouncing, thread preemption, and frametime jitter.
+By default, the Windows kernel thread scheduler and Hardware Abstraction Layer (HAL — the low-level kernel layer interfacing with motherboard chipsets and interrupt controllers) prioritize bulk throughput and energy efficiency. Under high-frequency peripheral workloads (1000-8000 Hz polling rates), default interrupt steering policies concentrate execution on CPU 0 or route mouse, graphics, and network queues across shared physical cores. This causes hardware execution pipeline contention, inter-core cache bouncing, thread preemption, and frametime jitter.
 
-DEVICE TWEAKER replaces the fragmented ecosystem of legacy utilities, such as **MSI Utility v2 / v3**, **Microsoft Interrupt Affinity Policy Tool (intaffinity)**, **GoInterruptPolicy**, as well as **RWEverything** invocations and fragile startup scripts for xHCI IMOD that are blocked by modern anti-cheats (Vanguard, Easy Anti-Cheat, BattlEye) due to the requirement of disabling the Vulnerable Driver Blocklist. All these critical tasks, including RSS queue balancing, network adapter moderation (NIC ITR), processor core isolation via ReservedCpuSets, and Windows 11 background raw mouse input throttle management, are unified within a single utility featuring automated hardware topology analysis and rollback safety (ORIGINAL STATE).
+DEVICE TWEAKER replaces the fragmented ecosystem of legacy utilities, such as **MSI Utility v3**, **Microsoft Interrupt Affinity Policy Tool**, **GoInterruptPolicy**, as well as **RWEverything** invocations and fragile startup scripts for xHCI IMOD that are blocked by modern anti-cheats (Vanguard, Easy Anti-Cheat, BattlEye) due to the requirement of disabling the Vulnerable Driver Blocklist. All these critical tasks, including RSS queue balancing, network adapter moderation (NIC ITR), processor core isolation via ReservedCpuSets, and Windows 11 background raw mouse input throttle management, are unified within a single utility featuring automated hardware topology analysis and instant rollback to pristine factory defaults.
 
 <p align="center">
   <img src="./DEVICE%20TWEAKER/assets/screenshots/main_interface_en.png" alt="DEVICE TWEAKER Main Interface" width="850">
@@ -28,7 +28,7 @@ DEVICE TWEAKER replaces the fragmented ecosystem of legacy utilities, such as **
 - **Eliminating Shared Interrupt Conflicts (IRQ Sharing):** In legacy Line-based (INTx) mode, multiple physical devices share a single IRQ line. When an interrupt occurs, the operating system must sequentially poll the Interrupt Service Routines (ISRs) of all registered devices at elevated hardware priority (DIRQL). MSI and MSI-X replace shared lines with targeted memory write transactions (PCIe Memory Write) directed to the Local APIC address space of designated processor cores.
 - **Enabling MSI / MSI-X Mode:** Enforcing the `MSISupported = 1` registry configuration on target devices (`Device Parameters\Interrupt Management\MessageSignaledInterruptProperties`).
 - **Unlocking Vector Allocation Limits (MessageNumberLimit):** In the Windows registry, `MessageNumberLimit` restricts the maximum number of MSI vectors the `pci.sys` bus driver allocates to a device. In DEVICE TWEAKER, choosing `0` (Unlocked mode) physically removes the `MessageNumberLimit` value from the device registry key, lifting the artificial OS clamp. This allows the PCI bus driver to allocate the full vector pool requested by the hardware in its MSI-X capability table (up to 2048 vectors per PCI-SIG PCIe / MSI-X specifications).
-- **Hardware Interrupt Dispatch Priority (DevicePriority):** Configuring `DevicePriority = 3` (`High`) in `Device Parameters\Interrupt Management\Affinity Policy` establishes high-priority interrupt dispatching for critical mouse and GPU queues at the Windows HAL layer.
+- **Hardware Interrupt Dispatch Priority (DevicePriority):** Configuring `DevicePriority = 3` (`High`) in `Device Parameters\Interrupt Management\Affinity Policy` establishes high-priority interrupt dispatching for critical mouse and GPU queues at the Windows kernel and Hardware Abstraction Layer (HAL).
 
 ### 2. Queue Allocation & Core Pinning (CPU Affinity)
 - **Precise Core Binding:** Assigning target logical processors via the Windows device policy `DevicePolicy = 4` (`IrqPolicySpecifiedProcessors`) and the `AssignmentSetOverride` bitmask (supporting configurations of up to 64 logical processors).
@@ -67,48 +67,49 @@ DEVICE TWEAKER replaces the fragmented ecosystem of legacy utilities, such as **
 - **Disabling USB Selective Suspend:** Eliminates wake latencies by preventing USB ports from entering low-power idle states (`SelectiveSuspendEnabled = 0`).
 - **Controller Power Policies:** Disables aggressive power savings on network adapters and system buses.
 
-### 8. Backup & Rollback System (ORIGINAL STATE)
+### 8. Backup & Baseline Protection System
 - **Immutable Baseline Snapshot:** Automatically captures pristine system state on initial launch into an immutable backup.
 - **Differential Checkpoints:** Creates safe registry rollback points prior to any write operation.
 - **One-Click Restoration:** Allows seamless step-by-step undo or full reversion to factory Windows defaults.
 
 ---
 
-## Optimization Scenario Showcase
+## Hardware Configuration Showcase & Optimization Scenarios
 
-<details>
-<summary><b>Expand Optimization Scenario Gallery</b></summary>
-<br>
+### 1. AMD Ryzen Architecture (Dual-CCD Configuration with 3D V-Cache)
+Demonstrated on a 16-core / 32-thread AMD Ryzen 9 9950X3D processor (featuring asymmetric 3D V-Cache on CCD0): the AUTO optimization algorithm automatically anchors graphics stack (GPU) and mouse USB controller interrupts to physical cores on the high-cache CCD0 die. The secondary compute die (CCD1) is completely evacuated of peripheral interrupts, eliminating cross-CCD Infinity Fabric transit penalties (~20 ns intra-CCD vs. 70-90 ns inter-CCD across the I/O Die).
 
-### GPU Queue Allocation (CPU Affinity)
-Binding graphics stack interrupts to physical cores on the primary compute complex (CCD0), isolating the secondary die (CCD1). Dynamic vendor badge accents (GeForce green for NVIDIA, Radeon red for AMD, Intel blue for Arc).
+<p align="center">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_9950x3d_dual_ccd_en.png" alt="AMD Ryzen 9 9950X3D Dual-CCD Configuration" width="850">
+</p>
+
+### 2. Intel Core Hybrid Microarchitecture (P-Cores and E-Cores)
+Demonstrated on an Intel Core i9-14900K processor (8 Performance P-Cores + 16 Efficient E-Cores, 32 threads): high-rate peripheral and GPU interrupts are routed strictly to high-IPC Performance cores. Efficient E-Cores and sibling Hyper-Threading threads are completely excluded from real-time interrupt processing due to reduced clock speeds, narrow pipelines, and higher wake latencies.
+
+<p align="center">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_intel_14900k_hybrid_en.png" alt="Intel Core i9-14900K Hybrid Architecture" width="850">
+</p>
+
+### 3. Direct Hardware xHCI IMOD Register Control
+Low-level hardware register table for USB host controllers with direct access via the custom kernel driver DTIMOD.sys. The utility detects the physical bus hierarchy: direct processor root complex controllers (CHIP 0 / Direct CPU) versus motherboard chipset hubs (CHIP 1 / Chipset Hub), allowing users to isolate gaming mice on direct CPU ports with unthrottled moderation (0 ns) while routing audio interfaces and keyboards to chipset controllers.
+
+<p align="center">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_imod_table_en.png" alt="xHCI IMOD Hardware Register Table" width="850">
+</p>
+
+### 4. Deterministic GPU Queue Allocation (CPU Affinity)
+Granular pinning of graphics stack interrupts to dedicated physical CPU cores with dynamic vendor badge color accents (GeForce green for NVIDIA, Radeon red for AMD, Intel blue for Arc).
 
 <p align="center">
   <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_gpu_affinity_en.png" alt="GPU Core Allocation" width="850">
 </p>
 
-### Hardware xHCI IMOD Register Table
-Direct hardware interrupter register control with 250 ns granularity via custom kernel driver DTIMOD.sys, displaying live hardware values, latency metrics, and controller topology (CHIP 0 / CHIP 1).
+### 5. Checkpoint Manager & Safe Rollback
+Instant single-click reversal of any configuration step or full restoration to the pristine factory baseline snapshot captured prior to applying tweaks.
 
 <p align="center">
-  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_imod_table_en.png" alt="xHCI IMOD Register Table" width="850">
+  <img src="./DEVICE%20TWEAKER/assets/screenshots/restore_dialog.png" alt="Backup and Restore Checkpoints" width="850">
 </p>
-
-### Hybrid Architecture (P-Cores / E-Cores)
-Separation of Performance and Efficient cores on Intel processors. Total exclusion of E-Cores and sibling Hyper-Threading threads from processing high-rate peripheral interrupts.
-
-<p align="center">
-  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_intel_14900k_hybrid_en.png" alt="Intel Hybrid Core Allocation" width="850">
-</p>
-
-### Recovery System (ORIGINAL STATE)
-Single-click restoration to previous tuning stages or full rollback to the clean baseline Windows configuration captured prior to any modifications.
-
-<p align="center">
-  <img src="./DEVICE%20TWEAKER/assets/screenshots/restore_dialog.png" alt="Backup and Restore Dialog" width="850">
-</p>
-
-</details>
 
 ---
 
@@ -128,7 +129,7 @@ DEVICE TWEAKER is engineered on fundamental PCI Express standards, the xHCI spec
 - **Standard Read-Only Mode:** Default application execution, hardware tree scanning, and the **REFRESH** command operate strictly through Windows SetupAPI and registry interfaces in Ring 3 without loading kernel code.
 - **On-Demand Driver Loading:** The custom driver `DTIMOD.sys` loads strictly when reading interrupter registers or applying IMOD values to perform physical memory mapping via `MmMapIoSpace`.
 - **Kernel Panic Prevention (BSOD):** The driver remains resident in memory until a scheduled system reboot, preventing bus driver crashes associated with dynamic hot-unloading.
-- **Registry Policy Activation:** Windows interrupt policies (`DevicePolicy`, `DevicePriority`, `MessageSignaledInterruptProperties`, `ReservedCpuSets`) take effect upon a standard system restart when the Windows HAL re-initializes APIC interrupt dispatch tables.
+- **Registry Policy Activation:** Windows interrupt policies (`DevicePolicy`, `DevicePriority`, `MessageSignaledInterruptProperties`, `ReservedCpuSets`) take effect upon a standard system restart when the Windows Hardware Abstraction Layer (HAL) re-initializes APIC interrupt dispatch tables.
 
 ---
 
