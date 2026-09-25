@@ -12,7 +12,7 @@
 
 **DEVICE TWEAKER** is a low-level tuning utility for Windows 10 and Windows 11 engineered for fine-grained configuration of Message Signaled Interrupts (MSI / MSI-X), deterministic interrupt routing (CPU Affinity), direct hardware register manipulation of USB interrupt moderation (xHCI IMOD) via a custom kernel driver, and network stack optimization (RSS / NIC ITR).
 
-By default, the Windows kernel thread scheduler and Hardware Abstraction Layer (HAL — the low-level kernel layer interfacing with motherboard chipsets and interrupt controllers) prioritize bulk throughput and energy efficiency. Under high-frequency peripheral workloads (1000-8000 Hz polling rates), default interrupt steering policies concentrate execution on CPU 0 or route mouse, graphics, and network queues across shared physical cores. This causes hardware execution pipeline contention, inter-core cache bouncing, thread preemption, and frametime jitter.
+By default, the Windows kernel thread scheduler and Hardware Abstraction Layer (HAL - the low-level kernel layer interfacing with motherboard chipsets and interrupt controllers) prioritize general bandwidth and energy efficiency. Under high-frequency peripheral workloads (1000-8000 Hz polling rates), default interrupt steering policies concentrate execution on CPU 0 or route mouse, graphics, and network queues across shared physical cores. This causes hardware execution pipeline contention, inter-core cache bouncing, thread preemption, micro-stutters, and frametime spikes.
 
 DEVICE TWEAKER replaces the fragmented ecosystem of legacy utilities, such as **MSI Utility v3**, **Microsoft Interrupt Affinity Policy Tool**, **GoInterruptPolicy**, as well as **RWEverything** invocations and fragile startup scripts for xHCI IMOD that are blocked by modern anti-cheats (Vanguard, Easy Anti-Cheat, BattlEye) due to the requirement of disabling the Vulnerable Driver Blocklist. All these critical tasks, including RSS queue balancing, network adapter moderation (NIC ITR), processor core isolation via ReservedCpuSets, and Windows 11 background raw mouse input throttle management, are unified within a single utility featuring automated hardware topology analysis and instant rollback to pristine factory defaults.
 
@@ -76,40 +76,29 @@ DEVICE TWEAKER replaces the fragmented ecosystem of legacy utilities, such as **
 
 ## Hardware Configuration Showcase & Optimization Scenarios
 
-### 1. AMD Ryzen Architecture (Dual-CCD Configuration with 3D V-Cache)
-Demonstrated on a 16-core / 32-thread AMD Ryzen 9 9950X3D processor (featuring asymmetric 3D V-Cache on CCD0): the AUTO optimization algorithm automatically anchors graphics stack (GPU) and mouse USB controller interrupts to physical cores on the high-cache CCD0 die. The secondary compute die (CCD1) is completely evacuated of peripheral interrupts, eliminating cross-CCD Infinity Fabric transit penalties (~20 ns intra-CCD vs. 70-90 ns inter-CCD across the I/O Die).
+### Architecture Comparison: AMD Dual-CCD vs Intel Hybrid
 
-<p align="center">
-  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_9950x3d_dual_ccd_en.png" alt="AMD Ryzen 9 9950X3D Dual-CCD Configuration" width="850">
-</p>
+| AMD Ryzen 9 9950X3D (Dual-CCD with 3D V-Cache) | Intel Core i9-14900K (P/E Hybrid Architecture) |
+| :---: | :---: |
+| <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_9950x3d_dual_ccd_en.png" width="410" alt="AMD Ryzen 9 9950X3D Dual-CCD"> | <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_intel_14900k_hybrid_en.png" width="410" alt="Intel Core i9-14900K Hybrid"> |
+| **CCD0 Die Localization**<br>AUTO mode anchors graphics stack and mouse USB controller interrupts to physical cores on the CCD0 die with 3D V-Cache. The secondary compute die (CCD1) is completely evacuated of peripheral interrupts, eliminating cross-CCD Infinity Fabric transit penalties (~20 ns intra-CCD vs 70-90 ns inter-CCD). | **E-Core and SMT Exclusion**<br>Interrupts are routed strictly to high-IPC Performance cores (P-Cores). Efficient E-Cores and sibling Hyper-Threading threads are excluded from real-time queues, eliminating scheduler latency and pipeline starvation. |
 
-### 2. Intel Core Hybrid Microarchitecture (P-Cores and E-Cores)
-Demonstrated on an Intel Core i9-14900K processor (8 Performance P-Cores + 16 Efficient E-Cores, 32 threads): high-rate peripheral and GPU interrupts are routed strictly to high-IPC Performance cores. Efficient E-Cores and sibling Hyper-Threading threads are completely excluded from real-time interrupt processing due to reduced clock speeds, narrow pipelines, and higher wake latencies.
+### Low-Level Hardware Control & System Safety
 
-<p align="center">
-  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_intel_14900k_hybrid_en.png" alt="Intel Core i9-14900K Hybrid Architecture" width="850">
-</p>
+| xHCI IMOD Register Table (DTIMOD.sys Ring 0) | Checkpoint Manager & Safe Rollback |
+| :---: | :---: |
+| <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_imod_table_en.png" width="410" alt="xHCI IMOD Register Table"> | <img src="./DEVICE%20TWEAKER/assets/screenshots/restore_dialog.png" width="410" alt="Checkpoint Manager"> |
+| **Direct Hardware Access**<br>The driver maps physical controller memory and identifies bus hierarchy (CHIP 0 direct CPU root complex vs CHIP 1 chipset hub). Mice run at zero moderation (0 ns / interval 0) while audio interfaces receive an optimized 1 ms interval to prevent buffer dropouts. | **Single-Click Recovery**<br>An immutable initial system snapshot is captured prior to applying tweaks. Automatic differential checkpoint creation before every APPLY ensures safe, immediate reversion to pristine Windows defaults. |
 
-### 3. Direct Hardware xHCI IMOD Register Control
-Low-level hardware register table for USB host controllers with direct access via the custom kernel driver DTIMOD.sys. The utility detects the physical bus hierarchy: direct processor root complex controllers (CHIP 0 / Direct CPU) versus motherboard chipset hubs (CHIP 1 / Chipset Hub), allowing users to isolate gaming mice on direct CPU ports with unthrottled moderation (0 ns) while routing audio interfaces and keyboards to chipset controllers.
+<div align="center">
 
-<p align="center">
-  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_amd_imod_table_en.png" alt="xHCI IMOD Hardware Register Table" width="850">
-</p>
+### Deterministic GPU Queue Allocation (CPU Affinity)
 
-### 4. Deterministic GPU Queue Allocation (CPU Affinity)
-Granular pinning of graphics stack interrupts to dedicated physical CPU cores with dynamic vendor badge color accents (GeForce green for NVIDIA, Radeon red for AMD, Intel blue for Arc).
+Pinning graphics stack interrupts to dedicated physical CPU cores with dynamic vendor badge color accents (GeForce green for NVIDIA, Radeon red for AMD, Intel blue for Arc).
 
-<p align="center">
-  <img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_gpu_affinity_en.png" alt="GPU Core Allocation" width="850">
-</p>
+<img src="./DEVICE%20TWEAKER/assets/screenshots/showcase_gpu_affinity_en.png" width="760" alt="GPU Core Allocation">
 
-### 5. Checkpoint Manager & Safe Rollback
-Instant single-click reversal of any configuration step or full restoration to the pristine factory baseline snapshot captured prior to applying tweaks.
-
-<p align="center">
-  <img src="./DEVICE%20TWEAKER/assets/screenshots/restore_dialog.png" alt="Backup and Restore Checkpoints" width="850">
-</p>
+</div>
 
 ---
 
