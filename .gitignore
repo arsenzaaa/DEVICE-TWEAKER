@@ -41,10 +41,12 @@ DEVICE TWEAKER/tmp/
 DEVICE TWEAKER/документации/
 DEVICE TWEAKER/bin/Smoke*/
 DEVICE TWEAKER/bin/UserRunAudit/
-DEVICE TWEAKER/DEVICE TWEAKER — копия/
+DEVICE TWEAKER/DEVICE TWEAKER - копия/
 DEVICE TWEAKER/**/Backups/
 DEVICE TWEAKER/**/logs/
 DEVICE TWEAKER/**/last-crash.txt
+docs/
 DEVICE TWEAKER/docs/research_repos/
 DEVICE TWEAKER/docs/*.pdf
 DEVICE TWEAKER/docs/*.txt
+
