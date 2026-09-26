@@ -1305,7 +1305,12 @@ public sealed partial class MainForm
             }
         }
 
-        if (!availableCategories.Contains(_activeCategoryFilter, StringComparer.OrdinalIgnoreCase))
+        string? envFilter = Environment.GetEnvironmentVariable("DEVICE_TWEAKER_CATEGORY_FILTER");
+        if (!string.IsNullOrWhiteSpace(envFilter) && availableCategories.Contains(envFilter, StringComparer.OrdinalIgnoreCase))
+        {
+            _activeCategoryFilter = envFilter.ToUpperInvariant();
+        }
+        else if (!availableCategories.Contains(_activeCategoryFilter, StringComparer.OrdinalIgnoreCase))
         {
             _activeCategoryFilter = "ALL";
         }

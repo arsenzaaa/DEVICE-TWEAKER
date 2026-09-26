@@ -41,7 +41,7 @@ if ($null -eq $targetScreen) {
     $targetScreen = [System.Windows.Forms.Screen]::PrimaryScreen
 }
 $targetArea = $targetScreen.WorkingArea
-$targetWidth = [Math]::Min(1280, $targetArea.Width - 40)
+$targetWidth = [Math]::Min(1360, $targetArea.Width - 40)
 $targetHeight = [Math]::Min(1000, $targetArea.Height - 40)
 $targetX = $targetArea.X + [Math]::Max(0, [int](($targetArea.Width - $targetWidth) / 2))
 $targetY = $targetArea.Y + [Math]::Max(0, [int](($targetArea.Height - $targetHeight) / 2))
@@ -125,6 +125,18 @@ function Invoke-Click(
     }
 }
 
+function Click-CategoryButton($scope, [string[]]$textCandidates, [string]$label) {
+    foreach ($cand in $textCandidates) {
+        $btn = Find-Desc $scope $cand 'Button' 1
+        if ($btn) {
+            Invoke-Click $btn "Click category $label ($cand)" 600
+            return $true
+        }
+    }
+    Write-Warning "Category button not found for: $($textCandidates -join ', ')"
+    return $false
+}
+
 function Send-WindowKey(
     [System.Windows.Automation.AutomationElement]$window,
     [int]$virtualKey,
@@ -183,72 +195,60 @@ function Dismiss-Dialogs([System.Windows.Automation.AutomationElement]$window, [
     }
 }
 
-# --- CAPTURE 1: INTEL CORE i9-14900K (HYBRID CPU, P-CORE + E-CORE + HT) ---
-Write-Host "Starting Intel 14900K capture..."
-$env:DEVICE_TWEAKER_QA_TEST_ADMIN = '1'
-$env:DEVICE_TWEAKER_QA_SANDBOX = '1'
-$env:DEVICE_TWEAKER_QA_HIDE_SANDBOX_HEADER = '1'
-$env:DEVICE_TWEAKER_QA_FINAL_PRESET = 'Intel14900K'
+function Capture-Scenario([string]$preset, [string]$lang, [string]$filter, [string]$outputFilename, [bool]$pageDown = $false) {
+    Write-Host "Capturing $outputFilename (preset=$preset, lang=$lang, filter=$filter)..."
+    Remove-Item Env:\DEVICE_TWEAKER_QA_TEST_ADMIN -ErrorAction SilentlyContinue
+    $env:DEVICE_TWEAKER_QA_SANDBOX = '1'
+    $env:DEVICE_TWEAKER_QA_HIDE_SANDBOX_HEADER = '1'
+    $env:DEVICE_TWEAKER_SHOWCASE = "${preset}_${lang}"
+    $env:DEVICE_TWEAKER_SHOWCASE_FILTER = $filter
+    $env:DEVICE_TWEAKER_LANGUAGE = $lang
+    $env:DEVICE_TWEAKER_CATEGORY_FILTER = $filter
 
-$proc1 = Start-Process -FilePath $exe -PassThru
-try {
-    $main1 = Get-MainWindow -processId $proc1.Id -timeoutSec 20
-    if (-not $main1) { throw "Could not find main window for Intel run" }
+    $proc = Start-Process -FilePath $exe -PassThru
+    try {
+        $main = Get-MainWindow -processId $proc.Id -timeoutSec 20
+        if (-not $main) { throw "Could not find main window for $outputFilename" }
 
-    # Wait for ready
-    Start-Sleep -Seconds 4
-    # Switch to RU
-    $ruBtn = Find-AutomationId $main1 'LANGUAGE_RU' 5
-    if ($ruBtn) { Invoke-Click $ruBtn 'Switch to RU' 1000 }
+        # Wait for showcase setup to apply and render
+        Start-Sleep -Milliseconds 3200
 
-    # Wait for test devices to finish loading
-    Start-Sleep -Seconds 3
+        if ($pageDown) {
+            Send-WindowKey $main 0x22 'PageDown'
+            Start-Sleep -Milliseconds 600
+        }
 
-    # Capture top main window
-    Capture-Window (Join-Path $assetsScreenshots 'showcase_intel_14900k_hybrid_ru.png') $main1
-
-    # Scroll down to capture GPU + NIC
-    Send-WindowKey $main1 0x22 'PageDown' # VK_NEXT
-    Start-Sleep -Milliseconds 500
-    Capture-Window (Join-Path $assetsScreenshots 'showcase_intel_14900k_gpu_nic_ru.png') $main1
-
-} finally {
-    Stop-Process -Id $proc1.Id -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 1
+        $outPath = Join-Path $assetsScreenshots $outputFilename
+        Capture-Window $outPath $main
+    } finally {
+        Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 400
+    }
 }
 
-# --- CAPTURE 2: AMD RYZEN 9 9950X3D (DUAL-CCD, V-CACHE CCD0 + FREQUENCY CCD1 + SMT) ---
-Write-Host "Starting AMD 9950X3D capture..."
-$env:DEVICE_TWEAKER_QA_FINAL_PRESET = 'Ryzen9950X3D'
+# --- CAPTURES: INTEL 14900K ---
+Capture-Scenario 'Intel14900K' 'RU' 'USB' 'showcase_intel_14900k_hybrid_ru.png'
+Capture-Scenario 'Intel14900K' 'RU' 'ALL' 'showcase_intel_14900k_gpu_nic_ru.png' $true
+Capture-Scenario 'Intel14900K' 'EN' 'USB' 'showcase_intel_14900k_hybrid_en.png'
 
-$proc2 = Start-Process -FilePath $exe -PassThru
-try {
-    $main2 = Get-MainWindow -processId $proc2.Id -timeoutSec 20
-    if (-not $main2) { throw "Could not find main window for AMD run" }
+# --- CAPTURES: AMD RYZEN 9 9950X3D (RU) ---
+Capture-Scenario 'Ryzen9950X3D' 'RU' 'USB' 'showcase_amd_9950x3d_dual_ccd_ru.png'
+Capture-Scenario 'Imod' 'RU' 'USB' 'showcase_amd_imod_table_ru.png'
+Capture-Scenario 'Ryzen9950X3D' 'RU' 'GPU' 'showcase_gpu_affinity_ru.png'
+Capture-Scenario 'NicItr' 'RU' 'NETWORK' 'showcase_nic_itr_ru.png'
+Capture-Scenario 'Ryzen9950X3D' 'RU' 'ALL' 'main_interface_ru.png'
+Capture-Scenario 'Ryzen9950X3D' 'RU' 'ALL' 'showcase_amd_9950x3d_devices_ru.png' $true
 
-    # Wait for ready
-    Start-Sleep -Seconds 4
-    # Switch to RU
-    $ruBtn = Find-AutomationId $main2 'LANGUAGE_RU' 5
-    if ($ruBtn) { Invoke-Click $ruBtn 'Switch to RU' 1000 }
+# --- CAPTURES: AMD RYZEN 9 9950X3D (EN) ---
+Capture-Scenario 'Ryzen9950X3D' 'EN' 'USB' 'showcase_amd_9950x3d_dual_ccd_en.png'
+Capture-Scenario 'Imod' 'EN' 'USB' 'showcase_amd_imod_table_en.png'
+Capture-Scenario 'Ryzen9950X3D' 'EN' 'GPU' 'showcase_gpu_affinity_en.png'
+Capture-Scenario 'NicItr' 'EN' 'NETWORK' 'showcase_nic_itr_en.png'
+Capture-Scenario 'Ryzen9950X3D' 'EN' 'ALL' 'main_interface_en.png'
 
-    # Wait for test devices to finish loading
-    Start-Sleep -Seconds 3
-
-    # Capture top main window (AMD Dual-CCD)
-    Capture-Window (Join-Path $assetsScreenshots 'showcase_amd_9950x3d_dual_ccd_ru.png') $main2
-
-    # Scroll down to capture GPU + NIC + Storage
-    Send-WindowKey $main2 0x22 'PageDown'
-    Start-Sleep -Milliseconds 500
-    Capture-Window (Join-Path $assetsScreenshots 'showcase_amd_9950x3d_devices_ru.png') $main2
-
-} finally {
-    Stop-Process -Id $proc2.Id -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 1
+$restoreSample = Join-Path $root 'bin\SmokeSafe\run_20260921_234551\12_restore_ru.png'
+if (Test-Path $restoreSample) {
+    Copy-Item $restoreSample (Join-Path $assetsScreenshots 'showcase_restore_ru.png') -Force
 }
-
-# Copy Russian restore dialog
-Copy-Item (Join-Path $root 'bin\SmokeSafe\run_20260921_234551\12_restore_ru.png') (Join-Path $assetsScreenshots 'showcase_restore_ru.png') -Force
 
 Write-Host "All showcase screenshots generated successfully!"

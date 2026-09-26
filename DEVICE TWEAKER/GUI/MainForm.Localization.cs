@@ -139,7 +139,19 @@ public sealed partial class MainForm
 
     private void InitializeLocalization()
     {
-        UiLanguage.Initialize();
+        string? envLang = Environment.GetEnvironmentVariable("DEVICE_TWEAKER_LANGUAGE");
+        if (string.Equals(envLang, "EN", StringComparison.OrdinalIgnoreCase))
+        {
+            UiLanguage.Set(UiLanguageCode.English, persist: false);
+        }
+        else if (string.Equals(envLang, "RU", StringComparison.OrdinalIgnoreCase))
+        {
+            UiLanguage.Set(UiLanguageCode.Russian, persist: false);
+        }
+        else
+        {
+            UiLanguage.Initialize();
+        }
         UiLanguage.Changed += HandleUiLanguageChanged;
         LocalizeControlTree(this);
         UpdateLanguageSelectorStyle();

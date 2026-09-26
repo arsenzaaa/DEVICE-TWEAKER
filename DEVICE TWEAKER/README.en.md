@@ -76,13 +76,42 @@ Per Intel xHCI Specification Revision 1.2 (§5.5.2), each hardware interrupter i
 - **Ring 0 Driver (`DTIMOD.sys`):** provides direct physical MMIO register access via `MmMapIoSpace`.
 - **Controller Partitioning (CHIP 0 / CHIP 1):** the `UsbChipPath` engine analyzes PCIe bus topology to distinguish direct CPU-attached lanes (CHIP 0) from chipset hubs (CHIP 1 / PCH). This allows applying zero delay (`0x0`) to mouse input on direct CPU ports while maintaining 1 ms (`0xFA0`) buffers for chipset audio devices to prevent audio dropouts.
 
+<p align="center">
+  <img src="./assets/screenshots/showcase_amd_imod_table_en.png" alt="Hardware USB xHCI IMOD Timer Moderation Table" width="100%">
+</p>
+
+#### Practical USB IMOD Configuration Examples
+
+| Use Case | Controller / Topology | IMOD Value | Moderation Delay | IRQ Priority | Target Affinity |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Gaming Mouse (1000 - 8000 Hz)** | CPU-direct CHIP 0 (Direct Lanes) | `0x0` | 0 ns (Zero latency) | High | Dedicated physical core (P-Core) |
+| **Gaming Keyboard (1000 - 8000 Hz)** | Chipset CHIP 1 (PCH Hub) | `0x0` | 0 ns (Zero latency) | High | Adjacent isolated core |
+| **USB DAC / Audio Interface** | Chipset CHIP 1 (PCH Hub) | `0xFA0` | 1000 µs (1.0 ms) | Normal | Secondary core (buffer underrun prevention) |
+| **Standard Peripherals (Flash, Cam)** | Any available hub | `0xC8` (Default) | 50 µs | Normal | General scheduler core pool |
+
+The interactive DEVICE TWEAKER table exposes hardware interrupters (IRQ 0..7), active delay intervals in nanoseconds, and enumerated USB client devices. The **`[SET]`** button invokes the Ring 0 driver to commit physical MMIO registers, **`[CHECK]`** verifies hardware registers in real time, and **`[REMOVE]`** restores Windows driver defaults (`0xC8` / 50 µs).
+
 ### Network Stack: NIC ITR Registers & RSS Queue Scaling
 
 - **Direct Physical Timer Programming:** using `DTIMOD.sys`, the utility reads and updates physical hardware registers:
   - Intel PCIe (EITR / ITR): I225, I226, I210, I211, I350, I219, 82580, 82576, and Killer E3100 (MMIO offsets `0x1680` and `0x00C4` with 1-2 µs granularity).
   - Realtek PCIe (IntrMit / IntrMitV2): RTL8111, RTL8168, RTL8125, RTL8126, and Killer E2500/E2600 (registers `0x00E2` and `0x0A00` with per-queue mask `0x7F7F7F7F`).
-- **Receive Side Scaling (RSS):** configures `*NumRssQueues` and `*RssBaseProcNumber` in the adapter driver key. Restricting queues to 2 and offsetting the base processing core from CPU 0 prevents network DPCs from preempting mouse input and graphics pipelines.
+- **Receive Side Scaling (RSS):** configures `*NumRssQueues` and `*RssBaseProcNumber` in the adapter driver key. Restricting queues to 2-4 and offsetting the base processing core from CPU 0 prevents network DPCs from preempting mouse input and graphics pipelines.
 - **PCIe Bus Power Management:** disables device D3 sleep states (`PnPCapabilities` bit `0x08`, synchronized via WMI `MSPower_DeviceEnable`) and disables USB Selective Suspend.
+
+<p align="center">
+  <img src="./assets/screenshots/showcase_nic_itr_en.png" alt="NIC ITR Registers and RSS Queue Allocation" width="100%">
+</p>
+
+#### Practical Network Adapter Configuration Examples
+
+| Network Adapter | ITR Mode | Register Value | RSS Queues | Core Allocation (Affinity) | Impact |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Intel Ethernet I225-V / I226-V (2.5G)** | Disabled (Zero Delay) | `0x0, 0x0, 0x0, 0x0` | 4 queues (`*NumRssQueues=4`) | Dedicated core block (CPU 12-15) | Instantaneous packet delivery with zero jitter and zero batch buffer delay |
+| **Realtek RTL8125 / RTL8126 (2.5G/5G)** | Disabled (Zero Delay) | `0x0` (`0x00000000`) | 2-4 queues | Secondary CCD0 / P-Cores | Complete elimination of moderation buffering on Dragon/Gaming NICs |
+| **Intel I219-V / I211-AT (1G)** | Fixed Delay | `0x3E8` (1000 µs) | 2 queues | Secondary CCD1 / E-Cores | Balanced throughput and reduced CPU overhead for background downloads |
+
+DEVICE TWEAKER simultaneously coordinates NDIS registry flags (`*ReceiveBuffers`, `*InterruptModeration`, `*RSS`) and physical hardware queue registers via the Ring 0 kernel driver, surfacing per-queue status (Other=Off, IRQ0=Off, IRQ1=Off...) directly inside the adapter device card.
 
 ### System Core Isolation (ReservedCpuSets)
 

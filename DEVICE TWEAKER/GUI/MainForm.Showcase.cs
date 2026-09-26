@@ -33,6 +33,10 @@ public sealed partial class MainForm
         {
             SetupImodShowcase(isRu);
         }
+        else if (showcase.StartsWith("NicItr", StringComparison.OrdinalIgnoreCase))
+        {
+            SetupNicItrShowcase(isRu);
+        }
         else
         {
             return false;
@@ -46,6 +50,10 @@ public sealed partial class MainForm
         else if (showcase.StartsWith("Imod", StringComparison.OrdinalIgnoreCase))
         {
             SetCategoryFilter("USB");
+        }
+        else if (showcase.StartsWith("NicItr", StringComparison.OrdinalIgnoreCase))
+        {
+            SetCategoryFilter("NETWORK");
         }
 
         UpdateAllBlocksInitialState();
@@ -594,6 +602,94 @@ public sealed partial class MainForm
 
             RecalcAffinityMask(usbBlock);
             OnBlockSettingChanged(usbBlock);
+        }
+
+        UpdateAllBlocksInitialState();
+        UpdateApplyButtonDirtyCount();
+        UpdateCpuHeaderUi();
+    }
+
+    private void SetupNicItrShowcase(bool isRu)
+    {
+        TestCpuConfig config = new()
+        {
+            LogicalCount = 32,
+            SmtEnabled = true,
+            UseHyperThreadingLabel = false,
+            CpuName = "AMD Ryzen 9 9950X3D",
+            CcdMap = new Dictionary<int, int>(),
+            CcxMap = new Dictionary<int, int>()
+        };
+
+        for (int lp = 0; lp < 32; lp++)
+        {
+            config.CoreMap[lp] = lp / 2;
+            int ccd = lp < 16 ? 0 : 1;
+            config.CcdMap[lp] = ccd;
+            config.CcxMap[lp] = ccd;
+            config.CppcRatings[lp] = lp < 16 ? 140 - (lp / 2) : 112 - ((lp - 16) / 2);
+        }
+
+        ApplyTestCpuConfig(config);
+
+        _testDevices.Clear();
+
+        // Device 1: Intel Ethernet Controller I226-V
+        _testDevices.Add(CreateTestDevice(
+            DeviceKind.NET_NDIS,
+            "Intel Ethernet Controller I226-V",
+            @"PCI\VEN_8086&DEV_125C&SUBSYS_14620000\4&2BA2BF07&0&0018",
+            usbRoles: "", audioEndpoints: "", storageTag: "", wifi: false,
+            usbIsXhci: false, usbHasDevices: false, integratedGpu: false,
+            testIrqCount: 4, testMsiStatus: "Enabled", nicPowerSaving: "off"));
+
+        // Device 2: Realtek RTL8125 2.5GbE Gaming Controller
+        _testDevices.Add(CreateTestDevice(
+            DeviceKind.NET_NDIS,
+            "Realtek RTL8125 2.5GbE Gaming Ethernet Family Controller",
+            @"PCI\VEN_10EC&DEV_8125&SUBSYS_14620000\4&2BA2BF07&0&0022",
+            usbRoles: "", audioEndpoints: "", storageTag: "", wifi: false,
+            usbIsXhci: false, usbHasDevices: false, integratedGpu: false,
+            testIrqCount: 4, testMsiStatus: "Enabled", nicPowerSaving: "off"));
+
+        RefreshBlocks();
+
+        foreach (DeviceBlock netBlock in _blocks.Where(b => b.Kind == DeviceKind.NET_NDIS))
+        {
+            bool isIntel = netBlock.Device.InstanceId.Contains("8086", StringComparison.OrdinalIgnoreCase);
+            int targetLp = isIntel ? 12 : 14;
+
+            netBlock.SuppressCpuEvents++;
+            try
+            {
+                for (int i = 0; i < netBlock.CpuBoxes.Count; i++)
+                {
+                    netBlock.CpuBoxes[i].Checked = i == targetLp;
+                }
+            }
+            finally { netBlock.SuppressCpuEvents--; }
+
+            netBlock.MsiCombo.SelectedItem = "Enabled";
+            netBlock.LimitBox.Text = "0";
+            netBlock.PrioCombo.SelectedItem = "High";
+            netBlock.PolicyCombo.SelectedItem = "SpecCPU";
+            if (netBlock.RssQueueBox is not null)
+            {
+                netBlock.RssQueueBox.Value = 4;
+            }
+
+            if (isIntel)
+            {
+                EnsureTestDeviceState(netBlock.Device).NicItrValue = "0, 0, 0, 0";
+            }
+            else
+            {
+                EnsureTestDeviceState(netBlock.Device).NicItrValue = "0x0";
+            }
+
+            RefreshNicItrBlock(netBlock);
+            RecalcAffinityMask(netBlock);
+            OnBlockSettingChanged(netBlock);
         }
 
         UpdateAllBlocksInitialState();

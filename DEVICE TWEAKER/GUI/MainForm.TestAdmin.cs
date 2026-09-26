@@ -5261,6 +5261,11 @@ public sealed partial class MainForm
 
                         _initialDeviceViewportHeightAdjusted = false;
                         RefreshBlocks();
+                        string? envFilter = Environment.GetEnvironmentVariable("DEVICE_TWEAKER_CATEGORY_FILTER");
+                        if (!string.IsNullOrWhiteSpace(envFilter))
+                        {
+                            SetCategoryFilter(envFilter);
+                        }
                         NotifySandboxModeChanged("qa-sandbox");
                         WriteLog(
                             $"TEST.QA.SANDBOX: ready testDevices={_testDevices.Count} only={_testDevicesOnly} dryRun={_testAutoDryRun}");

@@ -319,11 +319,11 @@ public sealed partial class MainForm
         int cpuPanelTop = cpuLabel.Bottom + UiScale(6);
         int cpuPanelHeight = UiScale(150);
         bool hasImod = ShouldShowImod(device);
-        int desiredSettingsSideWidth = hasImod ? UiScale(560) : UiScale(360);
+        int desiredSettingsSideWidth = hasImod ? UiScale(420) : UiScale(360);
         int settingsMinimumWidth = Math.Min(UiScale(360), Math.Max(UiScale(280), grp.Width - UiScale(48)));
         int settingsSideMinimumWidth = desiredSettingsSideWidth;
         int cpuPanelMinimumWidth = UiScale(320);
-        int settingsSideGap = UiScale(40);
+        int settingsSideGap = UiScale(20);
         int cpuPanelFullMaximumWidth = Math.Max(
             cpuPanelMinimumWidth,
             grp.Width - UiScale(16) - UiScale(24));
@@ -1853,7 +1853,7 @@ public sealed partial class MainForm
             settingsContentBottom = Math.Max(settingsContentBottom, child.Bottom);
         }
 
-        desiredSettingsSideWidth = showImod ? UiScale(540) : UiScale(360);
+        desiredSettingsSideWidth = showImod ? UiScale(420) : UiScale(360);
         UpdateResponsivePlacement();
 
         int settingsMinWidth = Math.Min(UiScale(360), availableSettingsWidth);
@@ -1960,7 +1960,7 @@ public sealed partial class MainForm
                 return bottom;
             }
 
-            desiredSettingsSideWidth = showImod ? UiScale(540) : UiScale(360);
+            desiredSettingsSideWidth = showImod ? UiScale(420) : UiScale(360);
             UpdateResponsivePlacement();
             LayoutNicItrRow();
             LayoutImodRow();
