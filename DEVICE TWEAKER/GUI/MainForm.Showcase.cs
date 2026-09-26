@@ -204,7 +204,7 @@ public sealed partial class MainForm
                     || block.Device.UsbRoles.Contains("Mouse", StringComparison.OrdinalIgnoreCase))
                 {
                     block.PrioCombo.SelectedItem = "High";
-                    block.ImodAutoCheck.Checked = true;
+                    block.ImodAutoCheck.Checked = false;
                     block.ImodBox.Text = "0x0";
                     if (block.RawMouseThrottleCheck is not null)
                     {
@@ -227,14 +227,14 @@ public sealed partial class MainForm
                     || block.Device.UsbRoles.Contains("Keyboard", StringComparison.OrdinalIgnoreCase))
                 {
                     block.PrioCombo.SelectedItem = "High";
-                    block.ImodAutoCheck.Checked = true;
+                    block.ImodAutoCheck.Checked = false;
                     block.ImodBox.Text = "0x0";
                     RefreshTestImodPreview(block, "test-imod-set");
                 }
                 else
                 {
                     block.PrioCombo.SelectedItem = "Normal";
-                    block.ImodAutoCheck.Checked = true;
+                    block.ImodAutoCheck.Checked = false;
                     block.ImodBox.Text = "0xFA0";
                     RefreshTestImodPreview(block, "test-imod-set");
                 }
@@ -411,7 +411,7 @@ public sealed partial class MainForm
                     || block.Device.UsbRoles.Contains("Mouse", StringComparison.OrdinalIgnoreCase))
                 {
                     block.PrioCombo.SelectedItem = "High";
-                    block.ImodAutoCheck.Checked = true;
+                    block.ImodAutoCheck.Checked = false;
                     block.ImodBox.Text = "0x0";
                     if (block.RawMouseThrottleCheck is not null)
                     {
@@ -434,14 +434,14 @@ public sealed partial class MainForm
                     || block.Device.UsbRoles.Contains("Keyboard", StringComparison.OrdinalIgnoreCase))
                 {
                     block.PrioCombo.SelectedItem = "High";
-                    block.ImodAutoCheck.Checked = true;
+                    block.ImodAutoCheck.Checked = false;
                     block.ImodBox.Text = "0x0";
                     RefreshTestImodPreview(block, "test-imod-set");
                 }
                 else
                 {
                     block.PrioCombo.SelectedItem = "Normal";
-                    block.ImodAutoCheck.Checked = true;
+                    block.ImodAutoCheck.Checked = false;
                     block.ImodBox.Text = "0xFA0";
                     RefreshTestImodPreview(block, "test-imod-set");
                 }

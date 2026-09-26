@@ -441,7 +441,7 @@ internal static partial class UiLanguage
         match = SubtitleRegex().Match(source);
         if (match.Success)
         {
-            return $"альфа-версия {match.Groups[1].Value} — разработчик {match.Groups[2].Value}";
+            return $"альфа-версия {match.Groups[1].Value} - разработчик {match.Groups[2].Value}";
         }
 
         match = CpuValueRegex().Match(source);
@@ -453,7 +453,7 @@ internal static partial class UiLanguage
         match = ApplyChangesDirtyRegex().Match(source);
         if (match.Success)
         {
-            return $"Применить настройки (Ctrl+S) — изменено: {match.Groups[1].Value}";
+            return $"Применить настройки (Ctrl+S) - изменено: {match.Groups[1].Value}";
         }
 
         match = CpuTooltipRegex().Match(source);
@@ -1448,7 +1448,7 @@ internal static partial class UiLanguage
     [GeneratedRegex("^Value: ReservedCpuSets = (.+) \\| CPUs: (.+)$", RegexOptions.CultureInvariant)]
     private static partial Regex CpuValueRegex();
 
-    [GeneratedRegex(@"^Apply changes \(Ctrl\+S\) — modified: (\d+)$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^Apply changes \(Ctrl\+S\) - modified: (\d+)$", RegexOptions.CultureInvariant)]
     private static partial Regex ApplyChangesDirtyRegex();
 
     [GeneratedRegex(@"^CPU (\d+): (P-core SMT sibling|P-core|E-core)(, CCD \d+)?(, CCX \d+)?, Group (\d+), Core (\d+), Local (\d+)\. CPPC: (.+)$", RegexOptions.CultureInvariant)]

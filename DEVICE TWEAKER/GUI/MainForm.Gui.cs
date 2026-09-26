@@ -54,6 +54,10 @@ public sealed partial class MainForm
             ?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion
             ?? "0.0.4-alpha.2";
+        if (informationalVersion.Contains('+'))
+        {
+            informationalVersion = informationalVersion.Split('+')[0];
+        }
         string subtitleText = $"alpha version {informationalVersion} - developed by {developerHandle}";
 
         LinkLabel logoSubtitle = new()
