@@ -123,9 +123,9 @@ internal sealed partial class NicItrTableLabel : Label
 
     private static (int Queue, int Value, int Rx, int Tx) Columns(int width)
     {
-        int value = Math.Max(58, (int)(width * 0.18));
-        int rx = Math.Max(value + 104, (int)(width * 0.48));
-        int tx = Math.Max(rx + 120, (int)(width * 0.76));
+        int value = Math.Max(72, (int)(width * 0.22));
+        int rx = Math.Max(value + 96, (int)(width * 0.50));
+        int tx = Math.Max(rx + 110, (int)(width * 0.76));
         return (0, value, rx, Math.Min(tx, Math.Max(rx + 1, width - 1)));
     }
 

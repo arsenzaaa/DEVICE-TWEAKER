@@ -15,9 +15,13 @@ public sealed partial class MainForm
         return HasUsbRole(device, "Keyboard")
             || HasUsbRole(device, "Mouse")
             || HasUsbRole(device, "Gamepad")
+            || HasUsbRole(device, "Audio")
+            || HasUsbRole(device, "DAC")
             || HasUsbRole(device, "Клавиатура")
             || HasUsbRole(device, "Мышь")
-            || HasUsbRole(device, "Геймпад");
+            || HasUsbRole(device, "Геймпад")
+            || HasUsbRole(device, "Аудио")
+            || HasUsbRole(device, "ЦАП");
     }
 
     private static bool HasUsbRole(DeviceInfo device, string role)

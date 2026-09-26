@@ -195,8 +195,14 @@ function Dismiss-Dialogs([System.Windows.Automation.AutomationElement]$window, [
     }
 }
 
-function Capture-Scenario([string]$preset, [string]$lang, [string]$filter, [string]$outputFilename, [bool]$pageDown = $false) {
-    Write-Host "Capturing $outputFilename (preset=$preset, lang=$lang, filter=$filter)..."
+function Capture-Scenario(
+    [string]$preset,
+    [string]$lang,
+    [string]$filter,
+    [string]$outputFilename,
+    [string]$deviceTarget = $null,
+    [bool]$pageDown = $false) {
+    Write-Host "Capturing $outputFilename (preset=$preset, lang=$lang, filter=$filter, device=$deviceTarget)..."
     Remove-Item Env:\DEVICE_TWEAKER_QA_TEST_ADMIN -ErrorAction SilentlyContinue
     $env:DEVICE_TWEAKER_QA_SANDBOX = '1'
     $env:DEVICE_TWEAKER_QA_HIDE_SANDBOX_HEADER = '1'
@@ -204,6 +210,11 @@ function Capture-Scenario([string]$preset, [string]$lang, [string]$filter, [stri
     $env:DEVICE_TWEAKER_SHOWCASE_FILTER = $filter
     $env:DEVICE_TWEAKER_LANGUAGE = $lang
     $env:DEVICE_TWEAKER_CATEGORY_FILTER = $filter
+    if ($deviceTarget) {
+        $env:DEVICE_TWEAKER_SHOWCASE_DEVICE = $deviceTarget
+    } else {
+        Remove-Item Env:\DEVICE_TWEAKER_SHOWCASE_DEVICE -ErrorAction SilentlyContinue
+    }
 
     $proc = Start-Process -FilePath $exe -PassThru
     try {
@@ -228,22 +239,26 @@ function Capture-Scenario([string]$preset, [string]$lang, [string]$filter, [stri
 
 # --- CAPTURES: INTEL 14900K ---
 Capture-Scenario 'Intel14900K' 'RU' 'USB' 'showcase_intel_14900k_hybrid_ru.png'
-Capture-Scenario 'Intel14900K' 'RU' 'ALL' 'showcase_intel_14900k_gpu_nic_ru.png' $true
+Capture-Scenario 'Intel14900K' 'RU' 'ALL' 'showcase_intel_14900k_gpu_nic_ru.png' $null $true
 Capture-Scenario 'Intel14900K' 'EN' 'USB' 'showcase_intel_14900k_hybrid_en.png'
 
 # --- CAPTURES: AMD RYZEN 9 9950X3D (RU) ---
 Capture-Scenario 'Ryzen9950X3D' 'RU' 'USB' 'showcase_amd_9950x3d_dual_ccd_ru.png'
-Capture-Scenario 'Imod' 'RU' 'USB' 'showcase_amd_imod_table_ru.png'
+Capture-Scenario 'Imod' 'RU' 'USB' 'showcase_amd_imod_table_ru.png' '15B6'
+Capture-Scenario 'Imod' 'RU' 'USB' 'showcase_usb_audio_dac_imod_ru.png' 'ASMedia'
 Capture-Scenario 'Ryzen9950X3D' 'RU' 'GPU' 'showcase_gpu_affinity_ru.png'
-Capture-Scenario 'NicItr' 'RU' 'NETWORK' 'showcase_nic_itr_ru.png'
+Capture-Scenario 'NicItr' 'RU' 'NETWORK' 'showcase_nic_itr_ru.png' 'Intel'
+Capture-Scenario 'NicItr' 'RU' 'NETWORK' 'showcase_nic_realtek_itr_ru.png' 'Realtek'
 Capture-Scenario 'Ryzen9950X3D' 'RU' 'ALL' 'main_interface_ru.png'
-Capture-Scenario 'Ryzen9950X3D' 'RU' 'ALL' 'showcase_amd_9950x3d_devices_ru.png' $true
+Capture-Scenario 'Ryzen9950X3D' 'RU' 'ALL' 'showcase_amd_9950x3d_devices_ru.png' $null $true
 
 # --- CAPTURES: AMD RYZEN 9 9950X3D (EN) ---
 Capture-Scenario 'Ryzen9950X3D' 'EN' 'USB' 'showcase_amd_9950x3d_dual_ccd_en.png'
-Capture-Scenario 'Imod' 'EN' 'USB' 'showcase_amd_imod_table_en.png'
+Capture-Scenario 'Imod' 'EN' 'USB' 'showcase_amd_imod_table_en.png' '15B6'
+Capture-Scenario 'Imod' 'EN' 'USB' 'showcase_usb_audio_dac_imod_en.png' 'ASMedia'
 Capture-Scenario 'Ryzen9950X3D' 'EN' 'GPU' 'showcase_gpu_affinity_en.png'
-Capture-Scenario 'NicItr' 'EN' 'NETWORK' 'showcase_nic_itr_en.png'
+Capture-Scenario 'NicItr' 'EN' 'NETWORK' 'showcase_nic_itr_en.png' 'Intel'
+Capture-Scenario 'NicItr' 'EN' 'NETWORK' 'showcase_nic_realtek_itr_en.png' 'Realtek'
 Capture-Scenario 'Ryzen9950X3D' 'EN' 'ALL' 'main_interface_en.png'
 
 $restoreSample = Join-Path $root 'bin\SmokeSafe\run_20260921_234551\12_restore_ru.png'

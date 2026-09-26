@@ -245,17 +245,17 @@ internal sealed partial class ImodMapTextBox : ScrollableControl
 
     private static (int Name, int Irq, int Value, int Delay) DeviceColumns(int width)
     {
-        int irq = Math.Max(120, (int)(width * 0.34));
-        int value = Math.Max(irq + 48, (int)(width * 0.50));
-        int delay = Math.Min(width - 86, Math.Max(value + 84, (int)(width * 0.70)));
+        int irq = Math.Max(100, (int)(width * 0.30));
+        int value = Math.Max(irq + 36, (int)(width * 0.44));
+        int delay = Math.Min(width - 96, Math.Max(value + 72, (int)(width * 0.66)));
         return (0, irq, value, Math.Min(delay, Math.Max(value + 1, width - 1)));
     }
 
     private static (int Irq1, int Value1, int Delay1, int Irq2, int Value2, int Delay2) InterruptColumns(int width)
     {
         int colWidth = width / 2;
-        int valueOffset = Math.Max(38, (int)(colWidth * 0.16));
-        int delayOffset = Math.Max(valueOffset + 78, (int)(colWidth * 0.50));
+        int valueOffset = Math.Max(36, (int)(colWidth * 0.16));
+        int delayOffset = Math.Max(valueOffset + 76, (int)(colWidth * 0.50));
 
         int irq1 = 0;
         int value1 = valueOffset;

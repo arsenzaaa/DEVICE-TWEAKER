@@ -64,9 +64,24 @@ public sealed partial class MainForm
             _devicesBusyOverlay.Visible = false;
         }
         SetOperationButtonsEnabled(true);
-        if (_devicesScroll is not null)
+        string? targetDev = Environment.GetEnvironmentVariable("DEVICE_TWEAKER_SHOWCASE_DEVICE");
+        if (!string.IsNullOrWhiteSpace(targetDev))
+        {
+            DeviceBlock? targetBlock = _blocks.FirstOrDefault(b =>
+                (b.Device.Name != null && b.Device.Name.Contains(targetDev, StringComparison.OrdinalIgnoreCase))
+                || (b.Device.UsbRoles != null && b.Device.UsbRoles.Contains(targetDev, StringComparison.OrdinalIgnoreCase))
+                || (b.Device.InstanceId != null && b.Device.InstanceId.Contains(targetDev, StringComparison.OrdinalIgnoreCase)));
+            if (targetBlock is not null && _devicesScroll is not null)
+            {
+                int offset = Math.Max(0, targetBlock.Group.Top);
+                _devicesScroll.Value = offset;
+                SetDevicesScrollOffset(offset);
+            }
+        }
+        else if (_devicesScroll is not null)
         {
             _devicesScroll.Value = 0;
+            SetDevicesScrollOffset(0);
         }
         _searchFilterBox?.Inner.Select(0, 0);
         _btnScanRef?.Focus();

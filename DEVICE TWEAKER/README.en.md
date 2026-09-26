@@ -77,19 +77,16 @@ Per Intel xHCI Specification Revision 1.2 (§5.5.2), each hardware interrupter i
 - **Controller Partitioning (CHIP 0 / CHIP 1):** the `UsbChipPath` engine analyzes PCIe bus topology to distinguish direct CPU-attached lanes (CHIP 0) from chipset hubs (CHIP 1 / PCH). This allows applying zero delay (`0x0`) to mouse input on direct CPU ports while maintaining 1 ms (`0xFA0`) buffers for chipset audio devices to prevent audio dropouts.
 
 <p align="center">
-  <img src="./assets/screenshots/showcase_amd_imod_table_en.png" alt="Hardware USB xHCI IMOD Timer Moderation Table" width="100%">
+  <img src="./assets/screenshots/showcase_amd_imod_table_en.png" alt="Direct CPU USB Controller: Zero Mouse Latency IMOD 0x0" width="100%">
 </p>
 
-#### Practical USB IMOD Configuration Examples
-
-| Use Case | Controller / Topology | IMOD Value | Moderation Delay | IRQ Priority | Target Affinity |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Gaming Mouse (1000 - 8000 Hz)** | CPU-direct CHIP 0 (Direct Lanes) | `0x0` | 0 ns (Zero latency) | High | Dedicated physical core (P-Core) |
-| **Gaming Keyboard (1000 - 8000 Hz)** | Chipset CHIP 1 (PCH Hub) | `0x0` | 0 ns (Zero latency) | High | Adjacent isolated core |
-| **USB DAC / Audio Interface** | Chipset CHIP 1 (PCH Hub) | `0xFA0` | 1000 µs (1.0 ms) | Normal | Secondary core (buffer underrun prevention) |
-| **Standard Peripherals (Flash, Cam)** | Any available hub | `0xC8` (Default) | 50 µs | Normal | General scheduler core pool |
-
 The interactive DEVICE TWEAKER table exposes hardware interrupters (IRQ 0..7), active delay intervals in nanoseconds, and enumerated USB client devices. The **`[SET]`** button invokes the Ring 0 driver to commit physical MMIO registers, **`[CHECK]`** verifies hardware registers in real time, and **`[REMOVE]`** restores Windows driver defaults (`0xC8` / 50 µs).
+
+For chipset-attached controllers (CHIP 1+) driving external audio DACs and microphones, a safe 1 ms hardware buffer (`0xFA0` / 1000 µs) with Normal IRQ priority ensures continuous audio streaming without dropouts or buffer clicks:
+
+<p align="center">
+  <img src="./assets/screenshots/showcase_usb_audio_dac_imod_en.png" alt="Chipset USB Controller: 1 ms Buffer for Audio DAC IMOD 0xFA0" width="100%">
+</p>
 
 ### Network Stack: NIC ITR Registers & RSS Queue Scaling
 
@@ -100,18 +97,16 @@ The interactive DEVICE TWEAKER table exposes hardware interrupters (IRQ 0..7), a
 - **PCIe Bus Power Management:** disables device D3 sleep states (`PnPCapabilities` bit `0x08`, synchronized via WMI `MSPower_DeviceEnable`) and disables USB Selective Suspend.
 
 <p align="center">
-  <img src="./assets/screenshots/showcase_nic_itr_en.png" alt="NIC ITR Registers and RSS Queue Allocation" width="100%">
+  <img src="./assets/screenshots/showcase_nic_itr_en.png" alt="Intel I226-V Network Adapter: 4 RSS Queues and EITR 0x0" width="100%">
 </p>
 
-#### Practical Network Adapter Configuration Examples
-
-| Network Adapter | ITR Mode | Register Value | RSS Queues | Core Allocation (Affinity) | Impact |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Intel Ethernet I225-V / I226-V (2.5G)** | Disabled (Zero Delay) | `0x0, 0x0, 0x0, 0x0` | 4 queues (`*NumRssQueues=4`) | Dedicated core block (CPU 12-15) | Instantaneous packet delivery with zero jitter and zero batch buffer delay |
-| **Realtek RTL8125 / RTL8126 (2.5G/5G)** | Disabled (Zero Delay) | `0x0` (`0x00000000`) | 2-4 queues | Secondary CCD0 / P-Cores | Complete elimination of moderation buffering on Dragon/Gaming NICs |
-| **Intel I219-V / I211-AT (1G)** | Fixed Delay | `0x3E8` (1000 µs) | 2 queues | Secondary CCD1 / E-Cores | Balanced throughput and reduced CPU overhead for background downloads |
-
 DEVICE TWEAKER simultaneously coordinates NDIS registry flags (`*ReceiveBuffers`, `*InterruptModeration`, `*RSS`) and physical hardware queue registers via the Ring 0 kernel driver, surfacing per-queue status (Other=Off, IRQ0=Off, IRQ1=Off...) directly inside the adapter device card.
+
+For Realtek Gaming adapters (RTL8125 / RTL8126), the utility reprograms the hardware `IntrMit` moderation register to `0x0`, eliminating interrupt batching delays:
+
+<p align="center">
+  <img src="./assets/screenshots/showcase_nic_realtek_itr_en.png" alt="Realtek RTL8125 Network Adapter: IntrMit 0x0 Register" width="100%">
+</p>
 
 ### System Core Isolation (ReservedCpuSets)
 

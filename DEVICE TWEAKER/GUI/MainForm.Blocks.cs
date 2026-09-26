@@ -319,7 +319,7 @@ public sealed partial class MainForm
         int cpuPanelTop = cpuLabel.Bottom + UiScale(6);
         int cpuPanelHeight = UiScale(150);
         bool hasImod = ShouldShowImod(device);
-        int desiredSettingsSideWidth = hasImod ? UiScale(420) : UiScale(360);
+        int desiredSettingsSideWidth = hasImod ? UiScale(460) : UiScale(360);
         int settingsMinimumWidth = Math.Min(UiScale(360), Math.Max(UiScale(280), grp.Width - UiScale(48)));
         int settingsSideMinimumWidth = desiredSettingsSideWidth;
         int cpuPanelMinimumWidth = UiScale(320);
@@ -1275,7 +1275,7 @@ public sealed partial class MainForm
 
         ThemedDropDownPicker cmbImodMode = new()
         {
-            Size = UiScale(156, 26),
+            Size = UiScale(96, 26),
             BackColor = Color.FromArgb(18, 18, 22),
             ForeColor = _fgMain,
             Font = _blockFont,
@@ -1288,7 +1288,7 @@ public sealed partial class MainForm
         };
         cmbImodMode.Items.AddRange([ImodModeSingle, ImodModeVector, ImodModeRoles]);
         cmbImodMode.SelectedIndex = 0;
-        cmbImodMode.DropDownWidth = cmbImodMode.Width;
+        cmbImodMode.DropDownWidth = UiScale(140);
         cmbImodMode.MaxDropDownItems = 3;
 
         Label lblImodModeHint = new()
@@ -1738,10 +1738,10 @@ public sealed partial class MainForm
 
             lblImodMode.Location = new Point(0, imodRowTop + labelOffset);
             cmbImodMode.Location = new Point(valueX, imodRowTop);
-            int modeHintLeft = cmbImodMode.Right + UiScale(14);
+            int modeHintLeft = cmbImodMode.Right + UiScale(8);
             lblImodModeHint.Location = new Point(modeHintLeft, imodRowTop + labelOffset);
             lblImodModeHint.Size = new Size(
-                Math.Max(UiScale(110), usableSettingsWidth - modeHintLeft - UiScale(8)),
+                Math.Max(UiScale(160), usableSettingsWidth - modeHintLeft - UiScale(2)),
                 UiScale(18));
 
             int valueRowTop = cmbImodMode.Bottom + rowGap;
@@ -1793,8 +1793,8 @@ public sealed partial class MainForm
             lblImodDefault.Location = new Point(lblImodCurrent.Right + statusGap, imodStatusTop);
             lblImodDefault.Size = new Size(defaultStatusWidth, UiScale(18));
             int imodMapRows = imodDeviceEditorRoles.Contains("Gamepad", StringComparer.OrdinalIgnoreCase) ? 12 : 11;
-            lblImodMap.Location = new Point(imodDetailsX, lblImodCurrent.Bottom + UiScale(14));
-            FitImodMapLabel(lblImodMap, usableSettingsWidth - imodDetailsX, imodMapRows);
+            lblImodMap.Location = new Point(0, lblImodCurrent.Bottom + UiScale(12));
+            FitImodMapLabel(lblImodMap, usableSettingsWidth, imodMapRows);
         }
 
         if (showImod)
@@ -1853,7 +1853,7 @@ public sealed partial class MainForm
             settingsContentBottom = Math.Max(settingsContentBottom, child.Bottom);
         }
 
-        desiredSettingsSideWidth = showImod ? UiScale(420) : UiScale(360);
+        desiredSettingsSideWidth = showImod ? UiScale(460) : UiScale(360);
         UpdateResponsivePlacement();
 
         int settingsMinWidth = Math.Min(UiScale(360), availableSettingsWidth);
@@ -1960,7 +1960,7 @@ public sealed partial class MainForm
                 return bottom;
             }
 
-            desiredSettingsSideWidth = showImod ? UiScale(420) : UiScale(360);
+            desiredSettingsSideWidth = showImod ? UiScale(460) : UiScale(360);
             UpdateResponsivePlacement();
             LayoutNicItrRow();
             LayoutImodRow();
