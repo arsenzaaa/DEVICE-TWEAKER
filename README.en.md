@@ -2,7 +2,7 @@
 
 # DEVICE TWEAKER
 
-Low-level Windows utility for hardware interrupt (MSI / MSI-X) configuration, topology-aware CPU queue steering (Interrupt Affinity), and physical timer moderation (xHCI IMOD / NIC ITR)
+Low-level utility for hardware interrupt (MSI / MSI-X) tuning, CPU queue steering (Interrupt Affinity), and physical timer moderation (xHCI IMOD / NIC ITR) • Windows 10 / 11 (x64) support
 
 [![Release](https://img.shields.io/github/v/release/arsenzaaa/DEVICE-TWEAKER?include_prereleases&style=for-the-badge&color=007acc&label=Release)](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases)
 [![License](https://img.shields.io/badge/License-GPLv3-2ea44f?style=for-the-badge)](./LICENSE)
@@ -18,9 +18,16 @@ Low-level Windows utility for hardware interrupt (MSI / MSI-X) configuration, to
 
 ## Overview
 
-**DEVICE TWEAKER** is an advanced systems engineering tool for 64-bit Windows 10 and Windows 11. It provides deterministic control over hardware interrupt routing (MSI / MSI-X), steers DPC/ISR execution queues to dedicated physical cores (Interrupt Affinity) with full awareness of asymmetric CPU topologies (Intel Core Hybrid, AMD Multi-CCD), reprograms physical timer moderation registers (xHCI IMOD / NIC ITR), and isolates system resources from unpinned OS threads.
+**DEVICE TWEAKER** is an advanced systems tuning utility for hardware interrupts, DPC/ISR queues, and controller physical timers in Windows. The program combines MSI/MSI-X vector configuration, topology-aware CPU queue steering (Interrupt Affinity) for modern architectures (Intel Hybrid, AMD Multi-CCD), direct physical register reprogramming for USB (xHCI IMOD) and network adapters (NIC ITR), and kernel-level core isolation via `ReservedCpuSets`.
 
-For direct physical MMIO register programming, the utility includes a custom signed Ring 0 kernel driver (`DTIMOD.sys`), fully compatible with Windows Core Isolation (HVCI / Memory Integrity) and kernel-level anti-cheat engines.
+For direct physical MMIO register access, the utility uses a custom signed Ring 0 driver (`DTIMOD.sys`), fully compatible with Windows Core Isolation (HVCI / Memory Integrity) and kernel anti-cheat engines.
+
+### Why Interrupt Optimization Matters
+
+- **Interrupts Preempt Game Threads:** Interrupt Service Routines (ISR) and Deferred Procedure Calls (DPC) execute at elevated Windows kernel priority levels (DIRQL / DISPATCH_LEVEL). When interrupt bursts from high-polling mice (1000-8000 Hz) or network controllers are processed on the same core executing your game or render loop, the application thread is preempted, causing input latency spikes, micro-stutters, and frametime jitter.
+- **Offloading CPU 0:** By default, Windows routes the system clock timer, disk storage I/O, and most peripheral interrupts to logical core 0, creating severe DPC bottlenecks. DEVICE TWEAKER safely moves peripheral interrupts off CPU 0 to dedicated execution cores.
+- **CPU Microarchitecture Awareness:** Standard OS scheduling does not account for asymmetric topologies such as Intel Hybrid architecture (high-IPC P-cores vs low-IPC E-cores) or AMD Ryzen multi-chiplet layouts (CCD0 with 3D V-Cache vs CCD1). Routing DPC queues to slow E-cores or incurring cross-die Infinity Fabric penalties adds significant latency. The tool pins interrupts to physical Intel P-cores or AMD cache-rich CCD0 cores.
+- **USB Hardware Moderation (xHCI IMOD):** USB xHCI controllers enable hardware interrupt moderation by default (50 us or 1 ms), accumulating mouse packets into batches. Setting `0 us` via the signed `DTIMOD.sys` driver disables hardware moderation, delivering mouse packets to the CPU immediately with deterministic timing.
 
 ## Features
 
