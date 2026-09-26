@@ -88,6 +88,9 @@ internal static class UsbChipPath
         ["a71e"] = ("Raptor Lake-P Thunderbolt 4 USB", "Raptor Lake (13th Gen)", "USB4/TB4"),
         ["7ec0"] = ("Meteor Lake-P Thunderbolt 4 USB", "Meteor Lake (Core Ultra)", "USB4/TB4"),
         ["a831"] = ("Lunar Lake-M Thunderbolt 4 USB", "Lunar Lake", "USB4/TB4"),
+        ["7f35"] = ("Arrow Lake Thunderbolt 4 USB", "Arrow Lake (Core Ultra 200)", "USB4/TB4"),
+        ["7f36"] = ("Arrow Lake Thunderbolt 4 USB", "Arrow Lake (Core Ultra 200)", "USB4/TB4"),
+        ["ae78"] = ("Arrow Lake-S Integrated USB 3.2 xHCI", "Arrow Lake-S (Core Ultra 200)", "USB 3.2"),
     };
 
     // Intel discrete Thunderbolt host (CHIP 0 - CPU-attached path)
@@ -108,6 +111,7 @@ internal static class UsbChipPath
     private static readonly Dictionary<string, (string Name, string Platform, string Usb)> IntelPch = new(StringComparer.OrdinalIgnoreCase)
     {
         ["7f6e"] = ("800 Series PCH USB 3.1 xHCI", "800 Series PCH", "USB 3.1"),
+        ["7f6f"] = ("800 Series PCH USB 3.2 xHCI", "800 Series PCH", "USB 3.2 Gen 2"),
         ["7a60"] = ("Raptor Lake USB 3.2 Gen 2x2 xHCI", "700 Series PCH", "USB 3.2 Gen 2x2"),
         ["7ae0"] = ("Alder Lake-S PCH USB 3.2 Gen 2x2 xHCI", "600 Series PCH (Desktop)", "USB 3.2 Gen 2x2"),
         ["7ae1"] = ("Alder Lake-S PCH USB 3.2 xHCI", "600 Series PCH (Desktop)", "USB 3.2"),
@@ -115,6 +119,7 @@ internal static class UsbChipPath
         ["54ed"] = ("Alder Lake-N PCH USB 3.2 xHCI", "Alder Lake-N PCH", "USB 3.2 Gen 2"),
         ["7e7d"] = ("Meteor Lake-P USB 3.2 xHCI", "Meteor Lake PCH", "USB 3.2 Gen 2"),
         ["777d"] = ("Arrow Lake USB 3.2 xHCI", "Arrow Lake", "USB 3.2"),
+        ["ae7d"] = ("Arrow Lake-S PCH USB 3.2 xHCI", "Arrow Lake-S PCH", "USB 3.2"),
         ["a87d"] = ("Lunar Lake-M USB 3.2 xHCI", "Lunar Lake PCH", "USB 3.2 Gen 2"),
         ["a0ed"] = ("Tiger Lake-LP USB 3.2 xHCI", "500 Series PCH", "USB 3.2 Gen 2"),
         ["43ed"] = ("Tiger Lake-H USB 3.2 xHCI", "500 Series PCH-H", "USB 3.2 Gen 2"),
@@ -142,6 +147,10 @@ internal static class UsbChipPath
         ["1588"] = ("Strix Halo USB 3.1 xHCI", "Strix Halo (Zen 5)", "USB 3.1"),
         ["161d"] = ("Rembrandt USB4 xHCI", "Ryzen 6000 Mobile", "USB4"),
         ["15c4"] = ("Phoenix USB4/Thunderbolt NHI", "Ryzen 7040 Mobile", "USB4/TB"),
+        ["15e2"] = ("Phoenix/Hawk Point USB 3.1 xHCI", "Ryzen 7040/8040 APU", "USB 3.1"),
+        ["15e3"] = ("Phoenix/Hawk Point USB 3.1 xHCI", "Ryzen 7040/8040 APU", "USB 3.1"),
+        ["1502"] = ("AMD USB4 Host Router", "Ryzen 7000/9000 (AM5)", "USB4"),
+        ["1503"] = ("AMD USB4 Host Router", "Ryzen 7000/9000 (AM5)", "USB4"),
         ["1639"] = ("Renoir/Cezanne USB 3.1", "Ryzen 4000/5000 APU", "USB 3.1"),
         ["149c"] = ("Matisse USB 3.0 Host Controller", "Ryzen 3000/5000 Desktop", "USB 3.0"),
         ["148c"] = ("Starship USB 3.0 Host Controller", "EPYC Rome / TR 3rd Gen", "USB 3.0"),
@@ -154,7 +163,9 @@ internal static class UsbChipPath
     {
         ["43fc"] = ("800 Series Chipset USB 3.x xHCI", "X870/B850 (AM5)", "USB 3.2"),
         ["43fd"] = ("800 Series Chipset USB 3.x xHCI", "X870/B850 (AM5)", "USB 3.2"),
+        ["43fe"] = ("800 Series Chipset USB 3.x xHCI", "X870E/B850 (AM5)", "USB 3.2"),
         ["43f7"] = ("600 Series Chipset USB 3.2", "X670/B650 (AM5)", "USB 3.2"),
+        ["43f6"] = ("600 Series Chipset USB 3.2", "X670/B650 (AM5)", "USB 3.2"),
         ["43ee"] = ("500 Series Chipset USB 3.1 xHCI", "X570/B550 (AM4)", "USB 3.1"),
         ["43ec"] = ("A520 Series Chipset USB 3.1 xHCI", "A520 (AM4)", "USB 3.1"),
         ["43d5"] = ("400 Series Chipset USB 3.1 xHCI", "X470/B450 (AM4)", "USB 3.1"),
@@ -173,8 +184,12 @@ internal static class UsbChipPath
         ["1b21:2142"] = ("ASM2142/3142 USB 3.1", "ASMedia add-in", "USB 3.1 Gen 2"),
         ["1b21:3242"] = ("ASM3242 USB 3.2", "ASMedia add-in", "USB 3.2 Gen 2x2"),
         ["1b21:2426"] = ("ASM4242 USB 3.2 xHCI", "ASMedia add-in", "USB 3.2"),
+        ["1b21:4242"] = ("ASM4242 USB4 Controller", "ASMedia add-in / onboard", "USB4"),
+        ["1b21:2424"] = ("ASM4242 USB4 Host", "ASMedia add-in / onboard", "USB4"),
         ["1106:3483"] = ("VL805/806 USB 3.0 xHCI", "VIA add-in", "USB 3.0"),
         ["1b73:1100"] = ("FL1100 USB 3.0", "Fresco Logic add-in", "USB 3.0"),
+        ["1b73:1000"] = ("FL1000 USB 3.0", "Fresco Logic add-in", "USB 3.0"),
+        ["1b73:1009"] = ("FL1009 USB 3.0", "Fresco Logic add-in", "USB 3.0"),
         ["1912:0015"] = ("uPD720202 USB 3.0", "Renesas add-in", "USB 3.0"),
     };
 
