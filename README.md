@@ -4,6 +4,10 @@
 
 Низкоуровневая утилита настройки аппаратных прерываний (MSI / MSI-X), маршрутизации DPC/ISR по ядрам процессора и аппаратных таймеров (xHCI IMOD / NIC ITR) в Windows 10 и 11
 
+[![Release](https://img.shields.io/github/v/release/arsenzaaa/DEVICE-TWEAKER?include_prereleases&style=for-the-badge&color=007acc&label=Release)](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases)
+[![License](https://img.shields.io/badge/License-GPLv3-2ea44f?style=for-the-badge)](./LICENSE)
+[![Telegram](https://img.shields.io/badge/Telegram-arsenzaa-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/arsenzaa)
+
 **Русский** • [English](./README.en.md)
 
 </div>
