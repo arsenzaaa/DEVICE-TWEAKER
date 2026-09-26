@@ -4,10 +4,6 @@
 
 Low-level Windows utility for hardware interrupt (MSI / MSI-X) configuration, topology-aware CPU queue steering (Interrupt Affinity), and physical timer moderation (xHCI IMOD / NIC ITR)
 
-[![Release](https://img.shields.io/github/v/release/arsenzaaa/DEVICE-TWEAKER?include_prereleases&color=0969da&style=flat-square)](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases)
-[![License](https://img.shields.io/badge/License-GPL--3.0-blue.svg?style=flat-square)](./LICENSE)
-[![Telegram](https://img.shields.io/badge/Telegram-@arsenzaa-229ED9?logo=telegram&logoColor=white&style=flat-square)](https://t.me/arsenzaa)
-
 [Русский](./README.md) • **English**
 
 </div>
