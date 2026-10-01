@@ -1,0 +1,53 @@
+# Build output and intermediate artifacts
+DEVICE TWEAKER/bin/
+DEVICE TWEAKER/obj/
+DEVICE TWEAKER/artifacts/
+DEVICE TWEAKER/IMOD/Driver/build/
+DEVICE TWEAKER/IMOD/Driver/obj/
+DEVICE TWEAKER/IMOD/build/
+DEVICE TWEAKER/IMOD/IMOD/intermediates/
+DEVICE TWEAKER/IMOD/IMOD/intermidates/
+
+# Logs and local publish checks
+DEVICE TWEAKER/**/*.log
+DEVICE TWEAKER/**/size-check/
+DEVICE TWEAKER/**/*.tmp
+DEVICE TWEAKER/**/*.bak
+DEVICE TWEAKER/**/*.pdb
+DEVICE TWEAKER/**/*.ilk
+DEVICE TWEAKER/**/*.idb
+DEVICE TWEAKER/**/*.iobj
+DEVICE TWEAKER/**/*.ipdb
+DEVICE TWEAKER/**/*.recipe
+DEVICE TWEAKER/**/*.tlog
+DEVICE TWEAKER/**/*.lastbuildstate
+
+# IDE/user-local files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Secrets
+DEVICE TWEAKER/**/*.pfx
+DEVICE TWEAKER/**/*.p12
+DEVICE TWEAKER/**/*.snk
+
+# Local-only / QA leftovers
+.playwright-cli/
+DEVICE TWEAKER/assets/screenshots/
+DEVICE TWEAKER/_compare/
+DEVICE TWEAKER/_handoff*/
+DEVICE TWEAKER/_audit/
+DEVICE TWEAKER/tmp/
+DEVICE TWEAKER/документации/
+DEVICE TWEAKER/bin/Smoke*/
+DEVICE TWEAKER/bin/UserRunAudit/
+DEVICE TWEAKER/DEVICE TWEAKER - копия/
+DEVICE TWEAKER/**/Backups/
+DEVICE TWEAKER/**/logs/
+DEVICE TWEAKER/**/last-crash.txt
+docs/
+DEVICE TWEAKER/docs/research_repos/
+DEVICE TWEAKER/docs/*.pdf
+DEVICE TWEAKER/docs/*.txt

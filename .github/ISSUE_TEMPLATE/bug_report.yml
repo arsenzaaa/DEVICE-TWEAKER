@@ -1,0 +1,45 @@
+name: Bug report
+description: Report a reproducible DEVICE TWEAKER problem
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: checkboxes
+    attributes:
+      label: Checklist
+      options:
+        - label: I tested the latest release and searched existing issues.
+          required: true
+        - label: I removed personal data, serial numbers, and private paths from logs.
+          required: true
+  - type: input
+    attributes:
+      label: Version
+      placeholder: Release tag and build (compact or self-contained)
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: System and device
+      description: Windows build, CPU, motherboard/BIOS, device Hardware ID, and driver version.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected and actual result
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: Restart performed?
+      options: ["Yes", "No", "Not applicable"]
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Relevant log excerpt
+      render: text

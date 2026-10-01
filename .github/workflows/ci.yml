@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore DeviceTweaker.sln
+
+      - name: Build
+        run: dotnet build "DEVICE TWEAKER/DeviceTweakerCS.csproj" -c Release --no-restore -p:TreatWarningsAsErrors=true
+
+      - name: Test
+        run: dotnet test "DEVICE TWEAKER/tests/DeviceTweaker.Tests/DeviceTweaker.Tests.csproj" -c Release --no-restore --logger "console;verbosity=normal"

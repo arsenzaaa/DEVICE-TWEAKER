@@ -1,0 +1,23 @@
+name: Feature request
+description: Propose a focused feature or hardware profile
+title: "[Request]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    attributes:
+      label: Problem
+      description: What concrete workflow or unsupported hardware is involved?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Technical evidence
+      description: Official specification, vendor documentation, Device ID, register layout, or reproducible measurements.
+  - type: textarea
+    attributes:
+      label: Safety and restore considerations
