@@ -15,7 +15,7 @@ Changes compared with the `v0.0.2` source.
 
 ### Hardware registers and input
 
-- Added `DTIMOD.sys` and xHCI IMOD controls for the controller and individual interrupters, USB device mapping, register readback after a write, and saved profiles for later application.
+- Moved xHCI IMOD control from WinIO to `DTIMOD.sys` and KDU. Added per-interrupter values, USB device mapping, and register readback to the existing controller-wide control. Saved-profile reapplication was adapted to the new driver.
 - Added NIC ITR controls for recognized Intel and Realtek controllers, including register reads, queue settings, and saved profiles. Hardware writes are unavailable for unknown PCI IDs.
 - Added mouse and keyboard event rate estimates based on Raw Input and `RawMouseThrottleDuration` controls on supported Windows 11 builds. This setting concerns throttling of background Raw Input listeners, not USB polling rate.
 - Refined HDMI/DisplayPort and S/PDIF audio detection. USB controllers with a custom Interrupt Affinity policy remain visible without a detected HID role.
