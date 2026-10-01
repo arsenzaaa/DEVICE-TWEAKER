@@ -11,7 +11,8 @@ Changes compared with the `v0.0.2` source.
 - Added RSS queue count control through `*NumRssQueues` alongside the existing base CPU setting. Saved values and active `Get-NetAdapterRss` state are shown separately.
 - Reworked automatic placement around physical cores, P/E-cores, SMT/HT, CPPC, and AMD CCD/CCX. The GPU is assigned two physical cores. An assignment is skipped with an explanation when CPU topology or device role cannot be determined reliably.
 - Separated the `MSISupported` setting, the interrupt mode estimate based on allocated IRQ numbers, and PCI hardware capability. The IRQ estimate remains a heuristic and cannot determine whether the driver uses MSI or MSI-X.
-- Added an explicit **Unlimited** display and numeric validation for MSI Limit. An empty Interrupt Affinity mask removes `DevicePolicy` and `AssignmentSetOverride` to restore Windows policy.
+- Added an explicit **Unlimited** display and MSI Limit validation against detected device capabilities before writing. An empty mask for a regular device sets `DevicePolicy` to `MachineDefault` and removes `AssignmentSetOverride`.
+- Corrected the `AllClose` and `All` mappings for `DevicePolicy` when reading and writing values: `1` and `3`, respectively. Version 0.0.2 had these labels reversed.
 
 ### Hardware registers and input
 
