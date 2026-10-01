@@ -15,15 +15,15 @@ public sealed partial class MainForm
         return width;
     }
 
-    private static void FixRssPolicyLabelOverlap(DeviceBlock block)
+    private void FixRssPolicyLabelOverlap(DeviceBlock block)
     {
-        int desiredLeft = block.PolicyLabel.Right + 8;
+        int desiredLeft = block.PolicyLabel.Right + UiScale(8);
         if (desiredLeft <= block.PolicyCombo.Left)
         {
             return;
         }
 
-        int rightPadding = 24;
+        int rightPadding = UiScale(24);
         int parentLeft = block.PolicyCombo.Parent?.Left ?? 0;
         int maxWidth = block.Group.ClientSize.Width - rightPadding - parentLeft - desiredLeft;
         int newWidth = block.PolicyCombo.Width;
@@ -32,9 +32,9 @@ public sealed partial class MainForm
             newWidth = maxWidth;
         }
 
-        if (newWidth < 90)
+        if (newWidth < UiScale(90))
         {
-            newWidth = 90;
+            newWidth = UiScale(90);
         }
 
         block.PolicyCombo.Location = new Point(desiredLeft, block.PolicyCombo.Top);
@@ -83,13 +83,13 @@ public sealed partial class MainForm
         WriteLog(
             $"UI.BLOCK: idx={index} title=\"{logTitle}\" kind={device.Kind} id={device.InstanceId} roles=\"{device.UsbRoles}\" audio=\"{device.AudioEndpoints}\" storage=\"{device.StorageTag}\"");
 
-        grp.Width = GetDevicesViewportWidth() - 40;
+        grp.Width = GetDevicesViewportWidth() - UiScale(40);
         grp.Height = _grpHeight;
         grp.BackColor = _bgGroup;
         grp.ForeColor = _fgMain;
         grp.Font = _blockFont;
         grp.Margin = new Padding(0);
-        grp.Padding = new Padding(12, 16, 12, 16);
+        grp.Padding = new Padding(UiScale(12), UiScale(16), UiScale(12), UiScale(16));
 
         grp.Paint += (_, e) =>
         {
@@ -103,8 +103,8 @@ public sealed partial class MainForm
         FlowLayoutPanel headerPanel = new()
         {
             AutoSize = false,
-            Size = new Size(grp.Width - 40, 24),
-            Location = new Point(18, 8),
+            Size = new Size(grp.Width - UiScale(40), UiScale(24)),
+            Location = new Point(UiScale(18), UiScale(8)),
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
             WrapContents = false,
             Margin = Padding.Empty,
@@ -131,7 +131,7 @@ public sealed partial class MainForm
                 Font = _blockFont,
                 ForeColor = _mutedWarn,
                 AutoSize = true,
-                Margin = new Padding(6, 2, 0, 0),
+                Margin = new Padding(UiScale(6), UiScale(2), 0, 0),
             };
             headerPanel.Controls.Add(headerNote);
         }
@@ -139,32 +139,32 @@ public sealed partial class MainForm
         Panel divider = new()
         {
             BackColor = _border,
-            Size = new Size(grp.Width - 32, 1),
-            Location = new Point(16, 36),
+            Size = new Size(grp.Width - UiScale(32), UiScale(1)),
+            Location = new Point(UiScale(16), UiScale(36)),
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
         };
 
-        int contentTop = 48;
+        int contentTop = UiScale(48);
         Label cpuLabel = new()
         {
             Text = "CPU Affinity",
             AutoSize = true,
             ForeColor = _fgMain,
-            Location = new Point(18, contentTop),
+            Location = new Point(UiScale(18), contentTop),
         };
         if (device.Kind == DeviceKind.STOR)
         {
             cpuLabel.ForeColor = _mutedText;
         }
 
-        int cpuPanelTop = cpuLabel.Bottom + 6;
-        int cpuPanelHeight = 150;
+        int cpuPanelTop = cpuLabel.Bottom + UiScale(6);
+        int cpuPanelHeight = UiScale(150);
         Panel cpuPanel = new()
         {
-            Location = new Point(16, cpuPanelTop),
-            Size = new Size(308, cpuPanelHeight),
+            Location = new Point(UiScale(16), cpuPanelTop),
+            Size = new Size(UiScale(308), cpuPanelHeight),
             BackColor = _bgForm,
-            Padding = new Padding(8, 6, 8, 6),
+            Padding = new Padding(UiScale(8), UiScale(6), UiScale(8), UiScale(6)),
         };
         cpuPanel.Paint += (_, e) =>
         {
@@ -177,7 +177,7 @@ public sealed partial class MainForm
 
         List<CheckBox> cpuBoxes = [];
         List<(int Lp, CheckBox Control, int Ccd, int Eff)> lpMeta = [];
-        int checkSpacing = 22;
+        int checkSpacing = UiScale(22);
 
         for (int i = 0; i < _maxLogical; i++)
         {
@@ -216,16 +216,16 @@ public sealed partial class MainForm
         foreach (int cid in ccdKeys)
         {
             List<(int Lp, CheckBox Control, int Ccd, int Eff)> items = lpMeta.Where(m => m.Ccd == cid).ToList();
-            List<(int Lp, CheckBox Control, int Ccd, int Eff)> pItems = items.Where(m => m.Eff == 0).ToList();
-            List<(int Lp, CheckBox Control, int Ccd, int Eff)> eItems = items.Where(m => m.Eff > 0).ToList();
+            List<(int Lp, CheckBox Control, int Ccd, int Eff)> pItems = items.Where(m => !IsEfficiencyClass(m.Eff)).ToList();
+            List<(int Lp, CheckBox Control, int Ccd, int Eff)> eItems = items.Where(m => IsEfficiencyClass(m.Eff)).ToList();
             List<(int Lp, CheckBox Control, int Ccd, int Eff)> other = items.Except(pItems).Except(eItems).ToList();
             List<(int Lp, CheckBox Control, int Ccd, int Eff)> ordered = [.. pItems, .. eItems, .. other];
             columns.Add(ordered);
         }
 
-        int columnGap = 16;
-        int startX = 10;
-        int minColumnWidth = 120;
+        int columnGap = UiScale(16);
+        int startX = UiScale(10);
+        int minColumnWidth = UiScale(120);
 
         int runningX = startX;
         int maxColumnCount = 0;
@@ -254,7 +254,7 @@ public sealed partial class MainForm
         {
             List<(int Lp, CheckBox Control, int Ccd, int Eff)> ordered = columns[i];
             int maxWidth = columnWidths[i];
-            int y = 4;
+            int y = UiScale(4);
             foreach ((int _, CheckBox control, int _, int _) in ordered)
             {
                 control.Location = new Point(runningX, y);
@@ -276,19 +276,19 @@ public sealed partial class MainForm
             cpuPanel.AutoScrollMinSize = Size.Empty;
         }
 
-        int desiredHeight = Math.Max((maxColumnCount * checkSpacing) + 18, 150);
+        int desiredHeight = Math.Max((maxColumnCount * checkSpacing) + UiScale(18), UiScale(150));
         if (cpuPanel.Height != desiredHeight)
         {
             cpuPanel.Height = desiredHeight;
         }
 
-        int maskY = cpuPanel.Bottom + 10;
+        int maskY = cpuPanel.Bottom + UiScale(10);
         Label lblMask = new()
         {
             Text = "Affinity Mask: 0x0",
             AutoSize = true,
             ForeColor = _accent,
-            Location = new Point(18, maskY),
+            Location = new Point(UiScale(18), maskY),
         };
         if (device.Kind == DeviceKind.STOR)
         {
@@ -300,14 +300,14 @@ public sealed partial class MainForm
             Text = "IRQ Count: [Click CALCULATE IRQ COUNTS]",
             AutoSize = true,
             ForeColor = _mutedText,
-            Location = new Point(18, maskY + 20),
+            Location = new Point(UiScale(18), maskY + UiScale(20)),
         };
 
-        int settingsX = cpuPanel.Right + 40;
-        int valueX = 132;
-        int rowGap = 12;
+        int settingsX = cpuPanel.Right + UiScale(40);
+        int valueX = UiScale(132);
+        int rowGap = UiScale(12);
         int rowTop = 0;
-        int labelOffset = 4;
+        int labelOffset = UiScale(4);
 
         Panel settingsPanel = new()
         {
@@ -326,7 +326,7 @@ public sealed partial class MainForm
         ComboBox cmbMsi = new()
         {
             Location = new Point(valueX, rowTop),
-            Size = new Size(150, 26),
+            Size = UiScale(150, 26),
             DropDownStyle = ComboBoxStyle.DropDownList,
             FlatStyle = FlatStyle.Flat,
             BackColor = Color.FromArgb(18, 18, 22),
@@ -347,7 +347,7 @@ public sealed partial class MainForm
         TextBox txtLimit = new()
         {
             Location = new Point(valueX, rowTop),
-            Size = new Size(100, 24),
+            Size = UiScale(100, 24),
             BackColor = Color.FromArgb(18, 18, 22),
             BorderStyle = BorderStyle.FixedSingle,
             ForeColor = _fgMain,
@@ -360,7 +360,7 @@ public sealed partial class MainForm
             Text = "(0 = unlimited)",
             AutoSize = true,
             ForeColor = _mutedText,
-            Location = new Point(txtLimit.Right + 8, txtLimit.Top + 4),
+            Location = new Point(txtLimit.Right + UiScale(8), txtLimit.Top + UiScale(4)),
         };
 
         settingsPanel.Controls.AddRange([lblLimit, txtLimit, lblLimitHint]);
@@ -376,7 +376,7 @@ public sealed partial class MainForm
         ComboBox cmbPrio = new()
         {
             Location = new Point(valueX, rowTop),
-            Size = new Size(150, 26),
+            Size = UiScale(150, 26),
             DropDownStyle = ComboBoxStyle.DropDownList,
             FlatStyle = FlatStyle.Flat,
             BackColor = Color.FromArgb(18, 18, 22),
@@ -397,7 +397,7 @@ public sealed partial class MainForm
         ComboBox cmbPolicy = new()
         {
             Location = new Point(valueX, rowTop),
-            Size = new Size(170, 26),
+            Size = UiScale(170, 26),
             DropDownStyle = ComboBoxStyle.DropDownList,
             FlatStyle = FlatStyle.Flat,
             BackColor = Color.FromArgb(18, 18, 22),
@@ -412,8 +412,8 @@ public sealed partial class MainForm
         settingsPanel.Controls.AddRange([lblPolicy, cmbPolicy]);
         rowTop = cmbPolicy.Bottom + rowGap;
 
-        int imodCheckSize = 14;
-        int imodCheckGap = 4;
+        int imodCheckSize = UiScale(14);
+        int imodCheckGap = UiScale(4);
 
         CheckBox chkImod = new()
         {
@@ -435,7 +435,7 @@ public sealed partial class MainForm
 
         TextBox txtImod = new()
         {
-            Size = new Size(100, 24),
+            Size = UiScale(100, 24),
             BackColor = Color.FromArgb(18, 18, 22),
             BorderStyle = BorderStyle.FixedSingle,
             ForeColor = _fgMain,
@@ -475,7 +475,7 @@ public sealed partial class MainForm
         Button btnImodDelete = new()
         {
             Text = "DELETE IMOD",
-            Size = new Size(120, 24),
+            Size = UiScale(120, 24),
             FlatStyle = FlatStyle.Flat,
             Font = _blockFont,
             UseVisualStyleBackColor = false,
@@ -499,10 +499,10 @@ public sealed partial class MainForm
             chkImod.Location = new Point(0, checkY);
             lblImod.Location = new Point(imodCheckSize + imodCheckGap, rowTop + labelOffset);
             txtImod.Location = new Point(valueX, rowTop);
-            lblImodHint.Location = new Point(txtImod.Right + 8, txtImod.Top + 4);
-            btnImodDelete.Location = new Point(lblImodHint.Right + 12, txtImod.Top - 1);
-            lblImodExperimental.Location = new Point(lblImod.Left, txtImod.Bottom + 4);
-            lblImodDefault.Location = new Point(txtImod.Left, txtImod.Bottom + 4);
+            lblImodHint.Location = new Point(txtImod.Right + UiScale(8), txtImod.Top + UiScale(4));
+            btnImodDelete.Location = new Point(lblImodHint.Right + UiScale(12), txtImod.Top - UiScale(1));
+            lblImodExperimental.Location = new Point(lblImod.Left, txtImod.Bottom + UiScale(4));
+            lblImodDefault.Location = new Point(txtImod.Left, txtImod.Bottom + UiScale(4));
             settingsPanel.Controls.AddRange([chkImod, lblImod, txtImod, lblImodHint, lblImodExperimental, lblImodDefault, btnImodDelete]);
             rowTop = Math.Max(lblImodDefault.Bottom, lblImodExperimental.Bottom) + rowGap;
         }
@@ -527,14 +527,14 @@ public sealed partial class MainForm
         int settingsTop = cpuPanel.Top + Math.Max(0, (cpuPanel.Height - settingsSize.Height) / 2);
         settingsPanel.Location = new Point(settingsX, settingsTop);
 
-        int infoY = Math.Max(lblIrq.Bottom + 14, cpuPanel.Bottom + 18);
-        infoY = Math.Max(infoY, settingsPanel.Bottom + 18);
+        int infoY = Math.Max(lblIrq.Bottom + UiScale(14), cpuPanel.Bottom + UiScale(18));
+        infoY = Math.Max(infoY, settingsPanel.Bottom + UiScale(18));
         Label lblInfo = new()
         {
             Text = "PNP ID: -",
             AutoEllipsis = true,
-            Location = new Point(18, infoY),
-            Size = new Size(grp.Width - 40, 70),
+            Location = new Point(UiScale(18), infoY),
+            Size = new Size(grp.Width - UiScale(40), UiScale(70)),
             Cursor = Cursors.Hand,
             ForeColor = _fgMain,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
@@ -562,7 +562,7 @@ public sealed partial class MainForm
             lblInfo,
         ]);
 
-        grp.Height = Math.Max(cpuPanel.Bottom + 110, lblInfo.Bottom + 20);
+        grp.Height = Math.Max(cpuPanel.Bottom + UiScale(110), lblInfo.Bottom + UiScale(20));
 
         DeviceBlock block = new()
         {
@@ -604,9 +604,9 @@ public sealed partial class MainForm
 
     private void LayoutBlocks()
     {
-        int paddingX = 24;
-        int gapY = 18;
-        int y = 12;
+        int paddingX = UiScale(24);
+        int gapY = UiScale(18);
+        int y = UiScale(12);
         bool firstPlaced = true;
 
         Panel? reserved = _reservedCpuPanel;
@@ -639,14 +639,14 @@ public sealed partial class MainForm
         foreach (DeviceBlock b in _blocks)
         {
             int width = GetDevicesViewportWidth() - (paddingX * 2);
-            if (width < 360)
+            if (width < UiScale(360))
             {
-                width = 360;
+                width = UiScale(360);
             }
 
             b.Group.Width = width;
-            int currentHeight = b.InfoLabel.Height > 0 ? b.InfoLabel.Height : 60;
-            int infoWidth = Math.Max(140, b.Group.Width - b.InfoLabel.Left - 24);
+            int currentHeight = b.InfoLabel.Height > 0 ? b.InfoLabel.Height : UiScale(60);
+            int infoWidth = Math.Max(UiScale(140), b.Group.Width - b.InfoLabel.Left - UiScale(24));
             b.InfoLabel.Size = new Size(infoWidth, currentHeight);
 
             PlaceControl(b.Group);
@@ -675,16 +675,16 @@ public sealed partial class MainForm
         if (reserved is not null && !reservedInserted)
         {
             int width = GetDevicesViewportWidth() - (paddingX * 2);
-            if (width < 360)
+            if (width < UiScale(360))
             {
-                width = 360;
+                width = UiScale(360);
             }
 
             UpdateReservedCpuSetsPanelLayout(reserved, width);
             PlaceControl(reserved);
         }
 
-        int bottomPadding = 32;
+        int bottomPadding = UiScale(32);
         int contentHeight = y + bottomPadding;
         if (_devicesPanel.Height != contentHeight)
         {

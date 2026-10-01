@@ -616,6 +616,7 @@ public sealed partial class MainForm
 
                 foreach (UsbControllerInfo ctrl in controllers)
                 {
+                    string primaryKey = NormalizeInstanceId(ctrl.ControllerPNPID);
                     foreach (string ctrlKey in GetUsbControllerKeys(ctrl.ControllerPNPID, NormalizeInstanceId))
                     {
                         if (!map.TryGetValue(ctrlKey, out List<string>? roles))
@@ -627,7 +628,10 @@ public sealed partial class MainForm
                         if (!roles.Contains(role, StringComparer.OrdinalIgnoreCase))
                         {
                             roles.Add(role);
-                            WriteLog($"USBROLE: HID map {role} -> {ctrlKey} (product=\"{dev.ProductString}\" usagePage={dev.UsagePage} usage={dev.UsageId} inst={dev.DeviceInstanceId})");
+                            if (string.Equals(ctrlKey, primaryKey, StringComparison.OrdinalIgnoreCase))
+                            {
+                                WriteLog($"USBROLE: HID map {role} -> {ctrlKey} (product=\"{dev.ProductString}\" usagePage={dev.UsagePage} usage={dev.UsageId} inst={dev.DeviceInstanceId})");
+                            }
                         }
                     }
                 }
@@ -653,6 +657,7 @@ public sealed partial class MainForm
                     continue;
                 }
 
+                string primaryKey = NormalizeInstanceId(ctrlParent);
                 foreach (string ctrlKey in GetUsbControllerKeys(ctrlParent, NormalizeInstanceId))
                 {
                     if (!map.TryGetValue(ctrlKey, out List<string>? roles))
@@ -664,7 +669,10 @@ public sealed partial class MainForm
                     if (!roles.Contains(role, StringComparer.OrdinalIgnoreCase))
                     {
                         roles.Add(role);
-                        WriteLog($"USBROLE: HID parent-walk {role} -> {ctrlKey} (product=\"{dev.ProductString}\" inst={dev.DeviceInstanceId})");
+                        if (string.Equals(ctrlKey, primaryKey, StringComparison.OrdinalIgnoreCase))
+                        {
+                            WriteLog($"USBROLE: HID parent-walk {role} -> {ctrlKey} (product=\"{dev.ProductString}\" inst={dev.DeviceInstanceId})");
+                        }
                     }
                 }
             }
@@ -734,6 +742,7 @@ public sealed partial class MainForm
                 continue;
             }
 
+            string primaryKey = NormalizeInstanceId(ctrl);
             foreach (string ctrlKey in GetUsbControllerKeys(ctrl, NormalizeInstanceId))
             {
                 if (!map.TryGetValue(ctrlKey, out List<string>? roles))
@@ -745,7 +754,10 @@ public sealed partial class MainForm
                 if (!roles.Contains(role, StringComparer.OrdinalIgnoreCase))
                 {
                     roles.Add(role);
-                    WriteLog($"USBROLE: PNP fallback {role} -> {ctrlKey} (inst={d.InstanceId})");
+                    if (string.Equals(ctrlKey, primaryKey, StringComparison.OrdinalIgnoreCase))
+                    {
+                        WriteLog($"USBROLE: PNP fallback {role} -> {ctrlKey} (inst={d.InstanceId})");
+                    }
                 }
             }
         }

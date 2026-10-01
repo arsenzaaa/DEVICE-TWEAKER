@@ -1750,6 +1750,7 @@ public sealed partial class MainForm
             Topology = topo,
             CcdMap = ccdMap,
         };
+        UpdateEfficiencyClassMap(topo);
 
         _cpuGroupCount = 1;
         _cpuLpByIndex.Clear();
@@ -1834,7 +1835,7 @@ public sealed partial class MainForm
         }
 
         List<int> eLps = _cpuInfo.Topology.LPs
-            .Where(lp => lp.EffClass > 0)
+            .Where(lp => IsEfficiencyCore(lp))
             .Select(lp => lp.LP)
             .OrderBy(x => x)
             .ToList();

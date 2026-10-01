@@ -11,17 +11,18 @@ public sealed partial class MainForm
         dialog.MaximizeBox = false;
         dialog.MinimizeBox = false;
         dialog.ShowInTaskbar = false;
+        dialog.AutoScaleMode = AutoScaleMode.None;
         dialog.BackColor = _bgForm;
         dialog.ForeColor = _fgMain;
         dialog.Font = _dialogFont;
         dialog.Icon = Icon;
 
-        const int padding = 20;
-        const int maxTextWidth = 520;
-        const int minWidth = 360;
-        const int buttonWidth = 92;
-        const int buttonHeight = 32;
-        const int buttonGap = 16;
+        int padding = UiScale(20);
+        int maxTextWidth = UiScale(520);
+        int minWidth = UiScale(360);
+        int buttonWidth = UiScale(92);
+        int buttonHeight = UiScale(32);
+        int buttonGap = UiScale(16);
 
         Size textSize = TextRenderer.MeasureText(
             message,
@@ -84,17 +85,18 @@ public sealed partial class MainForm
         dialog.MaximizeBox = false;
         dialog.MinimizeBox = false;
         dialog.ShowInTaskbar = false;
+        dialog.AutoScaleMode = AutoScaleMode.None;
         dialog.BackColor = _bgForm;
         dialog.ForeColor = _fgMain;
         dialog.Font = _dialogFont;
         dialog.Icon = Icon;
 
-        const int padding = 20;
-        const int maxTextWidth = 520;
-        const int minWidth = 360;
-        const int buttonWidth = 120;
-        const int buttonHeight = 32;
-        const int buttonGap = 16;
+        int padding = UiScale(20);
+        int maxTextWidth = UiScale(520);
+        int minWidth = UiScale(360);
+        int buttonWidth = UiScale(120);
+        int buttonHeight = UiScale(32);
+        int buttonGap = UiScale(16);
 
         Size textSize = TextRenderer.MeasureText(
             message,

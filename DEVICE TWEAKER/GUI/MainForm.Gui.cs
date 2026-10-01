@@ -6,8 +6,10 @@ public sealed partial class MainForm
 {
     private void InitializeGui()
     {
+        UpdateUiScale();
         Text = "DEVICE TWEAKER";
-        Size = new Size(1120, 840);
+        Size formSize = UiScale(1120, 840);
+        Size = formSize;
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = _bgForm;
         ForeColor = _fgMain;
@@ -16,15 +18,15 @@ public sealed partial class MainForm
 
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
-        MinimumSize = Size;
-        MaximumSize = Size;
+        MinimumSize = formSize;
+        MaximumSize = formSize;
 
         Panel brandPanel = new()
         {
             Dock = DockStyle.Top,
-            Height = 112,
+            Height = UiScale(112),
             BackColor = _bgPanel,
-            Padding = new Padding(28, 16, 28, 8),
+            Padding = new Padding(UiScale(28), UiScale(16), UiScale(28), UiScale(8)),
         };
 
         Label logoLabel = new()
@@ -33,7 +35,7 @@ public sealed partial class MainForm
             AutoSize = true,
             Font = _brandFont,
             ForeColor = _accent,
-            Margin = new Padding(0, 2, 0, 0),
+            Margin = new Padding(0, UiScale(2), 0, 0),
         };
 
         const string developerHandle = "@arsenza";
@@ -51,9 +53,9 @@ public sealed partial class MainForm
             VisitedLinkColor = _mutedText,
             DisabledLinkColor = _mutedText,
             ForeColor = _mutedText,
-            MaximumSize = new Size(940, 0),
+            MaximumSize = new Size(UiScale(940), 0),
             TextAlign = ContentAlignment.MiddleCenter,
-            Margin = new Padding(0, 4, 0, 0),
+            Margin = new Padding(0, UiScale(4), 0, 0),
         };
         int linkStart = subtitleText.IndexOf(developerHandle, StringComparison.Ordinal);
         if (linkStart >= 0)
@@ -98,9 +100,9 @@ public sealed partial class MainForm
         Panel statusPanel = new()
         {
             Dock = DockStyle.Top,
-            Height = 74,
+            Height = UiScale(74),
             BackColor = _bgPanel,
-            Padding = new Padding(28, 2, 28, 2),
+            Padding = new Padding(UiScale(28), UiScale(2), UiScale(28), UiScale(2)),
         };
 
         string prefixText = "Hyper-Threading";
@@ -136,7 +138,7 @@ public sealed partial class MainForm
             Text = statusDisplay,
             AutoSize = true,
             Font = _htFont,
-            Margin = new Padding(2, 0, 0, 0),
+            Margin = new Padding(UiScale(2), 0, 0, 0),
         };
 
         _cpuHeaderLabel = new Label
@@ -146,7 +148,7 @@ public sealed partial class MainForm
             ForeColor = _mutedText,
             Font = _headerFont,
             TextAlign = ContentAlignment.MiddleCenter,
-            Margin = new Padding(0, 0, 0, 1),
+            Margin = new Padding(0, 0, 0, UiScale(1)),
         };
 
         FlowLayoutPanel htChip = new()
@@ -154,7 +156,7 @@ public sealed partial class MainForm
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             WrapContents = false,
-            Padding = new Padding(10, 3, 10, 3),
+            Padding = new Padding(UiScale(10), UiScale(3), UiScale(10), UiScale(3)),
             Margin = new Padding(0),
             BackColor = _bgPanel,
         };
@@ -186,7 +188,7 @@ public sealed partial class MainForm
         };
         _cpuHeaderLabel.Anchor = AnchorStyles.None;
         htChip.Anchor = AnchorStyles.None;
-        _cpuHeaderLabel.Margin = new Padding(0, 0, 0, 6);
+        _cpuHeaderLabel.Margin = new Padding(0, 0, 0, UiScale(6));
         htChip.Margin = new Padding(0);
         statusLayout.Controls.Add(_cpuHeaderLabel, 0, 1);
         statusLayout.Controls.Add(htChip, 0, 2);
@@ -197,9 +199,9 @@ public sealed partial class MainForm
         Panel buttonPanel = new()
         {
             Dock = DockStyle.Top,
-            Height = 108,
+            Height = UiScale(108),
             BackColor = _bgPanel,
-            Padding = new Padding(24, 4, 24, 16),
+            Padding = new Padding(UiScale(24), UiScale(4), UiScale(24), UiScale(16)),
             Margin = Padding.Empty,
         };
 
@@ -280,7 +282,7 @@ public sealed partial class MainForm
         Panel accentStrip = new()
         {
             Dock = DockStyle.Top,
-            Height = 1,
+            Height = UiScale(1),
             BackColor = _accent,
         };
 
@@ -292,13 +294,13 @@ public sealed partial class MainForm
             Margin = Padding.Empty,
         };
 
-        const int scrollWidth = 14;
+        int scrollWidth = UiScale(14);
         _devicesPanel = new Panel
         {
             Dock = DockStyle.None,
             BackColor = _bgForm,
             AutoScroll = false,
-            Padding = new Padding(24, 12, 32 + scrollWidth, 32),
+            Padding = new Padding(UiScale(24), UiScale(12), UiScale(32) + scrollWidth, UiScale(32)),
         };
         _devicesPanel.Location = new Point(0, 0);
         _devicesPanel.SizeChanged += (_, _) => SyncDevicesScrollBar();
@@ -310,9 +312,9 @@ public sealed partial class MainForm
             TrackColor = _bgForm,
             RailColor = _bgForm,
             ThumbColor = _accent,
-            ThumbWidth = 10,
+            ThumbWidth = UiScale(10),
             RailWidth = 0,
-            ThumbCornerRadius = 7,
+            ThumbCornerRadius = UiScale(7),
             Visible = false,
             Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right,
         };
@@ -368,6 +370,12 @@ public sealed partial class MainForm
             WriteLog("UI: APPLY button clicked");
             foreach (DeviceBlock b in _blocks)
             {
+                if (b.Device.Wifi)
+                {
+                    WriteLog($"APPLY.SKIP: {b.Device.InstanceId} Kind={b.Kind} reason=wifi");
+                    continue;
+                }
+
                 SaveBlockSettings(b);
             }
 
@@ -402,6 +410,12 @@ public sealed partial class MainForm
 
             foreach (DeviceBlock b in _blocks)
             {
+                if (b.Device.Wifi)
+                {
+                    WriteLog($"AUTO.APPLY.SKIP: {b.Device.InstanceId} Kind={b.Kind} reason=wifi");
+                    continue;
+                }
+
                 SaveBlockSettings(b);
             }
 
@@ -608,8 +622,8 @@ public sealed partial class MainForm
         return new Button
         {
             Text = text,
-            Size = new Size(186, 36),
-            Margin = new Padding(8, 4, 8, 4),
+            Size = UiScale(186, 36),
+            Margin = new Padding(UiScale(8), UiScale(4), UiScale(8), UiScale(4)),
             FlatStyle = FlatStyle.Flat,
             Font = _buttonFont,
             UseVisualStyleBackColor = false,

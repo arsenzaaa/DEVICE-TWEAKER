@@ -10,6 +10,8 @@ public sealed partial class MainForm
     private readonly Dictionary<int, CpuLpInfo> _cpuLpByIndex = new();
     private readonly Dictionary<int, int> _cpuSetIdByIndex = new();
     private readonly Dictionary<int, int> _cpuIndexByCpuSetId = new();
+    private readonly HashSet<int> _effClassP = new();
+    private readonly HashSet<int> _effClassE = new();
     private int _maxLogical;
     private int _grpHeight;
     private int _cpuGroupCount = 1;
@@ -46,6 +48,7 @@ public sealed partial class MainForm
             Topology = cpuRaw,
             CcdMap = ccdMap,
         };
+        UpdateEfficiencyClassMap(cpuRaw);
 
         _cpuGroupCount = Math.Max(1, cpuRaw.LPs.Select(lp => lp.Group).Distinct().Count());
         _cpuLpByIndex.Clear();
@@ -66,7 +69,7 @@ public sealed partial class MainForm
         }
 
         _maxLogical = Math.Min(group0Count, MaxAffinityBits);
-        _grpHeight = 120 + (_maxLogical * 24) + 160;
+        _grpHeight = UiScale(120) + (_maxLogical * UiScale(24)) + UiScale(160);
 
         WriteLog($"CPU.SUMMARY: logical={cpuRaw.Logical} physical={cpuRaw.PhysicalCores} groups={_cpuGroupCount} group0={group0Count} maxAffinity={_maxLogical}");
         if (_cpuGroupCount > 1)
@@ -74,6 +77,73 @@ public sealed partial class MainForm
             WriteLog($"CPU.GROUPS: using group0 for affinity UI (KAFFINITY max {MaxAffinityBits})");
         }
         WriteLog($"CPU.IDENT: {cpuVendor.Name} | Vendor={cpuVendor.Vendor} | SMT/HT={_smtText}");
+    }
+
+    private void UpdateEfficiencyClassMap(CpuTopology topo)
+    {
+        _effClassP.Clear();
+        _effClassE.Clear();
+
+        List<(int EffClass, bool HasSmt)> cores = topo.ByCore.Values
+            .Where(g => g.Count > 0)
+            .Select(g => (g[0].EffClass, g.Count > 1))
+            .ToList();
+        if (cores.Count == 0)
+        {
+            return;
+        }
+
+        List<int> classes = cores.Select(x => x.EffClass).Distinct().OrderBy(x => x).ToList();
+        if (classes.Count == 0)
+        {
+            return;
+        }
+
+        List<int> smtClasses = cores.Where(x => x.HasSmt).Select(x => x.EffClass).Distinct().OrderBy(x => x).ToList();
+        List<int> nonSmtClasses = cores.Where(x => !x.HasSmt).Select(x => x.EffClass).Distinct().OrderBy(x => x).ToList();
+
+        if (smtClasses.Count == 1 && nonSmtClasses.Count == 1 && smtClasses[0] != nonSmtClasses[0])
+        {
+            _effClassP.Add(smtClasses[0]);
+            _effClassE.Add(nonSmtClasses[0]);
+            WriteLog($"CPU.EFFCLASS: SMT class={smtClasses[0]} NonSMT class={nonSmtClasses[0]} -> P={smtClasses[0]} E={nonSmtClasses[0]}");
+            return;
+        }
+
+        int perfClass = classes.Contains(0) ? 0 : classes[0];
+        _effClassP.Add(perfClass);
+        foreach (int cls in classes)
+        {
+            if (cls != perfClass)
+            {
+                _effClassE.Add(cls);
+            }
+        }
+
+        WriteLog($"CPU.EFFCLASS: classes=[{string.Join(',', classes)}] perfClass={perfClass} eClasses=[{string.Join(',', _effClassE)}]");
+    }
+
+    private bool IsEfficiencyClass(int effClass)
+    {
+        if (_effClassP.Count > 0 || _effClassE.Count > 0)
+        {
+            if (_effClassE.Contains(effClass))
+            {
+                return true;
+            }
+
+            if (_effClassP.Contains(effClass))
+            {
+                return false;
+            }
+        }
+
+        return effClass > 0;
+    }
+
+    private bool IsEfficiencyCore(CpuLpInfo lpInfo)
+    {
+        return IsEfficiencyClass(lpInfo.EffClass);
     }
 
     private CpuTopology? QueryCpuCpuSet()
@@ -372,7 +442,7 @@ public sealed partial class MainForm
 
         string suffix = "P";
         Color textColor = _cpuTextP;
-        if (lpInfo.EffClass > 0)
+        if (IsEfficiencyCore(lpInfo))
         {
             suffix = "E";
             textColor = _cpuTextE;
@@ -396,7 +466,7 @@ public sealed partial class MainForm
         cb.UseVisualStyleBackColor = false;
         cb.BackColor = ccdId == 1 ? Color.FromArgb(70, 30, 30) : _bgGroup;
         cb.ForeColor = textColor;
-        cb.Padding = new Padding(2, 0, 0, 0);
+        cb.Padding = new Padding(UiScale(2), 0, 0, 0);
         cb.Margin = Padding.Empty;
     }
 }

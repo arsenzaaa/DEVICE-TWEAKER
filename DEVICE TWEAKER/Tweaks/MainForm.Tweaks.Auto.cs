@@ -23,7 +23,7 @@ public sealed partial class MainForm
                 continue;
             }
 
-            if (primary.EffClass > 0)
+            if (IsEfficiencyCore(primary))
             {
                 primaryE.Add(primary.LP);
             }
@@ -61,8 +61,6 @@ public sealed partial class MainForm
 
         List<int> primaryP = cpuSets.Value.P.Where(lp => lp >= 0 && lp < _maxLogical).ToList();
         List<int> primaryE = cpuSets.Value.E.Where(lp => lp >= 0 && lp < _maxLogical).ToList();
-        bool hasE = primaryE.Count > 0;
-
         List<int> targetCcdLps = [];
         List<int> ccdIdsUnique = [];
         if (_cpuInfo is not null && _cpuInfo.CcdMap.Count > 0)
@@ -91,13 +89,13 @@ public sealed partial class MainForm
         if (_cpuInfo is not null)
         {
             allP = _cpuInfo.Topology.LPs
-                .Where(lp => lp.EffClass == 0 && (targetCcdLps.Count == 0 || targetCcdLps.Contains(lp.LP)))
+                .Where(lp => !IsEfficiencyCore(lp) && (targetCcdLps.Count == 0 || targetCcdLps.Contains(lp.LP)))
                 .Select(lp => lp.LP)
                 .OrderBy(x => x)
                 .ToList();
 
             allE = _cpuInfo.Topology.LPs
-                .Where(lp => lp.EffClass > 0 && (targetCcdLps.Count == 0 || targetCcdLps.Contains(lp.LP)))
+                .Where(lp => IsEfficiencyCore(lp) && (targetCcdLps.Count == 0 || targetCcdLps.Contains(lp.LP)))
                 .Select(lp => lp.LP)
                 .OrderBy(x => x)
                 .ToList();
@@ -122,84 +120,33 @@ public sealed partial class MainForm
 
         WriteLog($"AUTO: CPU primary P=[{string.Join(',', primaryP)}] E=[{string.Join(',', primaryE)}]");
 
-        HashSet<int> used = [];
+        List<int> coreOrder = primaryP.Count > 0 ? primaryP : primaryE;
+        bool usingP = primaryP.Count > 0;
+        bool zeroAvailable = coreOrder.Contains(0);
+        List<int> available = [];
+        int coreIndex = 0;
+        int extras = 0;
+        Queue<int> audioQueue = new(primaryE.Where(lp => lp != 0));
+        int audioECount = 0;
+        int audioEAssigned = 0;
+        bool useAudioE = primaryP.Count > 0 && audioQueue.Count > 0;
 
-        int? TakeLowestP(bool excludeZero)
+        List<int> TakeNext(int count)
         {
-            IEnumerable<int> candidates = primaryP.Where(p => !used.Contains(p));
-            if (excludeZero)
+            List<int> lps = [];
+            while (lps.Count < count && coreIndex < available.Count)
             {
-                candidates = candidates.Where(p => p != 0);
+                lps.Add(available[coreIndex]);
+                coreIndex++;
             }
 
-            int? lp = candidates.OrderBy(x => x).Cast<int?>().FirstOrDefault();
-            if (lp is null)
+            if (lps.Count == count && extras > 0 && coreIndex < available.Count)
             {
-                return null;
+                coreIndex++;
+                extras--;
             }
 
-            used.Add(lp.Value);
-            return lp.Value;
-        }
-
-        int? TakeHighestP(bool excludeZero)
-        {
-            IEnumerable<int> candidates = primaryP.Where(p => !used.Contains(p));
-            if (excludeZero)
-            {
-                candidates = candidates.Where(p => p != 0);
-            }
-
-            int[] arr = candidates.OrderBy(x => x).ToArray();
-            if (arr.Length == 0)
-            {
-                return null;
-            }
-
-            int lp = arr[^1];
-            used.Add(lp);
-            return lp;
-        }
-
-        List<int> TakeTwoAdjacentP(bool allowZero)
-        {
-            IEnumerable<int> candidates = primaryP.Where(p => !used.Contains(p));
-            if (!allowZero)
-            {
-                candidates = candidates.Where(p => p != 0);
-            }
-
-            int[] arr = candidates.OrderBy(x => x).ToArray();
-            if (arr.Length < 2)
-            {
-                return [];
-            }
-
-            for (int i = 0; i < arr.Length - 1; i++)
-            {
-                if (Math.Abs(arr[i + 1] - arr[i]) == 1)
-                {
-                    used.Add(arr[i]);
-                    used.Add(arr[i + 1]);
-                    return [arr[i], arr[i + 1]];
-                }
-            }
-
-            used.Add(arr[0]);
-            used.Add(arr[1]);
-            return [arr[0], arr[1]];
-        }
-
-        int? TakeOneE()
-        {
-            int? lp = primaryE.Where(e => !used.Contains(e)).OrderBy(x => x).Cast<int?>().FirstOrDefault();
-            if (lp is null)
-            {
-                return null;
-            }
-
-            used.Add(lp.Value);
-            return lp.Value;
+            return lps;
         }
 
         foreach (IGrouping<DeviceKind, DeviceBlock> g in _blocks.GroupBy(b => b.Kind))
@@ -221,17 +168,14 @@ public sealed partial class MainForm
         List<DeviceBlock> netNdisBlocks = _blocks.Where(b => b.Kind == DeviceKind.NET_NDIS && !wifiIds.Contains(b.Device.InstanceId)).ToList();
         List<DeviceBlock> netCxBlocks = _blocks.Where(b => b.Kind == DeviceKind.NET_CX && !wifiIds.Contains(b.Device.InstanceId)).ToList();
         List<DeviceBlock> gpuBlocks = _blocks.Where(b => b.Kind == DeviceKind.GPU).ToList();
-        List<DeviceBlock> storBlocks = _blocks.Where(b => b.Kind == DeviceKind.STOR).ToList();
         List<DeviceBlock> audioBlocks = _blocks.Where(b => b.Kind == DeviceKind.AUDIO).ToList();
-        List<DeviceBlock> realAudioBlocks = [];
+        int storCount = _blocks.Count(b => b.Kind == DeviceKind.STOR);
         HashSet<string> skipAutoIds = new(StringComparer.OrdinalIgnoreCase);
-        int? audioLpForMic = null;
-        bool audioLpFromSpeakers = false;
 
         int netCount = netNdisBlocks.Count + netCxBlocks.Count;
         bool hasWiFiOnly = wifiIds.Count > 0 && netCount == 0;
         WriteLog(
-            $"AUTO.SUMMARY: GPU={gpuBlocks.Count} NET={netCount} USB={usbBlocks.Count} AUDIO={audioBlocks.Count} STOR={storBlocks.Count} WIFI={wifiIds.Count} WiFiOnly={hasWiFiOnly} targetCCD=[{string.Join(',', targetCcdLps)}] primaryP=[{string.Join(',', primaryP)}] primaryE=[{string.Join(',', primaryE)}]");
+            $"AUTO.SUMMARY: GPU={gpuBlocks.Count} NET={netCount} USB={usbBlocks.Count} AUDIO={audioBlocks.Count} STOR={storCount} WIFI={wifiIds.Count} WiFiOnly={hasWiFiOnly} targetCCD=[{string.Join(',', targetCcdLps)}] primaryP=[{string.Join(',', primaryP)}] primaryE=[{string.Join(',', primaryE)}]");
         if (hasWiFiOnly)
         {
             WriteLog("AUTO.WIFI-ONLY: no wired NET adapters found; skipping NET affinity.");
@@ -246,7 +190,7 @@ public sealed partial class MainForm
             bool isDisplay = IsDisplayHdmiaudio(pnpId, desc) || IsDisplayAudioEndpointsText(audioText);
             if (!isDisplay)
             {
-                realAudioBlocks.Add(audioBlock);
+                continue;
             }
             else
             {
@@ -353,278 +297,90 @@ public sealed partial class MainForm
             }
         }
 
-        if (realAudioBlocks.Count > 0)
+        List<DeviceBlock> orderedBlocks = _blocks
+            .Where(b => b.Kind != DeviceKind.STOR)
+            .Where(b => !wifiIds.Contains(b.Device.InstanceId))
+            .Where(b => !skipAutoIds.Contains(b.Device.InstanceId))
+            .ToList();
+
+        int audioCount = orderedBlocks.Count(b => b.Kind == DeviceKind.AUDIO);
+        if (useAudioE && audioCount > 0)
         {
-            foreach (DeviceBlock block in realAudioBlocks)
-            {
-                int? audioLp = null;
-                if (hasE)
-                {
-                    audioLp = TakeOneE();
-                }
-
-                if (audioLp is null && Regex.IsMatch(block.Device.AudioEndpoints ?? string.Empty, "(?i)speakers"))
-                {
-                    if (_maxLogical > 2 && !used.Contains(2))
-                    {
-                        audioLp = 2;
-                    }
-                    else if (_maxLogical > 10 && !used.Contains(10))
-                    {
-                        audioLp = 10;
-                    }
-                }
-
-                audioLp ??= TakeLowestP(excludeZero: true);
-                audioLp ??= TakeLowestP(excludeZero: false);
-                if (audioLp is null && primaryP.Count > 0)
-                {
-                    audioLp = primaryP[0];
-                }
-
-                if (audioLp is not null && block.Kind != DeviceKind.STOR)
-                {
-                    used.Add(audioLp.Value);
-                    block.SuppressCpuEvents++;
-                    try
-                    {
-                        foreach (CheckBox cb in block.CpuBoxes)
-                        {
-                            cb.Checked = false;
-                        }
-
-                        if (audioLp.Value >= 0 && audioLp.Value < block.CpuBoxes.Count)
-                        {
-                            block.CpuBoxes[audioLp.Value].Checked = true;
-                        }
-                    }
-                    finally
-                    {
-                        block.SuppressCpuEvents--;
-                    }
-
-                    if (block.Kind != DeviceKind.NET_NDIS && block.PolicyCombo.Enabled)
-                    {
-                        block.PolicyCombo.SelectedItem = "SpecCPU";
-                    }
-
-                    RecalcAffinityMask(block);
-                    bool isSpeakers = Regex.IsMatch(block.Device.AudioEndpoints ?? string.Empty, "(?i)speakers");
-                    if (audioLpForMic is null || (isSpeakers && !audioLpFromSpeakers))
-                    {
-                        audioLpForMic = audioLp.Value;
-                        audioLpFromSpeakers = isSpeakers;
-                    }
-                    WriteLog($"AUTO: AUDIO {block.Device.InstanceId} -> LP={audioLp} policy={(block.PolicyCombo.SelectedItem?.ToString() ?? "(none)")}");
-                }
-                else
-                {
-                    WriteLog($"AUTO: AUDIO {block.Device.InstanceId} -> no available LP");
-                }
-            }
+            audioECount = Math.Min(audioCount, audioQueue.Count);
         }
 
-        List<DeviceBlock> micUsbBlocks = usbBlocks
-            .Where(b => !string.IsNullOrWhiteSpace(b.Device.UsbRoles) && Regex.IsMatch(b.Device.UsbRoles, "(?i)\\bMicrophone\\b"))
-            .Where(b => !Regex.IsMatch(b.Device.UsbRoles ?? string.Empty, "(?i)\\b(Mouse|Keyboard|Gamepad)\\b"))
-            .ToList();
-        if (micUsbBlocks.Count > 0)
+        int totalNeeded = orderedBlocks.Sum(b => b.Kind == DeviceKind.GPU ? 2 : 1) - audioECount;
+        if (totalNeeded < 0)
         {
-            int? micLp = audioLpForMic;
-            string micSource = "audio";
-            if (micLp is null)
-            {
-                int? eLp = TakeOneE();
-                if (eLp is not null)
-                {
-                    micLp = eLp.Value;
-                    micSource = "E-core";
-                }
-                else
-                {
-                    int? pLp = TakeLowestP(excludeZero: true);
-                    pLp ??= TakeLowestP(excludeZero: false);
-                    if (pLp is null && primaryP.Count > 0)
-                    {
-                        pLp = primaryP[0];
-                    }
-                    if (pLp is not null)
-                    {
-                        micLp = pLp.Value;
-                        micSource = "P-core";
-                    }
-                }
-            }
+            totalNeeded = 0;
+        }
+        available = coreOrder.Where(lp => lp != 0).ToList();
+        if (available.Count < totalNeeded && zeroAvailable)
+        {
+            available.Add(0);
+        }
 
-            if (micLp is null)
+        extras = Math.Max(0, available.Count - totalNeeded);
+        coreIndex = 0;
+
+        foreach (DeviceBlock block in orderedBlocks)
+        {
+            int need = block.Kind == DeviceKind.GPU ? 2 : 1;
+            List<int> lps;
+            if (useAudioE && block.Kind == DeviceKind.AUDIO && audioEAssigned < audioECount)
             {
-                foreach (DeviceBlock block in micUsbBlocks)
+                lps = audioQueue.Count > 0 ? [audioQueue.Dequeue()] : [];
+                if (lps.Count > 0)
                 {
-                    WriteLog($"AUTO: USB(MIC) {block.Device.InstanceId} -> no available LP; skip");
+                    audioEAssigned++;
                 }
             }
             else
             {
-                foreach (DeviceBlock block in micUsbBlocks)
-                {
-                    int lpVal = micLp.Value;
-                    block.SuppressCpuEvents++;
-                    try
-                    {
-                        foreach (CheckBox cb in block.CpuBoxes)
-                        {
-                            cb.Checked = false;
-                        }
-
-                        if (lpVal >= 0 && lpVal < block.CpuBoxes.Count)
-                        {
-                            block.CpuBoxes[lpVal].Checked = true;
-                        }
-                    }
-                    finally
-                    {
-                        block.SuppressCpuEvents--;
-                    }
-
-                    if (block.Kind != DeviceKind.NET_NDIS && block.PolicyCombo.Enabled)
-                    {
-                        block.PolicyCombo.SelectedItem = "SpecCPU";
-                    }
-
-                    RecalcAffinityMask(block);
-                    WriteLog($"AUTO: USB(MIC) {block.Device.InstanceId} -> LP={lpVal} policy=SpecCPU source={micSource}");
-                }
+                lps = TakeNext(need);
             }
-        }
 
-        List<DeviceBlock> hidUsbBlocks = usbBlocks
-            .Where(b => !string.IsNullOrWhiteSpace(b.Device.UsbRoles)
-                && Regex.IsMatch(b.Device.UsbRoles, "(?i)Mouse|Keyboard|Gamepad"))
-            .ToList();
-        foreach (DeviceBlock block in hidUsbBlocks)
-        {
-            int? lp = TakeLowestP(excludeZero: true);
-            lp ??= TakeHighestP(excludeZero: true);
-            lp ??= TakeLowestP(excludeZero: false);
-
-            if (lp is not null && block.Kind != DeviceKind.STOR)
+            if (lps.Count == 0)
             {
-                used.Add(lp.Value);
-                block.SuppressCpuEvents++;
-                try
-                {
-                    foreach (CheckBox cb in block.CpuBoxes)
-                    {
-                        cb.Checked = false;
-                    }
-
-                    if (lp.Value >= 0 && lp.Value < block.CpuBoxes.Count)
-                    {
-                        block.CpuBoxes[lp.Value].Checked = true;
-                    }
-                }
-                finally
-                {
-                    block.SuppressCpuEvents--;
-                }
-
-                if (block.Kind != DeviceKind.NET_NDIS && block.PolicyCombo.Enabled)
-                {
-                    block.PolicyCombo.SelectedItem = "SpecCPU";
-                }
-
-                RecalcAffinityMask(block);
-                WriteLog($"AUTO: USB(HID) {block.Device.InstanceId} -> LP={lp} policy=SpecCPU");
+                string label = block.Kind == DeviceKind.NET_NDIS || block.Kind == DeviceKind.NET_CX ? "NET" : block.Kind.ToString();
+                WriteLog($"AUTO: {label} {block.Device.InstanceId} -> no available LP ({(usingP ? "P" : "E")}-core list exhausted)");
+                continue;
             }
-        }
 
-        if (gpuBlocks.Count > 0)
-        {
-            List<int> gpuLps = [];
-            if (pCount >= 4)
+            block.SuppressCpuEvents++;
+            try
             {
-                gpuLps = TakeTwoAdjacentP(allowZero: false);
-            }
-            else
-            {
-                int? gpuLp = TakeHighestP(excludeZero: true) ?? TakeHighestP(excludeZero: false);
-                if (gpuLp is not null)
+                foreach (CheckBox cb in block.CpuBoxes)
                 {
-                    gpuLps = [gpuLp.Value];
+                    cb.Checked = false;
+                }
+
+                foreach (int lpVal in lps)
+                {
+                    if (lpVal >= 0 && lpVal < block.CpuBoxes.Count)
+                    {
+                        block.CpuBoxes[lpVal].Checked = true;
+                    }
                 }
             }
-
-            foreach (DeviceBlock block in gpuBlocks)
+            finally
             {
-                if (gpuLps.Count > 0 && block.Kind != DeviceKind.STOR)
-                {
-                    block.SuppressCpuEvents++;
-                    try
-                    {
-                        foreach (CheckBox cb in block.CpuBoxes)
-                        {
-                            cb.Checked = false;
-                        }
-
-                        foreach (int lpVal in gpuLps)
-                        {
-                            if (lpVal >= 0 && lpVal < block.CpuBoxes.Count)
-                            {
-                                block.CpuBoxes[lpVal].Checked = true;
-                            }
-                        }
-                    }
-                    finally
-                    {
-                        block.SuppressCpuEvents--;
-                    }
-
-                    if (block.Kind != DeviceKind.NET_NDIS && block.PolicyCombo.Enabled)
-                    {
-                        block.PolicyCombo.SelectedItem = "SpecCPU";
-                    }
-
-                    RecalcAffinityMask(block);
-                    WriteLog($"AUTO: GPU {block.Device.InstanceId} -> LPs=[{string.Join(',', gpuLps)}] policy=SpecCPU");
-                }
+                block.SuppressCpuEvents--;
             }
-        }
 
-        List<DeviceBlock> netBlocks = [.. netNdisBlocks, .. netCxBlocks];
-        if (netBlocks.Count > 0)
-        {
-            int? netLp = TakeHighestP(excludeZero: true) ?? TakeLowestP(excludeZero: false);
-            foreach (DeviceBlock block in netBlocks)
+            if (block.Kind != DeviceKind.NET_NDIS && block.PolicyCombo.Enabled)
             {
-                if (netLp is not null && block.Kind != DeviceKind.STOR)
-                {
-                    block.SuppressCpuEvents++;
-                    try
-                    {
-                        foreach (CheckBox cb in block.CpuBoxes)
-                        {
-                            cb.Checked = false;
-                        }
-
-                        if (netLp.Value >= 0 && netLp.Value < block.CpuBoxes.Count)
-                        {
-                            block.CpuBoxes[netLp.Value].Checked = true;
-                        }
-                    }
-                    finally
-                    {
-                        block.SuppressCpuEvents--;
-                    }
-
-                    if (block.Kind != DeviceKind.NET_NDIS && block.PolicyCombo.Enabled)
-                    {
-                        block.PolicyCombo.SelectedItem = "SpecCPU";
-                    }
-
-                    RecalcAffinityMask(block);
-                    WriteLog($"AUTO: NET {block.Device.InstanceId} -> LP={netLp} policy={block.PolicyCombo.SelectedItem}");
-                }
+                block.PolicyCombo.SelectedItem = "SpecCPU";
             }
+
+            RecalcAffinityMask(block);
+
+            string labelText = block.Kind switch
+            {
+                DeviceKind.NET_NDIS or DeviceKind.NET_CX => "NET",
+                _ => block.Kind.ToString(),
+            };
+            WriteLog($"AUTO: {labelText} {block.Device.InstanceId} -> LPs=[{string.Join(',', lps)}] policy={block.PolicyCombo.SelectedItem}");
         }
 
         WriteLog("AUTO: Invoke-AutoOptimization done");

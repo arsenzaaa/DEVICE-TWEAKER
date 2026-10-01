@@ -46,6 +46,9 @@ public sealed partial class MainForm : Form
             return;
         }
 
+        UpdateUiScale();
+        AutoScaleMode = AutoScaleMode.None;
+
         InitializeCpu();
         InitializeGui();
         ApplyAppIcon();

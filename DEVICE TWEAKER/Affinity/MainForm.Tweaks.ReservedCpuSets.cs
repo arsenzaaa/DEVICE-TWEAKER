@@ -259,7 +259,7 @@ public sealed partial class MainForm
             BackColor = _bgGroup,
             ForeColor = _fgMain,
             Margin = new Padding(0),
-            Padding = new Padding(12, 16, 12, 16),
+            Padding = new Padding(UiScale(12), UiScale(16), UiScale(12), UiScale(16)),
             TabStop = false,
         };
         grp.Paint += (_, e) =>
@@ -295,7 +295,7 @@ public sealed partial class MainForm
             AutoEllipsis = true,
             Font = _baseFont,
             ForeColor = _fgMain,
-            Margin = new Padding(0, 6, 0, 0),
+            Margin = new Padding(0, UiScale(6), 0, 0),
             Cursor = Cursors.Hand,
         };
         pathLabel.MouseEnter += (_, _) => pathLabel.ForeColor = _accent;
@@ -314,8 +314,8 @@ public sealed partial class MainForm
             BackColor = _bgForm,
             ForeColor = _fgMain,
             AutoScroll = false,
-            Margin = new Padding(0, 8, 0, 0),
-            Padding = new Padding(8, 6, 8, 6),
+            Margin = new Padding(0, UiScale(8), 0, 0),
+            Padding = new Padding(UiScale(8), UiScale(6), UiScale(8), UiScale(6)),
         };
         inner.Paint += (_, e) =>
         {
@@ -406,19 +406,19 @@ public sealed partial class MainForm
         int y = panel.Padding.Top;
 
         title.Width = availWidth;
-        title.Location = new Point(panel.Padding.Left + 4, y);
-        y = title.Bottom + 6;
+        title.Location = new Point(panel.Padding.Left + UiScale(4), y);
+        y = title.Bottom + UiScale(6);
 
         desc.Width = availWidth;
         desc.MaximumSize = new Size(availWidth, 0);
-        desc.Location = new Point(panel.Padding.Left + 4, y);
-        y = desc.Bottom + 8;
+        desc.Location = new Point(panel.Padding.Left + UiScale(4), y);
+        y = desc.Bottom + UiScale(8);
 
         if (meta.Count > 0)
         {
-            int startX = 10;
-            int columnGap = 16;
-            int checkSpacing = 22;
+            int startX = UiScale(10);
+            int columnGap = UiScale(16);
+            int checkSpacing = UiScale(22);
             int runningX = startX;
 
             List<int> ccdKeys = meta.Select(m => m.Ccd).Distinct().OrderBy(x => x).ToList();
@@ -431,23 +431,23 @@ public sealed partial class MainForm
             foreach (int cid in ccdKeys)
             {
                 List<ReservedCpuEntry> items = meta.Where(m => m.Ccd == cid).ToList();
-                List<ReservedCpuEntry> pItems = items.Where(m => m.Eff == 0).ToList();
-                List<ReservedCpuEntry> eItems = items.Where(m => m.Eff > 0).ToList();
+                List<ReservedCpuEntry> pItems = items.Where(m => !IsEfficiencyClass(m.Eff)).ToList();
+                List<ReservedCpuEntry> eItems = items.Where(m => IsEfficiencyClass(m.Eff)).ToList();
                 List<ReservedCpuEntry> other = items.Except(pItems).Except(eItems).ToList();
                 List<ReservedCpuEntry> ordered = [.. pItems, .. eItems, .. other];
 
-                int maxWidth = 120;
+                int maxWidth = UiScale(120);
                 if (ordered.Count > 0)
                 {
                     int w = ordered.Max(o => o.Control.PreferredSize.Width);
                     if (w > 0)
                     {
-                        maxWidth = w + 10;
+                        maxWidth = w + UiScale(10);
                     }
                 }
 
                 colWidths.Add(maxWidth);
-                int yPos = 4;
+                int yPos = UiScale(4);
                 foreach (ReservedCpuEntry entry in ordered)
                 {
                     entry.Control.Location = new Point(runningX, yPos);
@@ -461,15 +461,15 @@ public sealed partial class MainForm
             inner.Width = Math.Min(availWidth, totalWidthNeeded);
 
             int maxBottom = meta.Max(m => m.Control.Bottom);
-            inner.Height = Math.Max(checkSpacing + 10, maxBottom + 10);
-            inner.Location = new Point(panel.Padding.Left + 2, y);
-            y = inner.Bottom + 12;
+            inner.Height = Math.Max(checkSpacing + UiScale(10), maxBottom + UiScale(10));
+            inner.Location = new Point(panel.Padding.Left + UiScale(2), y);
+            y = inner.Bottom + UiScale(12);
         }
 
         path.MaximumSize = new Size(availWidth, 0);
-        path.Location = new Point(panel.Padding.Left + 4, y);
+        path.Location = new Point(panel.Padding.Left + UiScale(4), y);
         y = path.Bottom + panel.Padding.Bottom;
 
-        panel.Height = Math.Max(y, panel.Padding.Vertical + 40);
+        panel.Height = Math.Max(y, panel.Padding.Vertical + UiScale(40));
     }
 }
