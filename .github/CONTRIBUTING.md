@@ -4,7 +4,7 @@ Bug reports, hardware compatibility results, documentation corrections, and focu
 
 ## Before opening an issue
 
-- Use the latest preview release and search existing issues.
+- Use the latest release and search existing issues.
 - Include the Windows build, CPU, motherboard, BIOS, device Hardware ID, and driver version.
 - Describe the exact action, expected result, actual result, and whether a restart was performed.
 - Attach the relevant log after removing usernames, paths, serial numbers, and other private data.

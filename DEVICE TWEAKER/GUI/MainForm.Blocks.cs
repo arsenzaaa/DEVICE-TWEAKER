@@ -2860,7 +2860,7 @@ public sealed partial class MainForm
 
             if (includeImodReadback)
             {
-                // REFRESH no longer loads DTIMOD; this is UI/cache/preview refresh.
+                // Update the displayed IMOD state without loading DTIMOD.
                 if (ownsBusy)
                 {
                     TickDevicesBusy("Updating IMOD display...", 1);

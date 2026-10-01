@@ -11,9 +11,8 @@ public sealed partial class MainForm
     {
         UpdateUiScale();
         Text = "DEVICE TWEAKER";
-        // Allocate the complete two-column USB/IMOD layout before the first
-        // visible frame. Previously the form started at 1120 and grew after
-        // enumeration, which made the header jump and briefly clipped settings.
+        // Reserve space for the two-column USB/IMOD layout before the first
+        // visible frame so enumeration does not move or clip the header.
         Size formSize = UiScale(1172, 875);
         Size = formSize;
         StartPosition = FormStartPosition.CenterScreen;

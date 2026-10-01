@@ -341,7 +341,9 @@ $normalProc = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -
 Write-Report "START NORMAL pid=$($normalProc.Id)"
 $normalMain = Get-MainWindow -processId $normalProc.Id -timeoutSec 30
 if ($null -eq $normalMain) { throw 'Normal main window not found' }
-$startupSubtitle = Find-DescNamePattern $normalMain '^version .+ - developed by @arsenza$' 5
+$englishSubtitlePattern = '^version .+ - developed by @arsenza$'
+$russianSubtitlePattern = '^версия .+ - разработчик @arsenza$'
+$startupSubtitle = Find-DescNamePattern $normalMain $englishSubtitlePattern 5
 if ($null -eq $startupSubtitle) { throw 'Startup version subtitle not found' }
 Start-Sleep -Milliseconds 60
 $startupWindowRects = @()
@@ -521,7 +523,7 @@ if ($storageNoteRu.Count -lt 1) {
 }
 Capture-Window (Join-Path $outDir '11_normal_ru.png') $normalMain
 $refreshButtonRu = Find-AutomationId $normalMain 'REFRESH' 5
-$ruSubtitle = Find-DescNamePattern $normalMain '0\.0\.4-alpha\.2.+@arsenza$' 5
+$ruSubtitle = Find-DescNamePattern $normalMain $russianSubtitlePattern 5
 if ($null -eq $ruSubtitle) { throw 'Russian version subtitle not found before REFRESH' }
 Invoke-Click $refreshButtonRu 'language/RU refresh progress' 20
 for ($refreshFrame = 0; $refreshFrame -lt 8; $refreshFrame++) {
@@ -530,7 +532,7 @@ for ($refreshFrame = 0; $refreshFrame -lt 8; $refreshFrame++) {
     # WinForms may recreate the LinkLabel accessibility handle while the
     # device tree is rebuilt. Reacquire it for every frame so the assertion
     # checks the visible subtitle rather than a stale UIA object.
-    $liveRuSubtitle = Find-DescNamePattern $normalMain '0\.0\.4-alpha\.2.+@arsenza$' 1
+    $liveRuSubtitle = Find-DescNamePattern $normalMain $russianSubtitlePattern 1
     Assert-ElementRendered $refreshPath $normalMain $liveRuSubtitle "REFRESH subtitle frame=$refreshFrame"
     if ($refreshFrame -eq 0) {
         Copy-Item -LiteralPath $refreshPath -Destination (Join-Path $outDir '11_refresh_ru_loading.png') -Force
