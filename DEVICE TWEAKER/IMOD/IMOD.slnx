@@ -4,4 +4,5 @@
     <Platform Name="x86" />
   </Configurations>
   <Project Path="IMOD.vcxproj" />
+  <Project Path="Driver\ImodDriver.vcxproj" />
 </Solution>

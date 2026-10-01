@@ -1,0 +1,485 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="minirtl">
+      <UniqueIdentifier>{f7a995c4-ab5e-4da5-8c67-b786e28b68e0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\idrv">
+      <UniqueIdentifier>{62c72812-4f0a-4b4e-a30d-4f7eee638cc3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="hde">
+      <UniqueIdentifier>{3ec0ce53-a8de-4985-b6d0-dc01135c1d91}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ntos">
+      <UniqueIdentifier>{1df1a36e-45d4-430a-a401-9415b50be4bd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ldr">
+      <UniqueIdentifier>{f8e96a37-9fb4-4dd5-a6aa-a517a8f1d6db}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty">
+      <UniqueIdentifier>{98544574-94e6-4641-b98d-4a06905c61bd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\tinyaes">
+      <UniqueIdentifier>{c53b77e9-0d5d-4eb3-91d8-1b71f16abd1d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\whirlpool">
+      <UniqueIdentifier>{a336b00d-e024-4c89-9e15-64de5a7c6257}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sup.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="drvmap.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ps.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="kduprov.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="victim.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\intel.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\rtcore.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="hde\hde64.c">
+      <Filter>hde</Filter>
+    </ClCompile>
+    <ClCompile Include="pagewalk.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="compress.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\mapmem.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\atszio.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\winio.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\winring0.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="dsefix.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\phymem.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="shellcode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\lha.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_filename.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strcat.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strcmp.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strcmpi.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strcpy.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strend.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strlen.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strncpy.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\cmdline.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\strtou64.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\strtoul.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\u64tohex.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\directio64.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\gmer.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\dell.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\mimidrv.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\kph.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\ldr\ldr.cpp">
+      <Filter>ldr</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\procexp.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\dbk.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="ipcsvc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\ntos\ntsup.c">
+      <Filter>ntos</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\minirtl\_strncmp.c">
+      <Filter>minirtl</Filter>
+    </ClCompile>
+    <ClCompile Include="diag.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\marvinhw.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\zemana.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\asrdrv.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\alcpu.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\amd.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\hilscher.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\lenovo.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="sym.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\hp.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\zodiacon.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\echodrv.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\thirdparty\tinyaes\aes.c">
+      <Filter>thirdparty\tinyaes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Shared\thirdparty\whirlpool\whirlpool.c">
+      <Filter>thirdparty\whirlpool</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\nvidia.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\binalyze.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\rzpnk.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\evga.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\netease.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\tpup.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\tpw.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="idrv\ipcdec.cpp">
+      <Filter>Source Files\idrv</Filter>
+    </ClCompile>
+    <ClCompile Include="hvdetect.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="envdetect.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="provdb.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="global.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sup.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="drvmap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="wdksup.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ps.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="kduprov.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="victim.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\intel.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\rtcore.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="hde\hde64.h">
+      <Filter>hde</Filter>
+    </ClInclude>
+    <ClInclude Include="pagewalk.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compress.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\mapmem.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\atszio.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\winio.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\winring0.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="dsefix.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="kduplist.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\phymem.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="shellcode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\lha.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\ntos\halamd64.h">
+      <Filter>ntos</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\ntos\ntos.h">
+      <Filter>ntos</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\minirtl\_filename.h">
+      <Filter>minirtl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\minirtl\cmdline.h">
+      <Filter>minirtl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\minirtl\minirtl.h">
+      <Filter>minirtl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\minirtl\rtltypes.h">
+      <Filter>minirtl</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\directio64.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\ntos\ntbuilds.h">
+      <Filter>ntos</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\gmer.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\dell.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\mimidrv.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\kph.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\ldr\ldr.h">
+      <Filter>ldr</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\procexp.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\dbk.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\ldrsc.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="ipcsvc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\ntos\ntalpc.h">
+      <Filter>ntos</Filter>
+    </ClInclude>
+    <ClInclude Include="tests.h">
+      <Filter>minirtl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\ntos\ntsup.h">
+      <Filter>ntos</Filter>
+    </ClInclude>
+    <ClInclude Include="diag.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\marvinhw.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\zemana.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\consts.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\kdubase.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\asrdrv.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="sig.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\alcpu.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\amd.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\hilscher.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\lenovo.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="sym.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\hp.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\zodiacon.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\echodrv.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\thirdparty\tinyaes\aes.h">
+      <Filter>thirdparty\tinyaes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\thirdparty\whirlpool\nessie.h">
+      <Filter>thirdparty\whirlpool</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\thirdparty\whirlpool\whirlpool.h">
+      <Filter>thirdparty\whirlpool</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\nvidia.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\binalyze.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\rzpnk.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\evga.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\netease.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\tpup.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\tpw.h">
+      <Filter>Source Files\idrv</Filter>
+    </ClInclude>
+    <ClInclude Include="idrv\ipcdec.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="hvdetect.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="envdetect.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="provdb.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="resource.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="res\274.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="res\SB_SMBUS_SDK.bin">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="res\Taigei32.bin">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="shellmasm.asm">
+      <Filter>Source Files</Filter>
+    </MASM>
+  </ItemGroup>
+</Project>
