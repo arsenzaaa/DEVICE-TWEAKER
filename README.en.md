@@ -1,7 +1,7 @@
 <h1 align="center">DEVICE TWEAKER</h1>
 
 <p align="center">
-  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.3"><img alt="Download v0.0.3" width="218" src="https://img.shields.io/badge/DOWNLOAD-v0.0.3-168bd2?style=for-the-badge"></a>
+  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4"><img alt="Download v0.0.4" width="218" src="https://img.shields.io/badge/DOWNLOAD-v0.0.4-168bd2?style=for-the-badge"></a>
   <a href="./README.md"><img alt="Русский" width="132" src="https://img.shields.io/badge/LANGUAGE-RU-555d6b?style=for-the-badge"></a><br>
   <a href="./CHANGELOG.en.md"><img alt="Changelog" width="200" src="https://img.shields.io/badge/RELEASES-CHANGELOG-555d6b?style=for-the-badge"></a>
   <a href="https://t.me/arsenzaa"><img alt="Telegram @arsenzaa" width="195" src="https://img.shields.io/badge/Telegram-arsenzaa-2CA5E0?style=for-the-badge&amp;logo=telegram&amp;logoColor=white"></a>
@@ -21,7 +21,7 @@ Main features:
 
 ## Download and run
 
-The current release is [v0.0.3](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.3). Changes since v0.0.2 are listed in the [changelog](./CHANGELOG.en.md).
+The current release is [v0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4). Changes since v0.0.3 are listed in the [changelog](./CHANGELOG.en.md).
 
 Two EXE builds are available:
 
@@ -29,6 +29,12 @@ Two EXE builds are available:
 - `DEVICE.TWEAKER.SelfContained.exe` includes the .NET runtime.
 
 Run the EXE as administrator. The release includes `SHA256SUMS.txt` for both builds. Hardware IMOD/ITR access uses the bundled `DTIMOD.sys` and KDU; if register access is unavailable, the reason is recorded in the session log.
+
+## Interface
+
+![GPU CPU Affinity demonstration](./assets/screenshots/showcase_gpu_full_en.png)
+
+These screenshots use demo devices and settings without writing to the system: [USB and IMOD](./assets/screenshots/showcase_intel_14900k_full_en.png), [individual interrupters](./assets/screenshots/showcase_amd_imod_full_en.png), [network and NIC ITR](./assets/screenshots/showcase_nic_full_en.png).
 
 ## Interrupts
 

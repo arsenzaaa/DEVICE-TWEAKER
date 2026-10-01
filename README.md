@@ -1,7 +1,7 @@
 <h1 align="center">DEVICE TWEAKER</h1>
 
 <p align="center">
-  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.3"><img alt="Скачать v0.0.3" width="210" src="https://img.shields.io/badge/СКАЧАТЬ-v0.0.3-168bd2?style=for-the-badge"></a>
+  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4"><img alt="Скачать v0.0.4" width="210" src="https://img.shields.io/badge/СКАЧАТЬ-v0.0.4-168bd2?style=for-the-badge"></a>
   <a href="./README.en.md"><img alt="English" width="132" src="https://img.shields.io/badge/LANGUAGE-EN-555d6b?style=for-the-badge"></a><br>
   <a href="./CHANGELOG.md"><img alt="История изменений" width="200" src="https://img.shields.io/badge/ИЗМЕНЕНИЯ-CHANGELOG-555d6b?style=for-the-badge"></a>
   <a href="https://t.me/arsenzaa"><img alt="Telegram @arsenzaa" width="195" src="https://img.shields.io/badge/Telegram-arsenzaa-2CA5E0?style=for-the-badge&amp;logo=telegram&amp;logoColor=white"></a>
@@ -21,7 +21,7 @@
 
 ## Скачать и запустить
 
-Актуальная версия — [v0.0.3](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.3). Изменения относительно v0.0.2 перечислены в [истории версий](./CHANGELOG.md).
+Актуальная версия — [v0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4). Изменения относительно v0.0.3 перечислены в [истории версий](./CHANGELOG.md).
 
 Доступны два EXE:
 
@@ -29,6 +29,12 @@
 - `DEVICE.TWEAKER.SelfContained.exe` — автономная сборка со встроенной средой .NET.
 
 Запускайте EXE от имени администратора. `SHA256SUMS.txt` в релизе содержит контрольные суммы обеих сборок. Для аппаратного чтения и записи IMOD/ITR используются встроенные `DTIMOD.sys` и KDU; если доступ к регистрам недоступен, причина выводится в журнале.
+
+## Интерфейс
+
+![Демонстрация настройки CPU Affinity для GPU](./assets/screenshots/showcase_gpu_full_ru.png)
+
+На изображениях показаны демонстрационные устройства и настройки без записи в систему: [USB и IMOD](./assets/screenshots/showcase_intel_14900k_full_ru.png), [отдельные interrupter](./assets/screenshots/showcase_amd_imod_full_ru.png), [сеть и NIC ITR](./assets/screenshots/showcase_nic_full_ru.png).
 
 ## Прерывания
 

@@ -2,6 +2,14 @@
 
 [Русский](./CHANGELOG.md) · [DEVICE TWEAKER](./README.en.md)
 
+## [0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4) · October 1, 2026
+
+- GUI checks and release scripts now run correctly under Windows PowerShell 5.1 with Cyrillic text.
+- Corrected `Affinity Mask` terminology in the Russian help text and added a translation consistency test.
+- Added demo screenshots of the GPU, USB/IMOD, and network controls to the project page.
+- Releases are built from a fixed tag: tests, both EXEs, SHA-256 verification, and a draft release that records the source commit.
+- Application version and current-release links are updated to 0.0.4. Device-tuning behavior is unchanged.
+
 ## [0.0.3](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.3) · October 1, 2026
 
 Changes compared with the `v0.0.2` source.

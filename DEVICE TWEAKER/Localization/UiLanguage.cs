@@ -203,7 +203,6 @@ internal static partial class UiLanguage
             ("Power Saving", "Power Saving"),
             ("power saving", "power saving"),
             ("Raw Input", "Raw Input"),
-            ("raw input", "raw input"),
             ("raw mouse input", "raw mouse input"),
             ("IMOD Mode", "IMOD Mode"),
             ("IMOD mode", "IMOD mode"),
@@ -1227,7 +1226,7 @@ internal static partial class UiLanguage
             ["DevicePriority is a requested interrupt priority for Windows to consider. High does not set game or DPC priority and does not guarantee the order or latency of interrupt handling."] =
                 "DevicePriority задаёт запрашиваемый приоритет прерываний для Windows. Значение High не меняет приоритет игры или DPC и не гарантирует порядок либо задержку обработки прерываний.",
             ["DevicePolicy requests how Windows assigns processors to device interrupts:\n• SpecCPU uses the selected Affinity Mask\n• MachineDefault leaves placement to Windows\n• AllClose / Single request nearby or one processor\n• SpreadMessages may distribute multiple MSI-X messages when the device and driver use them.\nA driver can target DPCs separately."] =
-                "DevicePolicy задаёт политику выбора процессоров для прерываний устройства:\n• SpecCPU использует выбранную маску Affinity\n• MachineDefault оставляет выбор Windows\n• AllClose / Single запрашивают близкие процессоры либо один процессор\n• SpreadMessages может распределять сообщения MSI-X, если устройство и драйвер используют несколько векторов.\nДрайвер может отдельно выбирать CPU для DPC.",
+                "DevicePolicy задаёт политику выбора процессоров для прерываний устройства:\n• SpecCPU использует выбранную маску Affinity Mask\n• MachineDefault оставляет выбор Windows\n• AllClose / Single запрашивают близкие процессоры либо один процессор\n• SpreadMessages может распределять сообщения MSI-X, если устройство и драйвер используют несколько векторов.\nДрайвер может отдельно выбирать CPU для DPC.",
             ["AssignmentSetOverride selects logical CPUs eligible for this device's interrupts. A driver may queue DPCs on another CPU; use a trace to check actual ISR/DPC placement."] =
                 "AssignmentSetOverride задаёт допустимые логические процессоры для прерываний устройства. Драйвер может поставить DPC в очередь другого CPU; фактическое размещение ISR/DPC проверяется трассировкой.",
             ["IRQ count comes from WMI. WMI hint estimates MSI/MSI-X from IRQ numbers above 999; this does not verify the driver's interrupt resource type or distinguish MSI from MSI-X. HW shows device capability."] =

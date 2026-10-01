@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet("both", "with-net", "without-net")]
     [string]$Flavor = "both",
     [ValidateSet("Release", "Debug")]

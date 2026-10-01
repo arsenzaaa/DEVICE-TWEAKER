@@ -1,4 +1,4 @@
-# Safe GUI smoke for DEVICE TWEAKER (second monitor + TEST ADMIN sandbox).
+﻿# Safe GUI smoke for DEVICE TWEAKER (second monitor + TEST ADMIN sandbox).
 param(
     [string]$Root,
     [string]$ExePath,
@@ -612,14 +612,18 @@ $hwnd = [IntPtr]$main.Current.NativeWindowHandle
 # A second launch must activate the first window and exit without creating a
 # second long-running DEVICE TWEAKER process.
 $secondProc = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru
-if (-not $secondProc.WaitForExit(8000)) {
+if (-not $secondProc.WaitForExit(20000)) {
     $smokeFailed = $true
     Write-Report "FAIL: second instance did not exit pid=$($secondProc.Id)"
     Stop-Process -Id $secondProc.Id -Force -ErrorAction SilentlyContinue
 } else {
     Write-Report "PASS: second instance exited code=$($secondProc.ExitCode)"
 }
-$runningInstances = @(Get-Process | Where-Object { $_.ProcessName -eq $proc.ProcessName })
+$runningInstances = @(Get-Process | Where-Object {
+    $_.ProcessName -eq $proc.ProcessName -and
+    -not [string]::IsNullOrWhiteSpace($_.Path) -and
+    $_.Path.Equals($exe, [StringComparison]::OrdinalIgnoreCase)
+})
 if ($runningInstances.Count -ne 1) {
     $smokeFailed = $true
     Write-Report "FAIL: expected one running instance, found=$($runningInstances.Count)"

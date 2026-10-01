@@ -1,0 +1,97 @@
+name: Release package
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to package
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out the tagged source
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Verify tag and project version
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          $tag = $env:RELEASE_TAG
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw "Invalid release tag: $tag" }
+          $tagCommit = (git rev-list -n 1 "refs/tags/$tag").Trim()
+          $head = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $tagCommit -ne $head) { throw "Checkout does not match $tag" }
+          [xml]$project = Get-Content -LiteralPath 'DEVICE TWEAKER/DeviceTweakerCS.csproj'
+          $version = [string]$project.Project.PropertyGroup.Version
+          if ($tag -ne "v$version") { throw "Tag $tag differs from project version $version" }
+          $notes = "DEVICE TWEAKER/docs/releases/$tag.md"
+          if (-not (Test-Path -LiteralPath $notes)) { throw "Release notes missing: $notes" }
+          "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
+          "SOURCE_COMMIT=$head" >> $env:GITHUB_ENV
+
+      - name: Restore and test
+        shell: pwsh
+        run: |
+          dotnet restore DeviceTweaker.sln
+          if ($LASTEXITCODE -ne 0) { throw 'Restore failed' }
+          dotnet build 'DEVICE TWEAKER/DeviceTweakerCS.csproj' -c Release --no-restore -p:TreatWarningsAsErrors=true
+          if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
+          dotnet test 'DEVICE TWEAKER/tests/DeviceTweaker.Tests/DeviceTweaker.Tests.csproj' -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
+
+      - name: Build both release EXEs
+        shell: pwsh
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'DEVICE TWEAKER/build.ps1' -Flavor both -Configuration Release -SkipImodDriverBuild
+          if ($LASTEXITCODE -ne 0) { throw 'Release package build failed' }
+
+      - name: Verify package and prepare notes
+        shell: pwsh
+        run: |
+          $package = "DEVICE TWEAKER/bin/ReleasePackages/$env:RELEASE_TAG"
+          $expectedNames = @('DEVICE.TWEAKER.exe', 'DEVICE.TWEAKER.SelfContained.exe')
+          $sumLines = @(Get-Content -LiteralPath "$package/SHA256SUMS.txt")
+          if ($sumLines.Count -ne 2) { throw 'Expected two checksum lines' }
+          foreach ($name in $expectedNames) {
+            $line = @($sumLines | Where-Object { $_ -match "^[0-9A-Fa-f]{64}  $([regex]::Escape($name))$" })
+            if ($line.Count -ne 1) { throw "Missing or duplicate checksum for $name" }
+            $actual = (Get-FileHash -LiteralPath "$package/$name" -Algorithm SHA256).Hash
+            if ($actual -ne $line[0].Substring(0, 64)) { throw "Checksum mismatch: $name" }
+          }
+          $notes = Get-Content -LiteralPath "DEVICE TWEAKER/docs/releases/$env:RELEASE_TAG.md" -Raw
+          $notes += "`n`nSource commit: ``$env:SOURCE_COMMIT``.`n"
+          Set-Content -LiteralPath "$env:RUNNER_TEMP/release-notes.md" -Value $notes -Encoding utf8
+
+      - name: Save build for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: DEVICE-TWEAKER-${{ env.RELEASE_TAG }}-${{ env.SOURCE_COMMIT }}
+          path: DEVICE TWEAKER/bin/ReleasePackages/${{ env.RELEASE_TAG }}/
+          if-no-files-found: error
+
+      - name: Create draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $package = "DEVICE TWEAKER/bin/ReleasePackages/$env:RELEASE_TAG"
+          gh release create $env:RELEASE_TAG "$package/DEVICE.TWEAKER.exe" "$package/DEVICE.TWEAKER.SelfContained.exe" "$package/SHA256SUMS.txt" --draft --verify-tag --title "DEVICE TWEAKER $env:RELEASE_TAG" --notes-file "$env:RUNNER_TEMP/release-notes.md"
+          if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed; an existing release is never overwritten' }

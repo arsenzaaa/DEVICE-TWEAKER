@@ -53,7 +53,7 @@ dotnet build .\DeviceTweakerCS.csproj -c Release -p:BuildImodDriver=false
 
 ## Проверка перед релизом
 
-1. Обновите `Version`, `FileVersion` и `InformationalVersion` в `DeviceTweakerCS.csproj`.
+1. Обновите `Version`, `AssemblyVersion`, `FileVersion` и `InformationalVersion` в `DeviceTweakerCS.csproj`, а также версию в `assets/app.manifest`.
 2. Обновите описание изменений в `CHANGELOG.md` и `docs/releases/v*.md`.
 3. Соберите обе версии через `build.ps1`.
 4. Проверьте, что SHA-256 файла `IMOD/DTIMOD.sys` совпадает с `IMOD/DTIMOD.sys.sha256`.
@@ -61,7 +61,7 @@ dotnet build .\DeviceTweakerCS.csproj -c Release -p:BuildImodDriver=false
 6. Проверьте загрузку устройств, интерфейс, подсказки и выпадающие списки.
 7. Убедитесь, что без кнопки `CHECK` драйвер не загружается.
 8. Добавьте в GitHub Release два EXE и `SHA256SUMS.txt` из папки сборки в `bin\ReleasePackages\`. Драйвер уже встроен в EXE; папки `logs` и `Backups` не публикуйте.
-9. Перед загрузкой повторно сверьте SHA-256 обоих EXE со значениями из локального `SHA256SUMS.txt`.
+9. Перед публикацией сверьте SHA-256 обоих EXE со значениями из `SHA256SUMS.txt`. Для GitHub используйте workflow `Release package`, описанный в [RELEASE.md](RELEASE.md).
 
 Подробный чеклист публикации находится в [RELEASE.md](RELEASE.md).
 

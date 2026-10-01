@@ -47,7 +47,7 @@ DEVICE TWEAKER/DEVICE TWEAKER - копия/
 DEVICE TWEAKER/**/Backups/
 DEVICE TWEAKER/**/logs/
 DEVICE TWEAKER/**/last-crash.txt
-docs/
+/docs/
 DEVICE TWEAKER/docs/research_repos/
 DEVICE TWEAKER/docs/*.pdf
 DEVICE TWEAKER/docs/*.txt

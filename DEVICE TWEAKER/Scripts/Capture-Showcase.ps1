@@ -1,10 +1,11 @@
-param(
+﻿param(
     [string]$Monitor = 'Secondary',
     [switch]$GpuOnly,
     [switch]$FullBlock,
     [switch]$ImodOnly,
     [switch]$ReadmeOnly,
     [switch]$AllowForeground,
+    [string]$ExePath,
     [string]$OutputDirectory
 )
 
@@ -37,7 +38,13 @@ public static class SmokeNative {
 }
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$exe = Join-Path $root 'bin\Release\net8.0-windows\win-x64\DEVICE TWEAKER.exe'
+$exe = if ($ExePath) {
+    (Resolve-Path -LiteralPath $ExePath).Path
+} else {
+    $published = Join-Path $root 'bin\Publish\DEVICE TWEAKER\DEVICE TWEAKER.exe'
+    if (Test-Path -LiteralPath $published) { $published }
+    else { Join-Path $root 'bin\Release\net8.0-windows\win-x64\DEVICE TWEAKER.exe' }
+}
 if (-not (Test-Path $exe)) {
     throw "Executable not found at $exe. Please build first."
 }
