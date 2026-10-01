@@ -1,27 +1,22 @@
-<h1 align="center">DEVICE TWEAKER</h1>
+# DEVICE TWEAKER
 
-<p align="center">
-  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4"><img alt="Download v0.0.4" width="218" src="https://img.shields.io/badge/DOWNLOAD-v0.0.4-168bd2?style=for-the-badge"></a>
-  <a href="./README.md"><img alt="Русский" width="132" src="https://img.shields.io/badge/LANGUAGE-RU-555d6b?style=for-the-badge"></a><br>
-  <a href="./CHANGELOG.en.md"><img alt="Changelog" width="200" src="https://img.shields.io/badge/RELEASES-CHANGELOG-555d6b?style=for-the-badge"></a>
-  <a href="https://t.me/arsenzaa"><img alt="Telegram @arsenzaa" width="195" src="https://img.shields.io/badge/Telegram-arsenzaa-2CA5E0?style=for-the-badge&amp;logo=telegram&amp;logoColor=white"></a>
-</p>
+**[Download](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest)** · [Русский](./README.md) · [Changelog](./CHANGELOG.en.md) · [Author's Telegram](https://t.me/arsenzaa)
 
-**DEVICE TWEAKER** is a Windows 10/11 x64 utility combining MSI Utility V3, Interrupt Affinity Policy Tool, and ReservedCpuSets controls with xHCI IMOD, NIC ITR, and RSS settings.
+**DEVICE TWEAKER** is a Windows 10/11 x64 utility. It brings MSI Utility V3, Interrupt Affinity Policy Tool, and ReservedCpuSets controls together with xHCI IMOD, NIC ITR, and RSS settings in one interface.
 
-Main features:
+What you can configure:
 
-- [MSI Mode and MSI Limit](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/enabling-message-signaled-interrupts-in-the-registry), [IRQ Priority](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_priority), and [Interrupt Affinity](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/interrupt-affinity-and-priority): configure interrupts and eligible CPUs.
-- [USB xHCI IMOD](https://cdrdv2-public.intel.com/625472/625472_xHCI_Rev1_2b.pdf): detect attached devices, configure the controller or individual interrupters, and read registers back after writing.
-- [NIC ITR](https://cdrdv2-public.intel.com/333016/333016%20-%20I210_Datasheet_v_3_7.pdf): read hardware values on supported adapters, configure queues, and save a profile for the next Windows sign-in.
-- [RSS](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-receive-side-scaling): configure receive queue count and base CPU; saved settings and active adapter state are displayed separately.
-- [Auto-optimization](#auto-optimization-and-restore) based on P/E cores, SMT/HT, CPPC rating, AMD CCD/CCX, and device role.
-- [Raw Input](https://learn.microsoft.com/en-us/windows/win32/inputdev/raw-input): estimate mouse and keyboard event rates. [`RawMouseThrottleDuration`](#additional-settings) controls are available on supported Windows 11 builds.
-- [Backups and restore](#auto-optimization-and-restore), with detailed logs showing the result of each operation.
+- MSI Mode, MSI Limit, and IRQ Priority set interrupt parameters for a selected device; Interrupt Affinity selects CPUs for its IRQs.
+- xHCI IMOD configures the USB controller or individual interrupters and checks values after writing.
+- NIC ITR reads and sets registers on supported network adapters, configures queues, and saves a profile.
+- RSS sets the receive queue count and base CPU; saved settings and current adapter state appear separately.
+- Auto-optimization places devices on cores according to P/E cores, SMT/HT, CPPC, AMD CCD/CCX, and device role.
+- Raw Input estimates mouse and keyboard event rates; supported Windows 11 builds also offer `RawMouseThrottleDuration` controls.
+- Backups, restore, and a log showing what was applied, what was skipped, and why.
 
 ## Download and run
 
-The current release is [v0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4). Changes since v0.0.3 are listed in the [changelog](./CHANGELOG.en.md).
+The current release is [v0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4). See the [changelog](./CHANGELOG.en.md) for release history.
 
 Two EXE builds are available:
 
@@ -32,9 +27,11 @@ Run the EXE as administrator. The release includes `SHA256SUMS.txt` for both bui
 
 ## Interface
 
-![GPU CPU Affinity demonstration](./assets/screenshots/showcase_gpu_full_en.png)
+USB controller on a simulated Intel Core i9-14900K system. IMOD details are expanded; the values are test data, and no settings were written to the system.
 
-These screenshots use demo devices and settings without writing to the system: [USB and IMOD](./assets/screenshots/showcase_intel_14900k_full_en.png), [individual interrupters](./assets/screenshots/showcase_amd_imod_full_en.png), [network and NIC ITR](./assets/screenshots/showcase_nic_full_en.png).
+![DEVICE TWEAKER: USB controller on Intel Core i9-14900K with expanded IMOD table](./assets/screenshots/showcase_intel_14900k_full_en.png)
+
+[More screenshots: per-interrupter IMOD values, GPU, and network adapter](./SCREENSHOTS.en.md).
 
 ## Interrupts
 
@@ -82,7 +79,7 @@ The written `*NumRssQueues` value is not the number of queues used by a particul
 
 **Power Saving** controls available settings for the USB controller and its root hubs, including [USB selective suspend](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/usb-selective-suspend). For a wired network adapter, the switch changes whether Windows may turn off the device to save power. Availability depends on the driver.
 
-On supported Windows 11 builds, **Mouse Throttle** changes `RawMouseThrottleDuration`, a throttle interval for background Raw Input listeners to which Windows applies this mechanism. Some background registrations can bypass it. The setting does not change the mouse's USB polling rate or target the foreground window. The program estimates event rates from Raw Input intervals and shows them with the device information; this does not directly measure USB polling frequency.
+On supported Windows 11 builds, **Mouse Throttle** changes `RawMouseThrottleDuration`, a throttle interval for background [Raw Input](https://learn.microsoft.com/en-us/windows/win32/inputdev/raw-input) listeners to which Windows applies this mechanism. Some background registrations can bypass it. The setting does not change the mouse's USB polling rate or target the foreground window. The program estimates event rates from Raw Input intervals and shows them with the device information; this does not directly measure USB polling frequency.
 
 The **MOUSE**, **KEYBOARD**, **USB**, **GPU**, **NETWORK**, and **STORAGE** buttons jump to matching devices in the full list. Text search hides nonmatching devices.
 

@@ -1,27 +1,22 @@
-<h1 align="center">DEVICE TWEAKER</h1>
+# DEVICE TWEAKER
 
-<p align="center">
-  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4"><img alt="Скачать v0.0.4" width="210" src="https://img.shields.io/badge/СКАЧАТЬ-v0.0.4-168bd2?style=for-the-badge"></a>
-  <a href="./README.en.md"><img alt="English" width="132" src="https://img.shields.io/badge/LANGUAGE-EN-555d6b?style=for-the-badge"></a><br>
-  <a href="./CHANGELOG.md"><img alt="История изменений" width="200" src="https://img.shields.io/badge/ИЗМЕНЕНИЯ-CHANGELOG-555d6b?style=for-the-badge"></a>
-  <a href="https://t.me/arsenzaa"><img alt="Telegram @arsenzaa" width="195" src="https://img.shields.io/badge/Telegram-arsenzaa-2CA5E0?style=for-the-badge&amp;logo=telegram&amp;logoColor=white"></a>
-</p>
+**[Скачать приложение](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest)** · [English](./README.en.md) · [История изменений](./CHANGELOG.md) · [Telegram автора](https://t.me/arsenzaa)
 
-**DEVICE TWEAKER** — утилита для Windows 10/11 x64, объединяющая настройки MSI Utility V3, Interrupt Affinity Policy Tool и ReservedCpuSets с управлением xHCI IMOD, NIC ITR и RSS.
+**DEVICE TWEAKER** — утилита для Windows 10/11 x64. В одном интерфейсе собраны настройки MSI Utility V3, Interrupt Affinity Policy Tool и ReservedCpuSets, а также управление xHCI IMOD, NIC ITR и RSS.
 
-Основные возможности:
+Что можно настроить:
 
-- [MSI Mode и MSI Limit](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/enabling-message-signaled-interrupts-in-the-registry), [IRQ Priority](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_priority) и [Interrupt Affinity](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/interrupt-affinity-and-priority): настройка прерываний и выбор допустимых CPU.
-- [USB xHCI IMOD](https://cdrdv2-public.intel.com/625472/625472_xHCI_Rev1_2b.pdf): определение подключённых устройств, настройка контроллера или отдельных interrupter и проверка регистров после записи.
-- [NIC ITR](https://cdrdv2-public.intel.com/333016/333016%20-%20I210_Datasheet_v_3_7.pdf): чтение аппаратных значений поддерживаемых сетевых адаптеров, настройка очередей и сохранение профиля для следующего входа в Windows.
-- [RSS](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-receive-side-scaling): настройка числа очередей и базового CPU; сохранённые параметры и активное состояние адаптера отображаются отдельно.
-- [Автооптимизация](#автооптимизация-и-восстановление) с учётом P/E-cores, SMT/HT, CPPC-рейтинга, AMD CCD/CCX и роли каждого устройства.
-- [Raw Input](https://learn.microsoft.com/en-us/windows/win32/inputdev/raw-input): оценка частоты событий мыши и клавиатуры. На поддерживаемых сборках Windows 11 доступна настройка [`RawMouseThrottleDuration`](#дополнительные-настройки).
-- [Резервные копии и восстановление](#автооптимизация-и-восстановление), подробные логи с результатом применения настроек.
+- MSI Mode, MSI Limit и IRQ Priority — параметры прерываний выбранного устройства; Interrupt Affinity — выбор CPU для его IRQ.
+- xHCI IMOD — настройка USB-контроллера или отдельных interrupter с проверкой значений после записи.
+- NIC ITR — чтение и настройка регистров поддерживаемых сетевых адаптеров, работа с очередями и сохранение профиля.
+- RSS — число очередей и базовый CPU; сохранённые настройки и текущее состояние адаптера показаны отдельно.
+- Автооптимизация — распределение устройств по ядрам с учётом P/E-cores, SMT/HT, CPPC, AMD CCD/CCX и роли устройства.
+- Raw Input — оценка частоты событий мыши и клавиатуры; на поддерживаемых сборках Windows 11 можно настроить `RawMouseThrottleDuration`.
+- Резервные копии, восстановление и лог, в котором видно, что применилось, а что было пропущено и почему.
 
 ## Скачать и запустить
 
-Актуальная версия — [v0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4). Изменения относительно v0.0.3 перечислены в [истории версий](./CHANGELOG.md).
+Актуальная версия — [v0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4). Список изменений есть в [истории версий](./CHANGELOG.md).
 
 Доступны два EXE:
 
@@ -32,9 +27,11 @@
 
 ## Интерфейс
 
-![Демонстрация настройки CPU Affinity для GPU](./assets/screenshots/showcase_gpu_full_ru.png)
+USB-контроллер на демонстрационной системе с Intel Core i9-14900K. Подробности IMOD раскрыты; показанные значения — тестовые, настройки в систему не записывались.
 
-На изображениях показаны демонстрационные устройства и настройки без записи в систему: [USB и IMOD](./assets/screenshots/showcase_intel_14900k_full_ru.png), [отдельные interrupter](./assets/screenshots/showcase_amd_imod_full_ru.png), [сеть и NIC ITR](./assets/screenshots/showcase_nic_full_ru.png).
+![DEVICE TWEAKER: USB-контроллер на Intel Core i9-14900K с раскрытой таблицей IMOD](./assets/screenshots/showcase_intel_14900k_full_ru.png)
+
+[Другие скриншоты: IMOD по interrupter, видеокарта и сетевой адаптер](./SCREENSHOTS.md).
 
 ## Прерывания
 
@@ -82,7 +79,7 @@
 
 **Power Saving** управляет доступными настройками энергосбережения USB-контроллера и связанных с ним корневых USB-хабов, включая [USB selective suspend](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/usb-selective-suspend). Для проводного сетевого адаптера переключатель меняет разрешение Windows отключать устройство ради экономии энергии. Фактическая доступность этих параметров зависит от драйвера.
 
-На поддерживаемых сборках Windows 11 **Mouse Throttle** меняет `RawMouseThrottleDuration` — интервал ограничения для фоновых обработчиков Raw Input, к которым Windows применяет throttling. Некоторые фоновые регистрации могут обходить это ограничение. Настройка не меняет USB polling rate мыши и не нацелена на активное окно. Программа оценивает частоту по интервалам событий Raw Input и показывает результат рядом с информацией об устройстве; это не прямое измерение частоты USB-опроса.
+На поддерживаемых сборках Windows 11 **Mouse Throttle** меняет `RawMouseThrottleDuration` — интервал ограничения для фоновых обработчиков [Raw Input](https://learn.microsoft.com/en-us/windows/win32/inputdev/raw-input), к которым Windows применяет throttling. Некоторые фоновые регистрации могут обходить это ограничение. Настройка не меняет USB polling rate мыши и не нацелена на активное окно. Программа оценивает частоту по интервалам событий Raw Input и показывает результат рядом с информацией об устройстве; это не прямое измерение частоты USB-опроса.
 
 Кнопки **МЫШЬ**, **КЛАВИАТУРА**, **USB**, **GPU**, **СЕТЬ** и **НАКОПИТЕЛИ** перемещают к соответствующим устройствам в общем списке. Строка поиска скрывает несовпадающие устройства.
 
