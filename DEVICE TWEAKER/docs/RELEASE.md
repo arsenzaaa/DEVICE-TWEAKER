@@ -1,10 +1,10 @@
 # Релиз DEVICE TWEAKER
 
-Порядок подготовки следующего релиза на GitHub. `v0.0.3` приведён как пример.
+Порядок подготовки следующего релиза на GitHub.
 
 ## Структура репозитория
 
-На GitHub проект лежит во вложенной папке. Локальная папка на рабочем столе соответствует `DEVICE TWEAKER/` внутри репозитория.
+Исходники и скрипты сборки находятся в `DEVICE TWEAKER/` внутри репозитория. Команды ниже выполняются из этой папки.
 
 ```text
 DEVICE-TWEAKER/
@@ -24,7 +24,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Flavor both -Co
 
 Готовый набор будет здесь:
 
-`bin\ReleasePackages\v0.0.3\`
+`bin\ReleasePackages\v<InformationalVersion>\`
 
 На GitHub Release прикрепляются:
 

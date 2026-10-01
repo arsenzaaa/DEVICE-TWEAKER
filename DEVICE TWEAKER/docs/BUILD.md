@@ -19,7 +19,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Flavor both -Co
 
 - `-Flavor both` - собрать обе версии.
 - `-Flavor with-net` - собрать автономную версию со встроенным .NET 8 Runtime.
-- `-Flavor without-net` - собрать обычную версию, для которой требуется установленный .NET 8 или новее.
+- `-Flavor without-net` - собрать обычную версию, для которой требуется .NET Desktop Runtime x64 версии 8 или новее (в сборке включён `RollForward=Major`).
 - `-Configuration Release` - релизная сборка.
 - `-SkipImodDriverBuild` - использовать готовый `IMOD/DTIMOD.sys`.
 - `-TrustImodDriverCert` - установить сертификат драйвера на тестовом компьютере.
@@ -29,7 +29,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Flavor both -Co
 
 - `bin\Publish\DEVICE TWEAKER\DEVICE TWEAKER.exe` - обычная версия.
 - `bin\Publish\DEVICE TWEAKER (SELF-CONTAINED)\DEVICE TWEAKER (SELF-CONTAINED).exe` - автономная версия со встроенным .NET 8 Runtime.
-- `bin\ReleasePackages\v0.0.3\` - готовый набор для GitHub Releases (два EXE и `SHA256SUMS.txt`).
+- `bin\ReleasePackages\v<InformationalVersion>\` - готовый набор для GitHub Releases (два EXE и `SHA256SUMS.txt`); номер берётся из `DeviceTweakerCS.csproj`.
 
 ## Обычная сборка через dotnet
 
@@ -60,7 +60,7 @@ dotnet build .\DeviceTweakerCS.csproj -c Release -p:BuildImodDriver=false
 5. Запустите автономную версию от имени администратора.
 6. Проверьте загрузку устройств, интерфейс, подсказки и выпадающие списки.
 7. Убедитесь, что без кнопки `CHECK` драйвер не загружается.
-8. Добавьте в GitHub Release два EXE и `SHA256SUMS.txt` из `bin\ReleasePackages\v0.0.3\`. Драйвер уже встроен в EXE; папки `logs` и `Backups` не публикуйте.
+8. Добавьте в GitHub Release два EXE и `SHA256SUMS.txt` из папки сборки в `bin\ReleasePackages\`. Драйвер уже встроен в EXE; папки `logs` и `Backups` не публикуйте.
 9. Перед загрузкой повторно сверьте SHA-256 обоих EXE со значениями из локального `SHA256SUMS.txt`.
 
 Подробный чеклист публикации находится в [RELEASE.md](RELEASE.md).

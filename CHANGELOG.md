@@ -38,4 +38,4 @@
 
 ## [0.0.1](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.1) · 14 января 2026
 
-- Первый публичный выпуск: графический интерфейс для MSI/MSI-X, Interrupt Affinity и настроек устройств в Windows 10/11 x64.
+- Первый публичный выпуск для Windows 10/11 x64: MSI Mode и Limit, IRQ Priority, Interrupt Affinity, ReservedCpuSets, базовый CPU RSS и xHCI IMOD через WinIO.

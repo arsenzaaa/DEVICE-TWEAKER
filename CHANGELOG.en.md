@@ -38,4 +38,4 @@ Changes compared with the `v0.0.1` source.
 
 ## [0.0.1](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.1) · January 14, 2026
 
-- First public release: a Windows 10/11 x64 GUI for MSI/MSI-X, Interrupt Affinity, and device settings.
+- First public release for Windows 10/11 x64: MSI Mode and Limit, IRQ Priority, Interrupt Affinity, ReservedCpuSets, RSS base CPU, and xHCI IMOD through WinIO.
