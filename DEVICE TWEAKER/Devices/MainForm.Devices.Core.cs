@@ -19,6 +19,53 @@ public sealed partial class MainForm
         return NativeCfgMgr32.TryGetParentInstanceId(id, out string? parent) ? parent : null;
     }
 
+    private static bool IsIntegratedGpuDevice(string instanceId, string name)
+    {
+        string text = $"{instanceId} {name}".Trim();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        // Discrete adapters first — never treat as iGPU.
+        if (Regex.IsMatch(
+                text,
+                "(?i)\\bGeForce\\b|\\bRTX\\b|\\bGTX\\b|\\bQuadro\\b|\\bTesla\\b|\\bRadeon\\s+RX\\b|\\bRadeon\\s+Pro\\b|Laptop\\s+GPU\\b"))
+        {
+            return false;
+        }
+
+        if (Regex.IsMatch(text, "(?i)Intel\\s*(?:\\(R\\))?\\s*Arc(?:\\(TM\\))?\\s+A\\d{3,}"))
+        {
+            return false;
+        }
+
+        if (Regex.IsMatch(text, "(?i)Intel\\s*(?:\\(R\\))?\\s*(?:UHD|HD|Iris(?:\\s+Xe)?)(?:\\s+Graphics)?\\b"))
+        {
+            return true;
+        }
+
+        if (Regex.IsMatch(text, "(?i)Intel\\s*(?:\\(R\\))?\\s*Arc(?:\\(TM\\))?\\s+Graphics\\b"))
+        {
+            return true;
+        }
+
+        // "AMD Radeon(TM) Graphics", "AMD Radeon Graphics", optional vendor prefix.
+        if (Regex.IsMatch(text, "(?i)(?:AMD\\s+)?Radeon(?:\\(TM\\))?\\s+Graphics\\b"))
+        {
+            return true;
+        }
+
+        // APU mobile iGPU marketing names: Radeon 610M / 680M / 760M / 780M / 890M …
+        // (no "Graphics" suffix — this is what broke Ryzen 8940HX Radeon 610M detection).
+        if (Regex.IsMatch(text, "(?i)(?:AMD\\s+)?Radeon(?:\\(TM\\))?\\s+\\d{3,4}M\\b"))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     private static bool IsWiFiDevice(string pnpid, string name, string service)
     {
         if (Regex.IsMatch(name, "(?i)Wi-?Fi|Wireless|802\\.11|WLAN"))
@@ -26,7 +73,7 @@ public sealed partial class MainForm
             return true;
         }
 
-        if (Regex.IsMatch(pnpid, "(?i)\\\\VEN_14C3\\\\"))
+        if (Regex.IsMatch(pnpid, "(?i)VEN_14C3(?:&|\\\\)"))
         {
             return true;
         }
@@ -163,8 +210,12 @@ public sealed partial class MainForm
             return false;
         }
 
-        string lower = t.ToLowerInvariant();
-        if (Regex.IsMatch(lower, "(?i)hdmi|display audio|monitor|displayport|digital audio|dp\\b"))
+        if (IsSpdifAudioEndpointsText(t))
+        {
+            return false;
+        }
+
+        if (Regex.IsMatch(t, "(?i)hdmi|display\\s*audio|monitor|монитор|displayport|\\bdp\\b"))
         {
             return true;
         }
@@ -172,6 +223,35 @@ public sealed partial class MainForm
         if (Regex.IsMatch(t, "^[A-Z0-9]{3,}$", RegexOptions.CultureInvariant) && Regex.IsMatch(t, "\\d", RegexOptions.CultureInvariant))
         {
             return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsSpdifAudioEndpointsText(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        string t = text.Trim();
+        if (t == "[UNKNOWN]")
+        {
+            return false;
+        }
+
+        bool hasDisplayHint = Regex.IsMatch(t, "(?i)hdmi|display\\s*audio|monitor|монитор|displayport|\\bdp\\b");
+        bool hasSpdifToken = Regex.IsMatch(t, "(?i)s\\s*/?\\s*p\\s*d\\s*i\\s*f|spdif|iec\\s*958|toslink");
+        if (hasSpdifToken)
+        {
+            return !hasDisplayHint;
+        }
+
+        bool hasDigitalToken = Regex.IsMatch(t, "(?i)digital\\s+audio|цифров(ое|ой)\\s+аудио|цифров(ой|ое)\\s+выход");
+        if (hasDigitalToken)
+        {
+            return !hasDisplayHint;
         }
 
         return false;

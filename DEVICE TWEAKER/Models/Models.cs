@@ -13,6 +13,28 @@ internal enum DeviceKind
     OTHER,
 }
 
+internal enum NdisAffinityMode
+{
+    Rss,
+    IrqPolicy,
+    Both,
+}
+
+internal sealed record NdisRssRuntimeState(
+    bool AdapterFound,
+    bool RssFound,
+    bool? Enabled,
+    int? BaseProcessorGroup,
+    int? BaseProcessorNumber,
+    int? MaxProcessorGroup,
+    int? MaxProcessorNumber,
+    int? MaxProcessors,
+    int? NumberOfReceiveQueues,
+    string AdapterName,
+    string InterfaceDescription,
+    string Profile,
+    string Error);
+
 internal sealed record CpuVendorInfo(string Name, string Vendor);
 
 internal sealed record CpuLpInfo(
@@ -23,7 +45,8 @@ internal sealed record CpuLpInfo(
     int NUMA,
     int EffClass,
     int LocalIndex = -1,
-    int CpuSetId = -1);
+    int CpuSetId = -1,
+    long L3CacheSizeBytes = 0);
 
 internal sealed class CpuTopology
 {
@@ -72,6 +95,58 @@ internal sealed class CpuInfo
 {
     public required CpuTopology Topology { get; init; }
     public required Dictionary<int, int> CcdMap { get; init; }
+    public required Dictionary<int, int> CcxMap { get; init; }
+    public required Dictionary<int, long> CcdL3CacheBytes { get; init; }
+}
+
+[Flags]
+internal enum PciInterruptSupport : uint
+{
+    None = 0,
+    LineBased = 1,
+    Msi = 2,
+    MsiX = 4,
+}
+
+internal sealed record PciInterruptCapabilities(
+    PciInterruptSupport Support,
+    uint? MessageMaximum,
+    string Source = "Windows PnP");
+
+internal sealed class DeviceIrqInfo
+{
+    public int Count { get; private set; }
+    public List<long> IrqNumbers { get; } = [];
+    public string MsiStatus { get; set; } = "Unknown";
+    public string Source { get; set; } = "WMI";
+    public PciInterruptCapabilities? Capabilities { get; set; }
+    public HashSet<string> DeviceInstanceIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public int MatchedDeviceCount => DeviceInstanceIds.Count;
+    public bool IsAmbiguous => MatchedDeviceCount > 1;
+
+    public void AddIrq(long? irqNumber, string? deviceInstanceId = null)
+    {
+        if (!string.IsNullOrWhiteSpace(deviceInstanceId))
+        {
+            DeviceInstanceIds.Add(deviceInstanceId);
+        }
+
+        Count++;
+        if (!irqNumber.HasValue)
+        {
+            return;
+        }
+
+        IrqNumbers.Add(irqNumber.Value);
+        if (irqNumber.Value > 999)
+        {
+            MsiStatus = "Enabled";
+        }
+        else if (MsiStatus == "Unknown")
+        {
+            MsiStatus = "Disabled";
+        }
+    }
 }
 
 internal sealed class DeviceInfo
@@ -82,12 +157,25 @@ internal sealed class DeviceInfo
     public required string RegBase { get; init; }
     public required DeviceKind Kind { get; init; }
     public string UsbRoles { get; init; } = string.Empty;
+    public string UsbPollingRates { get; init; } = string.Empty;
     public string AudioEndpoints { get; init; } = string.Empty;
     public string StorageTag { get; init; } = string.Empty;
+    public bool IsIntegratedGpu { get; set; }
     public bool Wifi { get; init; }
     public bool UsbIsXhci { get; init; }
     public bool UsbHasDevices { get; init; }
+    public UsbChipPathInfo? UsbChipPath { get; init; }
+    /// <summary>Controller Device Parameters SelectiveSuspendEnabled: "on"/"off", or null if unset.</summary>
+    public string? UsbSelectiveSuspend { get; set; }
+    /// <summary>NIC Device Manager power saving: "on"/"off", or null if unset/not applicable (Wi‑Fi).</summary>
+    public string? NicPowerSaving { get; set; }
     public bool IsTestDevice { get; init; }
+    public int? TestIrqCount { get; init; }
+    public int TestIrqMatchCount { get; init; } = 1;
+    public string TestMsiStatus { get; init; } = "Auto";
+    public string TestMsiCapabilities { get; init; } = "Auto";
+    public uint? TestMsiMessageMaximum { get; init; }
+    public TestDeviceState? TestState { get; set; }
 }
 
 internal sealed class DeviceBlock
@@ -95,22 +183,111 @@ internal sealed class DeviceBlock
     public required DeviceInfo Device { get; init; }
     public required DeviceKind Kind { get; init; }
     public required Panel Group { get; init; }
+    public Panel? HeaderPanel { get; init; }
+    public Label? HeaderNote { get; init; }
+    public Control? Divider { get; init; }
+    public Label? CpuTitleLabel { get; init; }
+    public Panel? CpuPanel { get; init; }
+    public Panel? SettingsPanel { get; init; }
+    public required Label TitleLabel { get; init; }
     public required List<CheckBox> CpuBoxes { get; init; }
     public required Label AffinityLabel { get; init; }
     public required Label IrqLabel { get; init; }
-    public required ComboBox MsiCombo { get; init; }
+    public required ThemedDropDownPicker MsiCombo { get; init; }
+    /// <summary>Device Manager power saving (USB Selective Suspend / NIC turn-off). Checked = Enabled.</summary>
+    public ThemedCheckBox? PowerSavingCheck { get; init; }
     public required TextBox LimitBox { get; init; }
-    public required ComboBox PrioCombo { get; init; }
-    public required ComboBox PolicyCombo { get; init; }
+    public required ThemedDropDownPicker PrioCombo { get; init; }
+    public required ThemedDropDownPicker PolicyCombo { get; init; }
     public required Label PolicyLabel { get; init; }
+    public ThemedDropDownPicker? NdisModeCombo { get; init; }
+    public Label? NdisModeLabel { get; init; }
+    public NumericUpDown? RssQueueBox { get; init; }
+    public TextBox? NicItrBox { get; init; }
+    public Label? NicItrStatusLabel { get; init; }
+    public Label? NicItrTimeLabel { get; init; }
+    public Button? NicItrApplyButton { get; init; }
+    public Button? NicItrSaveButton { get; init; }
+    public Button? NicItrCheckButton { get; init; }
     public required CheckBox ImodAutoCheck { get; init; }
+    public ThemedDropDownPicker? ImodModeCombo { get; init; }
+    public Label? ImodModeHintLabel { get; init; }
+    public Button? ImodCheckButton { get; init; }
     public required TextBox ImodBox { get; init; }
     public required Label ImodDefaultLabel { get; init; }
-    public required Label InfoLabel { get; init; }
+    public required Label ImodCurrentLabel { get; init; }
+    public Control? ImodMapLabel { get; init; }
+    public Button? ImodDetailsButton { get; init; }
+    public bool ImodDetailsExpanded { get; set; }
+    public CheckBox? RawMouseThrottleCheck { get; init; }
+    public ThemedDropDownPicker? RawMouseThrottleCombo { get; init; }
+    public Label? RawMouseThrottleStatusLabel { get; init; }
+    public required Control InfoLabel { get; init; }
+    public Action? RelayoutAction { get; set; }
 
     public ulong AffinityMask { get; set; }
     public int? IrqCount { get; set; }
+    public PciInterruptCapabilities? InterruptCapabilities { get; set; }
     public int SuppressCpuEvents { get; set; }
+    public int SuppressImodEvents { get; set; }
+    public int? RssBaseCore { get; set; }
+    public int NicItrOperationGeneration { get; set; }
+    public NdisRssRuntimeState? NdisRssRuntime { get; set; }
+
+    public bool IsDirty { get; set; }
+    public Label? ModifiedBadge { get; set; }
+    public ulong InitialAffinityMask { get; set; }
+    public int InitialMsiIndex { get; set; }
+    public string InitialLimitText { get; set; } = string.Empty;
+    public int InitialPrioIndex { get; set; }
+    public int InitialPolicyIndex { get; set; }
+    public bool? InitialPowerSaving { get; set; }
+    public string InitialImodText { get; set; } = string.Empty;
+    public bool InitialImodChecked { get; set; }
+    public bool? InitialRawMouseThrottleEnabled { get; set; }
+    public int InitialRawMouseThrottleIndex { get; set; } = -1;
+
+    public void CaptureInitialState()
+    {
+        InitialAffinityMask = AffinityMask;
+        InitialMsiIndex = MsiCombo.SelectedIndex;
+        InitialLimitText = LimitBox.Text ?? string.Empty;
+        InitialPrioIndex = PrioCombo.SelectedIndex;
+        InitialPolicyIndex = PolicyCombo.SelectedIndex;
+        InitialPowerSaving = PowerSavingCheck?.Checked;
+        InitialImodText = ImodBox.Text ?? string.Empty;
+        InitialImodChecked = ImodAutoCheck.Checked;
+        InitialRawMouseThrottleEnabled = RawMouseThrottleCheck?.Checked;
+        InitialRawMouseThrottleIndex = RawMouseThrottleCombo?.SelectedIndex ?? -1;
+        IsDirty = false;
+        UpdateModifiedBadge();
+    }
+
+    public bool CheckIsDirty()
+    {
+        bool dirty = AffinityMask != InitialAffinityMask
+            || MsiCombo.SelectedIndex != InitialMsiIndex
+            || !string.Equals(LimitBox.Text?.Trim(), InitialLimitText.Trim(), StringComparison.Ordinal)
+            || PrioCombo.SelectedIndex != InitialPrioIndex
+            || (PolicyCombo.Enabled && PolicyCombo.SelectedIndex != InitialPolicyIndex)
+            || (PowerSavingCheck is not null && PowerSavingCheck.Checked != InitialPowerSaving)
+            || (ImodAutoCheck.Visible && ImodAutoCheck.Checked != InitialImodChecked)
+            || (ImodBox.Visible && !string.Equals(ImodBox.Text?.Trim(), InitialImodText.Trim(), StringComparison.Ordinal))
+            || (RawMouseThrottleCheck is not null && RawMouseThrottleCheck.Checked != InitialRawMouseThrottleEnabled)
+            || (RawMouseThrottleCombo is not null && RawMouseThrottleCombo.SelectedIndex != InitialRawMouseThrottleIndex);
+
+        IsDirty = dirty;
+        UpdateModifiedBadge();
+        return dirty;
+    }
+
+    public void UpdateModifiedBadge()
+    {
+        if (ModifiedBadge is not null)
+        {
+            ModifiedBadge.Visible = IsDirty;
+        }
+    }
 }
 
 internal sealed record UsbControllerInfo(string ControllerPNPID, string ControllerName);
@@ -124,6 +301,34 @@ internal sealed class HidDeviceInfo
     public List<UsbControllerInfo> UsbControllers { get; init; } = [];
     public int? UsagePage { get; init; }
     public int? UsageId { get; init; }
+}
+
+internal sealed record UsbPollingRateInfo(
+    string VendorProductId,
+    double Hertz,
+    string Speed,
+    int BInterval,
+    string Tag);
+
+internal sealed class UsbEndpointInfo
+{
+    public string HostControllerPath { get; init; } = string.Empty;
+    public string HubPath { get; init; } = string.Empty;
+    public string TopologyPath { get; init; } = string.Empty;
+    public int PortNumber { get; init; }
+    public string Speed { get; init; } = string.Empty;
+    public bool DeviceIsHub { get; init; }
+    public int DeviceAddress { get; init; }
+    public string VendorId { get; init; } = string.Empty;
+    public string ProductId { get; init; } = string.Empty;
+    public int InterfaceNumber { get; init; }
+    public int AlternateSetting { get; init; }
+    public string InterfaceClass { get; init; } = string.Empty;
+    public string InterfaceSubClass { get; init; } = string.Empty;
+    public string InterfaceProtocol { get; init; } = string.Empty;
+    public string Direction { get; init; } = string.Empty;
+    public string TransferType { get; init; } = string.Empty;
+    public int BInterval { get; init; }
 }
 
 internal sealed record WmiPnPDevice(
@@ -153,5 +358,6 @@ internal sealed class ReservedCpuPanelTag
     public required Label Title { get; init; }
     public required Label Description { get; init; }
     public required List<ReservedCpuEntry> Meta { get; init; }
-    public required Label PathLabel { get; init; }
+    public required InfoTextBox PathLabel { get; init; }
+    public required InfoTextBox ValueLabel { get; init; }
 }

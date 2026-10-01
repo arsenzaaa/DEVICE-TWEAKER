@@ -1,5 +1,7 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
+using System.Diagnostics;
 using System.Management;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace DeviceTweakerCS;
@@ -128,7 +130,311 @@ public sealed partial class MainForm
         return null;
     }
 
-    private void SetNdisBaseCore(string instanceId, int baseCore)
+    private int? GetNdisRssQueues(string instanceId)
+    {
+        string enumPath = $@"SYSTEM\CurrentControlSet\Enum\{instanceId}";
+        string? ckPath = GetClassKeyForDevice(instanceId);
+        if (!string.IsNullOrWhiteSpace(ckPath))
+        {
+            try
+            {
+                using RegistryKey? ck = Registry.LocalMachine.OpenSubKey(ckPath);
+                object? val = ck?.GetValue("*NumRssQueues");
+                if (TryParseRegistryInt(val, out int result))
+                {
+                    return result;
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        try
+        {
+            using RegistryKey? ek = Registry.LocalMachine.OpenSubKey(enumPath);
+            object? val = ek?.GetValue("*NumRssQueues");
+            if (TryParseRegistryInt(val, out int result))
+            {
+                return result;
+            }
+        }
+        catch
+        {
+        }
+
+        return null;
+    }
+
+    private string? GetNdisNetCfgInstanceId(string instanceId)
+    {
+        string? ckPath = GetClassKeyForDevice(instanceId);
+        if (!string.IsNullOrWhiteSpace(ckPath))
+        {
+            try
+            {
+                using RegistryKey? ck = Registry.LocalMachine.OpenSubKey(ckPath);
+                if (ck?.GetValue("NetCfgInstanceId") is string classGuid && !string.IsNullOrWhiteSpace(classGuid))
+                {
+                    return classGuid.Trim('{', '}');
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        try
+        {
+            using RegistryKey? enumKey = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Enum\{instanceId}");
+            if (enumKey?.GetValue("NetCfgInstanceId") is string enumGuid && !string.IsNullOrWhiteSpace(enumGuid))
+            {
+                return enumGuid.Trim('{', '}');
+            }
+        }
+        catch
+        {
+        }
+
+        return null;
+    }
+
+    private NdisRssRuntimeState GetNdisRssRuntimeState(string instanceId)
+    {
+        string normalized = NormalizeInstanceId(instanceId);
+        DeviceBlock? testBlock = _blocks.FirstOrDefault(b =>
+            b.Device.IsTestDevice
+            && string.Equals(NormalizeInstanceId(b.Device.InstanceId), normalized, StringComparison.OrdinalIgnoreCase));
+        if (testBlock is not null)
+        {
+            if (testBlock.NdisRssRuntime is NdisRssRuntimeState seeded)
+            {
+                return seeded;
+            }
+
+            return new NdisRssRuntimeState(
+                AdapterFound: true,
+                RssFound: true,
+                Enabled: true,
+                BaseProcessorGroup: 0,
+                BaseProcessorNumber: testBlock.RssBaseCore ?? 0,
+                MaxProcessorGroup: 0,
+                MaxProcessorNumber: Math.Max(0, _maxLogical - 1),
+                MaxProcessors: Math.Max(1, _maxLogical),
+                NumberOfReceiveQueues: ClampRssQueueCount((int)(testBlock.RssQueueBox?.Value ?? 1)),
+                AdapterName: testBlock.Device.Name,
+                InterfaceDescription: testBlock.Device.Name,
+                Profile: "TEST",
+                Error: string.Empty);
+        }
+
+        if (_ndisRssRuntimeCache.TryGetValue(normalized, out NdisRssRuntimeState? cached))
+        {
+            return cached;
+        }
+
+        NdisRssRuntimeState state = ReadNdisRssRuntimeState(instanceId);
+        _ndisRssRuntimeCache[normalized] = state;
+        return state;
+    }
+
+    private NdisRssRuntimeState ReadNdisRssRuntimeState(string instanceId)
+    {
+        string? netCfgInstanceId = GetNdisNetCfgInstanceId(instanceId);
+        string guid = EscapePowerShellSingleQuoted(netCfgInstanceId ?? string.Empty);
+        string pnp = EscapePowerShellSingleQuoted(instanceId);
+        string script =
+            "$ErrorActionPreference='SilentlyContinue';" +
+            $"$guid='{guid}';$pnp='{pnp}';" +
+            "$adapters=@(Get-NetAdapter -IncludeHidden -ErrorAction SilentlyContinue);" +
+            "$adapter=$null;" +
+            "if($guid){$adapter=$adapters|Where-Object{$_.InterfaceGuid -and ($_.InterfaceGuid.ToString() -ieq $guid)}|Select-Object -First 1};" +
+            "if(-not $adapter -and $pnp){$adapter=$adapters|Where-Object{($_.PnPDeviceID -as [string]) -ieq $pnp}|Select-Object -First 1};" +
+            "if(-not $adapter){[pscustomobject]@{AdapterFound=$false;RssFound=$false;Error='adapter-not-found'}|ConvertTo-Json -Compress;exit};" +
+            "$rss=Get-NetAdapterRss -Name $adapter.Name -ErrorAction SilentlyContinue;" +
+            "if(-not $rss){[pscustomobject]@{AdapterFound=$true;RssFound=$false;AdapterName=$adapter.Name;InterfaceDescription=$adapter.InterfaceDescription;Error='rss-not-found'}|ConvertTo-Json -Compress;exit};" +
+            "[pscustomobject]@{AdapterFound=$true;RssFound=$true;AdapterName=$adapter.Name;InterfaceDescription=$adapter.InterfaceDescription;Enabled=$rss.Enabled;BaseProcessorGroup=$rss.BaseProcessorGroup;BaseProcessorNumber=$rss.BaseProcessorNumber;MaxProcessorGroup=$rss.MaxProcessorGroup;MaxProcessorNumber=$rss.MaxProcessorNumber;MaxProcessors=$rss.MaxProcessors;NumberOfReceiveQueues=$rss.NumberOfReceiveQueues;Profile=$rss.Profile;Error=''}|ConvertTo-Json -Compress";
+
+        try
+        {
+            using Process process = new();
+            process.StartInfo = new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            process.StartInfo.ArgumentList.Add("-NoProfile");
+            process.StartInfo.ArgumentList.Add("-ExecutionPolicy");
+            process.StartInfo.ArgumentList.Add("Bypass");
+            process.StartInfo.ArgumentList.Add("-Command");
+            process.StartInfo.ArgumentList.Add(script);
+
+            if (!process.Start())
+            {
+                return EmptyNdisRssRuntimeState("powershell-start-failed");
+            }
+
+            Task<string> stdout = process.StandardOutput.ReadToEndAsync();
+            Task<string> stderr = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(3500))
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    _ = process.WaitForExit(1000);
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    _ = Task.WaitAll([stdout, stderr], 1000);
+                }
+                catch
+                {
+                }
+
+                return EmptyNdisRssRuntimeState("powershell-timeout");
+            }
+
+            try
+            {
+                _ = Task.WaitAll([stdout, stderr], 1000);
+            }
+            catch
+            {
+            }
+
+            string output = stdout.IsCompletedSuccessfully ? stdout.Result : string.Empty;
+            string error = stderr.IsCompletedSuccessfully ? stderr.Result : string.Empty;
+            string json = ExtractJsonObject(output);
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return EmptyNdisRssRuntimeState(string.IsNullOrWhiteSpace(error) ? "empty-output" : error.Trim());
+            }
+
+            using JsonDocument doc = JsonDocument.Parse(json);
+            JsonElement root = doc.RootElement;
+            return new NdisRssRuntimeState(
+                AdapterFound: GetJsonBool(root, "AdapterFound") == true,
+                RssFound: GetJsonBool(root, "RssFound") == true,
+                Enabled: GetJsonBool(root, "Enabled"),
+                BaseProcessorGroup: GetJsonInt(root, "BaseProcessorGroup"),
+                BaseProcessorNumber: GetJsonInt(root, "BaseProcessorNumber"),
+                MaxProcessorGroup: GetJsonInt(root, "MaxProcessorGroup"),
+                MaxProcessorNumber: GetJsonInt(root, "MaxProcessorNumber"),
+                MaxProcessors: GetJsonInt(root, "MaxProcessors"),
+                NumberOfReceiveQueues: GetJsonInt(root, "NumberOfReceiveQueues"),
+                AdapterName: GetJsonString(root, "AdapterName"),
+                InterfaceDescription: GetJsonString(root, "InterfaceDescription"),
+                Profile: GetJsonString(root, "Profile"),
+                Error: GetJsonString(root, "Error"));
+        }
+        catch (Exception ex)
+        {
+            return EmptyNdisRssRuntimeState(ex.Message);
+        }
+    }
+
+    private static NdisRssRuntimeState EmptyNdisRssRuntimeState(string error)
+    {
+        return new NdisRssRuntimeState(
+            AdapterFound: false,
+            RssFound: false,
+            Enabled: null,
+            BaseProcessorGroup: null,
+            BaseProcessorNumber: null,
+            MaxProcessorGroup: null,
+            MaxProcessorNumber: null,
+            MaxProcessors: null,
+            NumberOfReceiveQueues: null,
+            AdapterName: string.Empty,
+            InterfaceDescription: string.Empty,
+            Profile: string.Empty,
+            Error: error);
+    }
+
+    private static string EscapePowerShellSingleQuoted(string value)
+    {
+        return value.Replace("'", "''");
+    }
+
+    private static string ExtractJsonObject(string output)
+    {
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return string.Empty;
+        }
+
+        int start = output.IndexOf('{');
+        int end = output.LastIndexOf('}');
+        return start >= 0 && end >= start ? output[start..(end + 1)] : string.Empty;
+    }
+
+    private static string GetJsonString(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out JsonElement value) || value.ValueKind == JsonValueKind.Null)
+        {
+            return string.Empty;
+        }
+
+        return value.ValueKind == JsonValueKind.String
+            ? value.GetString() ?? string.Empty
+            : value.ToString();
+    }
+
+    private static int? GetJsonInt(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out JsonElement value) || value.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out int intValue))
+        {
+            return intValue;
+        }
+
+        if (value.ValueKind == JsonValueKind.String && int.TryParse(value.GetString(), out int parsed))
+        {
+            return parsed;
+        }
+
+        return null;
+    }
+
+    private static bool? GetJsonBool(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out JsonElement value) || value.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String when bool.TryParse(value.GetString(), out bool parsed) => parsed,
+            _ => null,
+        };
+    }
+
+    private void SetNdisBaseCore(
+        string instanceId,
+        int baseCore,
+        OperationReport? report = null,
+        string? deviceName = null)
     {
         if (baseCore < 0)
         {
@@ -141,20 +447,227 @@ public sealed partial class MainForm
             try
             {
                 using RegistryKey? ck = Registry.LocalMachine.CreateSubKey(ckPath);
-                ck?.SetValue("*RssBaseProcNumber", baseCore, RegistryValueKind.DWord);
+                if (ck is null)
+                {
+                    throw new InvalidOperationException("NDIS class key could not be opened for writing");
+                }
+
+                ck.SetValue("*RssBaseProcNumber", baseCore, RegistryValueKind.DWord);
                 WriteLog($"RSS.SET: {instanceId} -> *RssBaseProcNumber={baseCore} (class key)");
             }
-            catch
+            catch (Exception ex)
             {
+                WriteLog($"RSS.SET.ERROR: {instanceId} value=*RssBaseProcNumber error=\"{FlattenLogText(ex.ToString())}\"");
+                report?.AddError($"{deviceName ?? instanceId} — set RSS base CPU", ex.Message);
             }
         }
         else
         {
             WriteLog($"RSS.SET.SKIP: {instanceId} class key not found; *RssBaseProcNumber not written");
+            report?.AddError($"{deviceName ?? instanceId} — set RSS base CPU", "NDIS class key was not found");
         }
     }
 
-    private void ClearNdisBaseCore(string instanceId)
+    private void SetNdisRssQueues(
+        string instanceId,
+        int queues,
+        OperationReport? report = null,
+        string? deviceName = null)
+    {
+        if (queues < 1)
+        {
+            queues = 1;
+        }
+
+        string? ckPath = GetClassKeyForDevice(instanceId);
+        if (!string.IsNullOrWhiteSpace(ckPath))
+        {
+            try
+            {
+                using RegistryKey? ck = Registry.LocalMachine.CreateSubKey(ckPath);
+                if (ck is null)
+                {
+                    throw new InvalidOperationException("NDIS class key could not be opened for writing");
+                }
+
+                ck.SetValue("*NumRssQueues", queues, RegistryValueKind.DWord);
+                WriteLog($"RSS.SET: {instanceId} -> *NumRssQueues={queues} (class key)");
+            }
+            catch (Exception ex)
+            {
+                WriteLog($"RSS.SET.ERROR: {instanceId} value=*NumRssQueues error=\"{FlattenLogText(ex.ToString())}\"");
+                report?.AddError($"{deviceName ?? instanceId} — set RSS queue count", ex.Message);
+            }
+        }
+        else
+        {
+            WriteLog($"RSS.SET.SKIP: {instanceId} class key not found; *NumRssQueues not written");
+            report?.AddError($"{deviceName ?? instanceId} — set RSS queue count", "NDIS class key was not found");
+        }
+    }
+
+    private void SetNdisRssExtraValues(
+        string instanceId,
+        int baseCore,
+        int queues,
+        OperationReport? report = null,
+        string? deviceName = null)
+    {
+        if (baseCore < 0)
+        {
+            baseCore = 0;
+        }
+
+        if (queues < 1)
+        {
+            queues = 1;
+        }
+
+        int maxCore = Math.Max(baseCore, baseCore + queues - 1);
+        string? ckPath = GetClassKeyForDevice(instanceId);
+        if (string.IsNullOrWhiteSpace(ckPath))
+        {
+            WriteLog($"RSS.EXTRA.SET.SKIP: {instanceId} class key not found");
+            report?.AddError($"{deviceName ?? instanceId} — set extended RSS values", "NDIS class key was not found");
+            return;
+        }
+
+        try
+        {
+            using RegistryKey? ck = Registry.LocalMachine.CreateSubKey(ckPath);
+            if (ck is null)
+            {
+                report?.AddError($"{deviceName ?? instanceId} — set extended RSS values", "NDIS class key is unavailable");
+                return;
+            }
+
+            ck.SetValue("*RssBaseProcGroup", 0, RegistryValueKind.DWord);
+            ck.SetValue("*MaxRssProcessors", queues, RegistryValueKind.DWord);
+            ck.SetValue("*RSSMaxProcGroup", 0, RegistryValueKind.DWord);
+            ck.SetValue("*RssMaxProcNumber", maxCore, RegistryValueKind.DWord);
+            // Do not force NUMA node 0. When the keyword is absent, NDIS can
+            // select the node closest to the adapter according to ACPI. This
+            // preserves the existing group-0 RSS policy without breaking
+            // multi-node systems.
+            ck.DeleteValue("*NumaNodeId", throwOnMissingValue: false);
+            WriteLog($"RSS.EXTRA.SET: {instanceId} group=0 maxProcessors={queues} maxProc={maxCore} numa=automatic");
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"RSS.EXTRA.SET: {instanceId} failed: {ex.Message}");
+            report?.AddError($"{deviceName ?? instanceId} — set extended RSS values", ex.Message);
+        }
+    }
+
+    private static bool TryParseRegistryInt(object? value, out int result)
+    {
+        result = 0;
+        if (value is null)
+        {
+            return false;
+        }
+
+        switch (value)
+        {
+            case int i:
+                result = i;
+                return true;
+            case uint ui:
+                result = unchecked((int)ui);
+                return true;
+            case long l:
+                result = unchecked((int)l);
+                return true;
+            case ulong ul:
+                result = unchecked((int)ul);
+                return true;
+            case short s:
+                result = s;
+                return true;
+            case ushort us:
+                result = us;
+                return true;
+            case byte b:
+                result = b;
+                return true;
+            case sbyte sb:
+                result = sb;
+                return true;
+            case string str when int.TryParse(str, out int parsed):
+                result = parsed;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static bool HasNonZeroAssignmentOverride(object? value)
+    {
+        if (value is null)
+        {
+            return false;
+        }
+
+        switch (value)
+        {
+            case byte[] bytes:
+                return bytes.Any(b => b != 0);
+            case int i:
+                return i != 0;
+            case uint ui:
+                return ui != 0;
+            case long l:
+                return l != 0;
+            case ulong ul:
+                return ul != 0;
+            case short s:
+                return s != 0;
+            case ushort us:
+                return us != 0;
+            case byte b:
+                return b != 0;
+            case sbyte sb:
+                return sb != 0;
+            case string str when ulong.TryParse(str, out ulong parsed):
+                return parsed != 0;
+            default:
+                return false;
+        }
+    }
+
+    private bool HasNonDefaultInterruptAffinity(string regBase)
+    {
+        string affPath = regBase + @"\Device Parameters\Interrupt Management\Affinity Policy";
+        try
+        {
+            using RegistryKey? affKey = Registry.LocalMachine.OpenSubKey(affPath);
+            if (affKey is null)
+            {
+                return false;
+            }
+
+            if (TryParseRegistryInt(affKey.GetValue("DevicePolicy"), out int policy) && policy != 0)
+            {
+                return true;
+            }
+
+            if (TryParseRegistryInt(affKey.GetValue("DevicePriority"), out int priority) && priority != 2)
+            {
+                return true;
+            }
+
+            return HasNonZeroAssignmentOverride(affKey.GetValue("AssignmentSetOverride"));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void ClearNdisBaseCore(
+        string instanceId,
+        OperationReport? report = null,
+        string? deviceName = null)
     {
         string? ckPath = GetClassKeyForDevice(instanceId);
         if (string.IsNullOrWhiteSpace(ckPath))
@@ -166,9 +679,69 @@ public sealed partial class MainForm
         {
             using RegistryKey? ck = Registry.LocalMachine.OpenSubKey(ckPath, writable: true);
             ck?.DeleteValue("*RssBaseProcNumber", throwOnMissingValue: false);
+            WriteLog($"RSS.CLEAR: {instanceId} value=*RssBaseProcNumber keyPresent={ck is not null}");
         }
-        catch
+        catch (Exception ex)
         {
+            WriteLog($"RSS.CLEAR.ERROR: {instanceId} value=*RssBaseProcNumber error=\"{FlattenLogText(ex.ToString())}\"");
+            report?.AddError($"{deviceName ?? instanceId} — clear RSS base CPU", ex.Message);
+        }
+    }
+
+    private void ClearNdisRssQueues(
+        string instanceId,
+        OperationReport? report = null,
+        string? deviceName = null)
+    {
+        string? ckPath = GetClassKeyForDevice(instanceId);
+        if (string.IsNullOrWhiteSpace(ckPath))
+        {
+            return;
+        }
+
+        try
+        {
+            using RegistryKey? ck = Registry.LocalMachine.OpenSubKey(ckPath, writable: true);
+            ck?.DeleteValue("*NumRssQueues", throwOnMissingValue: false);
+            WriteLog($"RSS.CLEAR: {instanceId} value=*NumRssQueues keyPresent={ck is not null}");
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"RSS.CLEAR.ERROR: {instanceId} value=*NumRssQueues error=\"{FlattenLogText(ex.ToString())}\"");
+            report?.AddError($"{deviceName ?? instanceId} — clear RSS queue count", ex.Message);
+        }
+    }
+
+    private void ClearNdisRssExtraValues(
+        string instanceId,
+        OperationReport? report = null,
+        string? deviceName = null)
+    {
+        string? ckPath = GetClassKeyForDevice(instanceId);
+        if (string.IsNullOrWhiteSpace(ckPath))
+        {
+            return;
+        }
+
+        try
+        {
+            using RegistryKey? ck = Registry.LocalMachine.OpenSubKey(ckPath, writable: true);
+            if (ck is null)
+            {
+                return;
+            }
+
+            foreach (string name in new[] { "*RssBaseProcGroup", "*MaxRssProcessors", "*RSSMaxProcGroup", "*RssMaxProcNumber", "*NumaNodeId" })
+            {
+                ck.DeleteValue(name, throwOnMissingValue: false);
+            }
+
+            WriteLog($"RSS.CLEAR: {instanceId} values=extra-rss keyPresent=true");
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"RSS.CLEAR.ERROR: {instanceId} values=extra-rss error=\"{FlattenLogText(ex.ToString())}\"");
+            report?.AddError($"{deviceName ?? instanceId} — clear extended RSS values", ex.Message);
         }
     }
 
@@ -286,6 +859,14 @@ public sealed partial class MainForm
                     DeviceKind.STOR => 5,
                     _ => 6,
                 })
+                .ThenBy(d => d.Kind == DeviceKind.USB ? (d.UsbChipPath?.Origin switch
+                {
+                    UsbChipOrigin.CpuDirect => 1,
+                    UsbChipOrigin.Thunderbolt => 2,
+                    UsbChipOrigin.Chipset => 3,
+                    UsbChipOrigin.Addon => 4,
+                    _ => 5,
+                }) : 0)
                 .ThenBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
@@ -328,7 +909,8 @@ public sealed partial class MainForm
             usbControllersWithDevice.Add(controllerId);
         }
 
-        Dictionary<string, List<string>> usbRoles = UsbControllerRoles(raw, deviceLookup, usbPairs);
+        Dictionary<string, UsbPollingRateInfo> usbPolling = BuildUsbPollingRateLookup();
+        Dictionary<string, List<string>> usbRoles = UsbControllerRoles(raw, deviceLookup, usbPairs, usbPolling);
         Dictionary<string, List<string>> audioEndpoints = AudioControllerEndpoints(raw, deviceLookup);
         List<WmiPhysicalDisk> physicalDisks = WmiInterop.GetPhysicalDisks();
 
@@ -363,15 +945,17 @@ public sealed partial class MainForm
                 continue;
             }
 
-            if (Regex.IsMatch(d.InstanceId, "(?i)^PCI\\\\VEN_10DE&DEV_1AE[0-9A-F]"))
-            {
-                WriteLog($"SCAN: skipped NVIDIA USB/XHCI controller {d.InstanceId}");
-                continue;
-            }
-
             if (skipPatterns.Any(p => Regex.IsMatch(d.InstanceId, p, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)))
             {
                 WriteLog($"SCAN: skipped filtered device {d.InstanceId}");
+                continue;
+            }
+
+            string normalizedInstanceId = NormalizeInstanceId(d.InstanceId);
+            if (_testHiddenDeviceIds.Contains(normalizedInstanceId))
+            {
+                string hiddenName = _testHiddenDeviceLabels.TryGetValue(normalizedInstanceId, out string? label) ? label : d.Name ?? d.InstanceId;
+                WriteLog($"SCAN.TEST.HIDE: skipped hidden real device {d.InstanceId} name=\"{hiddenName}\"");
                 continue;
             }
 
@@ -429,12 +1013,6 @@ public sealed partial class MainForm
             if (Regex.IsMatch(name, "(?i)Intel\\s*(?:\\(R\\))?\\s*RST\\s*VMD\\s*Controller\\b"))
             {
                 WriteLog($"SCAN: skipped filtered device (Intel RST VMD controller) {d.InstanceId} class={d.Class} name=\"{name}\"");
-                continue;
-            }
-
-            if (Regex.IsMatch(name, "(?i)Intel\\s*(?:\\(R\\))?\\s*UHD\\s*Graphics\\b"))
-            {
-                WriteLog($"SCAN: skipped filtered device (Intel UHD Graphics) {d.InstanceId} class={d.Class} name=\"{name}\"");
                 continue;
             }
 
@@ -498,7 +1076,7 @@ public sealed partial class MainForm
                 continue;
             }
 
-            if (kind == DeviceKind.USB && Regex.IsMatch(d.InstanceId, "(?i)\\\\VEN_10DE\\\\"))
+            if (kind == DeviceKind.USB && Regex.IsMatch(d.InstanceId, @"(?i)VEN_10DE(?:&|\\)"))
             {
                 WriteLog($"SCAN: skipped NVIDIA USB controller {d.InstanceId} name=\"{name}\"");
                 continue;
@@ -520,26 +1098,35 @@ public sealed partial class MainForm
             }
 
             string usbText = string.Empty;
+            string usbPollingText = string.Empty;
             if (kind == DeviceKind.USB && !string.IsNullOrWhiteSpace(idKey))
             {
                 foreach (string k in GetUsbControllerKeys(idKey, NormalizeInstanceId))
                 {
                     if (usbRoles.TryGetValue(k, out List<string>? roles))
                     {
-                        usbText = string.Join(", ", roles.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(r => r));
+                        List<string> distinctRoles = roles.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(r => r).ToList();
+                        usbText = string.Join(", ", distinctRoles);
+                        usbPollingText = FormatUsbPollingRoleSummary(distinctRoles);
                         break;
                     }
                 }
 
                 if (string.IsNullOrWhiteSpace(usbText))
                 {
-                    WriteLog($"SCAN: skipped USB controller (no attached roles) {d.InstanceId} name=\"{name}\"");
-                    continue;
+                    if (!HasNonDefaultInterruptAffinity(regBase))
+                    {
+                        WriteLog($"SCAN: skipped USB controller (no attached roles) {d.InstanceId} name=\"{name}\"");
+                        continue;
+                    }
+
+                    WriteLog($"SCAN: keeping USB controller (no attached roles, custom affinity present) {d.InstanceId} name=\"{name}\"");
                 }
             }
 
             string audioText = string.Empty;
             List<string>? rawList = null;
+            bool isSpdifOnlyAudio = false;
             if (kind == DeviceKind.AUDIO)
             {
                 if (audioEndpoints.TryGetValue(d.InstanceId, out List<string>? names))
@@ -549,8 +1136,12 @@ public sealed partial class MainForm
 
                 if (rawList is not null && rawList.Count > 0)
                 {
+                    bool hasSpdifEndpoint = rawList.Any(IsSpdifAudioEndpointsText);
+                    bool hasNonSpdifEndpoint = rawList.Any(endpoint => !IsSpdifAudioEndpointsText(endpoint));
+                    isSpdifOnlyAudio = hasSpdifEndpoint && !hasNonSpdifEndpoint;
+
                     audioText = FormatAudioEndpointsSummary(rawList);
-                    bool isDisplayAudio = IsDisplayHdmiaudio(d.InstanceId, name) || IsDisplayAudioEndpointsText(audioText);
+                    bool isDisplayAudio = !isSpdifOnlyAudio && (IsDisplayHdmiaudio(d.InstanceId, name) || IsDisplayAudioEndpointsText(audioText));
                     if (isDisplayAudio && !string.IsNullOrWhiteSpace(audioText))
                     {
                         audioText = Regex.Replace(audioText, "^(?i)HDMI AUDIO(?:\\s*#\\d+)?\\s*-?\\s*", string.Empty, RegexOptions.CultureInvariant);
@@ -559,6 +1150,15 @@ public sealed partial class MainForm
                         audioText = string.IsNullOrWhiteSpace(audioText) ? transportLabel : $"{transportLabel} - {audioText}";
                     }
                 }
+            }
+
+            if (kind == DeviceKind.AUDIO && isSpdifOnlyAudio)
+            {
+                string endpointsLog = rawList is not null && rawList.Count > 0
+                    ? string.Join("; ", rawList)
+                    : audioText;
+                WriteLog($"SCAN: skipped AUDIO device (filtered S/PDIF endpoint) {d.InstanceId} class={d.Class} name=\"{name}\" endpoints=\"{endpointsLog}\"");
+                continue;
             }
 
             if (kind == DeviceKind.AUDIO && (rawList is null || rawList.Count == 0))
@@ -577,6 +1177,30 @@ public sealed partial class MainForm
             if (kind == DeviceKind.STOR)
             {
                 storageTag = GetStorageTagForDevice(displayName, physicalDisks);
+                if (string.IsNullOrWhiteSpace(storageTag))
+                {
+                    if (!HasNonDefaultInterruptAffinity(regBase))
+                    {
+                        WriteLog($"SCAN: skipped storage controller (no attached drives) {d.InstanceId} name=\"{name}\"");
+                        continue;
+                    }
+
+                    WriteLog($"SCAN: keeping storage controller (no attached drives, custom affinity present) {d.InstanceId} name=\"{name}\"");
+                }
+            }
+
+            bool isIntegratedGpu = kind == DeviceKind.GPU && IsIntegratedGpuDevice(d.InstanceId, displayName);
+
+            UsbChipPathInfo? usbChipPath = null;
+            string? usbSuspend = null;
+            if (kind == DeviceKind.USB)
+            {
+                usbChipPath = UsbChipPath.Classify(d.InstanceId);
+                usbSuspend = UsbChipPath.TryReadSelectiveSuspendLabel(d.InstanceId);
+                WriteLog(
+                    $"USB.CHIP: {d.InstanceId} {usbChipPath.CompactTag} origin={usbChipPath.Origin} " +
+                    $"platform=\"{usbChipPath.Platform}\" usb=\"{usbChipPath.UsbSpec}\" " +
+                    $"suspend={(usbSuspend ?? "n/a")} vid={usbChipPath.Vid} did={usbChipPath.Did}");
             }
 
             DeviceInfo devInfo = new()
@@ -587,16 +1211,24 @@ public sealed partial class MainForm
                 RegBase = regBase,
                 Kind = kind,
                 UsbRoles = usbText,
+                UsbPollingRates = usbPollingText,
                 AudioEndpoints = audioText,
                 StorageTag = storageTag,
+                IsIntegratedGpu = isIntegratedGpu,
                 Wifi = isWifi,
                 UsbIsXhci = usbIsXhci,
                 UsbHasDevices = usbHasDevices,
+                UsbChipPath = usbChipPath,
+                UsbSelectiveSuspend = usbSuspend,
             };
 
             devices.Add(devInfo);
-            WriteLog($"SCAN: device {d.InstanceId} kind={kind} class={d.Class} name=\"{displayName}\" reg=HKLM\\{regBase} usbRoles=\"{usbText}\" audio=\"{audioText}\"");
+            string gpuTypeLog = isIntegratedGpu ? " gpuType=iGPU" : (kind == DeviceKind.GPU ? " gpuType=dGPU" : string.Empty);
+            WriteLog($"SCAN: device {d.InstanceId} kind={kind} class={d.Class} name=\"{displayName}\"{gpuTypeLog} reg=HKLM\\{regBase} usbRoles=\"{usbText}\" usbPolling=\"{usbPollingText}\" audio=\"{audioText}\"");
         }
+
+        RefineIntegratedGpuFlags(devices);
+        RefineUsbChipPathIndices(devices);
 
         devices = devices
             .ToList();
@@ -604,6 +1236,7 @@ public sealed partial class MainForm
         if (_testDevicesEnabled && _testDevices.Count > 0)
         {
             devices.AddRange(_testDevices);
+            RefineUsbChipPathIndices(devices);
             WriteLog($"SCAN.TEST: appended test devices count={_testDevices.Count}");
         }
 
@@ -611,6 +1244,67 @@ public sealed partial class MainForm
 
         WriteLog($"SCAN: Get-DeviceList done, count={devices.Count}");
         return devices;
+    }
+
+    private static void RefineUsbChipPathIndices(List<DeviceInfo> devices)
+    {
+        List<DeviceInfo> cpuDirectUsb = devices
+            .Where(d => d.Kind == DeviceKind.USB && d.UsbChipPath is { BaseChipCount: 0 })
+            .ToList();
+
+        if (cpuDirectUsb.Count > 1)
+        {
+            for (int i = 0; i < cpuDirectUsb.Count; i++)
+            {
+                if (cpuDirectUsb[i].UsbChipPath is { } path)
+                {
+                    path.InstanceIndex = i + 1;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Hybrid laptops often expose an unnamed/odd APU adapter next to NVIDIA.
+    /// If a discrete NVIDIA/Intel dGPU is present, mark remaining AMD Radeon
+    /// adapters (non-RX / non-Pro) as integrated.
+    /// </summary>
+    private void RefineIntegratedGpuFlags(List<DeviceInfo> devices)
+    {
+        List<DeviceInfo> gpus = devices.Where(d => d.Kind == DeviceKind.GPU).ToList();
+        if (gpus.Count < 2)
+        {
+            return;
+        }
+
+        bool hasDiscrete = gpus.Any(g =>
+            !g.IsIntegratedGpu
+            && Regex.IsMatch(
+                $"{g.InstanceId} {g.Name}",
+                "(?i)\\bGeForce\\b|\\bRTX\\b|\\bGTX\\b|\\bQuadro\\b|Laptop\\s+GPU\\b|Intel\\s*(?:\\(R\\))?\\s*Arc(?:\\(TM\\))?\\s+A\\d{3,}"));
+        if (!hasDiscrete)
+        {
+            return;
+        }
+
+        foreach (DeviceInfo gpu in gpus)
+        {
+            if (gpu.IsIntegratedGpu)
+            {
+                continue;
+            }
+
+            string text = $"{gpu.InstanceId} {gpu.Name}";
+            bool amdRadeon = Regex.IsMatch(text, "(?i)VEN_1002|\\bRadeon\\b");
+            bool discreteAmd = Regex.IsMatch(text, "(?i)\\bRadeon\\s+RX\\b|\\bRadeon\\s+Pro\\b");
+            if (!amdRadeon || discreteAmd)
+            {
+                continue;
+            }
+
+            gpu.IsIntegratedGpu = true;
+            WriteLog($"SCAN.GPU.REFINE: {gpu.InstanceId} name=\"{SanitizeLogValue(gpu.Name)}\" -> iGPU reason=hybrid-with-discrete");
+        }
     }
 
     private static string GetStorageTagForDevice(string deviceName, IReadOnlyList<WmiPhysicalDisk> physicalDisks)
@@ -625,7 +1319,7 @@ public sealed partial class MainForm
 
         if (physicalDisks.Count == 0)
         {
-            return isNvme ? "SSD" : string.Empty;
+            return isNvme ? "NVMe" : string.Empty;
         }
 
         List<ushort> busTypes = [];
@@ -641,7 +1335,7 @@ public sealed partial class MainForm
 
         if (busTypes.Count == 0)
         {
-            return isNvme ? "SSD" : string.Empty;
+            return isNvme ? "NVMe" : string.Empty;
         }
 
         bool anySsd = false;
@@ -659,7 +1353,7 @@ public sealed partial class MainForm
 
         if (anySsd && !anyHdd)
         {
-            return "SSD";
+            return isNvme ? "NVMe" : "SSD";
         }
 
         if (anyHdd && !anySsd)
@@ -672,17 +1366,142 @@ public sealed partial class MainForm
             return "SSD+HDD";
         }
 
-        return isNvme ? "SSD" : string.Empty;
+        return isNvme ? "NVMe" : string.Empty;
     }
 
-    private Dictionary<string, int> GetDeviceIrqCounts()
+    private static string NormalizeIrqLookupPath(string idOrPath)
     {
-        Dictionary<string, int> irqCounts = new(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(idOrPath))
+        {
+            return string.Empty;
+        }
+
+        string clean = idOrPath.Replace('/', '\\').Trim();
+        clean = Regex.Replace(clean, @"^Microsoft\.PowerShell\.Core\\Registry::", string.Empty, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        clean = Regex.Replace(clean, @"^(HKLM:\\|HKLM\\|HKEY_LOCAL_MACHINE\\)", string.Empty, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        clean = Regex.Replace(clean, @"^SYSTEM\\CurrentControlSet\\Enum\\", string.Empty, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        while (clean.Contains(@"\\", StringComparison.Ordinal))
+        {
+            clean = clean.Replace(@"\\", @"\");
+        }
+
+        return clean.Trim('\\');
+    }
+
+    private static string GetIrqPnpKey(string idOrPath)
+    {
+        string clean = NormalizeIrqLookupPath(idOrPath);
+        if (string.IsNullOrWhiteSpace(clean))
+        {
+            return string.Empty;
+        }
+
+        string[] parts = clean.Split('\\', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2)
+        {
+            return GetShortPnpId(clean);
+        }
+
+        string bus = parts[0].ToUpperInvariant();
+        string deviceId = parts[1].ToUpperInvariant();
+        string? vendor = null;
+        string? device = null;
+        bool useVidPid = bus is "USB" or "HID" || deviceId.Contains("VID_", StringComparison.OrdinalIgnoreCase);
+
+        foreach (string segment in deviceId.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (useVidPid)
+            {
+                if (vendor is null && segment.StartsWith("VID_", StringComparison.OrdinalIgnoreCase))
+                {
+                    vendor = segment.ToUpperInvariant();
+                }
+                else if (device is null && segment.StartsWith("PID_", StringComparison.OrdinalIgnoreCase))
+                {
+                    device = segment.ToUpperInvariant();
+                }
+            }
+            else
+            {
+                if (vendor is null && segment.StartsWith("VEN_", StringComparison.OrdinalIgnoreCase))
+                {
+                    vendor = segment.ToUpperInvariant();
+                }
+                else if (device is null && segment.StartsWith("DEV_", StringComparison.OrdinalIgnoreCase))
+                {
+                    device = segment.ToUpperInvariant();
+                }
+            }
+
+            if (vendor is not null && device is not null)
+            {
+                break;
+            }
+        }
+
+        if (useVidPid)
+        {
+            return $"{bus}_{vendor ?? "UNKNOWN_VID"}_{device ?? "UNKNOWN_PID"}";
+        }
+
+        return $"{bus}_{vendor ?? "UNKNOWN_VEN"}_{device ?? "UNKNOWN_DEV"}";
+    }
+
+    private static long? TryParseIrqNumber(string antecedent)
+    {
+        Match match = Regex.Match(antecedent, @"IRQNumber=(?<irq>\d+)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        if (!match.Success)
+        {
+            return null;
+        }
+
+        return long.TryParse(match.Groups["irq"].Value, out long irqNumber)
+            ? irqNumber
+            : null;
+    }
+
+    private static string FormatIrqNumbers(IEnumerable<long> irqNumbers)
+    {
+        string text = string.Join(", ", irqNumbers);
+        return string.IsNullOrWhiteSpace(text) ? "none" : text;
+    }
+
+    private string ReadMsiStatusFromRegistry(DeviceBlock block)
+    {
+        if (block.Device.IsTestDevice)
+        {
+            return "Unknown";
+        }
+
+        string msiPath = block.Device.RegBase + @"\Device Parameters\Interrupt Management\MessageSignaledInterruptProperties";
+        try
+        {
+            using RegistryKey? msiKey = Registry.LocalMachine.OpenSubKey(msiPath);
+            if (msiKey is null)
+            {
+                return "Unknown";
+            }
+
+            return TryParseRegistryInt(msiKey.GetValue("MSISupported"), out int msiSupported)
+                ? msiSupported == 1 ? "Enabled" : "Disabled"
+                : "Unknown";
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"IRQ.MSI.REG: {block.Device.InstanceId} failed: {ex.Message}");
+            return "Unknown";
+        }
+    }
+
+    private Dictionary<string, DeviceIrqInfo> GetDeviceIrqCounts()
+    {
+        Dictionary<string, DeviceIrqInfo> irqCounts = new(StringComparer.OrdinalIgnoreCase);
         try
         {
             using ManagementObjectSearcher searcher = new(
                 "root\\CIMV2",
                 "SELECT Antecedent, Dependent FROM Win32_PnPAllocatedResource");
+            searcher.Options.Timeout = TimeSpan.FromSeconds(10);
 
             foreach (ManagementObject mo in searcher.Get())
             {
@@ -712,14 +1531,19 @@ public sealed partial class MainForm
                         continue;
                     }
 
-                    string formattedId = GetShortPnpId(deviceId);
+                    string formattedId = GetIrqPnpKey(deviceId);
                     if (string.IsNullOrWhiteSpace(formattedId))
                     {
                         continue;
                     }
 
-                    irqCounts.TryGetValue(formattedId, out int count);
-                    irqCounts[formattedId] = count + 1;
+                    if (!irqCounts.TryGetValue(formattedId, out DeviceIrqInfo? entry))
+                    {
+                        entry = new DeviceIrqInfo();
+                        irqCounts[formattedId] = entry;
+                    }
+
+                    entry.AddIrq(TryParseIrqNumber(antecedent), deviceId);
                 }
                 catch
                 {
@@ -732,7 +1556,8 @@ public sealed partial class MainForm
 
         foreach (string k in irqCounts.Keys)
         {
-            WriteLog($"IRQ.COUNT: {k} -> {irqCounts[k]}");
+            DeviceIrqInfo entry = irqCounts[k];
+            WriteLog($"IRQ.COUNT: {k} -> count={entry.Count} msi={entry.MsiStatus} matches={entry.MatchedDeviceCount} ambiguous={entry.IsAmbiguous} irqs=[{FormatIrqNumbers(entry.IrqNumbers)}]");
         }
 
         return irqCounts;

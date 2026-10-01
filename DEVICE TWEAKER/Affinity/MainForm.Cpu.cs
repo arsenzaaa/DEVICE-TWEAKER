@@ -1,6 +1,10 @@
-﻿using System.Management;
+using System.Management;
+using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics.X86;
+using System.Text.RegularExpressions;
 
 namespace DeviceTweakerCS;
 
@@ -12,6 +16,11 @@ public sealed partial class MainForm
     private readonly Dictionary<int, int> _cpuIndexByCpuSetId = new();
     private readonly HashSet<int> _effClassP = new();
     private readonly HashSet<int> _effClassE = new();
+    private readonly Dictionary<int, int> _cppcRatings = new();
+    private readonly Dictionary<int, int> _cppcRanks = new();
+    private bool _cppcEnabled;
+    private bool _cpuTopologyReliable;
+    private bool _cpuSetIdsReliable;
     private int _maxLogical;
     private int _grpHeight;
     private int _cpuGroupCount = 1;
@@ -21,10 +30,16 @@ public sealed partial class MainForm
 
     private void InitializeCpu()
     {
+        _cpuTopologyReliable = false;
+        _cpuSetIdsReliable = false;
         CpuTopology? cpuRaw = QueryCpuCpuSet();
         if (cpuRaw is null)
         {
             cpuRaw = QueryCpuGlpi();
+        }
+        if (cpuRaw is null)
+        {
+            cpuRaw = QueryCpuMinimal();
         }
 
         CpuVendorInfo cpuVendor = DetectCpuVendor();
@@ -43,12 +58,17 @@ public sealed partial class MainForm
         _cpuHeaderText = $"CPU: {cpuVendor.Name}";
 
         Dictionary<int, int> ccdMap = BuildCcdMap(cpuRaw, cpuVendor);
+        Dictionary<int, int> ccxMap = BuildCcxMap(cpuRaw);
+        Dictionary<int, long> ccdL3CacheBytes = BuildCcdL3CacheSizeMap(cpuRaw, ccdMap);
         _cpuInfo = new CpuInfo
         {
             Topology = cpuRaw,
             CcdMap = ccdMap,
+            CcxMap = ccxMap,
+            CcdL3CacheBytes = ccdL3CacheBytes,
         };
         UpdateEfficiencyClassMap(cpuRaw);
+        LoadCppcRatings(cpuRaw);
 
         _cpuGroupCount = Math.Max(1, cpuRaw.LPs.Select(lp => lp.Group).Distinct().Count());
         _cpuLpByIndex.Clear();
@@ -57,9 +77,11 @@ public sealed partial class MainForm
         foreach (CpuLpInfo lp in cpuRaw.LPs)
         {
             _cpuLpByIndex[lp.LP] = lp;
-            int cpuSetId = lp.CpuSetId >= 0 ? lp.CpuSetId : lp.LP;
-            _cpuSetIdByIndex[lp.LP] = cpuSetId;
-            _cpuIndexByCpuSetId.TryAdd(cpuSetId, lp.LP);
+            if (lp.CpuSetId >= 0)
+            {
+                _cpuSetIdByIndex[lp.LP] = lp.CpuSetId;
+                _cpuIndexByCpuSetId.TryAdd(lp.CpuSetId, lp.LP);
+            }
         }
 
         int group0Count = cpuRaw.LPs.Count(lp => lp.Group == 0);
@@ -69,14 +91,287 @@ public sealed partial class MainForm
         }
 
         _maxLogical = Math.Min(group0Count, MaxAffinityBits);
-        _grpHeight = UiScale(120) + (_maxLogical * UiScale(24)) + UiScale(160);
+        _grpHeight = UiScale(280);
 
-        WriteLog($"CPU.SUMMARY: logical={cpuRaw.Logical} physical={cpuRaw.PhysicalCores} groups={_cpuGroupCount} group0={group0Count} maxAffinity={_maxLogical}");
+        int ccdCount = ccdMap.Values.Distinct().Count();
+        int ccxCount = ccxMap.Values.Distinct().Count();
+        WriteLog($"CPU.SUMMARY: logical={cpuRaw.Logical} physical={cpuRaw.PhysicalCores} groups={_cpuGroupCount} ccd={ccdCount} ccx={ccxCount} group0={group0Count} maxAffinity={_maxLogical}");
+        WriteLog($"CPU.CCD.L3: {FormatCcdL3CacheSizes(ccdL3CacheBytes)}");
         if (_cpuGroupCount > 1)
         {
             WriteLog($"CPU.GROUPS: using group0 for affinity UI (KAFFINITY max {MaxAffinityBits})");
         }
         WriteLog($"CPU.IDENT: {cpuVendor.Name} | Vendor={cpuVendor.Vendor} | SMT/HT={_smtText}");
+    }
+
+    private void LoadCppcRatings(CpuTopology topology)
+    {
+        _cppcRatings.Clear();
+        _cppcRanks.Clear();
+        _cppcEnabled = false;
+
+        try
+        {
+            List<(int Group, int Number, int Performance)> events = QueryKernelProcessorPowerEvents(Math.Max(topology.Logical * 4, 16));
+            if (events.Count == 0)
+            {
+                WriteLog("CPU.CPPC: no Event ID 55 data");
+                return;
+            }
+
+            Dictionary<(int Group, int Number), int> lpByGroupAndNumber = topology.LPs
+                .Where(lp => lp.Group >= 0 && lp.LocalIndex >= 0)
+                .GroupBy(lp => (lp.Group, lp.LocalIndex))
+                .ToDictionary(group => group.Key, group => group.First().LP);
+            Dictionary<int, int> collected = [];
+            foreach (var (group, processor, performance) in events)
+            {
+                if (lpByGroupAndNumber.TryGetValue((group, processor), out int globalLp))
+                {
+                    collected.TryAdd(globalLp, performance);
+                }
+
+                if (collected.Count >= topology.Logical)
+                {
+                    break;
+                }
+            }
+
+            if (collected.Count == 0)
+            {
+                WriteLog("CPU.CPPC: Event ID 55 present but ratings were not parsed");
+                return;
+            }
+
+            int[] requiredLps = topology.LPs
+                .Where(lp => lp.Group == 0)
+                .Select(lp => lp.LP)
+                .Distinct()
+                .OrderBy(lp => lp)
+                .ToArray();
+            int[] missingLps = requiredLps.Where(lp => !collected.ContainsKey(lp)).ToArray();
+            if (missingLps.Length > 0)
+            {
+                WriteLog($"CPU.CPPC: disabled, incomplete group0 data parsed={collected.Count} required={requiredLps.Length} missing=[{string.Join(',', missingLps)}]");
+                return;
+            }
+
+            collected = collected
+                .Where(item => requiredLps.Contains(item.Key))
+                .ToDictionary(item => item.Key, item => item.Value);
+
+            List<int> uniqueRatings = collected.Values.Distinct().OrderByDescending(v => v).ToList();
+            if (uniqueRatings.Count <= 1)
+            {
+                WriteLog($"CPU.CPPC: disabled, all parsed cores share rating={uniqueRatings.FirstOrDefault()} count={collected.Count}");
+                return;
+            }
+
+            int rank = 1;
+            foreach (int rating in uniqueRatings)
+            {
+                foreach (KeyValuePair<int, int> item in collected.Where(kvp => kvp.Value == rating))
+                {
+                    _cppcRatings[item.Key] = item.Value;
+                    _cppcRanks[item.Key] = rank;
+                }
+
+                rank++;
+            }
+
+            _cppcEnabled = _cppcRanks.Count > 0;
+            string ratingsText = string.Join(
+                " ",
+                _cppcRatings
+                    .OrderBy(kvp => kvp.Key)
+                    .Select(kvp => $"CPU{kvp.Key}=R{kvp.Value}/#{_cppcRanks[kvp.Key]}"));
+            WriteLog($"CPU.CPPC: enabled count={_cppcRanks.Count} {ratingsText}");
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"CPU.CPPC: unavailable: {ex.Message}");
+            _cppcEnabled = false;
+        }
+    }
+
+    private bool HasHybridCpu()
+    {
+        if (_cpuInfo?.Topology is null)
+        {
+            return false;
+        }
+
+        if (_effClassE.Count > 0)
+        {
+            return true;
+        }
+
+        return _cpuInfo.Topology.LPs
+            .Select(lp => lp.EffClass)
+            .Where(eff => eff >= 0)
+            .Distinct()
+            .Skip(1)
+            .Any();
+    }
+
+    private bool HasDualCcdCpu()
+    {
+        return _cpuInfo?.CcdMap.Values
+            .Distinct()
+            .Skip(1)
+            .Any() == true;
+    }
+
+    private bool HasVisibleCcxSplit()
+    {
+        if (_cpuInfo is null || _cpuInfo.CcxMap.Count == 0)
+        {
+            return false;
+        }
+
+        return _cpuInfo.CcdMap
+            .GroupBy(kvp => kvp.Value)
+            .Any(group => group
+                .Select(kvp => _cpuInfo.CcxMap.TryGetValue(kvp.Key, out int ccx) ? ccx : 0)
+                .Distinct()
+                .Skip(1)
+                .Any());
+    }
+
+    private static List<(int Group, int Number, int Performance)> QueryKernelProcessorPowerEvents(int maxEvents)
+    {
+        List<(int Group, int Number, int Performance)> events = [];
+        try
+        {
+            string query = "*[System[Provider[@Name='Microsoft-Windows-Kernel-Processor-Power'] and EventID=55]]";
+            EventLogQuery logQuery = new("System", PathType.LogName, query)
+            {
+                ReverseDirection = true,
+            };
+
+            using EventLogReader reader = new(logQuery);
+            for (int i = 0; i < maxEvents; i++)
+            {
+                using EventRecord? record = reader.ReadEvent();
+                if (record is null)
+                {
+                    break;
+                }
+
+                string xml = record.ToXml();
+                if (TryReadEventDataInt(xml, "Number", out int processor)
+                    && TryReadEventDataInt(xml, "MaximumPerformancePercent", out int performance))
+                {
+                    int group = TryReadEventDataInt(xml, "Group", out int parsedGroup) ? parsedGroup : 0;
+                    events.Add((group, processor, performance));
+                }
+            }
+
+            if (events.Count > 0)
+            {
+                return events;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"CPU.CPPC: native EventLogReader unavailable, falling back to wevtutil: {ex.Message}");
+        }
+
+        try
+        {
+            string xmlText = QueryKernelProcessorPowerEventsViaWevtutil(maxEvents);
+            if (!string.IsNullOrWhiteSpace(xmlText))
+            {
+                foreach (Match eventMatch in Regex.Matches(xmlText, "<Event\\b.*?</Event>", RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+                {
+                    string eventXml = eventMatch.Value;
+                    if (TryReadEventDataInt(eventXml, "Number", out int processor)
+                        && TryReadEventDataInt(eventXml, "MaximumPerformancePercent", out int performance))
+                    {
+                        int group = TryReadEventDataInt(eventXml, "Group", out int parsedGroup) ? parsedGroup : 0;
+                        events.Add((group, processor, performance));
+                    }
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return events;
+    }
+
+    private static string QueryKernelProcessorPowerEventsViaWevtutil(int maxEvents)
+    {
+        using Process process = new();
+        process.StartInfo = new ProcessStartInfo
+        {
+            FileName = "wevtutil.exe",
+            Arguments = $"qe System /q:\"*[System[Provider[@Name='Microsoft-Windows-Kernel-Processor-Power'] and EventID=55]]\" /c:{maxEvents.ToString(CultureInfo.InvariantCulture)} /rd:true /f:xml",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+
+        if (!process.Start())
+        {
+            return string.Empty;
+        }
+
+        Task<string> stdout = process.StandardOutput.ReadToEndAsync();
+        Task<string> stderr = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(2500))
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                _ = process.WaitForExit(1000);
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                _ = Task.WaitAll([stdout, stderr], 1000);
+            }
+            catch
+            {
+            }
+
+            return string.Empty;
+        }
+
+        try
+        {
+            _ = Task.WaitAll([stdout, stderr], 1000);
+        }
+        catch
+        {
+        }
+
+        return process.ExitCode == 0 && stdout.IsCompletedSuccessfully
+            ? stdout.Result
+            : string.Empty;
+    }
+
+    private static bool TryReadEventDataInt(string eventXml, string name, out int value)
+    {
+        value = 0;
+        Match match = Regex.Match(
+            eventXml,
+            $"<Data\\s+Name=['\"]{Regex.Escape(name)}['\"]>(?<value>[^<]+)</Data>",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        return match.Success
+            && int.TryParse(match.Groups["value"].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
     }
 
     private void UpdateEfficiencyClassMap(CpuTopology topo)
@@ -110,7 +405,10 @@ public sealed partial class MainForm
             return;
         }
 
-        int perfClass = classes.Contains(0) ? 0 : classes[0];
+        // Windows defines larger EfficiencyClass values as faster and less
+        // power-efficient. SMT remains the strongest hybrid hint above, while
+        // this branch also works on hybrid CPUs with HT disabled.
+        int perfClass = classes.Max();
         _effClassP.Add(perfClass);
         foreach (int cls in classes)
         {
@@ -138,7 +436,7 @@ public sealed partial class MainForm
             }
         }
 
-        return effClass > 0;
+        return false;
     }
 
     private bool IsEfficiencyCore(CpuLpInfo lpInfo)
@@ -166,27 +464,48 @@ public sealed partial class MainForm
                 }
 
                 int offset = 0;
-                List<(int Group, int LocalIndex, int Core, int LLC, int NUMA, int EffClass, int CpuSetId)> raw = [];
-                while (offset < len)
+                int recordSize = Marshal.SizeOf<NativeCpuSet.SystemCpuSetInformation>();
+                if (recordSize != 32)
                 {
-                    NativeCpuSet.SystemCpuSetInformation item = Marshal.PtrToStructure<NativeCpuSet.SystemCpuSetInformation>(buf + offset);
-                    if (item.Size < 1)
+                    WriteLog($"CPU.TOPO: invalid managed CpuSet ABI size={recordSize}, expected=32");
+                    return null;
+                }
+
+                List<(int Group, int LocalIndex, int Core, int LLC, int NUMA, int EffClass, int CpuSetId)> raw = [];
+                while (offset <= len - (sizeof(int) * 2))
+                {
+                    IntPtr record = IntPtr.Add(buf, offset);
+                    int size = Marshal.ReadInt32(record);
+                    int type = Marshal.ReadInt32(record, sizeof(int));
+                    if (size < sizeof(int) * 2 || size > len - offset)
                     {
+                        WriteLog($"CPU.TOPO: invalid CpuSet record offset={offset} size={size} remaining={len - offset}");
                         break;
                     }
 
-                    raw.Add((
-                        Group: item.Group,
-                        LocalIndex: item.LogicalProcessorIndex,
-                        Core: item.CoreIndex,
-                        LLC: item.LastLevelCacheIndex,
-                        NUMA: item.NumaNodeIndex,
-                        EffClass: item.EfficiencyClass,
-                        CpuSetId: item.Id));
+                    if (type == 0 && size >= recordSize)
+                    {
+                        NativeCpuSet.SystemCpuSetInformation item = Marshal.PtrToStructure<NativeCpuSet.SystemCpuSetInformation>(record);
+                        raw.Add((
+                            Group: item.Group,
+                            LocalIndex: item.LogicalProcessorIndex,
+                            Core: item.CoreIndex,
+                            LLC: item.LastLevelCacheIndex,
+                            NUMA: item.NumaNodeIndex,
+                            EffClass: item.EfficiencyClass,
+                            CpuSetId: checked((int)item.Id)));
+                    }
 
-                    offset += item.Size;
+                    offset += size;
                 }
 
+                if (raw.Count == 0)
+                {
+                    WriteLog("CPU.TOPO: CpuSet returned no processor records, falling back to GLPI");
+                    return null;
+                }
+
+                Dictionary<(int Group, int Local), long> l3ByProcessor = QueryL3CacheSizesByProcessor();
                 List<CpuLpInfo> entries = [];
                 int globalIndex = 0;
                 foreach (IGrouping<int, (int Group, int LocalIndex, int Core, int LLC, int NUMA, int EffClass, int CpuSetId)> group
@@ -202,12 +521,16 @@ public sealed partial class MainForm
                             NUMA: item.NUMA,
                             EffClass: item.EffClass,
                             LocalIndex: item.LocalIndex,
-                            CpuSetId: item.CpuSetId));
+                            CpuSetId: item.CpuSetId,
+                            L3CacheSizeBytes: l3ByProcessor.TryGetValue((item.Group, item.LocalIndex), out long l3Bytes) ? l3Bytes : 0));
                         globalIndex++;
                     }
                 }
 
                 CpuTopology topo = new(entries.OrderBy(x => x.LP).ToList());
+
+                _cpuTopologyReliable = true;
+                _cpuSetIdsReliable = true;
 
                 WriteLog("CPU.TOPO: source=CpuSet");
                 foreach (CpuLpInfo e in topo.LPs.OrderBy(x => x.LP))
@@ -232,30 +555,323 @@ public sealed partial class MainForm
         }
     }
 
-    private CpuTopology QueryCpuGlpi()
+    private CpuTopology? QueryCpuGlpi()
     {
-        int envLP = Environment.ProcessorCount;
-        List<CpuLpInfo> list = [];
-        for (int i = 0; i < envLP; i++)
+        int length = 0;
+        _ = NativeLogicalProcessor.GetLogicalProcessorInformationEx(
+            NativeLogicalProcessor.RelationAll,
+            IntPtr.Zero,
+            ref length);
+        if (length <= 0)
         {
-            list.Add(new CpuLpInfo(
-                Group: 0,
-                LP: i,
-                Core: i,
-                LLC: 0,
-                NUMA: 0,
-                EffClass: 0,
-                LocalIndex: i,
-                CpuSetId: i));
+            WriteLog($"CPU.TOPO: GLPIEx size query failed error={Marshal.GetLastWin32Error()}");
+            return null;
         }
 
-        WriteLog("CPU.TOPO: source=GLPI (fallback)");
-        foreach (CpuLpInfo e in list)
+        IntPtr buffer = Marshal.AllocHGlobal(length);
+        try
         {
-            WriteLog($"CPU.ENTRY: G0 L{e.LP} Local={e.LocalIndex} Id={e.CpuSetId} Core={e.LP} SMT=0 NUMA=0 LLC=0 EffClass=0");
+            if (!NativeLogicalProcessor.GetLogicalProcessorInformationEx(
+                    NativeLogicalProcessor.RelationAll,
+                    buffer,
+                    ref length))
+            {
+                WriteLog($"CPU.TOPO: GLPIEx query failed error={Marshal.GetLastWin32Error()}");
+                return null;
+            }
+
+            List<(IntPtr Address, int Relationship, int Size)> records = [];
+            int offset = 0;
+            while (offset <= length - NativeLogicalProcessor.RecordHeaderSize)
+            {
+                IntPtr record = IntPtr.Add(buffer, offset);
+                int relationship = Marshal.ReadInt32(record);
+                int size = Marshal.ReadInt32(record, sizeof(int));
+                if (size < NativeLogicalProcessor.RecordHeaderSize || size > length - offset)
+                {
+                    WriteLog($"CPU.TOPO: invalid GLPIEx record offset={offset} size={size} remaining={length - offset}");
+                    return null;
+                }
+
+                records.Add((record, relationship, size));
+                offset += size;
+            }
+
+            if (offset != length)
+            {
+                WriteLog($"CPU.TOPO: GLPIEx record length mismatch parsed={offset} returned={length}");
+                return null;
+            }
+
+            Dictionary<(int Group, int Local), GlpiLpBuilder> builders = [];
+            Dictionary<int, int> nextCoreByGroup = [];
+            foreach (var record in records.Where(r => r.Relationship == NativeLogicalProcessor.RelationProcessorCore))
+            {
+                byte efficiencyClass = Marshal.ReadByte(record.Address, NativeLogicalProcessor.RecordHeaderSize + 1);
+                int groupCount = Marshal.ReadInt16(record.Address, NativeLogicalProcessor.ProcessorGroupCountOffset) & 0xFFFF;
+                if (groupCount <= 0)
+                {
+                    continue;
+                }
+
+                if (NativeLogicalProcessor.ProcessorGroupMasksOffset
+                    + (groupCount * NativeLogicalProcessor.GroupAffinitySize) > record.Size)
+                {
+                    WriteLog($"CPU.TOPO: invalid processor-core record size={record.Size} groups={groupCount}");
+                    return null;
+                }
+
+                for (int maskIndex = 0; maskIndex < groupCount; maskIndex++)
+                {
+                    IntPtr groupMask = IntPtr.Add(
+                        record.Address,
+                        NativeLogicalProcessor.ProcessorGroupMasksOffset + (maskIndex * NativeLogicalProcessor.GroupAffinitySize));
+                    ulong mask = NativeLogicalProcessor.ReadAffinityMask(groupMask);
+                    int group = Marshal.ReadInt16(groupMask, IntPtr.Size) & 0xFFFF;
+                    int core = nextCoreByGroup.TryGetValue(group, out int nextCore) ? nextCore : 0;
+                    nextCoreByGroup[group] = core + 1;
+                    foreach (int local in EnumerateAffinityBits(mask))
+                    {
+                        builders[(group, local)] = new GlpiLpBuilder(group, local, core, efficiencyClass);
+                    }
+                }
+            }
+
+            if (builders.Count == 0)
+            {
+                WriteLog("CPU.TOPO: GLPIEx returned no processor-core relationships");
+                return null;
+            }
+
+            foreach (var record in records.Where(r => r.Relationship is NativeLogicalProcessor.RelationNumaNode or NativeLogicalProcessor.RelationNumaNodeEx))
+            {
+                int node = Marshal.ReadInt32(record.Address, NativeLogicalProcessor.NumaNodeNumberOffset);
+                int groupCount = record.Relationship == NativeLogicalProcessor.RelationNumaNode
+                    ? 1
+                    : Math.Max(1, Marshal.ReadInt16(record.Address, NativeLogicalProcessor.NumaGroupCountOffset) & 0xFFFF);
+                ApplyGlpiMasks(record, NativeLogicalProcessor.NumaGroupMasksOffset, groupCount, builders,
+                    builder => builder.Numa = node);
+            }
+
+            Dictionary<int, int> nextCacheByGroup = [];
+            Dictionary<(int Group, int Local), int> cacheLevelByLp = [];
+            foreach (var record in records.Where(r => r.Relationship == NativeLogicalProcessor.RelationCache))
+            {
+                int level = Marshal.ReadByte(record.Address, NativeLogicalProcessor.CacheLevelOffset);
+                long cacheSize = unchecked((uint)Marshal.ReadInt32(record.Address, NativeLogicalProcessor.CacheSizeOffset));
+                int type = Marshal.ReadInt32(record.Address, NativeLogicalProcessor.CacheTypeOffset);
+                if (level <= 0 || type is not (0 or 1))
+                {
+                    continue;
+                }
+
+                int groupCount = Math.Max(1, Marshal.ReadInt16(record.Address, NativeLogicalProcessor.CacheGroupCountOffset) & 0xFFFF);
+                if (NativeLogicalProcessor.CacheGroupMasksOffset
+                    + (groupCount * NativeLogicalProcessor.GroupAffinitySize) > record.Size)
+                {
+                    WriteLog($"CPU.TOPO: invalid cache record size={record.Size} groups={groupCount}");
+                    return null;
+                }
+
+                for (int maskIndex = 0; maskIndex < groupCount; maskIndex++)
+                {
+                    IntPtr groupMask = IntPtr.Add(
+                        record.Address,
+                        NativeLogicalProcessor.CacheGroupMasksOffset + (maskIndex * NativeLogicalProcessor.GroupAffinitySize));
+                    ulong mask = NativeLogicalProcessor.ReadAffinityMask(groupMask);
+                    int group = Marshal.ReadInt16(groupMask, IntPtr.Size) & 0xFFFF;
+                    int cache = nextCacheByGroup.TryGetValue(group, out int nextCache) ? nextCache : 0;
+                    nextCacheByGroup[group] = cache + 1;
+                    foreach (int local in EnumerateAffinityBits(mask))
+                    {
+                        var key = (group, local);
+                        if (builders.TryGetValue(key, out GlpiLpBuilder? builder)
+                            && (!cacheLevelByLp.TryGetValue(key, out int oldLevel) || level >= oldLevel))
+                        {
+                            builder.Llc = cache;
+                            builder.L3CacheSizeBytes = level == 3 ? cacheSize : 0;
+                            cacheLevelByLp[key] = level;
+                        }
+                    }
+                }
+            }
+
+            List<CpuLpInfo> entries = [];
+            int globalIndex = 0;
+            foreach (GlpiLpBuilder builder in builders.Values.OrderBy(b => b.Group).ThenBy(b => b.Local))
+            {
+                entries.Add(new CpuLpInfo(
+                    builder.Group,
+                    globalIndex++,
+                    builder.Core,
+                    builder.Llc,
+                    builder.Numa,
+                    builder.EfficiencyClass,
+                    builder.Local,
+                    CpuSetId: -1,
+                    L3CacheSizeBytes: builder.L3CacheSizeBytes));
+            }
+
+            CpuTopology topology = new(entries);
+            _cpuTopologyReliable = true;
+            _cpuSetIdsReliable = false;
+            WriteLog("CPU.TOPO: source=GLPIEx fallback cpuSetIds=unavailable");
+            foreach (CpuLpInfo entry in topology.LPs)
+            {
+                int coreKey = CpuTopology.MakeCoreKey(entry.Group, entry.Core);
+                bool smt = topology.ByCore.TryGetValue(coreKey, out List<CpuLpInfo>? siblings) && siblings.Count > 1;
+                WriteLog($"CPU.ENTRY: G{entry.Group} L{entry.LP} Local={entry.LocalIndex} Id=n/a Core={entry.Core} SMT={(smt ? 1 : 0)} NUMA={entry.NUMA} LLC={entry.LLC} EffClass={entry.EffClass}");
+            }
+
+            return topology;
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"CPU.TOPO: GLPIEx fallback failed: {ex.Message}");
+            return null;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    private static IEnumerable<int> EnumerateAffinityBits(ulong mask)
+    {
+        for (int bit = 0; bit < 64; bit++)
+        {
+            if ((mask & (1UL << bit)) != 0)
+            {
+                yield return bit;
+            }
+        }
+    }
+
+    private static void ApplyGlpiMasks(
+        (IntPtr Address, int Relationship, int Size) record,
+        int masksOffset,
+        int groupCount,
+        IReadOnlyDictionary<(int Group, int Local), GlpiLpBuilder> builders,
+        Action<GlpiLpBuilder> apply)
+    {
+        for (int maskIndex = 0; maskIndex < groupCount; maskIndex++)
+        {
+            int offset = masksOffset + (maskIndex * NativeLogicalProcessor.GroupAffinitySize);
+            if (offset + NativeLogicalProcessor.GroupAffinitySize > record.Size)
+            {
+                break;
+            }
+
+            IntPtr groupMask = IntPtr.Add(record.Address, offset);
+            ulong mask = NativeLogicalProcessor.ReadAffinityMask(groupMask);
+            int group = Marshal.ReadInt16(groupMask, IntPtr.Size) & 0xFFFF;
+            foreach (int local in EnumerateAffinityBits(mask))
+            {
+                if (builders.TryGetValue((group, local), out GlpiLpBuilder? builder))
+                {
+                    apply(builder);
+                }
+            }
+        }
+    }
+
+    private CpuTopology QueryCpuMinimal()
+    {
+        int logicalCount = Math.Max(1, Environment.ProcessorCount);
+        List<CpuLpInfo> entries = Enumerable.Range(0, logicalCount)
+            .Select(index => new CpuLpInfo(0, index, index, 0, 0, 0, index, -1))
+            .ToList();
+        _cpuTopologyReliable = false;
+        _cpuSetIdsReliable = false;
+        WriteLog($"CPU.TOPO.ERROR: all topology APIs failed; using display-only minimal map logical={logicalCount}; AUTO affinity disabled");
+        return new CpuTopology(entries);
+    }
+
+    private sealed class GlpiLpBuilder(int group, int local, int core, int efficiencyClass)
+    {
+        public int Group { get; } = group;
+        public int Local { get; } = local;
+        public int Core { get; } = core;
+        public int EfficiencyClass { get; } = efficiencyClass;
+        public int Llc { get; set; }
+        public int Numa { get; set; }
+        public long L3CacheSizeBytes { get; set; }
+    }
+
+    private Dictionary<(int Group, int Local), long> QueryL3CacheSizesByProcessor()
+    {
+        Dictionary<(int Group, int Local), long> result = [];
+        int length = 0;
+        _ = NativeLogicalProcessor.GetLogicalProcessorInformationEx(
+            NativeLogicalProcessor.RelationCache,
+            IntPtr.Zero,
+            ref length);
+        if (length <= 0)
+        {
+            return result;
         }
 
-        return new CpuTopology(list);
+        IntPtr buffer = Marshal.AllocHGlobal(length);
+        try
+        {
+            if (!NativeLogicalProcessor.GetLogicalProcessorInformationEx(
+                    NativeLogicalProcessor.RelationCache,
+                    buffer,
+                    ref length))
+            {
+                return result;
+            }
+
+            int offset = 0;
+            while (offset <= length - NativeLogicalProcessor.RecordHeaderSize)
+            {
+                IntPtr record = IntPtr.Add(buffer, offset);
+                int relationship = Marshal.ReadInt32(record);
+                int size = Marshal.ReadInt32(record, sizeof(int));
+                if (size < NativeLogicalProcessor.RecordHeaderSize || size > length - offset)
+                {
+                    break;
+                }
+
+                if (relationship == NativeLogicalProcessor.RelationCache
+                    && Marshal.ReadByte(record, NativeLogicalProcessor.CacheLevelOffset) == 3
+                    && Marshal.ReadInt32(record, NativeLogicalProcessor.CacheTypeOffset) == 0)
+                {
+                    long cacheSize = unchecked((uint)Marshal.ReadInt32(record, NativeLogicalProcessor.CacheSizeOffset));
+                    int groupCount = Math.Max(1, Marshal.ReadInt16(record, NativeLogicalProcessor.CacheGroupCountOffset) & 0xFFFF);
+                    for (int maskIndex = 0; maskIndex < groupCount; maskIndex++)
+                    {
+                        int maskOffset = NativeLogicalProcessor.CacheGroupMasksOffset
+                            + (maskIndex * NativeLogicalProcessor.GroupAffinitySize);
+                        if (maskOffset + NativeLogicalProcessor.GroupAffinitySize > size)
+                        {
+                            break;
+                        }
+
+                        IntPtr groupMask = IntPtr.Add(record, maskOffset);
+                        ulong mask = NativeLogicalProcessor.ReadAffinityMask(groupMask);
+                        int group = Marshal.ReadInt16(groupMask, IntPtr.Size) & 0xFFFF;
+                        foreach (int local in EnumerateAffinityBits(mask))
+                        {
+                            result[(group, local)] = cacheSize;
+                        }
+                    }
+                }
+
+                offset += size;
+            }
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"CPU.CACHE: L3 size query failed: {ex.Message}");
+            result.Clear();
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+
+        return result;
     }
 
     private CpuVendorInfo DetectCpuVendor()
@@ -348,6 +964,85 @@ public sealed partial class MainForm
         return map;
     }
 
+    internal static Dictionary<int, long> BuildCcdL3CacheSizeMap(
+        CpuTopology cpu,
+        IReadOnlyDictionary<int, int> ccdMap)
+    {
+        Dictionary<int, long> result = [];
+        foreach (IGrouping<int, CpuLpInfo> llcGroup in cpu.LPs
+                     .Where(lp => lp.LLC >= 0 && lp.L3CacheSizeBytes > 0)
+                     .GroupBy(lp => CpuTopology.MakeLlcKey(lp.Group, lp.LLC)))
+        {
+            CpuLpInfo representative = llcGroup.First();
+            if (!ccdMap.TryGetValue(representative.LP, out int ccd))
+            {
+                continue;
+            }
+
+            long size = llcGroup.Max(lp => lp.L3CacheSizeBytes);
+            result[ccd] = result.TryGetValue(ccd, out long current) ? current + size : size;
+        }
+
+        return result;
+    }
+
+    private static string FormatCcdL3CacheSizes(IReadOnlyDictionary<int, long> sizes)
+    {
+        if (sizes.Count == 0)
+        {
+            return "unavailable";
+        }
+
+        return string.Join(
+            " ",
+            sizes.OrderBy(pair => pair.Key)
+                .Select(pair => $"CCD{pair.Key}={pair.Value / (1024d * 1024d):0.#}MB"));
+    }
+
+    private Dictionary<int, int> BuildCcxMap(CpuTopology cpu)
+    {
+        Dictionary<int, int> map = new();
+
+        List<KeyValuePair<int, List<CpuLpInfo>>> llcGroups = cpu.ByLLC
+            .Where(g => g.Key >= 0)
+            .OrderBy(g => g.Key)
+            .ToList();
+
+        bool perLpLlc = llcGroups.Count == cpu.Logical && llcGroups.All(g => g.Value.Count == 1);
+        if (llcGroups.Count == 0 || perLpLlc)
+        {
+            foreach (CpuLpInfo lp in cpu.LPs.OrderBy(x => x.LP))
+            {
+                map.TryAdd(lp.LP, 0);
+            }
+
+            return map;
+        }
+
+        int ccxIndex = 0;
+        foreach (IGrouping<int, KeyValuePair<int, List<CpuLpInfo>>> group in llcGroups
+            .GroupBy(g => ExtractCpuGroupFromLlcKey(g.Key))
+            .OrderBy(g => g.Key))
+        {
+            foreach (KeyValuePair<int, List<CpuLpInfo>> llcGroup in group.OrderBy(x => x.Key))
+            {
+                foreach (CpuLpInfo lp in llcGroup.Value)
+                {
+                    map.TryAdd(lp.LP, ccxIndex);
+                }
+
+                ccxIndex++;
+            }
+        }
+
+        foreach (CpuLpInfo lp in cpu.LPs.OrderBy(x => x.LP))
+        {
+            map.TryAdd(lp.LP, 0);
+        }
+
+        return map;
+    }
+
     private static int ExtractCpuGroupFromLlcKey(int llcKey)
     {
         return (llcKey >> 16) & 0xFFFF;
@@ -432,41 +1127,92 @@ public sealed partial class MainForm
         int coreKey = CpuTopology.MakeCoreKey(lpInfo.Group, lpInfo.Core);
         if (_cpuInfo.Topology.ByCore.TryGetValue(coreKey, out List<CpuLpInfo>? coreGroup) && coreGroup.Count > 1)
         {
-            if (coreGroup[0].LP != lpInfo.LP)
+            int primaryLp = coreGroup.Min(x => x.LP);
+            if (lpInfo.LP != primaryLp)
             {
                 isHyper = true;
             }
         }
 
         int ccdId = _cpuInfo.CcdMap.TryGetValue(lpIndex, out int cid) ? cid : 0;
+        int ccxId = _cpuInfo.CcxMap.TryGetValue(lpIndex, out int xid) ? xid : 0;
 
-        string suffix = "P";
+        string coreType = "P-Core";
         Color textColor = _cpuTextP;
         if (IsEfficiencyCore(lpInfo))
         {
-            suffix = "E";
+            coreType = "E-Core";
             textColor = _cpuTextE;
         }
         else if (isHyper)
         {
-            suffix = "T";
+            coreType = "P-Core/HT";
             textColor = _cpuTextSmt;
         }
 
-        string groupText = string.Empty;
+        bool showCcd = HasDualCcdCpu();
+        bool showCcx = HasVisibleCcxSplit();
+        List<string> cpuLabelParts = [coreType];
+        if (showCcd)
+        {
+            cpuLabelParts.Add($"CCD{ccdId}");
+        }
+
+        if (showCcx)
+        {
+            cpuLabelParts.Add($"CCX{ccxId}");
+        }
+
         if (_cpuGroupCount > 1)
         {
             string localText = lpInfo.LocalIndex >= 0 ? $"/L{lpInfo.LocalIndex}" : string.Empty;
-            groupText = $", G{lpInfo.Group}{localText}";
+            cpuLabelParts.Add($"G{lpInfo.Group}{localText}");
         }
 
-        cb.Text = $"CPU {lpIndex} ({suffix}, CCD {ccdId}{groupText})";
+        string cppcTooltip = "CPPC: unavailable";
+        if (_cppcEnabled && _cppcRanks.TryGetValue(lpIndex, out int rank))
+        {
+            if (_cppcRatings.TryGetValue(lpIndex, out int rating))
+            {
+                cpuLabelParts.Add(rank == 1 ? $"R{rating}, Pref" : $"R{rating}, #{rank}");
+                cppcTooltip = rank == 1
+                    ? $"CPPC: rating {rating}, preferred rank #1"
+                    : $"CPPC: rating {rating}, rank #{rank}";
+            }
+            else
+            {
+                cpuLabelParts.Add(rank == 1 ? "Pref" : $"#{rank}");
+                cppcTooltip = rank == 1 ? "CPPC: preferred rank #1" : $"CPPC: rank #{rank}";
+            }
+        }
+
+        cb.Text = $"CPU {lpIndex} ({string.Join(", ", cpuLabelParts)})";
+        cb.Font = _blockFont;
         cb.AutoSize = true;
         cb.FlatStyle = FlatStyle.Standard;
         cb.UseVisualStyleBackColor = false;
-        cb.BackColor = ccdId == 1 ? Color.FromArgb(70, 30, 30) : _bgGroup;
+        cb.BackColor = showCcx
+            ? _cpuCcxBackColors[Math.Abs(ccxId) % _cpuCcxBackColors.Length]
+            : showCcd && ccdId == 1 ? Color.FromArgb(70, 30, 30) : _bgGroup;
         cb.ForeColor = textColor;
         cb.Padding = new Padding(UiScale(2), 0, 0, 0);
         cb.Margin = Padding.Empty;
+        string ccdTooltip = showCcd ? $", CCD {ccdId}" : string.Empty;
+        string ccxTooltip = showCcx ? $", CCX {ccxId}" : string.Empty;
+        string l3Tooltip = string.Empty;
+        if (_cpuInfo.CcdL3CacheBytes.TryGetValue(ccdId, out long l3Bytes) && l3Bytes > 0)
+        {
+            string role = string.Empty;
+            List<int> ccdIds = _cpuInfo.CcdMap.Values.Distinct().OrderBy(id => id).ToList();
+            if (TrySelectNonVCacheCcd(ccdIds, _cpuInfo.CcdL3CacheBytes, out int nonVCacheCcd))
+            {
+                role = ccdId == nonVCacheCcd ? ", frequency/non-V-Cache CCD" : ", 3D V-Cache CCD";
+            }
+
+            l3Tooltip = $", L3 {l3Bytes / (1024d * 1024d):0.#} MB{role}";
+        }
+        _copyToolTip?.SetToolTip(
+            cb,
+            $"CPU {lpIndex}: {(IsEfficiencyCore(lpInfo) ? "E-core" : isHyper ? "P-core SMT sibling" : "P-core")}{ccdTooltip}{ccxTooltip}{l3Tooltip}, Group {lpInfo.Group}, Core {lpInfo.Core}, Local {lpInfo.LocalIndex}. {cppcTooltip}");
     }
 }

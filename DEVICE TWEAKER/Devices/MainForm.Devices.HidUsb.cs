@@ -1,4 +1,6 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
+
+using System.Globalization;
 
 namespace DeviceTweakerCS;
 
@@ -25,7 +27,7 @@ public sealed partial class MainForm
 
             string? usageRole = GetHidUsageRole(usagePage, usageId);
             string? pnpRole = GetPnpHidRole(pnpDev);
-            string? role = ResolveHidRole(product, productRole, usageRole, pnpRole);
+            string? role = ResolveHidRole(product, inst, productRole, usageRole, pnpRole);
 
             if (string.IsNullOrWhiteSpace(inst) || string.IsNullOrWhiteSpace(role))
             {
@@ -104,6 +106,276 @@ public sealed partial class MainForm
         return list;
     }
 
+    private Dictionary<string, UsbPollingRateInfo> BuildUsbPollingRateLookup()
+    {
+        Dictionary<string, UsbPollingRateInfo> lookup = new(StringComparer.OrdinalIgnoreCase);
+        List<UsbEndpointInfo> endpoints;
+        try
+        {
+            endpoints = UsbTopologyInterop.EnumerateEndpoints();
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"USBPOLL: endpoint enumeration failed: {ex.Message}");
+            return lookup;
+        }
+
+        WriteLog($"USBPOLL: endpoints={endpoints.Count}");
+
+        foreach (UsbEndpointInfo endpoint in endpoints)
+        {
+            if (!IsPollingEndpointCandidate(endpoint)
+                || !TryCalculatePollingRate(endpoint.Speed, endpoint.BInterval, out double hertz))
+            {
+                continue;
+            }
+
+            string vidPid = $"{endpoint.VendorId}:{endpoint.ProductId}".ToUpperInvariant();
+            UsbPollingRateInfo info = new(
+                vidPid,
+                hertz,
+                endpoint.Speed,
+                endpoint.BInterval,
+                FormatPollingRateTag(hertz));
+
+            SetBestPollingRate(lookup, vidPid, info);
+
+            if (endpoint.InterfaceNumber >= 0)
+            {
+                SetBestPollingRate(lookup, $"{vidPid}:MI_{endpoint.InterfaceNumber:X2}", info);
+            }
+
+            string? endpointRole = GetUsbEndpointRole(endpoint);
+            if (!string.IsNullOrWhiteSpace(endpointRole))
+            {
+                SetBestPollingRate(lookup, $"{vidPid}:{endpointRole}", info);
+            }
+
+            WriteLog(
+                $"USBPOLL.ENDPOINT: {vidPid} iface={endpoint.InterfaceNumber} class={endpoint.InterfaceClass} protocol={endpoint.InterfaceProtocol} dir={endpoint.Direction} type={endpoint.TransferType} speed={endpoint.Speed} bInterval={endpoint.BInterval} endpointMax={info.Tag}");
+        }
+
+        foreach (KeyValuePair<string, UsbPollingRateInfo> kvp in lookup
+            .Where(k => !k.Key.EndsWith(":Keyboard", StringComparison.OrdinalIgnoreCase)
+                && !k.Key.EndsWith(":Mouse", StringComparison.OrdinalIgnoreCase)
+                && !Regex.IsMatch(k.Key, ":MI_[0-9A-F]{2}$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+            .OrderBy(k => k.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            UsbPollingRateInfo info = kvp.Value;
+            WriteLog($"USBPOLL: {kvp.Key} endpointMax={info.Tag} speed={info.Speed} bInterval={info.BInterval} hz={info.Hertz.ToString("0.###", CultureInfo.InvariantCulture)}");
+        }
+
+        return lookup;
+    }
+
+    private static bool IsPollingEndpointCandidate(UsbEndpointInfo endpoint)
+    {
+        return !string.IsNullOrWhiteSpace(endpoint.VendorId)
+            && !string.IsNullOrWhiteSpace(endpoint.ProductId)
+            && string.Equals(endpoint.TransferType, "Interrupt", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(endpoint.Direction, "IN", StringComparison.OrdinalIgnoreCase)
+            && endpoint.AlternateSetting == 0
+            && endpoint.BInterval > 0;
+    }
+
+    private static void SetBestPollingRate(
+        Dictionary<string, UsbPollingRateInfo> lookup,
+        string key,
+        UsbPollingRateInfo candidate)
+    {
+        if (!lookup.TryGetValue(key, out UsbPollingRateInfo? existing)
+            || candidate.Hertz > existing.Hertz)
+        {
+            lookup[key] = candidate;
+        }
+    }
+
+    private static string? GetUsbEndpointRole(UsbEndpointInfo endpoint)
+    {
+        if (!string.Equals(endpoint.InterfaceClass, "0x03", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return endpoint.InterfaceProtocol.ToUpperInvariant() switch
+        {
+            "0X01" => "Keyboard",
+            "0X02" => "Mouse",
+            _ => null,
+        };
+    }
+
+    private static bool TryCalculatePollingRate(string speed, int bInterval, out double hertz)
+    {
+        hertz = 0;
+        if (bInterval <= 0)
+        {
+            return false;
+        }
+
+        if (speed.StartsWith("High", StringComparison.OrdinalIgnoreCase)
+            || speed.StartsWith("Super", StringComparison.OrdinalIgnoreCase))
+        {
+            if (bInterval > 16)
+            {
+                return false;
+            }
+
+            double microframes = Math.Pow(2, bInterval - 1);
+            hertz = 8000d / microframes;
+            return hertz > 0;
+        }
+
+        hertz = 1000d / bInterval;
+        return hertz > 0;
+    }
+
+    private static string FormatPollingRateTag(double hertz)
+    {
+        if (hertz >= 1000d)
+        {
+            double khz = hertz / 1000d;
+            double rounded = Math.Round(khz);
+            return Math.Abs(khz - rounded) < 0.05d
+                ? $"{rounded.ToString("0", CultureInfo.InvariantCulture)}K"
+                : $"{khz.ToString("0.#", CultureInfo.InvariantCulture)}K";
+        }
+
+        return $"{hertz.ToString(hertz >= 100d ? "0" : "0.#", CultureInfo.InvariantCulture)}Hz";
+    }
+
+    private static bool TryGetVidPidKey(string? instanceId, out string vidPid)
+    {
+        vidPid = string.Empty;
+        if (string.IsNullOrWhiteSpace(instanceId))
+        {
+            return false;
+        }
+
+        Match match = Regex.Match(
+            instanceId,
+            "VID_([0-9A-Fa-f]{4})&PID_([0-9A-Fa-f]{4})",
+            RegexOptions.CultureInvariant);
+
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        vidPid = $"{match.Groups[1].Value}:{match.Groups[2].Value}".ToUpperInvariant();
+        return true;
+    }
+
+    private string AddPollingRateTag(
+        string role,
+        string? instanceId,
+        IReadOnlyDictionary<string, UsbPollingRateInfo> pollingRateLookup)
+    {
+        bool isMouse = IsUsbRoleText(role, "Mouse");
+        bool isKeyboard = IsUsbRoleText(role, "Keyboard");
+
+        if ((!isMouse && !isKeyboard)
+            || !TryGetVidPidKey(instanceId, out string vidPid))
+        {
+            return role;
+        }
+
+        if (pollingRateLookup.Count == 0)
+        {
+            return isMouse ? $"{role} scanning" : role;
+        }
+
+        UsbPollingRateInfo? info = null;
+        if (TryGetMiKey(instanceId, out string miKey))
+        {
+            _ = pollingRateLookup.TryGetValue($"{vidPid}:{miKey}", out info);
+        }
+
+        if (info is null
+            && !pollingRateLookup.TryGetValue($"{vidPid}:{role}", out info)
+            && !pollingRateLookup.TryGetValue(vidPid, out info))
+        {
+            return isMouse ? $"{role} scanning" : role;
+        }
+
+        string tag = FormatStaticPollingTag(role, info.Tag);
+        return string.IsNullOrWhiteSpace(tag) ? role : $"{role} {tag}";
+    }
+
+    private static bool TryGetMiKey(string? instanceId, out string miKey)
+    {
+        miKey = string.Empty;
+        if (string.IsNullOrWhiteSpace(instanceId))
+        {
+            return false;
+        }
+
+        Match match = Regex.Match(instanceId, "&MI_([0-9A-Fa-f]{2})", RegexOptions.CultureInvariant);
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        miKey = "MI_" + match.Groups[1].Value.ToUpperInvariant();
+        return true;
+    }
+
+    private static string FormatStaticPollingTag(string role, string tag)
+    {
+        return string.IsNullOrWhiteSpace(tag)
+            ? (IsUsbRoleText(role, "Mouse") ? "scanning" : string.Empty)
+            : tag;
+    }
+
+    private static string FormatUsbPollingRoleSummary(IEnumerable<string> roles)
+    {
+        List<string> items = [];
+        foreach (string role in roles)
+        {
+            Match match = Regex.Match(
+                role.Trim(),
+                "^(Mouse|Keyboard)\\s+(.+)$",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+            if (match.Success)
+            {
+                items.Add($"{match.Groups[1].Value}: {match.Groups[2].Value}");
+            }
+        }
+
+        return string.Join(", ", items.Distinct(StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static bool IsUsbRoleText(string text, string role)
+    {
+        string trimmed = text.Trim();
+        return string.Equals(trimmed, role, StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith(role + " ", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsKnownInternalVendorHid(string productName)
+    {
+        if (string.IsNullOrWhiteSpace(productName))
+        {
+            return false;
+        }
+
+        return Regex.IsMatch(
+            productName,
+            "(?i)^ite\\s+device\\(\\d+\\)$",
+            RegexOptions.CultureInvariant);
+    }
+
+    private static bool IsCollectionLevelHid(string? instanceId)
+    {
+        if (string.IsNullOrWhiteSpace(instanceId))
+        {
+            return false;
+        }
+
+        return Regex.IsMatch(instanceId, "(?i)&COL\\d+", RegexOptions.CultureInvariant);
+    }
+
     private string? GetHidProductType(string productName)
     {
         if (string.IsNullOrWhiteSpace(productName))
@@ -111,8 +383,18 @@ public sealed partial class MainForm
             return null;
         }
 
+        if (IsKnownInternalVendorHid(productName))
+        {
+            return null;
+        }
+
         string name = productName.ToLowerInvariant();
-        if (Regex.IsMatch(name, "(?i)headset|headphone|earbud|earphone|microphone|\\bmic\\b|usb audio|audio|sound card|soundcard|speaker|speakers|dac|blackshark|kraken|barracuda|nari|seiren|hammerhead|tiamat|thresher|manowar|opus", RegexOptions.CultureInvariant))
+        if (name == "<none>" || name == "none" || name == "usb device" || name == "usb input device")
+        {
+            return null;
+        }
+
+        if (Regex.IsMatch(name, "(?i)headset|headphone|earbud|earphone|microphone|\\bmic\\b|usb audio|audio|sound card|soundcard|speaker|speakers|dac|surround\\s*sound|virtual\\s*surround|blackshark|kraken|barracuda|nari|seiren|hammerhead|tiamat|thresher|manowar|opus", RegexOptions.CultureInvariant))
         {
             return null;
         }
@@ -124,11 +406,6 @@ public sealed partial class MainForm
         if (name == "usb receiver")
         {
             return "Mouse";
-        }
-
-        if (name == "usb device" || name == "<none>")
-        {
-            return "Keyboard";
         }
 
         if (name == "wireless-receiver")
@@ -143,7 +420,7 @@ public sealed partial class MainForm
 
         string[] keyboardPatterns =
         [
-            "keyboard", "kbd", "kb", "he", "68", "75", "80", "63", "irok", "87", "96", "104", "820", "none",
+            "keyboard", "kbd", "kb", "he", "68", "75", "80", "63", "irok", "87", "96", "104", "820",
             "60%", "65%", "tkl", "varmilo", "blackwidow", "keypad", "mechanical", "comard", "ak820",
             "cherry mx", "gateron", "keychron", "ducky", "leopold", "filco", "akko", "85",
             "gmmk", "iqunix", "nuphy", "apex pro", "k70", "k95", "optical switch", "rs",
@@ -386,8 +663,22 @@ public sealed partial class MainForm
             RegexOptions.CultureInvariant);
     }
 
-    private static string? ResolveHidRole(string productName, string? productRole, string? usageRole, string? pnpRole)
+    private static string? ResolveHidRole(string productName, string? instanceId, string? productRole, string? usageRole, string? pnpRole)
     {
+        if (IsCollectionLevelHid(instanceId)
+            && string.IsNullOrWhiteSpace(usageRole)
+            && string.IsNullOrWhiteSpace(pnpRole))
+        {
+            return null;
+        }
+
+        if (IsKnownInternalVendorHid(productName)
+            && string.IsNullOrWhiteSpace(usageRole)
+            && string.IsNullOrWhiteSpace(pnpRole))
+        {
+            return null;
+        }
+
         if (!string.IsNullOrWhiteSpace(productRole))
         {
             if (string.IsNullOrWhiteSpace(usageRole)
@@ -408,6 +699,14 @@ public sealed partial class MainForm
                 && IsKeyboardMouseComboProduct(productName))
             {
                 return usageRole;
+            }
+
+            if ((string.Equals(productRole, "Mouse", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(usageRole, "Keyboard", StringComparison.OrdinalIgnoreCase))
+                || (string.Equals(productRole, "Keyboard", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(usageRole, "Mouse", StringComparison.OrdinalIgnoreCase)))
+            {
+                return null;
             }
 
             return productRole;
@@ -478,7 +777,7 @@ public sealed partial class MainForm
 
             string? usageRole = GetHidUsageRole(usagePage, usageId);
             string? pnpRole = GetPnpHidRole(pnpDev);
-            string? role = ResolveHidRole(product, productRole, usageRole, pnpRole);
+            string? role = ResolveHidRole(product, inst, productRole, usageRole, pnpRole);
 
             string? usbAncestor = null;
             string? currId = inst;
@@ -580,7 +879,11 @@ public sealed partial class MainForm
         return null;
     }
 
-    private Dictionary<string, List<string>> UsbControllerRoles(List<WmiPnPDevice> deviceCache, Dictionary<string, WmiPnPDevice> deviceLookup, List<(string ControllerId, string DependentId)> usbPairs)
+    private Dictionary<string, List<string>> UsbControllerRoles(
+        List<WmiPnPDevice> deviceCache,
+        Dictionary<string, WmiPnPDevice> deviceLookup,
+        List<(string ControllerId, string DependentId)> usbPairs,
+        IReadOnlyDictionary<string, UsbPollingRateInfo> pollingRateLookup)
     {
         Dictionary<string, List<string>> map = new(StringComparer.OrdinalIgnoreCase);
 
@@ -595,6 +898,7 @@ public sealed partial class MainForm
                     continue;
                 }
 
+                string displayRole = AddPollingRateTag(role, dev.DeviceInstanceId, pollingRateLookup);
                 List<UsbControllerInfo> controllers = dev.UsbControllers;
                 if (controllers.Count == 0)
                 {
@@ -625,12 +929,12 @@ public sealed partial class MainForm
                             map[ctrlKey] = roles;
                         }
 
-                        if (!roles.Contains(role, StringComparer.OrdinalIgnoreCase))
+                        if (!roles.Contains(displayRole, StringComparer.OrdinalIgnoreCase))
                         {
-                            roles.Add(role);
+                            roles.Add(displayRole);
                             if (string.Equals(ctrlKey, primaryKey, StringComparison.OrdinalIgnoreCase))
                             {
-                                WriteLog($"USBROLE: HID map {role} -> {ctrlKey} (product=\"{dev.ProductString}\" usagePage={dev.UsagePage} usage={dev.UsageId} inst={dev.DeviceInstanceId})");
+                                WriteLog($"USBROLE: HID map {displayRole} -> {ctrlKey} (product=\"{dev.ProductString}\" usagePage={dev.UsagePage} usage={dev.UsageId} inst={dev.DeviceInstanceId})");
                             }
                         }
                     }
@@ -645,7 +949,7 @@ public sealed partial class MainForm
                     continue;
                 }
 
-                bool alreadyMapped = map.Values.Any(v => v.Contains(role, StringComparer.OrdinalIgnoreCase));
+                bool alreadyMapped = map.Values.Any(v => v.Any(entry => IsUsbRoleText(entry, role)));
                 if (alreadyMapped)
                 {
                     continue;
@@ -657,6 +961,7 @@ public sealed partial class MainForm
                     continue;
                 }
 
+                string displayRole = AddPollingRateTag(role, dev.DeviceInstanceId, pollingRateLookup);
                 string primaryKey = NormalizeInstanceId(ctrlParent);
                 foreach (string ctrlKey in GetUsbControllerKeys(ctrlParent, NormalizeInstanceId))
                 {
@@ -666,12 +971,12 @@ public sealed partial class MainForm
                         map[ctrlKey] = roles;
                     }
 
-                    if (!roles.Contains(role, StringComparer.OrdinalIgnoreCase))
+                    if (!roles.Contains(displayRole, StringComparer.OrdinalIgnoreCase))
                     {
-                        roles.Add(role);
+                        roles.Add(displayRole);
                         if (string.Equals(ctrlKey, primaryKey, StringComparison.OrdinalIgnoreCase))
                         {
-                            WriteLog($"USBROLE: HID parent-walk {role} -> {ctrlKey} (product=\"{dev.ProductString}\" inst={dev.DeviceInstanceId})");
+                            WriteLog($"USBROLE: HID parent-walk {displayRole} -> {ctrlKey} (product=\"{dev.ProductString}\" inst={dev.DeviceInstanceId})");
                         }
                     }
                 }

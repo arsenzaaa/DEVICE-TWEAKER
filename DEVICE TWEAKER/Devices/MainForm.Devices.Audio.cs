@@ -166,7 +166,7 @@ public sealed partial class MainForm
         }
 
         string n = name.ToLowerInvariant();
-        if (Regex.IsMatch(n, "(?i)hdmi|display audio|digital audio|monitor|displayport|dp\\b"))
+        if (Regex.IsMatch(n, "(?i)hdmi|display\\s*audio|monitor|монитор|displayport|\\bdp\\b"))
         {
             return "HDMI Audio";
         }
@@ -207,8 +207,8 @@ public sealed partial class MainForm
         }
 
         string n = name;
-        n = Regex.Replace(n, "\\s*\\((high definition audio device|audio device)\\)$", string.Empty, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        n = Regex.Replace(n, "\\s*\\-\\s*(high definition audio device|audio device)$", string.Empty, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        n = Regex.Replace(n, "\\s*\\(\\s*(?:\\d+\\s*[-:]\\s*)?(high definition audio device|audio device)\\s*\\)$", string.Empty, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        n = Regex.Replace(n, "\\s*[-:]\\s*(?:\\d+\\s*[-:]\\s*)?(high definition audio device|audio device)$", string.Empty, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         return n.Trim();
     }
 
@@ -248,7 +248,7 @@ public sealed partial class MainForm
                 return "HDMI AUDIO";
             }
 
-            if (Regex.IsMatch(primary, "(?i)digital audio|display audio|hdmi"))
+            if (Regex.IsMatch(primary, "(?i)display\\s*audio|hdmi|displayport|\\bdp\\b|monitor|монитор"))
             {
                 return "HDMI AUDIO";
             }

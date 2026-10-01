@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Management;
 using System.Text.RegularExpressions;
 
@@ -28,7 +29,7 @@ internal static class WmiInterop
                     Class: mo["PNPClass"] as string,
                     Service: mo["Service"] as string,
                     Status: mo["Status"] as string,
-                    ConfigManagerErrorCode: mo["ConfigManagerErrorCode"] as int?));
+                    ConfigManagerErrorCode: ToNullableInt32(mo["ConfigManagerErrorCode"])));
             }
         }
         catch
@@ -67,7 +68,7 @@ internal static class WmiInterop
                     Class: mo["PNPClass"] as string,
                     Service: mo["Service"] as string,
                     Status: mo["Status"] as string,
-                    ConfigManagerErrorCode: mo["ConfigManagerErrorCode"] as int?);
+                    ConfigManagerErrorCode: ToNullableInt32(mo["ConfigManagerErrorCode"]));
             }
         }
         catch
@@ -183,6 +184,23 @@ internal static class WmiInterop
         catch
         {
             return 0;
+        }
+    }
+
+    private static int? ToNullableInt32(object? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return Convert.ToInt32(value, CultureInfo.InvariantCulture);
+        }
+        catch
+        {
+            return null;
         }
     }
 }

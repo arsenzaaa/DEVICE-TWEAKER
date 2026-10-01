@@ -14,7 +14,14 @@ public sealed partial class MainForm
     {
         return HasUsbRole(device, "Keyboard")
             || HasUsbRole(device, "Mouse")
-            || HasUsbRole(device, "Gamepad");
+            || HasUsbRole(device, "Gamepad")
+            || HasUsbRole(device, "Audio")
+            || HasUsbRole(device, "DAC")
+            || HasUsbRole(device, "Клавиатура")
+            || HasUsbRole(device, "Мышь")
+            || HasUsbRole(device, "Геймпад")
+            || HasUsbRole(device, "Аудио")
+            || HasUsbRole(device, "ЦАП");
     }
 
     private static bool HasUsbRole(DeviceInfo device, string role)
@@ -32,7 +39,9 @@ public sealed partial class MainForm
 
         foreach (string entry in roles.Split(',', StringSplitOptions.RemoveEmptyEntries))
         {
-            if (string.Equals(entry.Trim(), role, StringComparison.OrdinalIgnoreCase))
+            string trimmed = entry.Trim();
+            if (string.Equals(trimmed, role, StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith(role + " ", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }

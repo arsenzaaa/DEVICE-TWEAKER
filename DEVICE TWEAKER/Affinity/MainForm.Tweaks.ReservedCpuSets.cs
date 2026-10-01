@@ -1,3 +1,4 @@
+
 using Microsoft.Win32;
 
 namespace DeviceTweakerCS;
@@ -23,19 +24,7 @@ public sealed partial class MainForm
             if (key?.GetValue(valueName) is byte[] bytes)
             {
                 rawHex = string.Join(" ", bytes.Select(b => b.ToString("X2")));
-                int bitIndex = 0;
-                foreach (byte b in bytes)
-                {
-                    for (int i = 0; i < 8; i++)
-                    {
-                        if ((b & (1 << i)) != 0)
-                        {
-                            rawIds.Add(bitIndex);
-                        }
-
-                        bitIndex++;
-                    }
-                }
+                rawIds = DecodeReservedCpuSetsRawIds(bytes);
             }
         }
         catch (Exception ex)
@@ -88,11 +77,11 @@ public sealed partial class MainForm
         return reserved;
     }
 
-    private void SetReservedCpuSets(bool[] bits)
+    private bool SetReservedCpuSets(bool[] bits)
     {
         if (bits.Length == 0)
         {
-            return;
+            return true;
         }
 
         string keyPath = @"SYSTEM\CurrentControlSet\Control\Session Manager\Kernel";
@@ -107,6 +96,63 @@ public sealed partial class MainForm
             }
 
             setBits.Add(i);
+        }
+
+        byte[] bytes = EncodeReservedCpuSetsBytes(bits);
+
+        try
+        {
+            using RegistryKey key = Registry.LocalMachine.CreateSubKey(keyPath) ?? throw new InvalidOperationException("Failed to open HKLM key");
+            if (!hasAny)
+            {
+                key.DeleteValue(valueName, throwOnMissingValue: false);
+                WriteLog($"RESERVED.WRITE: path=HKLM\\{keyPath}\\{valueName} cleared (no bits set)");
+            }
+            else
+            {
+                key.SetValue(valueName, bytes, RegistryValueKind.Binary);
+                string hexStr = string.Join(" ", bytes.Select(b => b.ToString("X2")));
+                WriteLog($"RESERVED.WRITE: path=HKLM\\{keyPath}\\{valueName} set=[{string.Join(',', setBits)}] bytes=[{hexStr}]");
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"RESERVED.ERROR: failed to write ReservedCpuSets: {ex.Message}");
+            return false;
+        }
+    }
+
+    internal static List<int> DecodeReservedCpuSetsRawIds(byte[] bytes)
+    {
+        List<int> rawIds = [];
+        int bitIndex = 0;
+        foreach (byte b in bytes)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                if ((b & (1 << i)) != 0)
+                {
+                    rawIds.Add(bitIndex);
+                }
+
+                bitIndex++;
+            }
+        }
+
+        return rawIds;
+    }
+
+    internal static byte[] EncodeReservedCpuSetsBytes(bool[] bits)
+    {
+        List<int> setBits = [];
+        for (int i = 0; i < bits.Length; i++)
+        {
+            if (bits[i])
+            {
+                setBits.Add(i);
+            }
         }
 
         int maxIndex = setBits.Count > 0 ? setBits.Max() : -1;
@@ -128,28 +174,10 @@ public sealed partial class MainForm
             }
         }
 
-        try
-        {
-            using RegistryKey key = Registry.LocalMachine.CreateSubKey(keyPath) ?? throw new InvalidOperationException("Failed to open HKLM key");
-            if (!hasAny)
-            {
-                key.DeleteValue(valueName, throwOnMissingValue: false);
-                WriteLog($"RESERVED.WRITE: path=HKLM\\{keyPath}\\{valueName} cleared (no bits set)");
-            }
-            else
-            {
-                key.SetValue(valueName, bytes, RegistryValueKind.Binary);
-                string hexStr = string.Join(" ", bytes.Select(b => b.ToString("X2")));
-                WriteLog($"RESERVED.WRITE: path=HKLM\\{keyPath}\\{valueName} set=[{string.Join(',', setBits)}] bytes=[{hexStr}]");
-            }
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"RESERVED.ERROR: failed to write ReservedCpuSets: {ex.Message}");
-        }
+        return bytes;
     }
 
-    private void ResetReservedCpuSets()
+    private void ResetReservedCpuSets(OperationReport? report = null)
     {
         if (_reservedCpuPanel?.Tag is not ReservedCpuPanelTag tag || tag.Meta.Count == 0)
         {
@@ -157,7 +185,13 @@ public sealed partial class MainForm
         }
 
         bool[] empty = new bool[tag.Meta.Count];
-        SetReservedCpuSets(empty);
+        if (!SetReservedCpuSets(empty))
+        {
+            report?.AddError("Reserved CPU sets", "failed to clear ReservedCpuSets in registry");
+        }
+
+        _pendingReservedCpuSets = null;
+        _reservedCpuSetsDirty = false;
 
         _suppressReservedCpuEvents++;
         try
@@ -172,7 +206,8 @@ public sealed partial class MainForm
             _suppressReservedCpuEvents--;
         }
 
-        WriteLog("RESERVED.RESET: cleared ReservedCpuSets via Reset-AllTweaks");
+        UpdateReservedCpuValueLabel(tag);
+        WriteLog("RESERVED.RESET: cleared ReservedCpuSets via RESET WINDOWS DEFAULT");
     }
 
     private void ResetReservedCpuSetsPreview()
@@ -195,10 +230,14 @@ public sealed partial class MainForm
             _suppressReservedCpuEvents--;
         }
 
+        _pendingReservedCpuSets = new bool[tag.Meta.Count];
+        _reservedCpuSetsDirty = true;
+        UpdateReservedCpuValueLabel(tag);
         WriteLog("RESERVED.DRYRUN: cleared ReservedCpuSets (UI only)");
+        UpdateApplyButtonDirtyCount();
     }
 
-    private void UpdateReservedCpuSetsRegistry(Panel grp)
+    private void StageReservedCpuSets(Panel grp)
     {
         if (grp.Tag is not ReservedCpuPanelTag tag || tag.Meta.Count == 0)
         {
@@ -235,12 +274,92 @@ public sealed partial class MainForm
             }
         }
 
-        WriteLog($"RESERVED.UPDATE: requested set=[{string.Join(',', setBits)}] count={bits.Length}");
-        SetReservedCpuSets(bits);
+        _pendingReservedCpuSets = bits;
+        _reservedCpuSetsDirty = true;
+        WriteLog($"RESERVED.STAGE: requested set=[{string.Join(',', setBits)}] count={bits.Length}");
+        UpdateReservedCpuValueLabel(tag);
+        UpdateApplyButtonDirtyCount();
+    }
+
+    private void ApplyPendingReservedCpuSets(OperationReport? report)
+    {
+        if (_testAutoDryRun)
+        {
+            WriteLog("RESERVED.APPLY.SKIP: sandbox dry-run");
+            return;
+        }
+
+        if (!_reservedCpuSetsDirty || _pendingReservedCpuSets is null)
+        {
+            return;
+        }
+
+        if (!SetReservedCpuSets(_pendingReservedCpuSets))
+        {
+            report?.AddError("Reserved CPU sets", "failed to write the staged ReservedCpuSets value");
+            return;
+        }
+
+        _reservedCpuSetsDirty = false;
+        _pendingReservedCpuSets = null;
+        WriteLog("RESERVED.APPLY: staged value committed after backup");
+    }
+
+    private static byte[] BuildReservedCpuSetBytes(IReadOnlyList<int> setBits)
+    {
+        int maxIndex = setBits.Count > 0 ? setBits.Max() : -1;
+        int byteCount = maxIndex >= 0 ? (maxIndex / 8) + 1 : 0;
+        byte[] bytes = new byte[byteCount];
+        foreach (int id in setBits)
+        {
+            if (id < 0)
+            {
+                continue;
+            }
+
+            int byteIndex = id / 8;
+            int bitIndex = id % 8;
+            if (byteIndex >= 0 && byteIndex < bytes.Length)
+            {
+                bytes[byteIndex] = (byte)(bytes[byteIndex] | (1 << bitIndex));
+            }
+        }
+
+        return bytes;
+    }
+
+    private void UpdateReservedCpuValueLabel(ReservedCpuPanelTag tag)
+    {
+        string prefix = _reservedCpuSetsDirty
+            ? (UiLanguage.IsRussian ? "Ожидает APPLY: " : "Pending APPLY: ")
+            : "Value: ";
+        List<int> setBits = tag.Meta
+            .Where(entry => entry.Control.Checked)
+            .Select(entry => entry.Index)
+            .OrderBy(index => index)
+            .ToList();
+
+        if (setBits.Count == 0)
+        {
+            tag.ValueLabel.Text = $"{prefix}ReservedCpuSets = not set";
+            tag.ValueLabel.Tag = "ReservedCpuSets = not set";
+            return;
+        }
+
+        byte[] bytes = BuildReservedCpuSetBytes(setBits);
+        string hex = bytes.Length == 0 ? "empty" : string.Join(" ", bytes.Select(b => b.ToString("X2")));
+        tag.ValueLabel.Text = $"{prefix}ReservedCpuSets = [{hex}] | CPUs: {string.Join(", ", setBits)}";
+        tag.ValueLabel.Tag = tag.ValueLabel.Text;
     }
 
     private Panel? NewReservedCpuSetsPanel()
     {
+        if (!_cpuSetIdsReliable)
+        {
+            WriteLog("RESERVED.SKIP: CPU Set IDs unavailable from Windows; panel disabled");
+            return null;
+        }
+
         int logicalCount = _maxLogical;
         if (_cpuInfo is not null)
         {
@@ -252,23 +371,18 @@ public sealed partial class MainForm
             logicalCount = Environment.ProcessorCount;
         }
 
-        bool[] reservedBits = GetReservedCpuSets(logicalCount);
+        bool[] reservedBits = _pendingReservedCpuSets is { } pending && pending.Length == logicalCount
+            ? pending.ToArray()
+            : GetReservedCpuSets(logicalCount);
 
-        Panel grp = new()
+        Panel grp = new DeviceCardPanel
         {
             BackColor = _bgGroup,
             ForeColor = _fgMain,
+            BorderColor = _border,
             Margin = new Padding(0),
             Padding = new Padding(UiScale(12), UiScale(16), UiScale(12), UiScale(16)),
             TabStop = false,
-        };
-        grp.Paint += (_, e) =>
-        {
-            Rectangle rect = grp.ClientRectangle;
-            rect.Width -= 1;
-            rect.Height -= 1;
-            using Pen pen = new(_border);
-            e.Graphics.DrawRectangle(pen, rect);
         };
 
         Label title = new()
@@ -283,19 +397,22 @@ public sealed partial class MainForm
         {
             Text = @"Reads HKLM:\System\CurrentControlSet\Control\Session Manager\Kernel\ReservedCpuSets",
             AutoSize = false,
-            Font = _baseFont,
+            Font = _technicalFont,
             ForeColor = _mutedText,
         };
 
-        Label pathLabel = new()
+        InfoTextBox pathLabel = new()
         {
             Text = @"Registry: HKLM\System\CurrentControlSet\Control\Session Manager\kernel",
             Tag = @"HKLM\System\CurrentControlSet\Control\Session Manager\kernel",
-            AutoSize = true,
-            AutoEllipsis = true,
-            Font = _baseFont,
+            Font = _technicalFont,
             ForeColor = _fgMain,
-            Margin = new Padding(0, UiScale(6), 0, 0),
+            BackColor = _bgGroup,
+            PrefixColor = _statusPrefix,
+            ValueColor = _fgMain,
+            SeparatorColor = _statusSeparator,
+            WordWrap = true,
+            TabStop = false,
             Cursor = Cursors.Hand,
         };
         pathLabel.MouseEnter += (_, _) => pathLabel.ForeColor = _accent;
@@ -309,21 +426,39 @@ public sealed partial class MainForm
             }
         };
 
-        Panel inner = new()
+        InfoTextBox valueLabel = new()
+        {
+            Text = "Value: ReservedCpuSets = not set",
+            Tag = "ReservedCpuSets = not set",
+            Font = _technicalFont,
+            ForeColor = _fgMain,
+            BackColor = _bgGroup,
+            PrefixColor = _statusPrefix,
+            ValueColor = _fgMain,
+            SeparatorColor = _statusSeparator,
+            WordWrap = true,
+            TabStop = false,
+            Cursor = Cursors.Hand,
+        };
+        valueLabel.MouseEnter += (_, _) => valueLabel.ForeColor = _accent;
+        valueLabel.MouseLeave += (_, _) => valueLabel.ForeColor = _fgMain;
+        valueLabel.Click += (_, _) =>
+        {
+            if (valueLabel.Tag is string txt && !string.IsNullOrWhiteSpace(txt))
+            {
+                Clipboard.SetText(txt);
+                ShowCopiedToolTip(valueLabel);
+            }
+        };
+
+        Panel inner = new DeviceCardPanel
         {
             BackColor = _bgForm,
             ForeColor = _fgMain,
+            BorderColor = _border,
             AutoScroll = false,
             Margin = new Padding(0, UiScale(8), 0, 0),
             Padding = new Padding(UiScale(8), UiScale(6), UiScale(8), UiScale(6)),
-        };
-        inner.Paint += (_, e) =>
-        {
-            Rectangle rect = inner.ClientRectangle;
-            rect.Width -= 1;
-            rect.Height -= 1;
-            using Pen pen = new(_border);
-            e.Graphics.DrawRectangle(pen, rect);
         };
 
         List<ReservedCpuEntry> meta = [];
@@ -363,7 +498,7 @@ public sealed partial class MainForm
             {
                 if (cb.Tag is Panel p)
                 {
-                    UpdateReservedCpuSetsRegistry(p);
+                    StageReservedCpuSets(p);
                 }
             };
 
@@ -375,6 +510,7 @@ public sealed partial class MainForm
         grp.Controls.Add(desc);
         grp.Controls.Add(inner);
         grp.Controls.Add(pathLabel);
+        grp.Controls.Add(valueLabel);
         grp.Tag = new ReservedCpuPanelTag
         {
             InnerPanel = inner,
@@ -382,7 +518,9 @@ public sealed partial class MainForm
             Description = desc,
             Meta = meta,
             PathLabel = pathLabel,
+            ValueLabel = valueLabel,
         };
+        UpdateReservedCpuValueLabel((ReservedCpuPanelTag)grp.Tag);
 
         return grp;
     }
@@ -400,7 +538,8 @@ public sealed partial class MainForm
         Label desc = data.Description;
         Panel inner = data.InnerPanel;
         List<ReservedCpuEntry> meta = data.Meta;
-        Label path = data.PathLabel;
+        InfoTextBox path = data.PathLabel;
+        InfoTextBox value = data.ValueLabel;
 
         int availWidth = panel.Width - panel.Padding.Left - panel.Padding.Right;
         int y = panel.Padding.Top;
@@ -466,9 +605,13 @@ public sealed partial class MainForm
             y = inner.Bottom + UiScale(12);
         }
 
-        path.MaximumSize = new Size(availWidth, 0);
+        path.Size = new Size(availWidth, GetPreferredTextHeight(path, availWidth) + UiScale(2));
         path.Location = new Point(panel.Padding.Left + UiScale(4), y);
-        y = path.Bottom + panel.Padding.Bottom;
+        y = path.Bottom + UiScale(4);
+
+        value.Size = new Size(availWidth, GetPreferredTextHeight(value, availWidth) + UiScale(2));
+        value.Location = new Point(panel.Padding.Left + UiScale(4), y);
+        y = value.Bottom + panel.Padding.Bottom;
 
         panel.Height = Math.Max(y, panel.Padding.Vertical + UiScale(40));
     }
