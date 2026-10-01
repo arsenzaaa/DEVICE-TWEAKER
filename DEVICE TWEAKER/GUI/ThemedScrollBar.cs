@@ -53,12 +53,16 @@ internal sealed class ThemedScrollBar : Control
     public int SmallChange { get; set; } = 40;
     public int LargeChange { get; set; } = 120;
 
+    private bool _hovered;
+
     public Color ThumbColor { get; set; } = Color.White;
+    public Color ThumbHoverColor { get; set; } = Color.Empty;
+    public Color ThumbDragColor { get; set; } = Color.Empty;
     public Color TrackColor { get; set; } = Color.Empty;
-    public Color RailColor { get; set; } = Color.White;
-    public int RailWidth { get; set; } = 2;
-    public int ThumbWidth { get; set; } = 8;
-    public int ThumbCornerRadius { get; set; } = 6;
+    public Color RailColor { get; set; } = Color.Empty;
+    public int RailWidth { get; set; } = 0;
+    public int ThumbWidth { get; set; } = 10;
+    public int ThumbCornerRadius { get; set; } = 7;
 
     public ThemedScrollBar()
     {
@@ -69,6 +73,20 @@ internal sealed class ThemedScrollBar : Control
         TabStop = false;
         Cursor = Cursors.Hand;
         Width = 12;
+    }
+
+    protected override void OnMouseEnter(EventArgs e)
+    {
+        base.OnMouseEnter(e);
+        _hovered = true;
+        Invalidate();
+    }
+
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        base.OnMouseLeave(e);
+        _hovered = false;
+        Invalidate();
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -97,12 +115,18 @@ internal sealed class ThemedScrollBar : Control
             return;
         }
 
-        using SolidBrush thumbBrush = new(ThumbColor);
-        int radius = Math.Min(ThumbCornerRadius, Math.Min(thumb.Width, thumb.Height) / 2);
-        if (radius > 0)
+        Color effectiveThumb = _dragging && !ThumbDragColor.IsEmpty
+            ? ThumbDragColor
+            : _hovered && !ThumbHoverColor.IsEmpty
+                ? ThumbHoverColor
+                : ThumbColor;
+
+        using SolidBrush thumbBrush = new(effectiveThumb);
+        int cornerDiameter = Math.Min(ThumbCornerRadius * 2, Math.Min(thumb.Width, thumb.Height));
+        if (cornerDiameter > 1)
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using GraphicsPath path = CreateRoundedRect(thumb, radius);
+            using GraphicsPath path = CreateRoundedRect(thumb, cornerDiameter);
             e.Graphics.FillPath(thumbBrush, path);
         }
         else
@@ -125,6 +149,7 @@ internal sealed class ThemedScrollBar : Control
             _dragging = true;
             _dragOffset = e.Y - thumb.Top;
             Capture = true;
+            Invalidate();
             return;
         }
 
@@ -167,6 +192,7 @@ internal sealed class ThemedScrollBar : Control
 
         _dragging = false;
         Capture = false;
+        Invalidate();
     }
 
     protected override void OnMouseWheel(MouseEventArgs e)
@@ -236,17 +262,17 @@ internal sealed class ThemedScrollBar : Control
         return width;
     }
 
-    private static GraphicsPath CreateRoundedRect(Rectangle rect, int radius)
+    private static GraphicsPath CreateRoundedRect(Rectangle rect, int cornerDiameter)
     {
         GraphicsPath path = new();
-        if (radius <= 0)
+        if (cornerDiameter <= 1)
         {
             path.AddRectangle(rect);
             path.CloseFigure();
             return path;
         }
 
-        int diameter = radius * 2;
+        int diameter = Math.Min(cornerDiameter, Math.Min(rect.Width, rect.Height));
         int right = rect.Right - diameter;
         int bottom = rect.Bottom - diameter;
 

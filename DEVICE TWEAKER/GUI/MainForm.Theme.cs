@@ -10,6 +10,12 @@ public sealed partial class MainForm
     private readonly Color _accentDark = Color.FromArgb(190, 190, 190);
     private readonly Color _border = Color.FromArgb(150, 150, 150);
     private readonly Color _statusDanger = Color.FromArgb(255, 80, 60);
+    private readonly Color _statusSuccess = Color.FromArgb(90, 200, 130);
+    private readonly Color _statusWarn = Color.FromArgb(230, 170, 70);
+    private readonly Color _statusActive = Color.FromArgb(208, 230, 250);
+    private readonly Color _statusInactive = Color.FromArgb(145, 145, 152);
+    private readonly Color _statusPrefix = Color.FromArgb(172, 180, 190);
+    private readonly Color _statusSeparator = Color.FromArgb(70, 70, 78);
     private readonly Color _mutedText = Color.FromArgb(200, 200, 200);
     private readonly Color _mutedWarn = Color.FromArgb(255, 80, 60);
 
@@ -24,18 +30,29 @@ public sealed partial class MainForm
     private readonly Color _cpuTextP = Color.FromArgb(255, 230, 120);
     private readonly Color _cpuTextE = Color.FromArgb(120, 200, 255);
     private readonly Color _cpuTextSmt = Color.FromArgb(255, 180, 60);
+    private readonly Color[] _cpuCcxBackColors =
+    [
+        Color.FromArgb(8, 8, 10),
+        Color.FromArgb(22, 22, 30),
+        Color.FromArgb(30, 24, 18),
+        Color.FromArgb(18, 28, 24),
+    ];
 
-    private readonly Font _baseFont = new("Consolas", 9);
-    private readonly Font _dialogFont = new("Consolas", 10.5f);
-    private readonly Font _titleFont = new("Consolas", 11, FontStyle.Bold);
-    private readonly Font _blockTitleFont = new("Consolas", 10, FontStyle.Bold);
-    private readonly Font _brandFont = new("Consolas", 27, FontStyle.Bold);
-    private readonly Font _headerFont = new("Consolas", 9.5f);
-    private readonly Font _htFont = new("Consolas", 13, FontStyle.Bold);
-    private readonly Font _buttonFont = new("Consolas", 11, FontStyle.Bold);
-    private readonly Font _blockFont = new("Consolas", 8.5f);
+    // OLED/high-DPI typography roles. Avoid 10 pt for persistent technical text:
+    // thin monochrome strokes become visibly smaller than adjacent UI chrome.
+    private readonly Font _baseFont = new("Consolas", 10.5f);
+    private readonly Font _subtitleFont = new("Consolas", 11);
+    private readonly Font _dialogFont = new("Consolas", 11.5f);
+    private readonly Font _titleFont = new("Consolas", 12, FontStyle.Bold);
+    private readonly Font _blockTitleFont = new("Consolas", 11, FontStyle.Bold);
+    private readonly Font _technicalFont = new("Consolas", 11);
+    private readonly Font _brandFont = new("Consolas", 28, FontStyle.Bold);
+    private readonly Font _headerFont = new("Consolas", 10.5f);
+    private readonly Font _htFont = new("Consolas", 14, FontStyle.Bold);
+    private readonly Font _buttonFont = new("Consolas", 12, FontStyle.Bold);
+    private readonly Font _blockFont = new("Consolas", 10.5f);
 
-    private ToolTip _copyToolTip = null!;
+    private ThemedToolTip _copyToolTip = null!;
     private Icon? _appIcon;
     private bool _darkModeInitialized;
 
@@ -43,12 +60,18 @@ public sealed partial class MainForm
     {
         if (disposing)
         {
+            UiLanguage.Changed -= HandleUiLanguageChanged;
+            DisposeRawPolling();
+            _startupRefreshTimer?.Dispose();
+            _layoutRefreshTimer?.Dispose();
             _copyToolTip?.Dispose();
             _appIcon?.Dispose();
             _baseFont.Dispose();
+            _subtitleFont.Dispose();
             _dialogFont.Dispose();
             _titleFont.Dispose();
             _blockTitleFont.Dispose();
+            _technicalFont.Dispose();
             _brandFont.Dispose();
             _headerFont.Dispose();
             _htFont.Dispose();
