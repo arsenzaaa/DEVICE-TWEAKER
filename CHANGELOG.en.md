@@ -4,15 +4,18 @@
 
 ## [0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4) · October 1, 2026
 
-- GUI checks and release scripts now run correctly under Windows PowerShell 5.1 with Cyrillic text.
-- Corrected `Affinity Mask` terminology in the Russian help text and added a translation consistency test.
-- Added demo screenshots of the GPU, USB/IMOD, and network controls to the project page.
-- Releases are built from a fixed tag: tests, both EXEs, SHA-256 verification, and a draft release that records the source commit.
-- Application version and current-release links are updated to 0.0.4. Device-tuning behavior is unchanged.
+- Corrected the Russian `Affinity Mask` help text and added a test for translation consistency.
+- Fixed GUI checks and the release script under Windows PowerShell 5.1 so Cyrillic text is read correctly.
+- Release builds are tied to a tag and source commit: tests run, both EXEs are built, and their SHA-256 hashes are checked before a draft release is created.
+- The main screenshot shows expanded IMOD values on Intel Core i9-14900K. The gallery shows AMD with the IMOD table, Intel with the GPU, and AMD with the network adapter. Devices and values are simulated; no settings were written to the system.
+- Removed graphic buttons from the start of the README, leaving a plain heading and text links.
+- Updated the application version, executable metadata, and current-release links. Device-tuning behavior did not change.
 
 ## [0.0.3](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.3) · October 1, 2026
 
 Changes compared with the `v0.0.2` source.
+
+The `v0.0.3` tag was moved to a later commit after the EXEs were published. As a result, the source at that tag does not exactly match the published EXEs. This release remains available as an archive; the [v0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4) description identifies its exact source commit.
 
 ### Interrupts and CPU placement
 
@@ -28,14 +31,15 @@ Changes compared with the `v0.0.2` source.
 - Added NIC ITR controls for recognized Intel and Realtek controllers, including register reads, queue settings, and saved profiles. Hardware writes are unavailable for unknown PCI IDs.
 - Added mouse and keyboard event rate estimates based on Raw Input and `RawMouseThrottleDuration` controls on supported Windows 11 builds. This setting concerns throttling of background Raw Input listeners, not USB polling rate.
 - Refined HDMI/DisplayPort and S/PDIF audio detection. USB controllers with a custom Interrupt Affinity policy remain visible without a detected HID role.
+- Added power settings for USB controllers and their root hubs, including USB selective suspend. Wired network adapters gained control over whether Windows may turn off the device to save power.
 
 ### Interface and restore
 
 - Added RU/EN switching without restart. Reworked device cards, IMOD/ITR panels, and category navigation.
-- Added backups with a storage location choice and restore of a selected snapshot. Manual apply, IMOD/ITR writes, and reset require a validated backup; automatic optimization requires an original settings snapshot.
+- Added backups with a storage location choice, restore of a selected snapshot, deletion of old backups, and settings reset. Manual apply, IMOD/ITR writes, and reset require a validated backup; automatic optimization requires an original settings snapshot.
 - Reports distinguish applied, skipped, and failed actions. Ordinary device refresh does not start the hardware access driver; **CHECK** rereads registers.
 
-## [0.0.2](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.2) · January 14, 2026
+## [0.0.2](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.2) · January 15, 2026
 
 Changes compared with the `v0.0.1` source.
 
