@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -11,27 +11,35 @@
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <SatelliteResourceLanguages>en;ru</SatelliteResourceLanguages>
     <ApplicationManifest>assets\app.manifest</ApplicationManifest>
     <ApplicationIcon>assets\DEVICE TWEAKER.ico</ApplicationIcon>
+    <!-- Local full-tree backups must not enter the compile graph. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);DEVICE TWEAKER — копия\**;_handoff*\**;_compare\**;bin\SmokeSafe\**;tests\**</DefaultItemExcludes>
 
     <AssemblyName>DEVICE TWEAKER</AssemblyName>
     <RootNamespace>DeviceTweakerCS</RootNamespace>
     <AssemblyTitle>DEVICE TWEAKER</AssemblyTitle>
 
-    <Version>0.0.2</Version>
-    <AssemblyVersion>0.0.2.0</AssemblyVersion>
-    <FileVersion>0.0.2.0</FileVersion>
-    <InformationalVersion>0.0.2</InformationalVersion>
+    <Version>0.0.3</Version>
+    <AssemblyVersion>0.0.3.0</AssemblyVersion>
+    <FileVersion>0.0.3.0</FileVersion>
+    <InformationalVersion>0.0.3</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
 
     <Company>arsenza</Company>
     <Authors>@arsenza</Authors>
     <Product>DEVICE TWEAKER</Product>
-    <Description>DEVICE TWEAKER v0.0.2 by @arsenza</Description>
+    <FileDescription>MADE BY ARSENZA</FileDescription>
     <Copyright>Copyright (c) arsenza</Copyright>
+
+    <BuildImodDriver Condition="'$(BuildImodDriver)' == '' and !Exists('IMOD\DTIMOD.sys')">true</BuildImodDriver>
+    <BuildImodDriver Condition="'$(BuildImodDriver)' == ''">false</BuildImodDriver>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="System.Management" Version="8.0.0" />
+    <InternalsVisibleTo Include="DeviceTweaker.Tests" />
   </ItemGroup>
 
   <ItemGroup>
@@ -40,10 +48,25 @@
     </EmbeddedResource>
   </ItemGroup>
 
-  <ItemGroup Condition="Exists('IMOD\\winio.sys')">
-    <EmbeddedResource Include="IMOD\\winio.sys">
-      <LogicalName>DeviceTweakerCS.IMOD.winio.sys</LogicalName>
+  <ItemGroup>
+    <EmbeddedResource Include="IMOD\\DTIMOD.sys">
+      <LogicalName>DeviceTweakerCS.IMOD.DTIMOD.sys</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="IMOD\\DTIMOD.sys.sha256">
+      <LogicalName>DeviceTweakerCS.IMOD.DTIMOD.sys.sha256</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="IMOD\\Loader\\kdu.exe">
+      <LogicalName>DeviceTweakerCS.IMOD.Loader.kdu.exe</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="IMOD\\Loader\\drv64.dll">
+      <LogicalName>DeviceTweakerCS.IMOD.Loader.drv64.dll</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
+
+  <Target Name="BuildImodDriverArtifact"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(BuildImodDriver)' == 'true' and '$(DesignTimeBuild)' != 'true' and '$(OS)' == 'Windows_NT'">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\publish-variants.ps1&quot; -BuildDriverOnly -Configuration &quot;$(Configuration)&quot;" />
+  </Target>
 
 </Project>
