@@ -2,7 +2,7 @@
 
 ## Supported version
 
-Security fixes are applied to the newest `0.0.4` preview only. Earlier previews are unsupported.
+The current supported release is `0.0.3`. Earlier releases are unsupported.
 
 ## Reporting a vulnerability
 
