@@ -266,7 +266,8 @@ function Capture-Scenario(
             $handle = [IntPtr]$main.Current.NativeWindowHandle
             $captureHeight = if ($preset -eq 'Imod' -and $lang -eq 'EN') { 1320 }
                 elseif ($preset -eq 'Imod') { 1200 }
-                elseif ($preset -eq 'Intel14900K') { 1100 }
+                elseif ($preset -eq 'Intel14900K' -and $deviceTarget -eq '461E' -and $lang -eq 'EN') { 1260 }
+                elseif ($preset -eq 'Intel14900K' -and $deviceTarget -eq '461E') { 1220 }
                 elseif ($preset -eq 'NicItr') { 1080 }
                 else { 1000 }
             if (-not [SmokeNative]::MoveWindow($handle, $targetX, $targetArea.Y, $targetWidth, $captureHeight, $true)) {
@@ -281,7 +282,7 @@ function Capture-Scenario(
             Start-Sleep -Milliseconds 6000
         }
 
-        if ($preset -eq 'Imod') {
+        if ($preset -eq 'Imod' -or ($preset -eq 'Intel14900K' -and $deviceTarget -eq '461E')) {
             $details = Find-AutomationId $main 'IMOD_DETAILS' 5
             Invoke-Click $details 'Expand IMOD details' 900
         }
@@ -300,8 +301,8 @@ function Capture-Scenario(
 }
 
 if ($GpuOnly) {
-    Capture-Scenario 'Ryzen9950X3D' 'RU' 'GPU' 'showcase_gpu_affinity_ru.png' 'NVIDIA'
-    Capture-Scenario 'Ryzen9950X3D' 'EN' 'GPU' 'showcase_gpu_affinity_en.png' 'NVIDIA'
+    Capture-Scenario 'Intel14900K' 'RU' 'GPU' 'showcase_gpu_affinity_ru.png' 'RTX 4090'
+    Capture-Scenario 'Intel14900K' 'EN' 'GPU' 'showcase_gpu_affinity_en.png' 'RTX 4090'
     return
 }
 
@@ -316,8 +317,8 @@ if ($ReadmeOnly) {
     Capture-Scenario 'Intel14900K' 'EN' 'USB' 'showcase_intel_14900k_full_en.png' '461E'
     Capture-Scenario 'Imod' 'RU' 'USB' 'showcase_amd_imod_full_ru.png' '15B6'
     Capture-Scenario 'Imod' 'EN' 'USB' 'showcase_amd_imod_full_en.png' '15B6'
-    Capture-Scenario 'Ryzen9950X3D' 'RU' 'GPU' 'showcase_gpu_full_ru.png' 'RTX 5090'
-    Capture-Scenario 'Ryzen9950X3D' 'EN' 'GPU' 'showcase_gpu_full_en.png' 'RTX 5090'
+    Capture-Scenario 'Intel14900K' 'RU' 'GPU' 'showcase_gpu_full_ru.png' 'RTX 4090'
+    Capture-Scenario 'Intel14900K' 'EN' 'GPU' 'showcase_gpu_full_en.png' 'RTX 4090'
     Capture-Scenario 'NicItr' 'RU' 'NETWORK' 'showcase_nic_full_ru.png' 'I226-V'
     Capture-Scenario 'NicItr' 'EN' 'NETWORK' 'showcase_nic_full_en.png' 'I226-V'
     return
