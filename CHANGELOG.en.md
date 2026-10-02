@@ -4,7 +4,7 @@
 
 ## [0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4) · October 1, 2026
 
-I did not add new device settings in this release. Here is what changed:
+No new device settings were added in this release. Changes:
 
 - Fixed the Russian Affinity Mask help text and added a translation check.
 - Fixed GUI checks and the release script under Windows PowerShell 5.1 so Cyrillic text is read correctly.

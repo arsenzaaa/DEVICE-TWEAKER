@@ -2,7 +2,7 @@
 
 [Project overview](./README.en.md) · [Русский](./SCREENSHOTS.md)
 
-These screenshots use simulated devices and test IMOD/ITR values. I did not write any settings to the system while capturing them.
+These screenshots use simulated devices and test IMOD/ITR values. No settings were written to the system while capturing them.
 
 ![Expanded IMOD value table on AMD Ryzen 9 9950X3D](./assets/screenshots/showcase_amd_imod_full_en.png)
 

@@ -1,8 +1,8 @@
 # DEVICE TWEAKER
 
-[Download](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4) · [Screenshots](./SCREENSHOTS.en.md) · [Changelog](./CHANGELOG.en.md) · [Русский](./README.md) · [My Telegram](https://t.me/arsenzaa)
+[Download](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4) · [Screenshots](./SCREENSHOTS.en.md) · [Changelog](./CHANGELOG.en.md) · [Русский](./README.md) · [Telegram](https://t.me/arsenzaa)
 
-DEVICE TWEAKER is my Windows 10/11 x64 utility. It brings MSI Mode and Limit, IRQ Priority, Interrupt Affinity, and ReservedCpuSets into one interface, with xHCI IMOD, NIC ITR, RSS, and automatic CPU placement.
+DEVICE TWEAKER is a utility for Windows 10/11 x64. It brings MSI Mode and Limit, IRQ Priority, Interrupt Affinity, and ReservedCpuSets into one interface. It also supports xHCI IMOD, NIC ITR, RSS, and automatic CPU placement.
 
 ## What it does
 
