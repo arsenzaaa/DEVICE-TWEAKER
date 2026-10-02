@@ -1,23 +1,20 @@
-name: Feature request
-description: Propose a focused feature or hardware profile
-title: "[Request]: "
+name: Предложить функцию
+description: Новая настройка, устройство или улучшение текущей работы
+title: "[Идея]: "
 labels: [enhancement]
 body:
   - type: textarea
     attributes:
-      label: Problem
-      description: What concrete workflow or unsupported hardware is involved?
+      label: Что хотите настроить или исправить?
+      description: Укажите устройство и текущую проблему
     validations:
       required: true
   - type: textarea
     attributes:
-      label: Proposed behavior
+      label: Как это должно работать?
     validations:
       required: true
   - type: textarea
     attributes:
-      label: Technical evidence
-      description: Official specification, vendor documentation, Device ID, register layout, or reproducible measurements.
-  - type: textarea
-    attributes:
-      label: Safety and restore considerations
+      label: Технические данные
+      description: Hardware ID, документация производителя, регистры или результаты измерений, если они есть

@@ -1,30 +1,29 @@
-# Contributing / Участие в разработке
+# Как помочь DEVICE TWEAKER
 
-Bug reports, hardware compatibility results, documentation corrections, and focused pull requests are welcome.
+Нашли баг, устройство определяется неправильно или есть идея для новой настройки? Откройте issue. Логи и точная конфигурация железа помогут разобраться быстрее, чем описание «не работает».
 
-## Before opening an issue
+## Если нашли баг
 
-- Use the latest release and search existing issues.
-- Include the Windows build, CPU, motherboard, BIOS, device Hardware ID, and driver version.
-- Describe the exact action, expected result, actual result, and whether a restart was performed.
-- Attach the relevant log after removing usernames, paths, serial numbers, and other private data.
-- Never upload registry exports, certificates, keys, or unrelated system dumps.
+Укажите версию DEVICE TWEAKER, сборку Windows, CPU, материнскую плату, BIOS, Hardware ID устройства и версию драйвера. Напишите, что нажали, чего ожидали, что произошло и перезагружали ли компьютер. Приложите фрагмент лога с этим действием.
 
-## Pull requests
+Перед отправкой уберите из лога личные пути, имена пользователей и серийные номера. Для обычной ошибки не нужны дампы всей системы или экспорт реестра.
 
-Keep each pull request focused. Explain the hardware or Windows behavior behind the change and how it was verified. Do not claim a latency improvement without a repeatable measurement method and raw results.
+## Если хотите отправить PR
 
-Before submitting:
+Делайте один PR на одну задачу. Напишите, на каком железе или сборке Windows проверили изменение и как повторить проверку. Если заявляете об уменьшении задержки, приложите методику и исходные результаты измерений.
 
-```powershell
-dotnet build ".\DEVICE TWEAKER\DeviceTweakerCS.csproj" -c Release -p:TreatWarningsAsErrors=true
-dotnet test ".\DEVICE TWEAKER\tests\DeviceTweaker.Tests\DeviceTweaker.Tests.csproj" -c Release
-```
+Перед PR запустите сборку и тесты по [руководству](../DEVICE%20TWEAKER/README.md). Для изменений записи в регистры, IMOD/ITR и восстановления проверьте также случай, когда запись или чтение не удались. Для интерфейса проверьте русский и английский языки и масштаб Windows 100%, 125% и 150%.
 
-Changes to MMIO profiles, IOCTL handling, backups, restore, or registry writes require negative-path tests. UI changes require RU and EN checks and should preserve usable layout at 100%, 125%, and 150% scaling.
-
-By contributing, you agree that your work is distributed under GPL-3.0.
+Код проекта распространяется по [GPL-3.0](../LICENSE).
 
 ---
 
-Перед issue укажите сборку Windows, железо, Hardware ID и версию драйвера, точные шаги и факт перезагрузки. Очистите логи от личных данных. PR должен решать одну задачу, проходить сборку и тесты; изменения MMIO, IOCTL, backup/restore и реестра требуют проверки ошибочных сценариев. Заявления об улучшении задержки принимаются только с воспроизводимой методикой и исходными результатами.
+# Contributing
+
+Bug reports, hardware compatibility results, documentation fixes, and focused pull requests are welcome.
+
+For a bug, include the DEVICE TWEAKER version, Windows build, CPU, motherboard, BIOS, device Hardware ID, driver version, steps to reproduce, expected and actual results, and a relevant log excerpt. Mention whether you restarted Windows. Remove personal paths, usernames, and serial numbers from logs before posting.
+
+Keep each PR focused. Explain which hardware or Windows build you tested and how to repeat the check. Claims about lower latency need a repeatable method and raw results. Run the build and tests from the [build guide](../DEVICE%20TWEAKER/README.en.md) before submitting. Check read/write failures for changes to registers, IMOD/ITR, and restore; check RU/EN and 100%, 125%, and 150% scaling for UI changes.
+
+Contributions are distributed under [GPL-3.0](../LICENSE).

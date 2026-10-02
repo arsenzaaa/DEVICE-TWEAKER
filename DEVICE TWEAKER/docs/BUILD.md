@@ -37,7 +37,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Flavor both -Co
 dotnet build .\DeviceTweakerCS.csproj -c Release -p:BuildImodDriver=false
 ```
 
-Параметр `BuildImodDriver=false` отключает отдельную пересборку драйвера. Без него проект потребует Visual Studio с C++ Build Tools и WDK.
+Готовый `IMOD/DTIMOD.sys` уже есть в репозитории, поэтому обычная сборка не требует WDK. Чтобы пересобрать драйвер, задайте `-p:BuildImodDriver=true`; для этого нужны Visual Studio с C++ Build Tools и WDK.
 
 Для публичного релиза используйте `build.ps1`, чтобы обе версии собирались одинаково.
 

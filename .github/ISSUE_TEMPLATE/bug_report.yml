@@ -1,45 +1,39 @@
-name: Bug report
-description: Report a reproducible DEVICE TWEAKER problem
-title: "[Bug]: "
+name: Сообщить об ошибке
+description: Если DEVICE TWEAKER показывает или применяет что-то неправильно
+title: "[Баг]: "
 labels: [bug]
 body:
-  - type: checkboxes
-    attributes:
-      label: Checklist
-      options:
-        - label: I tested the latest release and searched existing issues.
-          required: true
-        - label: I removed personal data, serial numbers, and private paths from logs.
-          required: true
   - type: input
     attributes:
-      label: Version
-      placeholder: Release tag and build (compact or self-contained)
+      label: Версия программы
+      description: Номер релиза и сборка EXE (обычная или автономная)
     validations:
       required: true
   - type: textarea
     attributes:
-      label: System and device
-      description: Windows build, CPU, motherboard/BIOS, device Hardware ID, and driver version.
+      label: Система и устройство
+      description: Сборка Windows, CPU, материнская плата, BIOS, Hardware ID устройства и версия драйвера
     validations:
       required: true
   - type: textarea
     attributes:
-      label: Steps to reproduce
+      label: Как повторить
+      description: Что нажали и в каком порядке
     validations:
       required: true
   - type: textarea
     attributes:
-      label: Expected and actual result
+      label: Ожидали и получили
     validations:
       required: true
   - type: dropdown
     attributes:
-      label: Restart performed?
-      options: ["Yes", "No", "Not applicable"]
+      label: После этого перезагружали Windows?
+      options: ["Да", "Нет", "Не относится к ошибке"]
     validations:
       required: true
   - type: textarea
     attributes:
-      label: Relevant log excerpt
+      label: Фрагмент лога
+      description: Приложите строки, относящиеся к ошибке
       render: text

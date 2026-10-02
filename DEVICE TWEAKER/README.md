@@ -1,30 +1,12 @@
-# Сборка DEVICE TWEAKER
+# Исходники DEVICE TWEAKER
 
-[Главная страница](../README.md) | [English](./README.en.md) | [История изменений](../CHANGELOG.md)
+[Описание программы](../README.md) · [Как работают настройки](./docs/SETTINGS.md) · [English](./README.en.md)
 
-## Требования
+Здесь лежат исходники Windows Forms приложения. Если вам нужен готовый EXE, скачайте его со [страницы релиза](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4).
 
-- Windows 10/11 x64
-- .NET 8 SDK
-- PowerShell 5.1 или новее
-- Visual Studio C++ Build Tools и Windows Driver Kit для пересборки `DTIMOD.sys`
+## Собрать и проверить
 
-## Каталоги
-
-- `Affinity` содержит топологию CPU, маски и настройки affinity.
-- `Core` содержит применение настроек, восстановление, IMOD, NIC ITR и диагностику.
-- `Devices` отвечает за обнаружение и классификацию устройств.
-- `GUI` содержит Windows Forms интерфейс.
-- `Interop` содержит вызовы Windows API.
-- `Localization` содержит русские и английские строки.
-- `IMOD` содержит драйвер, загрузчик и связанные файлы.
-- `tests` содержит модульные тесты.
-
-Обычное обновление списка устройств не загружает драйвер Ring 0. Доступ к MMIO выполняется только при явной проверке или записи IMOD/ITR и только для распознанного профиля оборудования.
-
-## Сборка
-
-Команды выполняются из корня репозитория.
+Нужны Windows 10/11 x64, .NET 8 SDK и PowerShell 5.1 или новее. Запускайте команды из корня репозитория:
 
 ```powershell
 dotnet restore ".\DEVICE TWEAKER\DeviceTweakerCS.csproj"
@@ -32,19 +14,25 @@ dotnet build ".\DEVICE TWEAKER\DeviceTweakerCS.csproj" -c Release -p:TreatWarnin
 dotnet test ".\DEVICE TWEAKER\tests\DeviceTweaker.Tests\DeviceTweaker.Tests.csproj" -c Release
 ```
 
-## Релизные файлы
+Готовый `IMOD/DTIMOD.sys` уже есть в репозитории. Visual Studio C++ Build Tools и Windows Driver Kit нужны, только если вы хотите пересобрать драйвер.
+
+Два EXE и `SHA256SUMS.txt` собираются так:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File ".\DEVICE TWEAKER\publish-variants.ps1" `
   -Flavor both -Configuration Release -SkipImodDriverBuild
 ```
 
-Скрипт создаёт компактную и автономную сборки, а также файл `SHA256SUMS.txt`.
+Подробные параметры сборки и порядок выпуска описаны в [BUILD.md](./docs/BUILD.md) и [RELEASE.md](./docs/RELEASE.md).
 
-## Драйвер
+## Где искать код
 
-В репозитории находится тестово подписанный `IMOD/DTIMOD.sys`. Ожидаемый хеш хранится в `IMOD/DTIMOD.sys.sha256` и проверяется программой перед использованием.
+- `Affinity` — топология CPU и маски.
+- `Devices` — обнаружение и классификация устройств.
+- `Core` — применение настроек, восстановление, IMOD, NIC ITR и диагностика.
+- `GUI` и `Localization` — интерфейс и строки RU/EN.
+- `Interop` — вызовы Windows API.
+- `IMOD` — драйвер и загрузчик.
+- `tests` — тесты.
 
-Не добавляйте в репозиторий приватные ключи, PFX, локальные сертификаты и случайные бинарные файлы. Для нового Device ID нельзя копировать MMIO-смещения похожего контроллера без проверки документации и регистров.
-
-Правила для изменений и отчётов об ошибках находятся в [CONTRIBUTING.md](../.github/CONTRIBUTING.md) и [SECURITY.md](../.github/SECURITY.md).
+Если нашли ошибку или хотите прислать изменение, начните с [CONTRIBUTING.md](../.github/CONTRIBUTING.md).
