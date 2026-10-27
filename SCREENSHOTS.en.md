@@ -2,6 +2,10 @@
 
 [README](./README.en.md) · [Русский](./SCREENSHOTS.md)
 
+## USB IMOD / Intel Core i9-14900K
+
+![USB IMOD settings on Intel Core i9-14900K](./assets/screenshots/showcase_intel_14900k_full_en.png)
+
 ## USB IMOD / AMD Ryzen 9 9950X3D
 
 ![USB IMOD settings on AMD Ryzen 9 9950X3D](./assets/screenshots/showcase_amd_imod_full_en.png)

@@ -27,6 +27,7 @@ DEVICE TWEAKER/**/*.tlog
 DEVICE TWEAKER/**/*.lastbuildstate
 
 # IDE/user-local files
+/.playwright-cli/
 /.serena/
 /AGENTS.md
 *.user
