@@ -13,6 +13,7 @@ internal sealed record OperationIssue(
     string? UserMessage,
     string? TechnicalDetails)
 {
+    public bool IsSkipped { get; init; }
     public string DisplayText => string.IsNullOrWhiteSpace(UserMessage)
         ? Component
         : $"{Component}: {UserMessage}";
@@ -20,6 +21,11 @@ internal sealed record OperationIssue(
 
 internal sealed class OperationReport
 {
+#if DEVELOPER_QA
+    internal bool IsDeveloperPreview { get; init; }
+#else
+    internal bool IsDeveloperPreview => false;
+#endif
     private readonly List<OperationIssue> _issues = [];
 
     public IReadOnlyList<OperationIssue> Issues => _issues;
@@ -54,6 +60,11 @@ internal sealed class OperationReport
         AddIssue(OperationIssueSeverity.Warning, component, userMessage, technicalDetails);
     }
 
+    public void AddSkipped(string component, string? userMessage, string? technicalDetails = null)
+    {
+        AddIssue(OperationIssueSeverity.Warning, component, userMessage, technicalDetails, isSkipped: true);
+    }
+
     public void AddError(string context, string? message)
     {
         // Most existing callers pass exception text. Preserve it for DETAILS,
@@ -70,7 +81,8 @@ internal sealed class OperationReport
         OperationIssueSeverity severity,
         string component,
         string? userMessage,
-        string? technicalDetails)
+        string? technicalDetails,
+        bool isSkipped = false)
     {
         string cleanComponent = string.IsNullOrWhiteSpace(component) ? "Operation" : component.Trim();
         string? cleanUserMessage = string.IsNullOrWhiteSpace(userMessage) ? null : userMessage.Trim();
@@ -80,10 +92,11 @@ internal sealed class OperationReport
             issue.Severity == severity
             && string.Equals(issue.Component, cleanComponent, StringComparison.OrdinalIgnoreCase)
             && string.Equals(issue.UserMessage, cleanUserMessage, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(issue.TechnicalDetails, cleanTechnicalDetails, StringComparison.OrdinalIgnoreCase));
+            && string.Equals(issue.TechnicalDetails, cleanTechnicalDetails, StringComparison.OrdinalIgnoreCase)
+            && issue.IsSkipped == isSkipped);
         if (!duplicate)
         {
-            _issues.Add(new OperationIssue(severity, cleanComponent, cleanUserMessage, cleanTechnicalDetails));
+            _issues.Add(new OperationIssue(severity, cleanComponent, cleanUserMessage, cleanTechnicalDetails) { IsSkipped = isSkipped });
         }
     }
 }

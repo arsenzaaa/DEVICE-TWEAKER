@@ -1,0 +1,298 @@
+{
+  "schemaVersion": 1,
+  "id": "backup-menu-flow",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    {
+      "id": "restore-open",
+      "action": "dialog",
+      "value": "restore"
+    },
+    {
+      "id": "restore-ready",
+      "action": "wait",
+      "target": "id:DELETE SELECTED",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "restore-delete",
+      "action": "transition",
+      "target": "@active",
+      "durationMs": 400,
+      "intervalMs": 100,
+      "trigger": {
+        "action": "click",
+        "target": "id:DELETE SELECTED"
+      }
+    },
+    {
+      "id": "restore-still-open",
+      "action": "wait",
+      "target": "@active",
+      "value": "RESTORE",
+      "durationMs": 3000
+    },
+    {
+      "id": "restore-disabled-DELETE-SELECTED",
+      "action": "assert",
+      "target": "id:DELETE SELECTED",
+      "property": "enabled",
+      "value": "false"
+    },
+    {
+      "id": "restore-state",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "restore-remaining",
+      "action": "click",
+      "target": "id:RESTORE LAST"
+    },
+    {
+      "id": "restore-done",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "restore-one-open",
+      "action": "dialog",
+      "value": "restore-one"
+    },
+    {
+      "id": "restore-one-ready",
+      "action": "wait",
+      "target": "id:DELETE SELECTED",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "restore-one-delete",
+      "action": "transition",
+      "target": "@active",
+      "durationMs": 400,
+      "intervalMs": 100,
+      "trigger": {
+        "action": "click",
+        "target": "id:DELETE SELECTED"
+      }
+    },
+    {
+      "id": "restore-one-still-open",
+      "action": "wait",
+      "target": "@active",
+      "value": "RESTORE",
+      "durationMs": 3000
+    },
+    {
+      "id": "restore-one-disabled-DELETE-SELECTED",
+      "action": "assert",
+      "target": "id:DELETE SELECTED",
+      "property": "enabled",
+      "value": "false"
+    },
+    {
+      "id": "restore-one-disabled-RESTORE-LAST",
+      "action": "assert",
+      "target": "id:RESTORE LAST",
+      "property": "enabled",
+      "value": "false"
+    },
+    {
+      "id": "restore-one-disabled-RESTORE-SELECTED",
+      "action": "assert",
+      "target": "id:RESTORE SELECTED",
+      "property": "enabled",
+      "value": "false"
+    },
+    {
+      "id": "restore-one-state",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "restore-one-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "restore-one-done",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "restore-delete-failure-open",
+      "action": "dialog",
+      "value": "restore-delete-failure"
+    },
+    {
+      "id": "restore-delete-failure-ready",
+      "action": "wait",
+      "target": "id:DELETE SELECTED",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "restore-delete-failure-delete",
+      "action": "transition",
+      "target": "@active",
+      "durationMs": 400,
+      "intervalMs": 100,
+      "trigger": {
+        "action": "click",
+        "target": "id:DELETE SELECTED"
+      }
+    },
+    {
+      "id": "restore-delete-failure-still-open",
+      "action": "wait",
+      "target": "@active",
+      "value": "RESTORE",
+      "durationMs": 3000
+    },
+    {
+      "id": "restore-delete-failure-retry",
+      "action": "assert",
+      "target": "id:DELETE SELECTED",
+      "property": "enabled",
+      "value": "true"
+    },
+    {
+      "id": "restore-delete-failure-state",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "restore-delete-failure-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "restore-delete-failure-done",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "restore-delete-exception-open",
+      "action": "dialog",
+      "value": "restore-delete-exception"
+    },
+    {
+      "id": "restore-delete-exception-ready",
+      "action": "wait",
+      "target": "id:DELETE SELECTED",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "restore-delete-exception-delete",
+      "action": "transition",
+      "target": "@active",
+      "durationMs": 400,
+      "intervalMs": 100,
+      "trigger": {
+        "action": "click",
+        "target": "id:DELETE SELECTED"
+      }
+    },
+    {
+      "id": "restore-delete-exception-still-open",
+      "action": "wait",
+      "target": "@active",
+      "value": "RESTORE",
+      "durationMs": 3000
+    },
+    {
+      "id": "restore-delete-exception-retry",
+      "action": "assert",
+      "target": "id:DELETE SELECTED",
+      "property": "enabled",
+      "value": "true"
+    },
+    {
+      "id": "restore-delete-exception-state",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "restore-delete-exception-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "restore-delete-exception-done",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "file-result",
+      "action": "dialog",
+      "value": "backup-restored"
+    },
+    {
+      "id": "file-ready",
+      "action": "wait",
+      "target": "id:BACKUP_FILE",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "file-details",
+      "action": "click",
+      "target": "id:DETAILS"
+    },
+    {
+      "id": "path-ready",
+      "action": "wait",
+      "target": "id:BACKUP_FULL_PATH",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "path",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "path-close",
+      "action": "click",
+      "target": "active:id:OK"
+    },
+    {
+      "id": "result-close",
+      "action": "click",
+      "target": "active:id:OK"
+    },
+    {
+      "id": "done",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    }
+  ]
+}

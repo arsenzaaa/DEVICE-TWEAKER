@@ -28,6 +28,19 @@ public sealed partial class MainForm
         @"SYSTEM\CurrentControlSet\Control\CI\Config";
     private const string ImodVulnerableDriverBlocklistValueName = "VulnerableDriverBlocklistEnable";
 
+    private string BuildUsbImodConfirmationMessage(out DriverEnvironmentSnapshot details)
+    {
+        bool? hvciRunning = TryQueryImodCodeIntegrityOptions(out uint options)
+            ? (options & ImodCiOptionHvciEnabled) != 0 : null;
+        DriverEnvironmentSnapshot snapshot = DriverEnvironment.Capture(hvciRunning);
+        WriteLog($"DRIVER.PREFLIGHT: blocklist={snapshot.Blocklist.Value?.ToString() ?? snapshot.Blocklist.Evidence} "
+            + $"hvciRegistry={snapshot.HvciConfigured.Value?.ToString() ?? snapshot.HvciConfigured.Evidence} hvciRuntime={snapshot.HvciRunning} "
+            + $"defender={snapshot.Defender} faceit={snapshot.Faceit} vgk={snapshot.VanguardDriver} vgc={snapshot.VanguardService} "
+            + "driverLoad=not-tested compatibility=not-validated");
+        details = snapshot;
+        return DriverEnvironment.BuildCompactConfirmation(snapshot);
+    }
+
     private void LogImodDriverLoadDiagnostics(string driverPath, string? loadError)
     {
         WriteLog($"IMOD.DRIVER.LOAD: failed path={driverPath} error={CompactImodLogValue(loadError)}");
@@ -280,9 +293,9 @@ public sealed partial class MainForm
             || error.Contains("подпис", StringComparison.OrdinalIgnoreCase)
             || error.Contains("цифров", StringComparison.OrdinalIgnoreCase)
             || error.Contains("577", StringComparison.OrdinalIgnoreCase)
-            || error.Contains("kernel CI", StringComparison.OrdinalIgnoreCase)
-            || error.Contains("VulnerableDriverBlocklist", StringComparison.OrdinalIgnoreCase)
-            || error.Contains("Vulnerable Driver Blocklist", StringComparison.OrdinalIgnoreCase);
+            || error.Contains("code integrity policy", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("blocked by Vulnerable Driver Blocklist", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("blocked DTIMOD via Vulnerable Driver Blocklist", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsImodDefenderBlockedError(string? error)
@@ -301,18 +314,24 @@ public sealed partial class MainForm
 
     private static string FormatImodUnavailableUserMessage(string? technicalDetails, bool includeNotChanged = true)
     {
+        if (technicalDetails?.Contains(DriverRename.RestartMessage, StringComparison.Ordinal) == true)
+            return DriverRename.RestartMessage;
+        if (technicalDetails?.Contains(DriverRuntime.RestartMessage, StringComparison.Ordinal) == true)
+            return DriverRuntime.RestartMessage;
+        if (technicalDetails?.Contains("Restart Windows before loading", StringComparison.Ordinal) == true)
+            return "DTIMOD loading did not finish normally.\nRestart Windows, then press CHECK.";
         string suffix = includeNotChanged
             ? " USB IMOD was not changed."
             : string.Empty;
 
         if (IsImodDefenderBlockedError(technicalDetails))
         {
-            return "Windows Defender blocked DTIMOD." + suffix;
+            return "DTIMOD was rejected by Windows or antivirus." + suffix;
         }
 
         if (IsImodSignatureRejectedError(technicalDetails))
         {
-            return "Windows blocked DTIMOD via Vulnerable Driver Blocklist." + suffix;
+            return "Windows rejected DTIMOD due to code integrity/signature checks." + suffix;
         }
 
         return includeNotChanged
@@ -322,7 +341,7 @@ public sealed partial class MainForm
 
     private static bool TryReadVulnerableDriverBlocklistEnabled(out bool enabled, out string stateText)
     {
-        enabled = true;
+        enabled = false;
         stateText = ReadImodRegistryDwordState(
             RegistryHive.LocalMachine,
             ImodVulnerableDriverBlocklistPath,
@@ -330,9 +349,8 @@ public sealed partial class MainForm
 
         if (stateText.Equals("missing", StringComparison.OrdinalIgnoreCase))
         {
-            // Windows defaults to enabled when the value is absent.
-            enabled = true;
-            return true;
+            // Absence is not a measured state; defaults/policies depend on Windows.
+            return false;
         }
 
         if (stateText.StartsWith("error:", StringComparison.OrdinalIgnoreCase))
@@ -346,6 +364,7 @@ public sealed partial class MainForm
 
     private bool TryDisableVulnerableDriverBlocklist(out string? error)
     {
+        DemandRealWrite("DRIVER POLICY");
         error = null;
         try
         {
@@ -395,9 +414,9 @@ public sealed partial class MainForm
         }
 
         bool disable = ShowThemedConfirm(
-            "USB IMOD was blocked by Vulnerable Driver Blocklist.\n\n"
-            + "Disable Vulnerable Driver Blocklist so DTIMOD can load after reboot?\n\n"
-            + "Warning: this can break Faceit, The Finals, and similar anti-cheats.\n"
+            "Windows rejected DTIMOD. Vulnerable Driver Blocklist is enabled in the registry.\n\n"
+            + "Disable Vulnerable Driver Blocklist?\n"
+            + "The cause of rejection is unconfirmed. Other policies or anti-cheats may still block DTIMOD.\n\n"
             + "After reboot, run CHECK or AUTO-OPTIMIZATION again to apply IMOD.",
             "VULNERABLE DRIVER BLOCKLIST",
             UiLanguage.Text("DISABLE"),

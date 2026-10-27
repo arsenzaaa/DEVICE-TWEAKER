@@ -1,4 +1,4 @@
-using System.Windows.Forms;
+﻿using System.Windows.Forms;
 
 namespace DeviceTweakerCS;
 
@@ -169,11 +169,18 @@ internal sealed class DeviceInfo
     public string? UsbSelectiveSuspend { get; set; }
     /// <summary>NIC Device Manager power saving: "on"/"off", or null if unset/not applicable (Wi‑Fi).</summary>
     public string? NicPowerSaving { get; set; }
+#if DEVELOPER_QA
     public bool IsTestDevice { get; init; }
+#else
+    public bool IsTestDevice { get => false; init { if (value) throw new InvalidOperationException("Device simulation requires the developer QA build."); } }
+#endif
     public int? TestIrqCount { get; init; }
     public int TestIrqMatchCount { get; init; } = 1;
     public string TestMsiStatus { get; init; } = "Auto";
     public string TestMsiCapabilities { get; init; } = "Auto";
+#if DEVELOPER_QA
+    public string TestInterruptMode { get; init; } = "Auto";
+#endif
     public uint? TestMsiMessageMaximum { get; init; }
     public TestDeviceState? TestState { get; set; }
 }
@@ -193,6 +200,8 @@ internal sealed class DeviceBlock
     public required List<CheckBox> CpuBoxes { get; init; }
     public required Label AffinityLabel { get; init; }
     public required Label IrqLabel { get; init; }
+    public Label? InterruptModeLabel { get; init; }
+    public InterruptModeResult InterruptMode { get; set; } = InterruptModeResult.Pending;
     public required ThemedDropDownPicker MsiCombo { get; init; }
     /// <summary>Device Manager power saving (USB Selective Suspend / NIC turn-off). Checked = Enabled.</summary>
     public ThemedCheckBox? PowerSavingCheck { get; init; }
@@ -219,6 +228,8 @@ internal sealed class DeviceBlock
     public Control? ImodMapLabel { get; init; }
     public Button? ImodDetailsButton { get; init; }
     public bool ImodDetailsExpanded { get; set; }
+    public bool ImodReadbackRequested { get; set; }
+    public Panel? ImodReadbackPanel { get; init; }
     public CheckBox? RawMouseThrottleCheck { get; init; }
     public ThemedDropDownPicker? RawMouseThrottleCombo { get; init; }
     public Label? RawMouseThrottleStatusLabel { get; init; }

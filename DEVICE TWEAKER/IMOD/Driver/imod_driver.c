@@ -1,6 +1,8 @@
-#include <ntddk.h>
+#include <ntifs.h>
 #include <initguid.h>
 #include <wdmsec.h>
+#include <wdmguid.h>
+#include <devpkey.h>
 
 #include "imod_driver.h"
 
@@ -36,6 +38,10 @@ static NTSTATUS ImodWritePhysicalMemory(
     ULONG accessSize,
     ULONGLONG value);
 static BOOLEAN ImodIsValidAccessSize(ULONG accessSize);
+static NTSTATUS ImodQueryPci(struct ImodPciQuery *query, struct ImodPciReply *reply);
+static IO_WORKITEM_ROUTINE_EX ImodQueryPciWorker;
+C_ASSERT(sizeof(CM_PARTIAL_RESOURCE_DESCRIPTOR) == 20);
+C_ASSERT(FIELD_OFFSET(struct ImodPciReply, resources) == 276);
 
 NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 {
@@ -140,6 +146,23 @@ static NTSTATUS ImodDriverDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 
         switch (ioControlCode)
         {
+        case IOCTL_IMOD_QUERY_PCI:
+            if (ioBuffer == NULL || inputLength != sizeof(struct ImodPciQuery)
+                || outputLength < sizeof(struct ImodPciReply))
+            {
+                status = STATUS_INVALID_PARAMETER;
+                break;
+            }
+            {
+                PIO_WORKITEM workItem = IoAllocateWorkItem(DeviceObject);
+                if (workItem == NULL) { status = STATUS_INSUFFICIENT_RESOURCES; break; }
+                // IoGetDevicePropertyData requires a system thread, not the IOCTL caller's context.
+                IoMarkIrpPending(Irp);
+                IoQueueWorkItemEx(workItem, ImodQueryPciWorker, DelayedWorkQueue, Irp);
+                return STATUS_PENDING;
+            }
+            break;
+
         case IOCTL_IMOD_READ_PHYSICAL:
             if (ioBuffer == NULL || inputLength < sizeof(access) || outputLength < sizeof(access))
             {
@@ -220,6 +243,112 @@ static void ImodDriverUnload(IN PDRIVER_OBJECT DriverObject)
     {
         IoDeleteDevice(DriverObject->DeviceObject);
     }
+}
+
+static VOID ImodQueryPciWorker(PVOID IoObject, PVOID Context, PIO_WORKITEM WorkItem)
+{
+    PIRP irp = (PIRP)Context;
+    struct ImodPciQuery query;
+    struct ImodPciReply *reply = (struct ImodPciReply *)irp->AssociatedIrp.SystemBuffer;
+    NTSTATUS status;
+    UNREFERENCED_PARAMETER(IoObject);
+    // METHOD_BUFFERED shares input/output; retain the request before clearing the reply.
+    RtlCopyMemory(&query, reply, sizeof(query));
+    RtlZeroMemory(reply, sizeof(*reply));
+    status = irp->Cancel ? STATUS_CANCELLED : ImodQueryPci(&query, reply);
+    irp->IoStatus.Status = status;
+    irp->IoStatus.Information = NT_SUCCESS(status)
+        ? FIELD_OFFSET(struct ImodPciReply, resources) + reply->resourcesBytes : 0;
+    IoFreeWorkItem(WorkItem);
+    IoCompleteRequest(irp, IO_NO_INCREMENT);
+}
+
+static NTSTATUS ImodQueryPci(struct ImodPciQuery *query, struct ImodPciReply *reply)
+{
+    UNICODE_STRING name, expectedId, actualId;
+    PFILE_OBJECT fileObject = NULL;
+    PDEVICE_OBJECT deviceObject = NULL, pdo = NULL, target = NULL;
+    WCHAR id[256];
+    ULONG bytes = 0;
+    DEVPROPTYPE type = 0;
+    BUS_INTERFACE_STANDARD bus;
+    NTSTATUS status;
+    KEVENT event;
+    IO_STATUS_BLOCK ioStatus;
+    PIRP irp;
+    PIO_STACK_LOCATION stack;
+
+    if (KeGetCurrentIrql() != PASSIVE_LEVEL || query->version != IMOD_PCI_QUERY_VERSION
+        || query->pdoName[255] != 0 || query->instanceId[255] != 0)
+        return STATUS_INVALID_PARAMETER;
+    RtlInitUnicodeString(&name, query->pdoName);
+    RtlInitUnicodeString(&expectedId, query->instanceId);
+    if (name.Length < 16 || expectedId.Length < 8
+        || _wcsnicmp(query->pdoName, L"\\Device\\", 8) != 0
+        || _wcsnicmp(query->instanceId, L"PCI\\", 4) != 0)
+        return STATUS_INVALID_PARAMETER;
+
+    status = IoGetDeviceObjectPointer(&name, FILE_READ_ATTRIBUTES, &fileObject, &deviceObject);
+    if (!NT_SUCCESS(status)) return status;
+    pdo = IoGetDeviceAttachmentBaseRef(deviceObject);
+    // Validate the complete identity again in kernel, including the instance suffix.
+    status = IoGetDevicePropertyData(pdo, &DEVPKEY_Device_InstanceId, LOCALE_NEUTRAL, 0,
+        sizeof(id), id, &bytes, &type);
+    if (!NT_SUCCESS(status)) goto End;
+    if (type != DEVPROP_TYPE_STRING || bytes < sizeof(WCHAR) || bytes > sizeof(id)
+        || (bytes % sizeof(WCHAR)) != 0 || id[bytes / sizeof(WCHAR) - 1] != 0)
+    { status = STATUS_DATA_ERROR; goto End; }
+    RtlInitUnicodeString(&actualId, id);
+    if (!RtlEqualUnicodeString(&actualId, &expectedId, TRUE))
+    { status = STATUS_OBJECT_TYPE_MISMATCH; goto End; }
+
+    reply->version = IMOD_PCI_QUERY_VERSION;
+    reply->resourcesStatus = IoGetDeviceProperty(pdo, DevicePropertyAllocatedResources,
+        sizeof(reply->resources), reply->resources, &bytes);
+    if (NT_SUCCESS(reply->resourcesStatus) && bytes <= sizeof(reply->resources))
+        reply->resourcesBytes = bytes;
+    else if (NT_SUCCESS(reply->resourcesStatus)) reply->resourcesStatus = STATUS_DATA_ERROR;
+
+    RtlZeroMemory(&bus, sizeof(bus));
+    KeInitializeEvent(&event, NotificationEvent, FALSE);
+    target = IoGetAttachedDeviceReference(pdo);
+    irp = IoBuildSynchronousFsdRequest(IRP_MJ_PNP, target, NULL, 0, NULL, &event, &ioStatus);
+    if (irp == NULL) { reply->configStatus = STATUS_INSUFFICIENT_RESOURCES; goto Success; }
+    stack = IoGetNextIrpStackLocation(irp);
+    stack->MinorFunction = IRP_MN_QUERY_INTERFACE;
+    stack->Parameters.QueryInterface.InterfaceType = (LPGUID)&GUID_BUS_INTERFACE_STANDARD;
+    stack->Parameters.QueryInterface.Size = sizeof(bus);
+    stack->Parameters.QueryInterface.Version = 1;
+    stack->Parameters.QueryInterface.Interface = (PINTERFACE)&bus;
+    stack->Parameters.QueryInterface.InterfaceSpecificData = NULL;
+    irp->IoStatus.Status = STATUS_NOT_SUPPORTED;
+    status = IoCallDriver(target, irp);
+    if (status == STATUS_PENDING)
+    {
+        KeWaitForSingleObject(&event, Executive, KernelMode, FALSE, NULL);
+        status = ioStatus.Status;
+    }
+    reply->configStatus = status;
+    if (NT_SUCCESS(status))
+    {
+        if (bus.Size < sizeof(bus) || bus.Version != 1 || bus.GetBusData == NULL
+            || bus.InterfaceDereference == NULL)
+            reply->configStatus = STATUS_NOT_SUPPORTED;
+        else
+        {
+            reply->configBytes = bus.GetBusData(bus.Context, PCI_WHICHSPACE_CONFIG,
+                reply->config, 0, sizeof(reply->config));
+            if (reply->configBytes != sizeof(reply->config)) reply->configStatus = STATUS_DEVICE_DATA_ERROR;
+        }
+        if (bus.InterfaceDereference != NULL) bus.InterfaceDereference(bus.Context);
+    }
+Success:
+    status = STATUS_SUCCESS; // Per-source statuses remain in the reply.
+End:
+    if (target != NULL) ObDereferenceObject(target);
+    if (pdo != NULL) ObDereferenceObject(pdo);
+    if (fileObject != NULL) ObDereferenceObject(fileObject);
+    return status;
 }
 
 static BOOLEAN ImodIsValidAccessSize(ULONG accessSize)

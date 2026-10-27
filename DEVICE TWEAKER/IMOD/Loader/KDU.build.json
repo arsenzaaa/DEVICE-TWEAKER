@@ -1,0 +1,23 @@
+﻿{
+  "schemaVersion": 1,
+  "origin": "imported-git-tag",
+  "repository": "https://github.com/arsenzaaa/DEVICE-TWEAKER",
+  "tag": "v0.0.4",
+  "commit": "6094c866ac2d8baaf362d393f4911b76a4fc7908",
+  "configuration": "Release",
+  "sourceManifestSha256": "EAFC2DD775087CC14D00946F10AAD988CB35E91036306FC0E5963CC3B6888F13",
+  "buildScriptSha256": "B926BA67637C0A0AB5C3CD3A4026D8934F1D1E784DE7C0D6D0DB505B14A35D77",
+  "binaries": [
+    {
+      "name": "kdu.exe",
+      "sha256": "B340DAD4DDBE8607F9FDDB79F679375B4FF5080FE1A7EDB6CE015F69D3A0CD4F",
+      "version": "1.4.5.2512"
+    },
+    {
+      "name": "drv64.dll",
+      "sha256": "D032D855A0FF0EF3E3AD6EC8DAFFB8649048F82D3F1EEB89BEE3652EE6F01F80",
+      "version": "1.4.5.2512"
+    }
+  ],
+  "reproducibility": "Exact published binaries; matching vendored source retained. Byte-identical local rebuild is not claimed."
+}

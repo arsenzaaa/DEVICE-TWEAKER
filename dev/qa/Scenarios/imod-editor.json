@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1, "id": "imod-editor", "preset": "Intel14900K", "language": "RU", "filter": "USB", "width": 1200, "height": 900,
+  "steps": [
+    { "id": "show-audio", "action": "reveal", "target": "id:IMOD_ROLE_AUDIO", "device": "DEV_1242" },
+    { "id": "audio-ru", "action": "capture" },
+    { "id": "audio-fits", "action": "assert", "target": "id:IMOD_ROLE_AUDIO", "device": "DEV_1242", "property": "editorFits", "value": "true" },
+    { "id": "scroll-away", "action": "scroll", "value": "End" },
+    { "id": "return-audio", "action": "reveal", "target": "id:IMOD_ROLE_AUDIO", "device": "DEV_1242" },
+    { "id": "audio-return", "action": "capture" },
+    { "id": "return-fits", "action": "assert", "target": "id:IMOD_ROLE_AUDIO", "device": "DEV_1242", "property": "editorFits", "value": "true" },
+    { "id": "en", "action": "language", "value": "EN" },
+    { "id": "audio-en", "action": "capture" },
+    { "id": "audio-fits-en", "action": "assert", "target": "id:IMOD_ROLE_AUDIO", "device": "DEV_1242", "property": "editorFits", "value": "true" }
+  ]
+}

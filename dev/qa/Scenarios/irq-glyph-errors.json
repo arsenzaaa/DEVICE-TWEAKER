@@ -1,0 +1,257 @@
+{
+  "schemaVersion": 1,
+  "id": "irq-glyph-errors",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "GPU",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    {
+      "id": "EN-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "EN-reveal",
+      "action": "reveal",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-error-model",
+      "action": "irq-check-model",
+      "value": "failure",
+      "durationMs": 250
+    },
+    {
+      "id": "EN-error-click",
+      "action": "click",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-error-result",
+      "action": "wait",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "value": "read failed",
+      "durationMs": 3000
+    },
+    {
+      "id": "EN-error-ready",
+      "action": "wait",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "EN-error-stopped",
+      "action": "assert",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "reading",
+      "value": "false"
+    },
+    {
+      "id": "EN-error-all-pci-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "EN-error-hidden-device-queried",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "EN-error",
+      "action": "capture"
+    },
+    {
+      "id": "EN-retry-model",
+      "action": "irq-check-model",
+      "value": "success",
+      "durationMs": 250
+    },
+    {
+      "id": "EN-retry-click",
+      "action": "click",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-retry-result",
+      "action": "wait",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "value": "MSI-X",
+      "durationMs": 3000
+    },
+    {
+      "id": "EN-retry-ready",
+      "action": "wait",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "EN-retry-stopped",
+      "action": "assert",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "reading",
+      "value": "false"
+    },
+    {
+      "id": "EN-retry-all-pci-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "EN-retry-hidden-device-queried",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "EN-retry",
+      "action": "capture"
+    },
+    {
+      "id": "RU-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "RU-reveal",
+      "action": "reveal",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-error-model",
+      "action": "irq-check-model",
+      "value": "failure",
+      "durationMs": 250
+    },
+    {
+      "id": "RU-error-click",
+      "action": "click",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-error-result",
+      "action": "wait",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "value": "\u043e\u0448\u0438\u0431\u043a\u0430 \u0447\u0442\u0435\u043d\u0438\u044f",
+      "durationMs": 3000
+    },
+    {
+      "id": "RU-error-ready",
+      "action": "wait",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "RU-error-stopped",
+      "action": "assert",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "reading",
+      "value": "false"
+    },
+    {
+      "id": "RU-error-all-pci-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "RU-error-hidden-device-queried",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "RU-error",
+      "action": "capture"
+    },
+    {
+      "id": "RU-retry-model",
+      "action": "irq-check-model",
+      "value": "success",
+      "durationMs": 250
+    },
+    {
+      "id": "RU-retry-click",
+      "action": "click",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-retry-result",
+      "action": "wait",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "value": "MSI-X",
+      "durationMs": 3000
+    },
+    {
+      "id": "RU-retry-ready",
+      "action": "wait",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "RU-retry-stopped",
+      "action": "assert",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "reading",
+      "value": "false"
+    },
+    {
+      "id": "RU-retry-all-pci-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "RU-retry-hidden-device-queried",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "RU-retry",
+      "action": "capture"
+    }
+  ]
+}

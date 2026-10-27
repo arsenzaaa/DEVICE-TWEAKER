@@ -117,7 +117,7 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
         e.Graphics.FillRectangle(buttonBrush, arrowRect);
 
         string text = UiLanguage.Text(SelectedItem?.ToString() ?? string.Empty);
-        // TextRenderer clips glyph overhang unless NoPadding is set — without it "Enabled" becomes "nabled".
+        // TextRenderer clips glyph overhang unless NoPadding is set , without it "Enabled" becomes "nabled".
         Rectangle textRect = new(bounds.Left + 8, bounds.Top + 1, Math.Max(0, bounds.Width - arrowWidth - 12), bounds.Height - 2);
         Color textColor = Enabled ? ForeColor : Color.FromArgb(120, 120, 125);
         TextRenderer.DrawText(
@@ -149,12 +149,35 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
         borderRect.Width -= 1;
         borderRect.Height -= 1;
         e.Graphics.DrawRectangle(borderPen, borderRect);
+
+        if (Focused && ShowFocusCues && Enabled)
+            ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(textRect, -1, -2), textColor, BackColor);
+    }
+
+    protected override bool IsInputKey(Keys keyData)
+        => (keyData & Keys.KeyCode) is Keys.Up or Keys.Down or Keys.Home or Keys.End or Keys.PageUp or Keys.PageDown
+            || base.IsInputKey(keyData);
+
+    protected override void OnGotFocus(EventArgs e)
+    {
+        base.OnGotFocus(e);
+        Invalidate();
+    }
+
+    protected override void OnLostFocus(EventArgs e)
+    {
+        ClosePopup();
+        base.OnLostFocus(e);
+        Invalidate();
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
     {
-        Focus();
-        TogglePopup();
+        if (e.Button == MouseButtons.Left)
+        {
+            Focus();
+            TogglePopup();
+        }
         base.OnMouseDown(e);
     }
 
@@ -166,12 +189,14 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
             {
                 ClosePopup();
                 e.Handled = true;
+                e.SuppressKeyPress = true;
                 return;
             }
 
             if (popup.Content.HandleOwnerKey(e.KeyCode))
             {
                 e.Handled = true;
+                e.SuppressKeyPress = true;
                 return;
             }
         }
@@ -180,6 +205,22 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
         {
             TogglePopup();
             e.Handled = true;
+            e.SuppressKeyPress = true;
+            return;
+        }
+
+        if (e.Modifiers == Keys.None && e.KeyCode is Keys.Up or Keys.Down or Keys.Home or Keys.End)
+        {
+            int next = e.KeyCode switch
+            {
+                Keys.Up => Math.Max(0, SelectedIndex - 1),
+                Keys.Down => Math.Min(Items.Count - 1, SelectedIndex + 1),
+                Keys.Home => 0,
+                _ => Items.Count - 1,
+            };
+            SelectedIndex = next;
+            e.Handled = true;
+            e.SuppressKeyPress = true;
             return;
         }
 

@@ -241,19 +241,7 @@ public sealed partial class MainForm
     private NdisRssRuntimeState ReadNdisRssRuntimeState(string instanceId)
     {
         string? netCfgInstanceId = GetNdisNetCfgInstanceId(instanceId);
-        string guid = EscapePowerShellSingleQuoted(netCfgInstanceId ?? string.Empty);
-        string pnp = EscapePowerShellSingleQuoted(instanceId);
-        string script =
-            "$ErrorActionPreference='SilentlyContinue';" +
-            $"$guid='{guid}';$pnp='{pnp}';" +
-            "$adapters=@(Get-NetAdapter -IncludeHidden -ErrorAction SilentlyContinue);" +
-            "$adapter=$null;" +
-            "if($guid){$adapter=$adapters|Where-Object{$_.InterfaceGuid -and ($_.InterfaceGuid.ToString() -ieq $guid)}|Select-Object -First 1};" +
-            "if(-not $adapter -and $pnp){$adapter=$adapters|Where-Object{($_.PnPDeviceID -as [string]) -ieq $pnp}|Select-Object -First 1};" +
-            "if(-not $adapter){[pscustomobject]@{AdapterFound=$false;RssFound=$false;Error='adapter-not-found'}|ConvertTo-Json -Compress;exit};" +
-            "$rss=Get-NetAdapterRss -Name $adapter.Name -ErrorAction SilentlyContinue;" +
-            "if(-not $rss){[pscustomobject]@{AdapterFound=$true;RssFound=$false;AdapterName=$adapter.Name;InterfaceDescription=$adapter.InterfaceDescription;Error='rss-not-found'}|ConvertTo-Json -Compress;exit};" +
-            "[pscustomobject]@{AdapterFound=$true;RssFound=$true;AdapterName=$adapter.Name;InterfaceDescription=$adapter.InterfaceDescription;Enabled=$rss.Enabled;BaseProcessorGroup=$rss.BaseProcessorGroup;BaseProcessorNumber=$rss.BaseProcessorNumber;MaxProcessorGroup=$rss.MaxProcessorGroup;MaxProcessorNumber=$rss.MaxProcessorNumber;MaxProcessors=$rss.MaxProcessors;NumberOfReceiveQueues=$rss.NumberOfReceiveQueues;Profile=$rss.Profile;Error=''}|ConvertTo-Json -Compress";
+        string script = BuildNdisRssQueryScript(netCfgInstanceId, instanceId);
 
         try
         {
@@ -272,6 +260,7 @@ public sealed partial class MainForm
             process.StartInfo.ArgumentList.Add("-Command");
             process.StartInfo.ArgumentList.Add(script);
 
+            Stopwatch queryTime = Stopwatch.StartNew();
             if (!process.Start())
             {
                 return EmptyNdisRssRuntimeState("powershell-start-failed");
@@ -279,7 +268,9 @@ public sealed partial class MainForm
 
             Task<string> stdout = process.StandardOutput.ReadToEndAsync();
             Task<string> stderr = process.StandardError.ReadToEndAsync();
-            if (!process.WaitForExit(3500))
+            // The NetAdapter module can need more than 3.5 seconds on first load.
+            // Keep a bounded wait, and report failure instead of guessing RSS state.
+            if (!process.WaitForExit(10000))
             {
                 try
                 {
@@ -305,6 +296,7 @@ public sealed partial class MainForm
                 {
                 }
 
+                WriteLog($"RSS.QUERY: timeout durationMs={queryTime.ElapsedMilliseconds} limitMs=10000 instance={instanceId}");
                 return EmptyNdisRssRuntimeState("powershell-timeout");
             }
 
@@ -318,6 +310,10 @@ public sealed partial class MainForm
 
             string output = stdout.IsCompletedSuccessfully ? stdout.Result : string.Empty;
             string error = stderr.IsCompletedSuccessfully ? stderr.Result : string.Empty;
+            WriteLog($"RSS.QUERY: completed durationMs={queryTime.ElapsedMilliseconds} exitCode={process.ExitCode} instance={instanceId}");
+            if (process.ExitCode != 0)
+                return EmptyNdisRssRuntimeState(string.IsNullOrWhiteSpace(error)
+                    ? $"powershell-exit-{process.ExitCode}" : error.Trim());
             string json = ExtractJsonObject(output);
             if (string.IsNullOrWhiteSpace(json))
             {
@@ -345,6 +341,26 @@ public sealed partial class MainForm
         {
             return EmptyNdisRssRuntimeState(ex.Message);
         }
+    }
+
+    internal static string BuildNdisRssQueryScript(string? netCfgInstanceId, string instanceId)
+    {
+        string guid = EscapePowerShellSingleQuoted(netCfgInstanceId ?? string.Empty);
+        string pnp = EscapePowerShellSingleQuoted(instanceId);
+        return "$ErrorActionPreference='Stop';" +
+            $"$guid='{guid}';$pnp='{pnp}';" +
+            "try{$adapters=@(Get-NetAdapter -IncludeHidden -ErrorAction Stop)}catch{[pscustomobject]@{AdapterFound=$false;RssFound=$false;Error=('adapter-query-failed: '+$_.Exception.Message)}|ConvertTo-Json -Compress;exit};" +
+            "$adapter=$null;" +
+            "if($guid){$adapter=$adapters|Where-Object{$_.InterfaceGuid -and ($_.InterfaceGuid.ToString() -ieq $guid)}|Select-Object -First 1};" +
+            "if(-not $adapter -and $pnp){$adapter=$adapters|Where-Object{($_.PnPDeviceID -as [string]) -ieq $pnp}|Select-Object -First 1};" +
+            "if(-not $adapter){[pscustomobject]@{AdapterFound=$false;RssFound=$false;Error='adapter-not-found'}|ConvertTo-Json -Compress;exit};" +
+            "try{$rss=Get-NetAdapterRss -Name $adapter.Name -IncludeHidden -ErrorAction Stop}catch{" +
+            "$failure=$_.Exception;while($failure -and -not($failure -is [Microsoft.Management.Infrastructure.CimException])){$failure=$failure.InnerException};" +
+            "$reason=if($failure -and $failure.NativeErrorCode -eq [Microsoft.Management.Infrastructure.NativeErrorCode]::NotSupported){'rss-not-supported'}" +
+            "elseif($failure -and $failure.NativeErrorCode -eq [Microsoft.Management.Infrastructure.NativeErrorCode]::NotFound){'rss-not-found'}else{'rss-query-failed: '+$_.Exception.Message};" +
+            "[pscustomobject]@{AdapterFound=$true;RssFound=$false;AdapterName=$adapter.Name;InterfaceDescription=$adapter.InterfaceDescription;Error=$reason}|ConvertTo-Json -Compress;exit};" +
+            "if(-not $rss){[pscustomobject]@{AdapterFound=$true;RssFound=$false;AdapterName=$adapter.Name;InterfaceDescription=$adapter.InterfaceDescription;Error='rss-not-found'}|ConvertTo-Json -Compress;exit};" +
+            "[pscustomobject]@{AdapterFound=$true;RssFound=$true;AdapterName=$adapter.Name;InterfaceDescription=$adapter.InterfaceDescription;Enabled=$rss.Enabled;BaseProcessorGroup=$rss.BaseProcessorGroup;BaseProcessorNumber=$rss.BaseProcessorNumber;MaxProcessorGroup=$rss.MaxProcessorGroup;MaxProcessorNumber=$rss.MaxProcessorNumber;MaxProcessors=$rss.MaxProcessors;NumberOfReceiveQueues=$rss.NumberOfReceiveQueues;Profile=$rss.Profile;Error=''}|ConvertTo-Json -Compress";
     }
 
     private static NdisRssRuntimeState EmptyNdisRssRuntimeState(string error)
@@ -436,6 +452,7 @@ public sealed partial class MainForm
         OperationReport? report = null,
         string? deviceName = null)
     {
+        DemandRealWrite("SetNdisBaseCore");
         if (baseCore < 0)
         {
             baseCore = 0;
@@ -458,13 +475,13 @@ public sealed partial class MainForm
             catch (Exception ex)
             {
                 WriteLog($"RSS.SET.ERROR: {instanceId} value=*RssBaseProcNumber error=\"{FlattenLogText(ex.ToString())}\"");
-                report?.AddError($"{deviceName ?? instanceId} — set RSS base CPU", ex.Message);
+                report?.AddError($"{deviceName ?? instanceId}: set RSS base CPU", ex.Message);
             }
         }
         else
         {
             WriteLog($"RSS.SET.SKIP: {instanceId} class key not found; *RssBaseProcNumber not written");
-            report?.AddError($"{deviceName ?? instanceId} — set RSS base CPU", "NDIS class key was not found");
+            report?.AddError($"{deviceName ?? instanceId}: set RSS base CPU", "NDIS class key was not found");
         }
     }
 
@@ -474,6 +491,7 @@ public sealed partial class MainForm
         OperationReport? report = null,
         string? deviceName = null)
     {
+        DemandRealWrite("SetNdisRssQueues");
         if (queues < 1)
         {
             queues = 1;
@@ -496,13 +514,13 @@ public sealed partial class MainForm
             catch (Exception ex)
             {
                 WriteLog($"RSS.SET.ERROR: {instanceId} value=*NumRssQueues error=\"{FlattenLogText(ex.ToString())}\"");
-                report?.AddError($"{deviceName ?? instanceId} — set RSS queue count", ex.Message);
+                report?.AddError($"{deviceName ?? instanceId}: set RSS queue count", ex.Message);
             }
         }
         else
         {
             WriteLog($"RSS.SET.SKIP: {instanceId} class key not found; *NumRssQueues not written");
-            report?.AddError($"{deviceName ?? instanceId} — set RSS queue count", "NDIS class key was not found");
+            report?.AddError($"{deviceName ?? instanceId}: set RSS queue count", "NDIS class key was not found");
         }
     }
 
@@ -513,6 +531,7 @@ public sealed partial class MainForm
         OperationReport? report = null,
         string? deviceName = null)
     {
+        DemandRealWrite("SetNdisRssExtraValues");
         if (baseCore < 0)
         {
             baseCore = 0;
@@ -528,7 +547,7 @@ public sealed partial class MainForm
         if (string.IsNullOrWhiteSpace(ckPath))
         {
             WriteLog($"RSS.EXTRA.SET.SKIP: {instanceId} class key not found");
-            report?.AddError($"{deviceName ?? instanceId} — set extended RSS values", "NDIS class key was not found");
+            report?.AddError($"{deviceName ?? instanceId}: set extended RSS values", "NDIS class key was not found");
             return;
         }
 
@@ -537,7 +556,7 @@ public sealed partial class MainForm
             using RegistryKey? ck = Registry.LocalMachine.CreateSubKey(ckPath);
             if (ck is null)
             {
-                report?.AddError($"{deviceName ?? instanceId} — set extended RSS values", "NDIS class key is unavailable");
+                report?.AddError($"{deviceName ?? instanceId}: set extended RSS values", "NDIS class key is unavailable");
                 return;
             }
 
@@ -555,7 +574,7 @@ public sealed partial class MainForm
         catch (Exception ex)
         {
             WriteLog($"RSS.EXTRA.SET: {instanceId} failed: {ex.Message}");
-            report?.AddError($"{deviceName ?? instanceId} — set extended RSS values", ex.Message);
+            report?.AddError($"{deviceName ?? instanceId}: set extended RSS values", ex.Message);
         }
     }
 
@@ -669,6 +688,7 @@ public sealed partial class MainForm
         OperationReport? report = null,
         string? deviceName = null)
     {
+        DemandRealWrite("ClearNdisBaseCore");
         string? ckPath = GetClassKeyForDevice(instanceId);
         if (string.IsNullOrWhiteSpace(ckPath))
         {
@@ -684,7 +704,7 @@ public sealed partial class MainForm
         catch (Exception ex)
         {
             WriteLog($"RSS.CLEAR.ERROR: {instanceId} value=*RssBaseProcNumber error=\"{FlattenLogText(ex.ToString())}\"");
-            report?.AddError($"{deviceName ?? instanceId} — clear RSS base CPU", ex.Message);
+            report?.AddError($"{deviceName ?? instanceId}: clear RSS base CPU", ex.Message);
         }
     }
 
@@ -693,6 +713,7 @@ public sealed partial class MainForm
         OperationReport? report = null,
         string? deviceName = null)
     {
+        DemandRealWrite("ClearNdisRssQueues");
         string? ckPath = GetClassKeyForDevice(instanceId);
         if (string.IsNullOrWhiteSpace(ckPath))
         {
@@ -708,7 +729,7 @@ public sealed partial class MainForm
         catch (Exception ex)
         {
             WriteLog($"RSS.CLEAR.ERROR: {instanceId} value=*NumRssQueues error=\"{FlattenLogText(ex.ToString())}\"");
-            report?.AddError($"{deviceName ?? instanceId} — clear RSS queue count", ex.Message);
+            report?.AddError($"{deviceName ?? instanceId}: clear RSS queue count", ex.Message);
         }
     }
 
@@ -717,6 +738,7 @@ public sealed partial class MainForm
         OperationReport? report = null,
         string? deviceName = null)
     {
+        DemandRealWrite("ClearNdisRssExtraValues");
         string? ckPath = GetClassKeyForDevice(instanceId);
         if (string.IsNullOrWhiteSpace(ckPath))
         {
@@ -741,7 +763,7 @@ public sealed partial class MainForm
         catch (Exception ex)
         {
             WriteLog($"RSS.CLEAR.ERROR: {instanceId} values=extra-rss error=\"{FlattenLogText(ex.ToString())}\"");
-            report?.AddError($"{deviceName ?? instanceId} — clear extended RSS values", ex.Message);
+            report?.AddError($"{deviceName ?? instanceId}: clear extended RSS values", ex.Message);
         }
     }
 
@@ -1105,7 +1127,7 @@ public sealed partial class MainForm
                 {
                     if (usbRoles.TryGetValue(k, out List<string>? roles))
                     {
-                        List<string> distinctRoles = roles.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(r => r).ToList();
+                        List<string> distinctRoles = UsbRoleDisplay.Order(roles).ToList();
                         usbText = string.Join(", ", distinctRoles);
                         usbPollingText = FormatUsbPollingRoleSummary(distinctRoles);
                         break;

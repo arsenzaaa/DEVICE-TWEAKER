@@ -1,0 +1,281 @@
+{
+  "schemaVersion": 1,
+  "id": "device-palette",
+  "preset": "DevicePalette",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    {
+      "id": "gpu-nvidia-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "gpu-nvidia-en",
+      "action": "capture"
+    },
+    {
+      "id": "gpu-amd-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "GPU_AMD"
+    },
+    {
+      "id": "gpu-amd-en",
+      "action": "capture"
+    },
+    {
+      "id": "gpu-intel-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "GPU_INTEL"
+    },
+    {
+      "id": "gpu-intel-en",
+      "action": "capture"
+    },
+    {
+      "id": "gpu-other-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "GPU_OTHER"
+    },
+    {
+      "id": "gpu-other-en",
+      "action": "capture"
+    },
+    {
+      "id": "net-ndis-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DEV_125C"
+    },
+    {
+      "id": "net-ndis-en",
+      "action": "capture"
+    },
+    {
+      "id": "net-cx-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "NET_CX"
+    },
+    {
+      "id": "net-cx-en",
+      "action": "capture"
+    },
+    {
+      "id": "usb-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "usb-en",
+      "action": "capture"
+    },
+    {
+      "id": "audio-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "PALETTE\\AUDIO"
+    },
+    {
+      "id": "audio-en",
+      "action": "capture"
+    },
+    {
+      "id": "nvme-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DEV_A80C"
+    },
+    {
+      "id": "nvme-en",
+      "action": "capture"
+    },
+    {
+      "id": "ssd-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DISK_SSD"
+    },
+    {
+      "id": "ssd-en",
+      "action": "capture"
+    },
+    {
+      "id": "hdd-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DISK_HDD"
+    },
+    {
+      "id": "hdd-en",
+      "action": "capture"
+    },
+    {
+      "id": "sata-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DISK_SATA"
+    },
+    {
+      "id": "sata-en",
+      "action": "capture"
+    },
+    {
+      "id": "storage-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DISK_OTHER"
+    },
+    {
+      "id": "storage-en",
+      "action": "capture"
+    },
+    {
+      "id": "language-ru",
+      "action": "transition",
+      "durationMs": 400,
+      "intervalMs": 100,
+      "trigger": {
+        "action": "language",
+        "value": "RU"
+      }
+    },
+    {
+      "id": "gpu-nvidia-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "gpu-nvidia-ru",
+      "action": "capture"
+    },
+    {
+      "id": "gpu-amd-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "GPU_AMD"
+    },
+    {
+      "id": "gpu-amd-ru",
+      "action": "capture"
+    },
+    {
+      "id": "gpu-intel-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "GPU_INTEL"
+    },
+    {
+      "id": "gpu-intel-ru",
+      "action": "capture"
+    },
+    {
+      "id": "gpu-other-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "GPU_OTHER"
+    },
+    {
+      "id": "gpu-other-ru",
+      "action": "capture"
+    },
+    {
+      "id": "net-ndis-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DEV_125C"
+    },
+    {
+      "id": "net-ndis-ru",
+      "action": "capture"
+    },
+    {
+      "id": "net-cx-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "NET_CX"
+    },
+    {
+      "id": "net-cx-ru",
+      "action": "capture"
+    },
+    {
+      "id": "usb-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "usb-ru",
+      "action": "capture"
+    },
+    {
+      "id": "audio-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "PALETTE\\AUDIO"
+    },
+    {
+      "id": "audio-ru",
+      "action": "capture"
+    },
+    {
+      "id": "nvme-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DEV_A80C"
+    },
+    {
+      "id": "nvme-ru",
+      "action": "capture"
+    },
+    {
+      "id": "ssd-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DISK_SSD"
+    },
+    {
+      "id": "ssd-ru",
+      "action": "capture"
+    },
+    {
+      "id": "hdd-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DISK_HDD"
+    },
+    {
+      "id": "hdd-ru",
+      "action": "capture"
+    },
+    {
+      "id": "sata-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DISK_SATA"
+    },
+    {
+      "id": "sata-ru",
+      "action": "capture"
+    },
+    {
+      "id": "storage-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DISK_OTHER"
+    },
+    {
+      "id": "storage-ru",
+      "action": "capture"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "device-flow",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    { "id": "show-msi", "action": "reveal", "target": "role:msi", "device": "DEV_461E" },
+    { "id": "initial", "action": "capture" },
+    { "id": "mode", "action": "assert", "target": "role:mode", "device": "DEV_461E", "value": "MSI" },
+    { "id": "before", "action": "save-state", "value": "original" },
+    { "id": "disable-msi", "action": "select", "target": "role:msi", "device": "DEV_461E", "value": "Disabled" },
+    { "id": "pending", "action": "capture" },
+    { "id": "virtual-apply", "action": "apply-model", "device": "DEV_461E", "value": "applied" },
+    { "id": "saved", "action": "save-state", "value": "changed" },
+    { "id": "restore", "action": "restore-state", "value": "original" },
+    { "id": "restored-value", "action": "assert", "target": "role:msi", "device": "DEV_461E", "property": "value", "value": "Enabled" },
+    { "id": "show-details", "action": "reveal", "target": "id:IMOD_DETAILS", "device": "DEV_461E" },
+    { "id": "details", "action": "transition", "durationMs": 600, "intervalMs": 100,
+      "trigger": { "action": "click", "target": "id:IMOD_DETAILS", "device": "DEV_461E" } },
+    { "id": "russian", "action": "language", "value": "RU" },
+    { "id": "ru", "action": "capture" },
+    { "id": "small", "action": "resize", "width": 1000, "height": 720 },
+    { "id": "narrow", "action": "capture" },
+    { "id": "fault", "action": "model-error", "value": "write-denied" },
+    { "id": "fault-wait", "action": "wait", "target": "@active", "value": "SANDBOX ERROR", "durationMs": 3000 },
+    { "id": "error-dialog", "action": "capture", "target": "@active" },
+    { "id": "close-error", "action": "click", "target": "id:OK" },
+    { "id": "closed", "action": "wait", "target": "@main", "property": "enabled", "value": "true", "durationMs": 2000 }
+  ]
+}

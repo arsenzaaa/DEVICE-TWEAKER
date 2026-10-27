@@ -79,6 +79,7 @@ public sealed partial class MainForm
 
     private bool SetReservedCpuSets(bool[] bits)
     {
+        DemandRealWrite("SetReservedCpuSets");
         if (bits.Length == 0)
         {
             return true;
@@ -331,7 +332,7 @@ public sealed partial class MainForm
     private void UpdateReservedCpuValueLabel(ReservedCpuPanelTag tag)
     {
         string prefix = _reservedCpuSetsDirty
-            ? (UiLanguage.IsRussian ? "Ожидает APPLY: " : "Pending APPLY: ")
+            ? "Pending APPLY: "
             : "Value: ";
         List<int> setBits = tag.Meta
             .Where(entry => entry.Control.Checked)

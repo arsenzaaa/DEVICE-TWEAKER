@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 1,
+  "id": "imod-check",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    {
+      "id": "show-toggle",
+      "action": "reveal",
+      "target": "role:imod-toggle",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "disable-auto",
+      "action": "toggle",
+      "target": "role:imod-toggle",
+      "device": "DEV_461E",
+      "value": "false"
+    },
+    {
+      "id": "before",
+      "action": "capture"
+    },
+    {
+      "id": "check",
+      "action": "click",
+      "target": "role:imod-check",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "acknowledged",
+      "action": "wait",
+      "durationMs": 1000,
+      "target": "role:imod-check",
+      "device": "DEV_461E",
+      "value": "CHECK"
+    },
+    {
+      "id": "ack",
+      "action": "capture"
+    },
+    {
+      "id": "still-disabled",
+      "action": "assert",
+      "property": "checked",
+      "target": "role:imod-toggle",
+      "device": "DEV_461E",
+      "value": "false"
+    },
+    {
+      "id": "table-open",
+      "action": "assert",
+      "target": "id:IMOD_DETAILS",
+      "device": "DEV_461E",
+      "value": "HIDE"
+    },
+    {
+      "id": "current-visible",
+      "action": "assert",
+      "property": "visible",
+      "target": "role:imod-current",
+      "device": "DEV_461E",
+      "value": "true"
+    },
+    {
+      "id": "reset",
+      "action": "wait",
+      "durationMs": 3000,
+      "target": "role:imod-check",
+      "device": "DEV_461E",
+      "value": "CHECK"
+    },
+    {
+      "id": "after",
+      "action": "capture"
+    },
+    {
+      "id": "repeat",
+      "action": "transition",
+      "durationMs": 2000,
+      "intervalMs": 120,
+      "trigger": {
+        "action": "click",
+        "target": "role:imod-check",
+        "device": "DEV_461E"
+      },
+      "requireChange": false,
+      "target": "role:imod-check",
+      "device": "DEV_461E",
+      "value": "CHECK",
+      "property": "text"
+    },
+    {
+      "id": "repeat-reset",
+      "action": "assert",
+      "target": "role:imod-check",
+      "device": "DEV_461E",
+      "value": "CHECK"
+    },
+    {
+      "id": "russian",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "show-hide",
+      "action": "reveal",
+      "target": "id:IMOD_DETAILS",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "collapse",
+      "action": "click",
+      "target": "id:IMOD_DETAILS",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "ru-check",
+      "action": "click",
+      "target": "role:imod-check",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "ru-ack",
+      "action": "wait",
+      "durationMs": 1000,
+      "target": "role:imod-check",
+      "device": "DEV_461E",
+      "value": "ПРОВЕРИТЬ"
+    },
+    {
+      "id": "ru",
+      "action": "capture"
+    },
+    {
+      "id": "ru-table-open",
+      "action": "assert",
+      "target": "id:IMOD_DETAILS",
+      "device": "DEV_461E",
+      "value": "СКРЫТЬ"
+    },
+    {
+      "id": "ru-reset",
+      "action": "wait",
+      "durationMs": 3000,
+      "target": "role:imod-check",
+      "device": "DEV_461E",
+      "value": "ПРОВЕРИТЬ"
+    },
+    {
+      "id": "ru-still-disabled",
+      "action": "assert",
+      "property": "checked",
+      "target": "role:imod-toggle",
+      "device": "DEV_461E",
+      "value": "false"
+    },
+    {
+      "id": "ru-repeat",
+      "action": "transition",
+      "target": "role:imod-check",
+      "device": "DEV_461E",
+      "value": "ПРОВЕРИТЬ",
+      "property": "text",
+      "durationMs": 1800,
+      "intervalMs": 120,
+      "requireChange": false,
+      "trigger": {
+        "action": "click",
+        "target": "role:imod-check",
+        "device": "DEV_461E"
+      }
+    }
+  ]
+}

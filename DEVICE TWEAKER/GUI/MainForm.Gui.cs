@@ -234,18 +234,23 @@ public sealed partial class MainForm
         Button btnApply = NewTopButton("APPLY");
         Button btnAuto = NewTopButton("AUTO-OPTIMIZATION");
         Button btnRestore = NewTopButton("RESTORE");
+        _interruptModesReadButton = NewTopButton("READ IRQ MODE");
+        _interruptModesReadButton.Name = "IRQ_MODE_CHECK";
+        _interruptModesReadButton.TabStop = true;
+        _interruptModesReadButton.Click += async (_, _) => await CheckInterruptModeAsync();
         _btnScanRef = btnScan;
         _btnApplyRef = btnApply;
         _btnAutoRef = btnAuto;
         _btnRestoreRef = btnRestore;
-        _operationButtons = [btnScan, btnApply, btnAuto, btnRestore];
+        _operationButtons = [btnScan, btnApply, btnAuto, btnRestore, _interruptModesReadButton];
         int buttonGap = UiScale(8);
         btnApply.Margin = Padding.Empty;
         btnAuto.Margin = new Padding(buttonGap, 0, 0, 0);
         btnScan.Margin = new Padding(buttonGap, 0, 0, 0);
         btnRestore.Margin = new Padding(buttonGap, 0, 0, 0);
+        _interruptModesReadButton.Margin = new Padding(buttonGap, 0, 0, 0);
 
-        foreach (Button b in new[] { btnScan, btnApply, btnAuto, btnRestore })
+        foreach (Button b in _operationButtons)
         {
             SetTopButtonBaseStyle(b);
             b.MouseEnter += (_, _) => SetTopButtonHoverStyle(b);
@@ -268,25 +273,26 @@ public sealed partial class MainForm
 
         TableLayoutPanel buttonsGrid = new()
         {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 4,
+            AutoSize = false,
+            Size = UiScale(920, 36),
+            ColumnCount = 5,
             RowCount = 1,
             BackColor = _bgPanel,
             Anchor = AnchorStyles.None,
             Margin = Padding.Empty,
             Padding = Padding.Empty,
         };
-        buttonsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        buttonsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        buttonsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        buttonsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        buttonsGrid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        for (int column = 0; column < 5; column++)
+            buttonsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+        buttonsGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        foreach (Button button in _operationButtons) button.Dock = DockStyle.Fill;
+        buttonPanel.SizeChanged += (_, _) => buttonsGrid.Width = Math.Min(UiScale(920), Math.Max(1, buttonPanel.ClientSize.Width - buttonPanel.Padding.Horizontal));
 
         buttonsGrid.Controls.Add(btnApply, 0, 0);
         buttonsGrid.Controls.Add(btnAuto, 1, 0);
         buttonsGrid.Controls.Add(btnScan, 2, 0);
         buttonsGrid.Controls.Add(btnRestore, 3, 0);
+        buttonsGrid.Controls.Add(_interruptModesReadButton, 4, 0);
 
         buttonsHost.Controls.Add(buttonsGrid, 1, 0);
         buttonPanel.Controls.Add(buttonsHost);
@@ -356,6 +362,9 @@ public sealed partial class MainForm
         _devicesHost.SizeChanged += (_, _) =>
         {
             UpdateDevicesHostLayout();
+            // Form.Resize can run before DockStyle.Fill has its final width.
+            // Reflow cards against the actual viewport, after docking completes.
+            LayoutBlocks();
             UpdateDevicesScrollLayout();
             SyncDevicesScrollBar();
         };
@@ -370,7 +379,7 @@ public sealed partial class MainForm
             Font = _dialogFont,
             ForeColor = _statusInactive,
             BackColor = _bgForm,
-            Text = $"{UiLanguage.Text("NO MATCHING DEVICES")}\n{UiLanguage.Text("No devices match the current filter criteria.")}",
+            Text = $"{UiLanguage.Text("NO MATCHING DEVICES")}\n{UiLanguage.Text("No devices match this filter.")}",
             Visible = false,
         };
         _devicesHost.Controls.Add(_noMatchesLabel);
@@ -396,6 +405,8 @@ public sealed partial class MainForm
             InitialDelay = 400,
             ReshowDelay = 200,
         };
+        _copyToolTip.SetToolTip(_interruptModesReadButton,
+            "Read interrupt modes for all PCI devices, including hidden cards. Loads DTIMOD.sys if needed. Device settings are not changed.");
         UpdateFilterToolbarLocalization();
         _layoutRefreshTimer = new System.Windows.Forms.Timer
         {
@@ -571,10 +582,11 @@ public sealed partial class MainForm
             if (hasUsbImodTarget)
             {
                 optimizeUsbImod = ShowThemedConfirm(
-                    "USB IMOD tuning is available for detected XHCI controller(s).\n\nDTIMOD can be blocked by Vulnerable Driver Blocklist, Windows driver signature protection, antivirus, or anti-cheats.\n\nApply it during AUTO-OPTIMIZATION?",
+                    BuildUsbImodConfirmationMessage(out DriverEnvironmentSnapshot imodDetails),
                     "USB IMOD TUNING",
                     "APPLY",
-                    "SKIP");
+                    "SKIP",
+                    driverEnvironment: imodDetails);
                 WriteLog($"AUTO.IMOD.PROMPT: {(optimizeUsbImod ? "accepted" : "declined")}");
             }
             else
@@ -732,7 +744,7 @@ public sealed partial class MainForm
             }
 
         AutoCompleted:
-            // Dialog only after progress overlay is closed — never over a mid-stage %.
+            // Dialog only after progress overlay is closed , never over a mid-stage %.
             if (!showAutoResult)
             {
                 return;
@@ -1118,7 +1130,7 @@ public sealed partial class MainForm
         btn.ForeColor = _fgMain;
         if (btn == _btnApplyRef && (_blocks.Any(b => b.IsDirty) || _reservedCpuSetsDirty))
         {
-            btn.FlatAppearance.BorderColor = _statusWarn;
+            btn.FlatAppearance.BorderColor = _accent;
         }
         else
         {
@@ -1165,6 +1177,7 @@ public sealed partial class MainForm
 
     private void OpenUrl(string url)
     {
+        if (QaRun.TryBlock("EXTERNAL URL")) return;
         try
         {
             ProcessStartInfo startInfo = new()
@@ -1263,6 +1276,28 @@ public sealed partial class MainForm
         _filterPanel.Controls.Add(_filterCategoriesHost);
         _filterPanel.Controls.Add(searchHost);
 
+        bool arranging = false;
+        _filterPanel.Layout += (_, _) =>
+        {
+            if (arranging) return;
+            arranging = true;
+            try
+            {
+                int categoriesWidth = _filterCategoriesHost.PreferredSize.Width;
+                const int actionWidth = 0;
+                int clearWidth = _btnFilterClear.Visible ? _btnFilterClear.Width + _btnFilterClear.Margin.Horizontal : 0;
+                int available = _filterPanel.ClientSize.Width - _filterPanel.Padding.Horizontal;
+                bool stacked = available < categoriesWidth + actionWidth + clearWidth + UiScale(120);
+                int desiredHeight = UiScale(stacked ? 88 : 54);
+                if (_filterPanel.Height != desiredHeight) _filterPanel.Height = desiredHeight;
+                searchHost.Dock = stacked ? DockStyle.Top : DockStyle.Left;
+                _filterCategoriesHost.Dock = stacked ? DockStyle.Bottom : DockStyle.Right;
+                _searchFilterBox.Width = stacked ? UiScale(240)
+                    : Math.Clamp(available - categoriesWidth - actionWidth - clearWidth - UiScale(8), UiScale(120), UiScale(240));
+            }
+            finally { arranging = false; }
+        };
+
         RebuildFilterCategoryButtons();
     }
 
@@ -1280,6 +1315,8 @@ public sealed partial class MainForm
         }
 
         _filterCategoriesHost.SuspendLayout();
+        foreach (Control category in _filterCategoriesHost.Controls.Cast<Control>().ToArray())
+            category.Dispose();
         _filterCategoriesHost.Controls.Clear();
         _filterCategoryButtons.Clear();
 
@@ -1541,7 +1578,7 @@ public sealed partial class MainForm
 
         if (dirtyCount > 0)
         {
-            _copyToolTip.SetToolTip(_btnApplyRef, $"Apply changes (Ctrl+S) — modified: {dirtyCount}");
+            _copyToolTip.SetToolTip(_btnApplyRef, $"Apply changes (Ctrl+S): modified: {dirtyCount}");
         }
         else
         {
@@ -1579,7 +1616,7 @@ public sealed partial class MainForm
         }
         if (_noMatchesLabel != null)
         {
-            _noMatchesLabel.Text = $"{UiLanguage.Text("NO MATCHING DEVICES")}\n{UiLanguage.Text("No devices match the current filter criteria.")}";
+            _noMatchesLabel.Text = $"{UiLanguage.Text("NO MATCHING DEVICES")}\n{UiLanguage.Text("No devices match this filter.")}";
         }
         if (_btnScanRef != null)
         {

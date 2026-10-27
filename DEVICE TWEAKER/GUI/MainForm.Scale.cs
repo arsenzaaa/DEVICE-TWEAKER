@@ -25,6 +25,11 @@ public sealed partial class MainForm
             {
                 dpi = (int)UiBaseDpi;
             }
+#if DEVELOPER_QA
+            // Layout scaling model only; never changes Windows display settings.
+            if (int.TryParse(Environment.GetEnvironmentVariable("DEVICE_TWEAKER_QA_LAYOUT_DPI"), out int qaDpi)
+                && qaDpi is 96 or 120 or 144) dpi = qaDpi;
+#endif
 
             scale = dpi / UiBaseDpi;
         }

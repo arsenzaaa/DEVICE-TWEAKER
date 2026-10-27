@@ -1,21 +1,32 @@
-param(
+﻿param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Release",
 
     [ValidateSet("x64")]
     [string]$Platform = "x64",
 
-    [string]$PlatformToolset = "v143",
+    [string]$PlatformToolset = "v145",
 
     [switch]$CopyToLoader
 )
 
 $ErrorActionPreference = "Stop"
+if ($CopyToLoader) { throw "The release loader pair is pinned. Build outputs are kept under bin/KduBuild; update the payload manifest and validation explicitly before replacing it." }
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$sourceRoot = Join-Path $root "Source"
-$solutionDir = $sourceRoot
 $projectRoot = Resolve-Path (Join-Path $root "..\..")
+$upstream = Get-Content -LiteralPath (Join-Path $root 'upstream.json') -Raw | ConvertFrom-Json
+# Build a copy. Upstream contains a prebuilt post-build helper; never replace vendor inputs in place.
+$buildRoot = Join-Path $projectRoot ('bin\KduBuild\' + (Get-Date -Format 'yyyyMMdd_HHmmss') + '_' + [Guid]::NewGuid().ToString('N').Substring(0,8))
+foreach ($file in $upstream.files) {
+    $original = Join-Path $root $file.path
+    if ((Get-FileHash -LiteralPath $original -Algorithm SHA256).Hash -ne $file.sha256) { throw "Changed upstream input: $($file.path)" }
+    $copy = Join-Path $buildRoot $file.path
+    New-Item -ItemType Directory -Force -Path (Split-Path $copy) | Out-Null
+    Copy-Item -LiteralPath $original -Destination $copy
+}
+$sourceRoot = Join-Path $buildRoot "Source"
+$solutionDir = $sourceRoot
 
 function Find-MSBuild {
     $candidates = @(
@@ -95,6 +106,7 @@ Get-Item -LiteralPath $builtKdu, $builtDrv | Select-Object FullName, Length, Las
 Get-FileHash -Algorithm SHA256 $builtKdu, $builtDrv | Format-Table -AutoSize
 
 if ($CopyToLoader) {
+    if ($Configuration -ne 'Release') { throw 'Only Release KDU may enter the application payload' }
     $loaderDir = Join-Path $projectRoot "IMOD\Loader"
     if (-not (Test-Path -LiteralPath $loaderDir)) {
         throw "Loader directory does not exist: $loaderDir"
@@ -102,5 +114,13 @@ if ($CopyToLoader) {
 
     Copy-Item -LiteralPath $builtKdu -Destination (Join-Path $loaderDir "kdu.exe") -Force
     Copy-Item -LiteralPath $builtDrv -Destination (Join-Path $loaderDir "drv64.dll") -Force
+    $binaryRecords = @($builtKdu, $builtDrv | ForEach-Object {
+        [ordered]@{ name = [IO.Path]::GetFileName($_); sha256 = (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash;
+            version = [Diagnostics.FileVersionInfo]::GetVersionInfo($_).FileVersion }
+    })
+    [ordered]@{ schemaVersion = 1; tag = $upstream.tag; commit = $upstream.commit; configuration = $Configuration;
+        toolset = $PlatformToolset; sourceManifestSha256 = (Get-FileHash -LiteralPath (Join-Path $root 'upstream.json')).Hash;
+        buildScriptSha256 = (Get-FileHash -LiteralPath $PSCommandPath).Hash; binaries = $binaryRecords } |
+        ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $loaderDir 'KDU.build.json') -Encoding UTF8
     Write-Host "Copied rebuilt KDU binaries to $loaderDir"
 }

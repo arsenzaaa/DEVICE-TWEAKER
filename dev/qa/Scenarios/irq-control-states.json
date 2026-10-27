@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "id": "irq-control-states",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "GPU",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    {
+      "id": "EN-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "EN-reveal",
+      "action": "reveal",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-idle",
+      "action": "capture"
+    },
+    {
+      "id": "EN-hover",
+      "action": "hover",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-hovered",
+      "action": "capture"
+    },
+    {
+      "id": "EN-leave",
+      "action": "leave",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-focus",
+      "action": "focus",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-focused",
+      "action": "capture"
+    },
+    {
+      "id": "EN-model",
+      "action": "irq-check-model",
+      "value": "success",
+      "durationMs": 1400
+    },
+    {
+      "id": "EN-reading",
+      "action": "transition",
+      "durationMs": 2300,
+      "intervalMs": 200,
+      "trigger": {
+        "action": "click",
+        "target": "role:mode-refresh",
+        "device": "DEV_2684"
+      }
+    },
+    {
+      "id": "EN-ready",
+      "action": "wait",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "RU-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "RU-reveal",
+      "action": "reveal",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-idle",
+      "action": "capture"
+    },
+    {
+      "id": "RU-hover",
+      "action": "hover",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-hovered",
+      "action": "capture"
+    },
+    {
+      "id": "RU-leave",
+      "action": "leave",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-focus",
+      "action": "focus",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-focused",
+      "action": "capture"
+    },
+    {
+      "id": "RU-model",
+      "action": "irq-check-model",
+      "value": "success",
+      "durationMs": 1400
+    },
+    {
+      "id": "RU-reading",
+      "action": "transition",
+      "durationMs": 2300,
+      "intervalMs": 200,
+      "trigger": {
+        "action": "click",
+        "target": "role:mode-refresh",
+        "device": "DEV_2684"
+      }
+    },
+    {
+      "id": "RU-ready",
+      "action": "wait",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    }
+  ]
+}

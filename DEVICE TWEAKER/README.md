@@ -11,10 +11,14 @@
 ```powershell
 dotnet restore ".\DEVICE TWEAKER\DeviceTweakerCS.csproj"
 dotnet build ".\DEVICE TWEAKER\DeviceTweakerCS.csproj" -c Release -p:TreatWarningsAsErrors=true
-dotnet test ".\DEVICE TWEAKER\tests\DeviceTweaker.Tests\DeviceTweaker.Tests.csproj" -c Release
+dotnet test ".\dev\qa\tests\DeviceTweaker.Tests\DeviceTweaker.Tests.csproj" -c Release
 ```
 
 Готовый `IMOD/DTIMOD.sys` уже есть в репозитории. Visual Studio C++ Build Tools и Windows Driver Kit нужны, только если вы хотите пересобрать драйвер.
+
+После изменений драйвера пересоберите его через `publish-variants.ps1 -BuildDriverOnly`. QA сверяет исходники и бинарник с `IMOD/DTIMOD.build.json` и останавливается, если они не совпадают.
+
+Полный QA также использует C++ Build Tools / Windows SDK для нативной модели без загрузки драйвера. Исходники и комплект KDU сверяются с отдельными манифестами; порядок пересборки описан в [IMOD/KDU](IMOD/KDU/README.md).
 
 Два EXE и `SHA256SUMS.txt` собираются так:
 
@@ -27,12 +31,12 @@ powershell -ExecutionPolicy Bypass -File ".\DEVICE TWEAKER\publish-variants.ps1"
 
 ## Где искать код
 
-- `Affinity` — топология CPU и маски.
-- `Devices` — обнаружение и классификация устройств.
-- `Core` — применение настроек, восстановление, IMOD, NIC ITR и диагностика.
-- `GUI` и `Localization` — интерфейс и строки RU/EN.
-- `Interop` — вызовы Windows API.
-- `IMOD` — драйвер и загрузчик.
-- `tests` — тесты.
+- `Affinity`: топология CPU и маски.
+- `Devices`: обнаружение и классификация устройств.
+- `Core`: применение настроек, восстановление, IMOD, NIC ITR и диагностика.
+- `GUI` и `Localization`: интерфейс и строки RU/EN.
+- `Interop`: вызовы Windows API.
+- `IMOD`: драйвер и загрузчик.
+- [`dev/qa`](../dev/qa/README.md). проверки и отдельная сборка с тест-панелью.
 
 Если нашли ошибку или хотите прислать изменение, начните с [CONTRIBUTING.md](../.github/CONTRIBUTING.md).

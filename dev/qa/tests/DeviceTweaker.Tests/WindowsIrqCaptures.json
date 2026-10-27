@@ -1,0 +1,963 @@
+{
+  "resourceMaps": [
+    {
+      "name": "NVIDIA GeForce RTX 5060 Ti",
+      "instanceId": "PCI\\VEN_10DE&DEV_2D04&SUBSYS_53621462&REV_A1\\4&2BA2BF07&0&0008",
+      "pdo": "\\Device\\NTPNP_PCI0014",
+      "rawBase64": "AQAAAAUAAAABAAAAAQABABEAAAADAYAAAAAAgAAAAAAAAAAEAAAAAIEBAAABAAAAAAAAAAAAAAAAAAAABwGEAgAAAABAAAAAAAAAAgAAAACBAQAAAQAAAAEAAAAAAAAAAAAAAAMBhAAAAAAAQgAAAAAAAAIAAAAAgQEAAAEAAAADAAAAAAAAAAAAAAABATEBAGAAAAAAAACAAAAAAAAAAIEBAAABAAAABQAAAAAAAAAAAAAAAgEHAAAAAQDj////AFAAAAAAAAACAQcAAAABAOL///8AUAAAAAAAAAIBBwAAAAEA4f///wBQAAAAAAAAAgEHAAAAAQDg////AFAAAAAAAAACAQcAAAABAN////8AUAAAAAAAAAIBBwAAAAEA3v///wBQAAAAAAAAAgEHAAAAAQDd////AFAAAAAAAAACAQcAAAABANz///8AUAAAAAAAAAIBBwAAAAEA2////wBQAAAAAAAA",
+      "translatedBase64": "AQAAAAUAAAABAAAAAQABABEAAAADAYAAAAAAgAAAAAAAAAAEAAAAAIEBAAABAAAAAAAAAAAAAAAAAAAABwGEAgAAAABAAAAAAAAAAgAAAACBAQAAAQAAAAEAAAAAAAAAAAAAAAMBhAAAAAAAQgAAAAAAAAIAAAAAgQEAAAEAAAADAAAAAAAAAAAAAAABATEBAGAAAAAAAACAAAAAAAAAAIEBAAABAAAABQAAAAAAAAAAAAAAAgEHAAoAAACkAAAAAFAAAAAAAAACAQcACQAAAJQAAAAAUAAAAAAAAAIBBwAIAAAAhAAAAABQAAAAAAAAAgEHAAcAAAB0AAAAAFAAAAAAAAACAQcABgAAAGQAAAAAUAAAAAAAAAIBBwAFAAAAVAAAAABQAAAAAAAAAgEHAAsAAAC1AAAAAFAAAAAAAAACAQcACgAAAKUAAAAAUAAAAAAAAAIBBwAJAAAAlQAAAABQAAAAAAAA"
+    },
+    {
+      "name": "Realtek Gaming 2.5GbE Family Controller",
+      "instanceId": "PCI\\VEN_10EC&DEV_8125&SUBSYS_7D361462&REV_05\\4&17112BEF&0&00E2",
+      "pdo": "\\Device\\NTPNP_PCI0017",
+      "rawBase64": "AQAAAAUAAAAEAAAAAQABACYAAAABATEBAE8AAAAAAAAAAQAAAAAAAIEBAAABAAAAAAAAAAAAAAAAAAAAAwGAAAAAb4UAAAAAAAABAAAAAACBAQAAAQAAAAIAAAAAAAAAAAAAAAMBgAAAwG6FAAAAAABAAAAAAAAAgQEAAAEAAAAEAAAAAAAAAAAAAAACAQcAAAABANr///9AAAAAAAAAAAIBBwAAAAEA2f///0AAAAAAAAAAAgEHAAAAAQDY////QAAAAAAAAAACAQcAAAABANf///9AAAAAAAAAAAIBBwAAAAEA1v///0AAAAAAAAAAAgEHAAAAAQDV////QAAAAAAAAAACAQcAAAABANT///9AAAAAAAAAAAIBBwAAAAEA0////0AAAAAAAAAAAgEHAAAAAQDS////QAAAAAAAAAACAQcAAAABANH///9AAAAAAAAAAAIBBwAAAAEA0P///0AAAAAAAAAAAgEHAAAAAQDP////QAAAAAAAAAACAQcAAAABAM7///9AAAAAAAAAAAIBBwAAAAEAzf///0AAAAAAAAAAAgEHAAAAAQDM////QAAAAAAAAAACAQcAAAABAMv///9AAAAAAAAAAAIBBwAAAAEAyv///0AAAAAAAAAAAgEHAAAAAQDJ////QAAAAAAAAAACAQcAAAABAMj///9AAAAAAAAAAAIBBwAAAAEAx////0AAAAAAAAAAAgEHAAAAAQDG////QAAAAAAAAAACAQcAAAABAMX///9AAAAAAAAAAAIBBwAAAAEAxP///0AAAAAAAAAAAgEHAAAAAQDD////QAAAAAAAAAACAQcAAAABAML///9AAAAAAAAAAAIBBwAAAAEAwf///0AAAAAAAAAAAgEHAAAAAQDA////QAAAAAAAAAACAQcAAAABAL////9AAAAAAAAAAAIBBwAAAAEAvv///0AAAAAAAAAAAgEHAAAAAQC9////QAAAAAAAAAACAQcAAAABALz///9AAAAAAAAAAAIBBwAAAAEAu////0AAAAAAAAAA",
+      "translatedBase64": "AQAAAAUAAAAEAAAAAQABACYAAAABATEBAE8AAAAAAAAAAQAAAAAAAIEBAAABAAAAAAAAAAAAAAAAAAAAAwGAAAAAb4UAAAAAAAABAAAAAACBAQAAAQAAAAIAAAAAAAAAAAAAAAMBgAAAwG6FAAAAAABAAAAAAAAAgQEAAAEAAAAEAAAAAAAAAAAAAAACAQcACgAAAKQAAABAAAAAAAAAAAIBBwAJAAAAlAAAAEAAAAAAAAAAAgEHAAgAAACEAAAAQAAAAAAAAAACAQcABwAAAHQAAABAAAAAAAAAAAIBBwAGAAAAZAAAAEAAAAAAAAAAAgEHAAUAAABUAAAAQAAAAAAAAAACAQcACwAAALUAAABAAAAAAAAAAAIBBwAKAAAApQAAAEAAAAAAAAAAAgEHAAkAAACVAAAAQAAAAAAAAAACAQcACAAAAIUAAABAAAAAAAAAAAIBBwAHAAAAdQAAAEAAAAAAAAAAAgEHAAYAAABlAAAAQAAAAAAAAAACAQcABQAAAFUAAABAAAAAAAAAAAIBBwALAAAAtgAAAEAAAAAAAAAAAgEHAAoAAACmAAAAQAAAAAAAAAACAQcACQAAAJYAAABAAAAAAAAAAAIBBwAIAAAAhgAAAEAAAAAAAAAAAgEHAAcAAAB2AAAAQAAAAAAAAAACAQcABgAAAGYAAABAAAAAAAAAAAIBBwAFAAAAVgAAAEAAAAAAAAAAAgEHAAsAAAC3AAAAQAAAAAAAAAACAQcACgAAAKcAAABAAAAAAAAAAAIBBwAJAAAAlwAAAEAAAAAAAAAAAgEHAAgAAACHAAAAQAAAAAAAAAACAQcABwAAAHcAAABAAAAAAAAAAAIBBwAGAAAAZwAAAEAAAAAAAAAAAgEHAAUAAABXAAAAQAAAAAAAAAACAQcACwAAALgAAABAAAAAAAAAAAIBBwAKAAAAqAAAAEAAAAAAAAAAAgEHAAkAAACYAAAAQAAAAAAAAAACAQcACAAAAIgAAABAAAAAAAAAAAIBBwAHAAAAeAAAAEAAAAAAAAAA"
+    },
+    {
+      "name": "Standard NVM Express Controller",
+      "instanceId": "PCI\\VEN_1CC1&DEV_622A&SUBSYS_622A1CC1&REV_03\\4&97A1985&0&0030",
+      "pdo": "\\Device\\NTPNP_PCI0016",
+      "rawBase64": "AQAAAAUAAAACAAAAAQABABIAAAADAYAAAABwhQAAAAAAQAAAAAAAAIEBAAABAAAAAAAAAAAAAAAAAAAAAgEHAAAAAQD9////AAAAAAAAAAACAQcAAAABAPz///8AAAAAAAAAAAIBBwAAAAEA+////wAAAAAAAAAAAgEHAAAAAQD6////AAAAAAAAAAACAQcAAAABAPn///8AAAAAAAAAAAIBBwAAAAEA+P///wAAAAAAAAAAAgEHAAAAAQD3////AAAAAAAAAAACAQcAAAABAPb///8AAAAAAAAAAAIBBwAAAAEA9f///wAAAAAAAAAAAgEHAAAAAQD0////AAAAAAAAAAACAQcAAAABAPP///8AAAAAAAAAAAIBBwAAAAEA8v///wAAAAAAAAAAAgEHAAAAAQDx////AAAAAAAAAAACAQcAAAABAPD///8AAAAAAAAAAAIBBwAAAAEA7////wAAAAAAAAAAAgEHAAAAAQDu////AAAAAAAAAAA=",
+      "translatedBase64": "AQAAAAUAAAACAAAAAQABABIAAAADAYAAAABwhQAAAAAAQAAAAAAAAIEBAAABAAAAAAAAAAAAAAAAAAAAAgEHAAcAAABwAAAA//8AAAAAAAACAQcABgAAAGAAAAD//wAAAAAAAAIBBwAFAAAAUAAAAP//AAAAAAAAAgEHAAsAAACxAAAA//8AAAAAAAACAQcACgAAAKEAAAD//wAAAAAAAAIBBwAJAAAAkQAAAP//AAAAAAAAAgEHAAgAAACBAAAA//8AAAAAAAACAQcABwAAAHEAAAD//wAAAAAAAAIBBwAGAAAAYQAAAP//AAAAAAAAAgEHAAUAAABRAAAA//8AAAAAAAACAQcACwAAALIAAAD//wAAAAAAAAIBBwAKAAAAogAAAP//AAAAAAAAAgEHAAkAAACSAAAA//8AAAAAAAACAQcACAAAAIIAAAD//wAAAAAAAAIBBwAHAAAAcgAAAP//AAAAAAAAAgEHAAYAAABiAAAA//8AAAAAAAA="
+    },
+    {
+      "name": "Intel(R) USB 3.20 eXtensible Host Controller - 1.20 (Microsoft)",
+      "instanceId": "PCI\\VEN_8086&DEV_7AE0&SUBSYS_7D361462&REV_11\\3&11583659&0&A0",
+      "pdo": "\\Device\\NTPNP_PCI0003",
+      "rawBase64": "AQAAAAUAAAAAAAAAAQABAAMAAAADAYAAAABQA0IAAAAAAAEAAAAAAIEBAAABAAAAAAAAAAAAAAAAAAAAAgEDAAAAAQDk////AAAAAAAAAAA=",
+      "translatedBase64": "AQAAAAUAAAAAAAAAAQABAAMAAAADAYAAAABQA0IAAAAAAAEAAAAAAIEBAAABAAAAAAAAAAAAAAAAAAAAAgEDAAoAAACkAAAABAAAAAAAAAA="
+    },
+    {
+      "name": "Standard SATA AHCI Controller",
+      "instanceId": "PCI\\VEN_8086&DEV_7AE2&SUBSYS_7D361462&REV_11\\3&11583659&0&B8",
+      "pdo": "\\Device\\NTPNP_PCI0006",
+      "rawBase64": "AQAAAAUAAAAAAAAAAQABAA0AAAADAYAAAACAhQAAAAAAIAAAAAAAAIEBAAABAAAAAAAAAAAAAAAAAAAAAwGAAAAwgIUAAAAAAAEAAAAAAACBAQAAAQAAAAEAAAAAAAAAAAAAAAEBMQFQcAAAAAAAAAgAAAAAAAAAgQEAAAEAAAACAAAAAAAAAAAAAAABATEBQHAAAAAAAAAEAAAAAAAAAIEBAAABAAAAAwAAAAAAAAAAAAAAAQExASBwAAAAAAAAIAAAAAAAAACBAQAAAQAAAAQAAAAAAAAAAAAAAAMBgAAAIICFAAAAAAAIAAAAAAAAgQEAAAEAAAAFAAAAAAAAAAAAAAACAQMAAAABAP7///8AAAAAAAAAAA==",
+      "translatedBase64": "AQAAAAUAAAAAAAAAAQABAA0AAAADAYAAAACAhQAAAAAAIAAAAAAAAIEBAAABAAAAAAAAAAAAAAAAAAAAAwGAAAAwgIUAAAAAAAEAAAAAAACBAQAAAQAAAAEAAAAAAAAAAAAAAAEBMQFQcAAAAAAAAAgAAAAAAAAAgQEAAAEAAAACAAAAAAAAAAAAAAABATEBQHAAAAAAAAAEAAAAAAAAAIEBAAABAAAAAwAAAAAAAAAAAAAAAQExASBwAAAAAAAAIAAAAAAAAACBAQAAAQAAAAQAAAAAAAAAAAAAAAMBgAAAIICFAAAAAAAIAAAAAAAAgQEAAAEAAAAFAAAAAAAAAAAAAAACAQMACAAAAIAAAAD//wAAAAAAAA=="
+    },
+    {
+      "name": "Standard NVM Express Controller",
+      "instanceId": "PCI\\VEN_1CC1&DEV_612A&SUBSYS_612A1CC1&REV_01\\4&22739C7B&0&00EC",
+      "pdo": "\\Device\\NTPNP_PCI0018",
+      "rawBase64": "AQAAAAUAAAAGAAAAAQABAAsAAAADAYAAAABQhQAAAAAAQAAAAAAAAIEBAAABAAAAAAAAAAAAAAAAAAAAAgEHAAAAAQDt////AAAAAAAAAAACAQcAAAABAOz///8AAAAAAAAAAAIBBwAAAAEA6////wAAAAAAAAAAAgEHAAAAAQDq////AAAAAAAAAAACAQcAAAABAOn///8AAAAAAAAAAAIBBwAAAAEA6P///wAAAAAAAAAAAgEHAAAAAQDn////AAAAAAAAAAACAQcAAAABAOb///8AAAAAAAAAAAIBBwAAAAEA5f///wAAAAAAAAAA",
+      "translatedBase64": "AQAAAAUAAAAGAAAAAQABAAsAAAADAYAAAABQhQAAAAAAQAAAAAAAAIEBAAABAAAAAAAAAAAAAAAAAAAAAgEHAAUAAABSAAAA//8AAAAAAAACAQcACwAAALMAAAD//wAAAAAAAAIBBwAKAAAAowAAAP//AAAAAAAAAgEHAAkAAACTAAAA//8AAAAAAAACAQcACAAAAIMAAAD//wAAAAAAAAIBBwAHAAAAcwAAAP//AAAAAAAAAgEHAAYAAABjAAAA//8AAAAAAAACAQcABQAAAFMAAAD//wAAAAAAAAIBBwALAAAAtAAAAP//AAAAAAAA"
+    }
+  ],
+  "timestampMoscow": "2026-10-27 01:26:47",
+  "process64": true,
+  "scope": "Read-only allocated IRQ descriptors and interrupt capability property; no driver load",
+  "devices": [
+    {
+      "name": "NVIDIA GeForce RTX 5060 Ti",
+      "class": "Display",
+      "data": {
+        "InstanceId": "PCI\\VEN_10DE&DEV_2D04&SUBSYS_53621462&REV_A1\\4&2BA2BF07&0&0008",
+        "PdoName": "\\Device\\NTPNP_PCI0014",
+        "LocateStatus": 0,
+        "AllocStatus": 0,
+        "EnumStatus": 15,
+        "SupportStatus": 0,
+        "SupportType": 7,
+        "SupportMask": 7,
+        "Irqs": [
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967267,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 20480,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-E3-FF-FF-FF-00-50-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967266,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 20480,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-E2-FF-FF-FF-00-50-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967265,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 20480,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-E1-FF-FF-FF-00-50-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967264,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 20480,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-E0-FF-FF-FF-00-50-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967263,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 20480,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-DF-FF-FF-FF-00-50-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967262,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 20480,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-DE-FF-FF-FF-00-50-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967261,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 20480,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-DD-FF-FF-FF-00-50-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967260,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 20480,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-DC-FF-FF-FF-00-50-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967259,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 20480,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-DB-FF-FF-FF-00-50-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Realtek Gaming 2.5GbE Family Controller",
+      "class": "Net",
+      "data": {
+        "InstanceId": "PCI\\VEN_10EC&DEV_8125&SUBSYS_7D361462&REV_05\\4&17112BEF&0&00E2",
+        "PdoName": "\\Device\\NTPNP_PCI0017",
+        "LocateStatus": 0,
+        "AllocStatus": 0,
+        "EnumStatus": 15,
+        "SupportStatus": 0,
+        "SupportType": 7,
+        "SupportMask": 7,
+        "Irqs": [
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967258,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-DA-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967257,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-D9-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967256,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-D8-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967255,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-D7-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967254,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-D6-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967253,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-D5-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967252,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-D4-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967251,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-D3-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967250,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-D2-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967249,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-D1-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967248,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-D0-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967247,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-CF-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967246,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-CE-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967245,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-CD-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967244,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-CC-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967243,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-CB-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967242,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-CA-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967241,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-C9-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967240,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-C8-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967239,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-C7-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967238,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-C6-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967237,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-C5-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967236,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-C4-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967235,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-C3-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967234,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-C2-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967233,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-C1-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967232,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-C0-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967231,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-BF-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967230,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-BE-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967229,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-BD-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967228,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-BC-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967227,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 64,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-BB-FF-FF-FF-40-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Standard NVM Express Controller",
+      "class": "SCSIAdapter",
+      "data": {
+        "InstanceId": "PCI\\VEN_1CC1&DEV_622A&SUBSYS_622A1CC1&REV_03\\4&97A1985&0&0030",
+        "PdoName": "\\Device\\NTPNP_PCI0016",
+        "LocateStatus": 0,
+        "AllocStatus": 0,
+        "EnumStatus": 15,
+        "SupportStatus": 0,
+        "SupportType": 7,
+        "SupportMask": 7,
+        "Irqs": [
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967293,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-FD-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967292,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-FC-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967291,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-FB-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967290,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-FA-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967289,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-F9-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967288,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-F8-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967287,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-F7-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967286,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-F6-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967285,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-F5-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967284,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-F4-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967283,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-F3-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967282,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-F2-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967281,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-F1-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967280,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-F0-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967279,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-EF-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967278,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-EE-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Intel(R) USB 3.20 eXtensible Host Controller - 1.20 (Microsoft)",
+      "class": "USB",
+      "data": {
+        "InstanceId": "PCI\\VEN_8086&DEV_7AE0&SUBSYS_7D361462&REV_11\\3&11583659&0&A0",
+        "PdoName": "\\Device\\NTPNP_PCI0003",
+        "LocateStatus": 0,
+        "AllocStatus": 0,
+        "EnumStatus": 15,
+        "SupportStatus": 0,
+        "SupportType": 7,
+        "SupportMask": 3,
+        "Irqs": [
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967268,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-E4-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Standard SATA AHCI Controller",
+      "class": "HDC",
+      "data": {
+        "InstanceId": "PCI\\VEN_8086&DEV_7AE2&SUBSYS_7D361462&REV_11\\3&11583659&0&B8",
+        "PdoName": "\\Device\\NTPNP_PCI0006",
+        "LocateStatus": 0,
+        "AllocStatus": 0,
+        "EnumStatus": 15,
+        "SupportStatus": 0,
+        "SupportType": 7,
+        "SupportMask": 3,
+        "Irqs": [
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967294,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-FE-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Standard NVM Express Controller",
+      "class": "SCSIAdapter",
+      "data": {
+        "InstanceId": "PCI\\VEN_1CC1&DEV_612A&SUBSYS_612A1CC1&REV_01\\4&22739C7B&0&00EC",
+        "PdoName": "\\Device\\NTPNP_PCI0018",
+        "LocateStatus": 0,
+        "AllocStatus": 0,
+        "EnumStatus": 15,
+        "SupportStatus": 0,
+        "SupportType": 7,
+        "SupportMask": 7,
+        "Irqs": [
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967277,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-ED-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967276,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-EC-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967275,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-EB-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967274,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-EA-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967273,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-E9-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967272,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-E8-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967271,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-E7-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967270,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-E6-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          },
+          {
+            "SizeStatus": 0,
+            "DataStatus": 0,
+            "Size": 36,
+            "Count": 0,
+            "Type": 12,
+            "Number": 4294967269,
+            "Flags": 2,
+            "Group": 1,
+            "Affinity": 0,
+            "Hex": "00-00-00-00-0C-00-00-00-02-00-01-00-E5-FF-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00"
+          }
+        ]
+      }
+    }
+  ]
+}

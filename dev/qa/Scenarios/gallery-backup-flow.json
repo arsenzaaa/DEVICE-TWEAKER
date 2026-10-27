@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "id": "gallery-backup-flow",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    {
+      "id": "gallery",
+      "action": "gallery"
+    },
+    {
+      "id": "gallery-ready",
+      "action": "wait",
+      "target": "@active",
+      "value": "TEST ADMIN",
+      "durationMs": 3000
+    },
+    {
+      "id": "gallery-results",
+      "action": "click",
+      "target": "id:TEST_ADMIN_NAV_RESULTS"
+    },
+    {
+      "id": "gallery-reveal",
+      "action": "reveal",
+      "target": "text:PROMPT: RESTORE"
+    },
+    {
+      "id": "gallery-before",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "backup-open",
+      "action": "click",
+      "target": "text:PROMPT: RESTORE"
+    },
+    {
+      "id": "backup-ready",
+      "action": "wait",
+      "target": "id:DELETE SELECTED",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "delete",
+      "action": "transition",
+      "target": "@active",
+      "durationMs": 400,
+      "intervalMs": 100,
+      "trigger": {
+        "action": "click",
+        "target": "id:DELETE SELECTED"
+      }
+    },
+    {
+      "id": "menu-remains",
+      "action": "assert",
+      "target": "@active",
+      "value": "RESTORE"
+    },
+    {
+      "id": "protected",
+      "action": "assert",
+      "target": "id:DELETE SELECTED",
+      "property": "enabled",
+      "value": "false"
+    },
+    {
+      "id": "after-delete",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "menu-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "gallery-again",
+      "action": "wait",
+      "target": "@active",
+      "value": "TEST ADMIN",
+      "durationMs": 3000
+    },
+    {
+      "id": "gallery-close",
+      "action": "key",
+      "target": "@active",
+      "value": "Escape"
+    },
+    {
+      "id": "done",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    }
+  ]
+}

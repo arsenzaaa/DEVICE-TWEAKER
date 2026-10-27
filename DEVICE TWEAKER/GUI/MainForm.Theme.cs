@@ -55,17 +55,26 @@ public sealed partial class MainForm
     private ThemedToolTip _copyToolTip = null!;
     private Icon? _appIcon;
     private bool _darkModeInitialized;
+    private bool _uiDisposing;
 
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
+            _uiDisposing = true;
             UiLanguage.Changed -= HandleUiLanguageChanged;
             DisposeRawPolling();
             _startupRefreshTimer?.Dispose();
             _layoutRefreshTimer?.Dispose();
             _copyToolTip?.Dispose();
             _appIcon?.Dispose();
+        }
+
+        // Destroy child controls while their shared fonts are still alive.
+        // Native resize messages can be delivered during base.Dispose.
+        base.Dispose(disposing);
+        if (disposing)
+        {
             _baseFont.Dispose();
             _subtitleFont.Dispose();
             _dialogFont.Dispose();
@@ -79,6 +88,5 @@ public sealed partial class MainForm
             _blockFont.Dispose();
         }
 
-        base.Dispose(disposing);
     }
 }

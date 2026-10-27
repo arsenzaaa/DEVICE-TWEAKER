@@ -30,7 +30,7 @@ internal sealed class HighlightLabel : Label
             | TextFormatFlags.PreserveGraphicsClipping
             | TextFormatFlags.EndEllipsis;
 
-        // One draw per region — never overpaint the same glyphs twice.
+        // One draw per region , never overpaint the same glyphs twice.
         // Double TextRenderer passes with ClearType cause cyan/red fringing
         // on dark OLED backgrounds (visible on "Mouse scanning" headers).
         string prefix = Text[..index];

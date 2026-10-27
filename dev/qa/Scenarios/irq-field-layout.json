@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "id": "irq-field-layout",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "GPU",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    {
+      "id": "EN-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "EN-1200-resize",
+      "action": "resize",
+      "width": 1200,
+      "height": 900
+    },
+    {
+      "id": "EN-1200-DEV_2684-reveal",
+      "action": "reveal",
+      "target": "role:mode",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-1200-DEV_2684",
+      "action": "capture"
+    },
+    {
+      "id": "EN-1200-DEV_461E-reveal",
+      "action": "reveal",
+      "target": "role:mode",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-1200-DEV_461E",
+      "action": "capture"
+    },
+    {
+      "id": "EN-1000-resize",
+      "action": "resize",
+      "width": 1000,
+      "height": 900
+    },
+    {
+      "id": "EN-1000-DEV_2684-reveal",
+      "action": "reveal",
+      "target": "role:mode",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-1000-DEV_2684",
+      "action": "capture"
+    },
+    {
+      "id": "EN-1000-DEV_461E-reveal",
+      "action": "reveal",
+      "target": "role:mode",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-1000-DEV_461E",
+      "action": "capture"
+    },
+    {
+      "id": "RU-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "RU-1200-resize",
+      "action": "resize",
+      "width": 1200,
+      "height": 900
+    },
+    {
+      "id": "RU-1200-DEV_2684-reveal",
+      "action": "reveal",
+      "target": "role:mode",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-1200-DEV_2684",
+      "action": "capture"
+    },
+    {
+      "id": "RU-1200-DEV_461E-reveal",
+      "action": "reveal",
+      "target": "role:mode",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-1200-DEV_461E",
+      "action": "capture"
+    },
+    {
+      "id": "RU-1000-resize",
+      "action": "resize",
+      "width": 1000,
+      "height": 900
+    },
+    {
+      "id": "RU-1000-DEV_2684-reveal",
+      "action": "reveal",
+      "target": "role:mode",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-1000-DEV_2684",
+      "action": "capture"
+    },
+    {
+      "id": "RU-1000-DEV_461E-reveal",
+      "action": "reveal",
+      "target": "role:mode",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-1000-DEV_461E",
+      "action": "capture"
+    }
+  ]
+}

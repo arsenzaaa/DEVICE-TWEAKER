@@ -46,45 +46,44 @@ internal static class NativeCfgMgr32
 
         try
         {
-            string currentId = instanceId;
-            for (int depth = 0; depth < 8; depth++)
-            {
-                if (CM_Locate_DevNodeW(out uint devInst, currentId, 0) != CR_SUCCESS)
-                {
-                    return false;
-                }
-
-                if (TryGetDevNodeUInt32(devInst, 14, out uint supportMask))
-                {
-                    uint? maximum = TryGetDevNodeUInt32(devInst, 15, out uint maxValue)
-                        ? maxValue
-                        : null;
-                    capabilities = new PciInterruptCapabilities(
-                        (PciInterruptSupport)(supportMask & 0x7),
-                        maximum);
-                    return true;
-                }
-
-                if (CM_Get_Parent(out uint parentDevInst, devInst, 0) != CR_SUCCESS
-                    || CM_Get_Device_ID_Size(out uint idLen, parentDevInst, 0) != CR_SUCCESS)
-                {
-                    return false;
-                }
-
-                StringBuilder parentId = new((int)idLen + 1);
-                if (CM_Get_Device_IDW(parentDevInst, parentId, parentId.Capacity, 0) != CR_SUCCESS)
-                {
-                    return false;
-                }
-
-                currentId = parentId.ToString();
-            }
+            // A bridge's capabilities do not describe its child device.
+            if (!instanceId.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase)
+                || CM_Locate_DevNodeW(out uint devInst, instanceId, 0) != CR_SUCCESS
+                || !TryGetDevNodeUInt32(devInst, 14, out uint supportMask)) return false;
+            uint? maximum = TryGetDevNodeUInt32(devInst, 15, out uint maxValue) ? maxValue : null;
+            capabilities = new PciInterruptCapabilities((PciInterruptSupport)(supportMask & 0x7), maximum);
+            return true;
         }
         catch
         {
         }
 
         return false;
+    }
+
+    internal static bool TryGetPciPdoName(string instanceId, out string pdoName, out string error)
+    {
+        pdoName = string.Empty;
+        error = string.Empty;
+        if (!instanceId.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase))
+        {
+            error = "not a PCI device";
+            return false;
+        }
+        int cr = CM_Locate_DevNodeW(out uint devInst, instanceId, 0);
+        if (cr != CR_SUCCESS) { error = $"CM_Locate_DevNode: 0x{cr:X}"; return false; }
+        // DEVPKEY_Device_PDOName; exact devnode, no parent traversal.
+        DevPropKey key = new() { FormatId = new Guid("A45C254E-DF1C-4EFD-8020-67D146A850E0"), PropertyId = 16 };
+        byte[] data = new byte[512];
+        uint size = (uint)data.Length;
+        cr = CM_Get_DevNode_PropertyW(devInst, ref key, out uint type, data, ref size, 0);
+        if (cr != CR_SUCCESS || type != 0x12 || size < 2 || size > data.Length || size % 2 != 0)
+        { error = $"CM_Get_DevNode_Property(PDOName): 0x{cr:X}, type={type}, bytes={size}"; return false; }
+        if (data[size - 2] != 0 || data[size - 1] != 0)
+        { error = "PDO name is not terminated"; return false; }
+        pdoName = Encoding.Unicode.GetString(data, 0, (int)size - 2);
+        if (string.IsNullOrEmpty(pdoName)) { error = "Windows returned an empty PDO name"; return false; }
+        return true;
     }
 
     private static bool TryGetDevNodeUInt32(uint devInst, uint propertyId, out uint value)

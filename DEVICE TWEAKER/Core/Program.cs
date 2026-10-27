@@ -1,4 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
 namespace DeviceTweakerCS;
@@ -9,10 +9,27 @@ static class Program
     private static int _handlingFatalUiException;
 
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
+        if (args.Contains("--qa-read-only", StringComparer.Ordinal))
+            Environment.SetEnvironmentVariable("DEVICE_TWEAKER_QA_READ_ONLY", "1");
+        try { QaDesktop.DemandAssignedDesktop(); }
+        catch (Exception ex)
+        {
+            // Refuse before logging setup, single-instance handling or window creation.
+            Console.Error.WriteLine(ex.Message);
+            Environment.ExitCode = 3;
+            return;
+        }
+        if (QaRun.IsReadOnly)
+        {
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => QaRun.WriteReport();
+            QaRun.WriteReport();
+            if (args.Contains("--qa-probe", StringComparer.Ordinal)) return;
+        }
+
         UiLanguage.Initialize();
-        if (!WindowsSecurity.IsAdministrator())
+        if (!QaRun.IsReadOnly && !WindowsSecurity.IsAdministrator())
         {
             if (WindowsSecurity.TryRelaunchAsAdministrator())
             {
@@ -20,17 +37,20 @@ static class Program
             }
 
             MessageBox.Show(
-                UiLanguage.Text("This tool must be run as Administrator (it writes to HKLM registry).\n\nRight-click the EXE and choose 'Run as administrator'."),
+                UiLanguage.Text("Run DEVICE TWEAKER as administrator to apply settings.\n\nRight-click the EXE and choose 'Run as administrator'."),
                 "DEVICE TWEAKER",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
             return;
         }
 
-        using Mutex singleInstanceMutex = new(initiallyOwned: true, SingleInstanceMutexName, out bool isFirstInstance);
+        string mutexName = QaRun.IsReadOnly
+            ? @"Local\DEVICE_TWEAKER_QA_" + QaRun.SessionId
+            : SingleInstanceMutexName;
+        using Mutex singleInstanceMutex = new(initiallyOwned: true, mutexName, out bool isFirstInstance);
         if (!isFirstInstance)
         {
-            ActivateExistingInstance();
+            if (!QaRun.IsReadOnly) ActivateExistingInstance();
             return;
         }
 
@@ -112,9 +132,9 @@ static class Program
         try
         {
             MessageBox.Show(
-                UiLanguage.Text("DEVICE TWEAKER encountered a critical error and must close.\n\n"
-                    + "A crash report was saved in the logs folder. No further changes will be applied."),
-                UiLanguage.Text("DEVICE TWEAKER — CRITICAL ERROR"),
+                UiLanguage.Text("DEVICE TWEAKER has crashed and will close.\n\n"
+                    + "A crash report is saved in logs. No further settings will be applied."),
+                UiLanguage.Text("DEVICE TWEAKER: CRITICAL ERROR"),
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }

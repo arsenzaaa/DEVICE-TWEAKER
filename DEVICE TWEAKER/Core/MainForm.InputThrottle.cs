@@ -80,16 +80,16 @@ public sealed partial class MainForm
     private static string GetRawMouseThrottleToolTip(bool osSupported)
     {
         const string whatItDoes =
-            "On supported Windows builds, eligible background Raw Input listeners can be throttled.\n"
-            + "Throttling and coalescing can reduce the message load from background listeners.\n"
-            + "Mice with a polling rate from 1 to 8 kHz can create a high message load.\n"
+            "Limits Raw Input delivery to eligible background listeners on supported Windows builds.\n"
+            + "Can reduce the message load from background listeners.\n"
+            + "High mouse polling rates can increase this load.\n"
             + "This setting does not target foreground apps.\n"
-            + "Some background registrations can bypass the throttle.";
+            + "Some background listeners can bypass this limit.";
 
         const string how =
-            "The setting writes RawMouseThrottleDuration to HKCU\\Control Panel\\Mouse.\n"
-            + "DEVICE TWEAKER accepts DWORD values from 1 to 20 milliseconds.\n"
-            + "A larger value requests a longer throttle interval for background listeners.\n"
+            "RawMouseThrottleDuration: HKCU\\Control Panel\\Mouse.\n"
+            + "Accepted values: DWORD 1–20 ms.\n"
+            + "Larger values request longer intervals for background listeners.\n"
             + "Nominal intervals: 20 ms ≈ 50 Hz, 8 ms ≈ 125 Hz, 1 ms ≈ 1 kHz. Actual event rates also depend on input traffic and leeway.";
 
         const string when =
@@ -220,8 +220,8 @@ public sealed partial class MainForm
             if (_rawMouseThrottlePending && block.RawMouseThrottleStatusLabel is not null)
             {
                 block.RawMouseThrottleStatusLabel.Text = _pendingRawMouseThrottleEnabled
-                    ? $"{(UiLanguage.IsRussian ? "ожидает APPLY" : "pending APPLY")}: {GetRawMouseThrottleCapTag(_pendingRawMouseThrottleDuration)} (DWORD={_pendingRawMouseThrottleDuration})"
-                    : (UiLanguage.IsRussian ? "ожидает APPLY: выкл." : "pending APPLY: off");
+                    ? $"{"pending APPLY"}: {GetRawMouseThrottleCapTag(_pendingRawMouseThrottleDuration)} (DWORD={_pendingRawMouseThrottleDuration})"
+                    : "pending APPLY: off";
                 block.RawMouseThrottleStatusLabel.ForeColor = _statusWarn;
             }
         }
@@ -263,8 +263,8 @@ public sealed partial class MainForm
                 if (other.RawMouseThrottleStatusLabel is not null)
                 {
                     other.RawMouseThrottleStatusLabel.Text = enabled
-                        ? $"{(UiLanguage.IsRussian ? "ожидает APPLY" : "pending APPLY")}: {GetRawMouseThrottleCapTag(duration)} (DWORD={duration})"
-                        : (UiLanguage.IsRussian ? "ожидает APPLY: выкл." : "pending APPLY: off");
+                        ? $"{"pending APPLY"}: {GetRawMouseThrottleCapTag(duration)} (DWORD={duration})"
+                        : "pending APPLY: off";
                     other.RawMouseThrottleStatusLabel.ForeColor = _statusWarn;
                 }
 
@@ -305,6 +305,7 @@ public sealed partial class MainForm
 
     private void SetRawMouseThrottle(bool enabled, int duration)
     {
+        DemandRealWrite("SetRawMouseThrottle");
         if (!SupportsRawMouseThrottleOs())
         {
             throw new InvalidOperationException("RawMouseThrottleDuration requires Windows 11+.");
@@ -412,7 +413,7 @@ public sealed partial class MainForm
     private void UpdateRawMouseThrottleInfoLine(DeviceBlock block)
     {
         string status = GetRawMouseThrottleStatus();
-        string text = block.InfoLabel.Text ?? string.Empty;
+        string text = GetSourceControlText(block.InfoLabel);
         if (string.IsNullOrWhiteSpace(text))
         {
             block.InfoLabel.Text = status;

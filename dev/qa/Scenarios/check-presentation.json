@@ -1,0 +1,289 @@
+{
+  "schemaVersion": 1,
+  "id": "check-presentation",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "GPU",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    {
+      "id": "EN-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "EN-gpu-filter",
+      "action": "click",
+      "target": "id:FILTER_GPU"
+    },
+    {
+      "id": "EN-irq-reveal-scroll",
+      "action": "reveal",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-irq-reveal",
+      "action": "assert",
+      "target": "role:mode-refresh",
+      "property": "visible",
+      "value": "true",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-irq",
+      "action": "capture"
+    },
+    {
+      "id": "EN-irq-focus",
+      "action": "focus",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-irq-focused",
+      "action": "capture"
+    },
+    {
+      "id": "EN-irq-hover",
+      "action": "hover",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-irq-hovered",
+      "action": "capture"
+    },
+    {
+      "id": "EN-irq-leave",
+      "action": "leave",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-gpu-info-reveal",
+      "action": "reveal",
+      "target": "text:PNP ID: PCI_VEN_10DE_DEV_2684\nClass: Display\nRegistry: HKLM\\SYSTEM\\CurrentControlSet\\Enum\\PCI\\VEN_10DE&DEV_2684"
+    },
+    {
+      "id": "EN-gpu-info",
+      "action": "capture"
+    },
+    {
+      "id": "EN-usb-filter",
+      "action": "click",
+      "target": "id:FILTER_USB"
+    },
+    {
+      "id": "EN-imod-reveal",
+      "action": "reveal",
+      "target": "role:imod-toggle",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-imod-toggle",
+      "action": "toggle",
+      "target": "role:imod-toggle",
+      "device": "DEV_461E",
+      "value": "false"
+    },
+    {
+      "id": "EN-check-reveal",
+      "action": "reveal",
+      "target": "role:imod-check",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-check-hover",
+      "action": "hover",
+      "target": "role:imod-check",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-read",
+      "action": "transition",
+      "durationMs": 1800,
+      "intervalMs": 100,
+      "requireChange": false,
+      "trigger": {
+        "action": "click",
+        "target": "role:imod-check",
+        "device": "DEV_461E"
+      }
+    },
+    {
+      "id": "EN-check-leave",
+      "action": "leave",
+      "target": "role:imod-check",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-readback-visible",
+      "action": "assert",
+      "target": "role:imod-current",
+      "device": "DEV_461E",
+      "property": "visible",
+      "value": "true"
+    },
+    {
+      "id": "EN-check",
+      "action": "capture"
+    },
+    {
+      "id": "EN-backup-open",
+      "action": "dialog",
+      "value": "backup-location"
+    },
+    {
+      "id": "EN-backup",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "EN-backup-close",
+      "action": "key",
+      "target": "@active",
+      "value": "Escape"
+    },
+    {
+      "id": "RU-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "RU-gpu-filter",
+      "action": "click",
+      "target": "id:FILTER_GPU"
+    },
+    {
+      "id": "RU-irq-reveal-scroll",
+      "action": "reveal",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-irq-reveal",
+      "action": "assert",
+      "target": "role:mode-refresh",
+      "property": "visible",
+      "value": "true",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-irq",
+      "action": "capture"
+    },
+    {
+      "id": "RU-irq-focus",
+      "action": "focus",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-irq-focused",
+      "action": "capture"
+    },
+    {
+      "id": "RU-irq-hover",
+      "action": "hover",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-irq-hovered",
+      "action": "capture"
+    },
+    {
+      "id": "RU-irq-leave",
+      "action": "leave",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-gpu-info-reveal",
+      "action": "reveal",
+      "target": "text:PNP ID: PCI_VEN_10DE_DEV_2684\nКласс: Display\nРеестр: HKLM\\SYSTEM\\CurrentControlSet\\Enum\\PCI\\VEN_10DE&DEV_2684"
+    },
+    {
+      "id": "RU-gpu-info",
+      "action": "capture"
+    },
+    {
+      "id": "RU-usb-filter",
+      "action": "click",
+      "target": "id:FILTER_USB"
+    },
+    {
+      "id": "RU-imod-reveal",
+      "action": "reveal",
+      "target": "role:imod-toggle",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-imod-toggle",
+      "action": "toggle",
+      "target": "role:imod-toggle",
+      "device": "DEV_461E",
+      "value": "false"
+    },
+    {
+      "id": "RU-check-reveal",
+      "action": "reveal",
+      "target": "role:imod-check",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-check-hover",
+      "action": "hover",
+      "target": "role:imod-check",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-read",
+      "action": "transition",
+      "durationMs": 1800,
+      "intervalMs": 100,
+      "requireChange": false,
+      "trigger": {
+        "action": "click",
+        "target": "role:imod-check",
+        "device": "DEV_461E"
+      }
+    },
+    {
+      "id": "RU-check-leave",
+      "action": "leave",
+      "target": "role:imod-check",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-readback-visible",
+      "action": "assert",
+      "target": "role:imod-current",
+      "device": "DEV_461E",
+      "property": "visible",
+      "value": "true"
+    },
+    {
+      "id": "RU-check",
+      "action": "capture"
+    },
+    {
+      "id": "RU-backup-open",
+      "action": "dialog",
+      "value": "backup-location"
+    },
+    {
+      "id": "RU-backup",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "RU-backup-close",
+      "action": "key",
+      "target": "@active",
+      "value": "Escape"
+    }
+  ]
+}

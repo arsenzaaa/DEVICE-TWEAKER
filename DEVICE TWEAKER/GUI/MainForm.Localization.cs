@@ -186,15 +186,16 @@ public sealed partial class MainForm
         UpdateCpuHeaderUi();
         UpdateFilterToolbarLocalization();
         UpdateApplyButtonDirtyCount();
+        UpdateInterruptModesStatus();
         foreach (DeviceBlock block in _blocks)
         {
             if (block.ModifiedBadge is not null)
             {
-                block.ModifiedBadge.Text = UiLanguage.Text("[ MODIFIED ]");
+                block.ModifiedBadge.Text = UiLanguage.Text("Changed");
             }
             if (block.Kind == DeviceKind.STOR)
             {
-                _copyToolTip.SetToolTip(block.AffinityLabel, "Affinity editing is disabled for storage devices. Windows and the storage driver manage their queues; this setting does not measure SSD performance.");
+                _copyToolTip.SetToolTip(block.AffinityLabel, "Storage affinity is managed by Windows / the storage driver. Editing it here is disabled.");
             }
             else if (block.Kind == DeviceKind.AUDIO && (IsDisplayHdmiaudio(block.Device.InstanceId, block.Device.Name) || IsDisplayAudioEndpointsText(block.Device.AudioEndpoints)))
             {
@@ -202,11 +203,11 @@ public sealed partial class MainForm
             }
             else
             {
-                _copyToolTip.SetToolTip(block.AffinityLabel, "AssignmentSetOverride selects logical CPUs eligible for this device's interrupts. A driver may queue DPCs on another CPU; use a trace to check actual ISR/DPC placement.");
+                _copyToolTip.SetToolTip(block.AffinityLabel, "AssignmentSetOverride selects CPUs for device interrupts. The driver can send DPCs to other CPUs; check actual ISR / DPC placement with a trace.");
             }
             if (block.InfoLabel is not null)
             {
-                _copyToolTip.SetToolTip(block.InfoLabel, "Click to copy full registry path to clipboard");
+                _copyToolTip.SetToolTip(block.InfoLabel, "Click to copy the registry path.");
             }
             block.RelayoutAction?.Invoke();
             ResetHorizontalView(block.LimitBox);
@@ -303,6 +304,12 @@ public sealed partial class MainForm
 
         if (ShouldTranslateControlText(control))
         {
+            if (control is ThemedCheckBox { SyncCheckedStateText: true } toggle)
+            {
+                // Checked is authoritative for state captions, including controls
+                // initialized before the localization events were attached.
+                state.SourceText = toggle.Checked ? "Enabled" : "Disabled";
+            }
             SetLocalizedControlText(control, state.SourceText);
         }
 

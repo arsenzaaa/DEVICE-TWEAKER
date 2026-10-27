@@ -15,7 +15,7 @@
     <ApplicationManifest>assets\app.manifest</ApplicationManifest>
     <ApplicationIcon>assets\DEVICE TWEAKER.ico</ApplicationIcon>
     <!-- Local full-tree backups must not enter the compile graph. -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);DEVICE TWEAKER — копия\**;_handoff*\**;_compare\**;bin\SmokeSafe\**;tests\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);DEVICE TWEAKER — копия\**;_handoff*\**;_compare\**;bin\SmokeSafe\**;tests\**;tmp\**</DefaultItemExcludes>
 
     <AssemblyName>DEVICE TWEAKER</AssemblyName>
     <RootNamespace>DeviceTweakerCS</RootNamespace>
@@ -35,14 +35,34 @@
 
     <BuildImodDriver Condition="'$(BuildImodDriver)' == '' and !Exists('IMOD\DTIMOD.sys')">true</BuildImodDriver>
     <BuildImodDriver Condition="'$(BuildImodDriver)' == ''">false</BuildImodDriver>
+    <DeveloperQa Condition="'$(DeveloperQa)' == ''">false</DeveloperQa>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(DeveloperQa)' == 'true'">
+    <DefineConstants>$(DefineConstants);DEVELOPER_QA</DefineConstants>
+    <AssemblyName>DEVICE TWEAKER QA</AssemblyName>
+    <OutputPath>bin\DeveloperQa\$(Configuration)\</OutputPath>
+    <IntermediateOutputPath>obj\DeveloperQa\$(Configuration)\</IntermediateOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(DeveloperQa)' == 'true'">
+    <Compile Include="..\dev\qa\Panel\*.cs" Link="DeveloperQa\%(Filename)%(Extension)" />
+    <Compile Include="..\dev\qa\Workbench\*.cs" Link="DeveloperQa\Workbench\%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <ItemGroup>
+    <Compile Remove="IMOD\KDU\**\*.cs" />
     <PackageReference Include="System.Management" Version="8.0.0" />
     <InternalsVisibleTo Include="DeviceTweaker.Tests" />
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Core\DriverRename.cs">
+      <LogicalName>DeviceTweakerCS.DriverRename.cs</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Core\DriverRuntime.cs">
+      <LogicalName>DeviceTweakerCS.DriverRuntime.cs</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="assets\DEVICE TWEAKER.ico">
       <LogicalName>DeviceTweakerCS.AppIcon</LogicalName>
     </EmbeddedResource>

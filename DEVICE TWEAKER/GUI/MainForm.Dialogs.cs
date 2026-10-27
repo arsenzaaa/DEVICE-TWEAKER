@@ -85,68 +85,85 @@ public sealed partial class MainForm
         return footerPanel;
     }
 
-    private void ShowThemedInfo(string message, string title)
+    private void ShowThemedInfo(string message, string title, string? filePath = null)
     {
-        using Form dialog = new ThemedDialogForm();
-        dialog.Name = "INFO_DIALOG";
-        dialog.Text = title;
-        dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
-        dialog.StartPosition = FormStartPosition.CenterParent;
-        dialog.MaximizeBox = false;
-        dialog.MinimizeBox = false;
-        dialog.ShowInTaskbar = false;
-        dialog.AutoScaleMode = AutoScaleMode.None;
-        StyleThemedDialogSurface(dialog);
-        dialog.Font = _dialogFont;
-        dialog.Icon = Icon;
-        dialog.BackColor = _bgForm;
-        WireThemedTitleBar(dialog);
-
-        string normalized = NormalizeDialogMessage(UiLanguage.Text(message));
-
-        int padding = UiScale(20);
-        int maxTextWidth = UiScale(580);
-        int minWidth = UiScale(460);
-        int buttonWidth = UiScale(96);
-        int buttonHeight = UiScale(32);
-        int footerHeight = UiScale(50);
-
-        bool hasMultipleLines = normalized.Contains('\n');
-        Label messageLabel = new()
+        using Form dialog = new ThemedDialogForm
         {
-            AutoSize = true,
-            MaximumSize = new Size(maxTextWidth, 0),
-            Text = normalized,
-            ForeColor = _fgMain,
-            BackColor = _bgForm,
-            UseMnemonic = false,
-            TextAlign = hasMultipleLines ? ContentAlignment.TopLeft : ContentAlignment.MiddleCenter,
-            Font = _dialogFont,
+            Name = "INFO_DIALOG", Text = UiLanguage.Text(title),
+            FormBorderStyle = FormBorderStyle.FixedDialog, StartPosition = FormStartPosition.CenterParent,
+            MaximizeBox = false, MinimizeBox = false, ShowInTaskbar = false,
+            AutoScaleMode = AutoScaleMode.None, Font = _dialogFont, Icon = Icon,
+            BackColor = _bgForm, ForeColor = _fgMain,
         };
-
-        Size textSize = messageLabel.GetPreferredSize(new Size(maxTextWidth, 0));
-        int clientWidth = Math.Max(minWidth, textSize.Width + (padding * 2));
-        int innerWidth = clientWidth - (padding * 2);
-
-        messageLabel.MaximumSize = new Size(innerWidth, 0);
-        textSize = messageLabel.GetPreferredSize(new Size(innerWidth, 0));
-        messageLabel.AutoSize = false;
-        messageLabel.Size = new Size(innerWidth, textSize.Height);
-        messageLabel.Location = new Point(padding, padding);
-        dialog.Controls.Add(messageLabel);
-
-        Button okButton = NewDialogButton(UiLanguage.Text("OK"), buttonHeight, buttonWidth, isPrimary: true);
-        okButton.Name = "OK";
-        okButton.DialogResult = DialogResult.OK;
-
-        AttachThemedDialogFooter(dialog, [okButton]);
-
-        int clientHeight = padding + textSize.Height + padding + footerHeight;
-        dialog.ClientSize = new Size(clientWidth, clientHeight);
-        dialog.AcceptButton = okButton;
-        dialog.CancelButton = okButton;
-
+        WireThemedTitleBar(dialog);
+        int padding = UiScale(24), width = UiScale(620), inner = width - padding * 2;
+        int y = padding;
+        foreach (string paragraph in NormalizeDialogMessage(UiLanguage.Text(message)).Replace("\r\n", "\n").Split("\n\n", StringSplitOptions.RemoveEmptyEntries))
+            AddCenteredDialogText(dialog, paragraph.Trim(), inner, padding, ref y, _fgMain);
+        if (filePath is not null)
+        {
+            Label file = new()
+            {
+                Name = "BACKUP_FILE", Text = Path.GetFileName(filePath), AccessibleDescription = filePath,
+                AutoEllipsis = true, UseMnemonic = false, Font = _technicalFont, ForeColor = _mutedText,
+                BackColor = _bgForm, TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(padding, y), Size = new Size(inner, UiScale(26)),
+            };
+            dialog.Controls.Add(file);
+            y = file.Bottom + UiScale(16);
+        }
+        Button ok = NewDialogButton(UiLanguage.Text("OK"), UiScale(32), UiScale(96), isPrimary: true);
+        ok.Name = "OK"; ok.DialogResult = DialogResult.OK;
+        List<Button> buttons = [ok];
+        if (filePath is not null)
+        {
+            Button details = NewDialogButton(UiLanguage.Text("DETAILS"), UiScale(32));
+            details.Name = "DETAILS";
+            details.Click += (_, _) => ShowFileLocationDialog(dialog, filePath);
+            buttons.Add(details);
+            Button folder = NewDialogButton(UiLanguage.Text("BACKUPS"), UiScale(32));
+            folder.Name = "BACKUPS";
+            folder.Click += (_, _) => TryOpenResultFolder(ResolveResultBackupFolder(filePath), "UI.BACKUP.FOLDER");
+            buttons.Add(folder);
+        }
+        AttachThemedDialogFooter(dialog, buttons);
+        dialog.ClientSize = new Size(width, y + UiScale(8) + UiScale(50));
+        dialog.AcceptButton = ok; dialog.CancelButton = ok;
         ShowDialogDimmed(dialog);
+    }
+
+    private void ShowBackupFileResult(string path, bool restored)
+        => ShowThemedInfo(restored
+            ? "Backup restored.\n\nRestart Windows to finish restoring settings."
+            : "Backup saved.", "DEVICE TWEAKER", path);
+
+    private void ShowFileLocationDialog(Form owner, string path)
+    {
+        using Form dialog = new ThemedDialogForm
+        {
+            Name = "FILE_LOCATION_DIALOG", Text = UiLanguage.Text("BACKUP FILE"),
+            FormBorderStyle = FormBorderStyle.FixedDialog, StartPosition = FormStartPosition.CenterParent,
+            MaximizeBox = false, MinimizeBox = false, ShowInTaskbar = false,
+            AutoScaleMode = AutoScaleMode.None, Font = _dialogFont, Icon = Icon,
+            BackColor = _bgForm, ForeColor = _fgMain,
+        };
+        WireThemedTitleBar(dialog);
+        Label hint = new() { Text = UiLanguage.Text("Full path (select to copy):"), AutoSize = true,
+            Font = _technicalFont, ForeColor = _mutedText, Location = new Point(UiScale(24), UiScale(20)) };
+        TextBox pathBox = new()
+        {
+            Name = "BACKUP_FULL_PATH", Text = path, ReadOnly = true, Multiline = false,
+            Font = _dialogFont, BackColor = _bgForm, ForeColor = _fgMain, BorderStyle = BorderStyle.FixedSingle,
+            Location = new Point(UiScale(24), hint.Bottom + UiScale(12)), Width = UiScale(632),
+        };
+        dialog.Controls.Add(hint); dialog.Controls.Add(pathBox);
+        Button ok = NewDialogButton(UiLanguage.Text("OK"), UiScale(32), UiScale(96), isPrimary: true);
+        ok.Name = "OK"; ok.DialogResult = DialogResult.OK;
+        AttachThemedDialogFooter(dialog, [ok]);
+        dialog.ClientSize = new Size(UiScale(680), pathBox.Bottom + UiScale(24) + UiScale(50));
+        dialog.AcceptButton = ok; dialog.CancelButton = ok;
+        LocalizeControlTree(dialog);
+        dialog.ShowDialog(owner);
     }
 
     private void ShowThemedInfo(string message)
@@ -185,6 +202,8 @@ public sealed partial class MainForm
                 true);
             BackColor = backColor;
             TabStop = false;
+            AccessibleRole = AccessibleRole.StaticText;
+            AccessibleName = $"{component}: {detail} ({stateTag})";
 
             // 1. Dash marker
             _tokens.Add(new IssueItemToken
@@ -311,15 +330,14 @@ public sealed partial class MainForm
             .ToList();
         IReadOnlyList<OperationIssue> visibleIssues = actionableIssues.Take(3).ToList();
         string technicalText = BuildOperationTechnicalDetails(report);
-        bool hasTechnical = technicalText.Length > 0;
+        bool hasTechnical = technicalText.Length > 0 && (!isSuccess
+            || report.Issues.Any(issue => !string.IsNullOrWhiteSpace(issue.TechnicalDetails)));
         string backupFolder = ResolveResultBackupFolder(report.BackupPath);
         string logsFolder = AppDiagnostics.LogDirectory;
 
         int padding = UiScale(20);
-        int sectionGap = UiScale(12);
         int buttonHeight = UiScale(32);
         int footerHeight = UiScale(50);
-        int detailsHeight = UiScale(220);
         Rectangle workingArea = Screen.FromControl(this).WorkingArea;
 
         List<Button> visibleButtons = [];
@@ -346,7 +364,7 @@ public sealed partial class MainForm
         backupsButton.AccessibleDescription = backupFolder;
         visibleButtons.Add(backupsButton);
 
-        int clientWidth = isSuccess ? UiScale(480) : UiScale(680);
+        int clientWidth = isSuccess ? UiScale(480) : UiScale(600);
         int innerWidth = clientWidth - (padding * 2);
         int currentY = padding;
 
@@ -359,23 +377,8 @@ public sealed partial class MainForm
                         : "Auto-optimization completed and saved.\nPlease reboot your PC to finish applying the changes.")
                     : UiLanguage.Text(successMessage));
 
-            Label msgLabel = new()
-            {
-                AutoSize = true,
-                MaximumSize = new Size(innerWidth, 0),
-                Text = msg,
-                Font = _dialogFont,
-                ForeColor = _fgMain,
-                BackColor = _bgForm,
-                TextAlign = ContentAlignment.MiddleCenter,
-                UseMnemonic = false,
-                Location = new Point(padding, currentY),
-            };
-            Size msgSz = msgLabel.GetPreferredSize(new Size(innerWidth, 0));
-            msgLabel.AutoSize = false;
-            msgLabel.Size = new Size(innerWidth, msgSz.Height);
-            dialog.Controls.Add(msgLabel);
-            currentY = msgLabel.Bottom + UiScale(12);
+            foreach (string line in msg.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                AddCenteredDialogText(dialog, line, innerWidth, padding, ref currentY, _fgMain);
         }
         else
         {
@@ -384,289 +387,152 @@ public sealed partial class MainForm
                 : isPartial
                     ? (UiLanguage.IsRussian ? "Применено частично" : "Partially applied")
                     : (UiLanguage.IsRussian ? "Операция не выполнена" : "Operation not applied");
-
-            Color headerColor = isWarnings || isPartial
-                ? Color.FromArgb(235, 180, 75)
-                : (report.NoChangesMade ? Color.FromArgb(245, 95, 80) : Color.FromArgb(95, 205, 135));
-
-            Label statusLabel = new()
+            AddCenteredDialogText(dialog, statusHeader, innerWidth, padding, ref currentY, _fgMain);
+            string lead = NormalizeDialogMessage(UiLanguage.Text(report.Succeeded ? successMessage : partialMessage));
+            if (report.NoChangesMade && string.IsNullOrWhiteSpace(lead))
+                lead = UiLanguage.Text("The operation stopped before any changes were made.");
+            string comparableLead = lead.Replace('\u00a0', ' ');
+            if (isWarnings && comparableLead.Equals(UiLanguage.Text("Applied with warnings. Core settings were successfully configured.").Replace('\u00a0', ' '), StringComparison.OrdinalIgnoreCase))
+                lead = string.Empty;
+            else if (comparableLead.StartsWith(statusHeader + ".", StringComparison.OrdinalIgnoreCase))
+                lead = lead[(statusHeader.Length + 1)..].Trim();
+            else if (comparableLead.StartsWith(statusHeader + " (", StringComparison.OrdinalIgnoreCase))
+                lead = lead[(statusHeader.Length + 2)..].TrimEnd('.', ')');
+            if (lead.Length > 0 && !lead.Equals(statusHeader, StringComparison.OrdinalIgnoreCase))
+                AddCenteredDialogText(dialog, lead, innerWidth, padding, ref currentY, _mutedText);
+            foreach (OperationIssue issue in visibleIssues)
             {
-                AutoSize = true,
-                MaximumSize = new Size(innerWidth, 0),
-                Text = statusHeader,
-                Font = _blockTitleFont,
-                ForeColor = headerColor,
-                BackColor = _bgForm,
-                TextAlign = ContentAlignment.TopLeft,
-                UseMnemonic = false,
-                Location = new Point(padding, currentY),
-            };
-            Size sSz = statusLabel.GetPreferredSize(new Size(innerWidth, 0));
-            statusLabel.AutoSize = false;
-            statusLabel.Size = new Size(innerWidth, sSz.Height);
-            dialog.Controls.Add(statusLabel);
-            currentY = statusLabel.Bottom + UiScale(4);
-
-            string leadText;
-            if (report.NoChangesMade)
-            {
-                leadText = !string.IsNullOrWhiteSpace(partialMessage)
-                    ? NormalizeDialogMessage(UiLanguage.Text(partialMessage))
-                    : (UiLanguage.IsRussian ? "Действия были остановлены до внесения изменений." : "The operation stopped before any changes were made.");
-            }
-            else
-            {
-                leadText = NormalizeDialogMessage(UiLanguage.Text(report.Succeeded ? successMessage : partialMessage));
-                if (string.IsNullOrWhiteSpace(leadText) || leadText.Equals("DEVICE TWEAKER", StringComparison.OrdinalIgnoreCase))
+                string detail = !string.IsNullOrWhiteSpace(issue.UserMessage)
+                    ? UiLanguage.Text(issue.UserMessage)
+                    : UiLanguage.Text(issue.IsSkipped ? "Skipped" : issue.Severity == OperationIssueSeverity.Error ? "Not applied" : "Warning");
+                if (report.NoChangesMade)
                 {
-                    leadText = UiLanguage.IsRussian ? "Основные параметры были сохранены." : "Core settings were successfully configured.";
+                    foreach (string suffix in new[] { " No changes were made.", " Настройки не изменены." })
+                        if (detail.Length > suffix.Length && detail.Replace('\u00a0', ' ').EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                            detail = detail[..^suffix.Length];
                 }
+                string skip = issue.IsSkipped ? " (" + UiLanguage.Text("Skipped") + ")" : string.Empty;
+                AddCenteredDialogText(dialog, NormalizeDialogMessage(UiLanguage.Text(issue.Component) + skip + ": " + detail), innerWidth, padding, ref currentY, _mutedText);
             }
-
-            Label leadLabel = new()
-            {
-                AutoSize = true,
-                MaximumSize = new Size(innerWidth, 0),
-                Text = leadText,
-                Font = _dialogFont,
-                ForeColor = Color.FromArgb(170, 175, 188),
-                BackColor = _bgForm,
-                TextAlign = ContentAlignment.TopLeft,
-                UseMnemonic = false,
-                Location = new Point(padding, currentY),
-            };
-            Size leadSize = leadLabel.GetPreferredSize(new Size(innerWidth, 0));
-            leadLabel.AutoSize = false;
-            leadLabel.Size = new Size(innerWidth, leadSize.Height);
-            dialog.Controls.Add(leadLabel);
-            currentY = leadLabel.Bottom + UiScale(10);
-
-            for (int i = 0; i < visibleIssues.Count; i++)
-            {
-                OperationIssue issue = visibleIssues[i];
-                bool isOptionalSkip = !report.NoChangesMade && (
-                    issue.Severity == OperationIssueSeverity.Warning ||
-                    issue.Component.Contains("IMOD", StringComparison.OrdinalIgnoreCase) ||
-                    (issue.UserMessage?.Contains("недоступ", StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (issue.UserMessage?.Contains("unavail", StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (issue.TechnicalDetails?.Contains("blocklist", StringComparison.OrdinalIgnoreCase) ?? false)
-                );
-
-                string stateTag = isOptionalSkip
-                    ? (UiLanguage.IsRussian ? "пропущено" : "Skipped")
-                    : issue.Severity switch
-                    {
-                        OperationIssueSeverity.Warning => (UiLanguage.IsRussian ? "замечание" : "Warning"),
-                        _ => (UiLanguage.IsRussian ? "ошибка" : "Not applied"),
-                    };
-
-                string issueDetail = !string.IsNullOrWhiteSpace(issue.UserMessage)
-                    ? NormalizeDialogMessage(UiLanguage.Text(issue.UserMessage))
-                    : string.Empty;
-
-                Color tagColor = isOptionalSkip
-                    ? Color.FromArgb(160, 165, 178)
-                    : issue.Severity switch
-                    {
-                        OperationIssueSeverity.Warning => Color.FromArgb(240, 205, 125),
-                        _ => Color.FromArgb(250, 95, 80),
-                    };
-
-                IssueItemView itemView = new(
-                    UiLanguage.Text(issue.Component),
-                    issueDetail,
-                    stateTag,
-                    tagColor,
-                    _dialogFont,
-                    _blockTitleFont,
-                    _bgForm,
-                    innerWidth - UiScale(8),
-                    UiScale(18));
-
-                itemView.Location = new Point(padding + UiScale(4), currentY);
-                dialog.Controls.Add(itemView);
-                currentY = itemView.Bottom + UiScale(8);
-            }
-
-            if (actionableIssues.Count > visibleIssues.Count)
-            {
-                Label moreLabel = new()
-                {
-                    AutoSize = true,
-                    MaximumSize = new Size(innerWidth, 0),
-                    Text = UiLanguage.IsRussian
-                        ? $"+ Ещё: {actionableIssues.Count - visibleIssues.Count} — нажмите «Подробности» для просмотра"
-                        : $"+ {actionableIssues.Count - visibleIssues.Count} more — open details to view all",
-                    Font = _baseFont,
-                    ForeColor = _statusInactive,
-                    BackColor = _bgForm,
-                    TextAlign = ContentAlignment.TopLeft,
-                    UseMnemonic = false,
-                    Location = new Point(padding + UiScale(4), currentY + UiScale(2)),
-                };
-                Size moreSz = moreLabel.GetPreferredSize(new Size(innerWidth, 0));
-                moreLabel.AutoSize = false;
-                moreLabel.Size = new Size(innerWidth, moreSz.Height);
-                dialog.Controls.Add(moreLabel);
-                currentY = moreLabel.Bottom + UiScale(4);
-            }
+            if (hasTechnical)
+                AddCenteredDialogText(dialog, UiLanguage.Text(isPartial
+                    ? "See DETAILS for applied / skipped settings and their reasons."
+                    : isWarnings
+                        ? "Full results / warnings are in DETAILS."
+                        : "See DETAILS and LOGS for the error."), innerWidth, padding, ref currentY, _mutedText);
         }
-
-        // Details host
-        DeviceCardPanel detailsHost = new()
-        {
-            BorderColor = Color.FromArgb(38, 38, 48),
-            BackColor = Color.FromArgb(7, 7, 10),
-            Visible = false,
-            Location = new Point(padding, currentY + sectionGap),
-            Size = new Size(innerWidth, detailsHeight),
-        };
-
-        Panel detailsHeaderBar = new()
-        {
-            Location = new Point(1, 1),
-            Size = new Size(innerWidth - 2, UiScale(26)),
-            BackColor = Color.FromArgb(14, 14, 20),
-        };
-        detailsHeaderBar.Paint += (_, pe) =>
-        {
-            using Pen p = new(Color.FromArgb(32, 32, 42), 1);
-            pe.Graphics.DrawLine(p, 0, detailsHeaderBar.Height - 1, detailsHeaderBar.Width, detailsHeaderBar.Height - 1);
-        };
-        Label detailsHeader = new()
-        {
-            AutoSize = false,
-            Text = UiLanguage.Text("DIAGNOSTICS & SYSTEM LOG"),
-            Font = _blockTitleFont,
-            ForeColor = Color.FromArgb(140, 145, 160),
-            BackColor = Color.Transparent,
-            Location = new Point(UiScale(10), 0),
-            Size = new Size(detailsHeaderBar.Width - UiScale(20), detailsHeaderBar.Height),
-            TextAlign = ContentAlignment.MiddleLeft,
-            UseMnemonic = false,
-        };
-        detailsHeaderBar.Controls.Add(detailsHeader);
-        detailsHost.Controls.Add(detailsHeaderBar);
-
-        int detailsHeaderH = detailsHeaderBar.Height;
-        Panel detailsContent = new()
-        {
-            BackColor = Color.FromArgb(7, 7, 10),
-            Location = new Point(1, detailsHeaderH + 1),
-        };
-        Label detailsLabel = new()
-        {
-            AutoSize = true,
-            Text = technicalText,
-            Font = _technicalFont,
-            ForeColor = Color.FromArgb(180, 185, 200),
-            BackColor = Color.FromArgb(7, 7, 10),
-            UseMnemonic = false,
-            Location = new Point(UiScale(10), UiScale(6)),
-        };
-        detailsContent.Controls.Add(detailsLabel);
-        ThemedScrollBar detailsScroll = new()
-        {
-            Width = UiScale(14),
-            Dock = DockStyle.Right,
-            BackColor = Color.FromArgb(7, 7, 10),
-            TrackColor = Color.FromArgb(7, 7, 10),
-            RailColor = Color.FromArgb(7, 7, 10),
-            ThumbColor = Color.FromArgb(48, 48, 56),
-            ThumbHoverColor = Color.FromArgb(80, 80, 92),
-            ThumbDragColor = Color.FromArgb(120, 120, 135),
-            ThumbWidth = UiScale(8),
-            RailWidth = 0,
-            ThumbCornerRadius = UiScale(6),
-            Visible = false,
-        };
-        detailsHost.Controls.Add(detailsContent);
-        detailsHost.Controls.Add(detailsScroll);
-        dialog.Controls.Add(detailsHost);
-
-        bool syncingDetailsScroll = false;
-        void SyncDetailsLayout()
-        {
-            int contentW = Math.Max(1, detailsHost.ClientSize.Width - detailsScroll.Width - UiScale(24));
-            detailsLabel.MaximumSize = new Size(contentW, 0);
-            Size preferred = detailsLabel.GetPreferredSize(new Size(contentW, 0));
-            detailsLabel.Size = preferred;
-            detailsContent.Width = detailsHost.ClientSize.Width - detailsScroll.Width - 2;
-            detailsContent.Height = preferred.Height + UiScale(16);
-
-            int viewH = Math.Max(1, detailsHost.ClientSize.Height - detailsHeaderH - 2);
-            int maxOffset = Math.Max(0, detailsContent.Height - viewH);
-            int offset = Math.Max(0, Math.Min(maxOffset, -(detailsContent.Top - detailsHeaderH - 1)));
-            detailsContent.Location = new Point(1, detailsHeaderH + 1 - offset);
-            detailsScroll.Visible = maxOffset > 0;
-            syncingDetailsScroll = true;
-            detailsScroll.Maximum = Math.Max(detailsContent.Height, 1);
-            detailsScroll.ViewportSize = viewH;
-            detailsScroll.Value = offset;
-            syncingDetailsScroll = false;
-        }
-        detailsScroll.ValueChanged += (_, _) =>
-        {
-            if (!syncingDetailsScroll)
-            {
-                detailsContent.Top = detailsHeaderH + 1 - detailsScroll.Value;
-            }
-        };
-        detailsHost.SizeChanged += (_, _) => SyncDetailsLayout();
-        detailsHost.MouseWheel += (_, e) =>
-        {
-            if (detailsScroll.Visible)
-            {
-                detailsScroll.Value += e.Delta > 0 ? -detailsScroll.SmallChange : detailsScroll.SmallChange;
-            }
-        };
 
         AttachThemedDialogFooter(dialog, visibleButtons, UiScale(10));
-
         int compactHeight = currentY + UiScale(12) + footerHeight;
         dialog.ClientSize = new Size(clientWidth, Math.Min(compactHeight, workingArea.Height - UiScale(60)));
-        int baseClientHeight = dialog.ClientSize.Height;
-
-        void RelayoutExpanded(bool expanded)
-        {
-            detailsHost.Visible = expanded;
-            int requested = expanded ? baseClientHeight + detailsHeight + sectionGap : baseClientHeight;
-            dialog.ClientSize = new Size(clientWidth, Math.Min(requested, workingArea.Height - UiScale(60)));
-            if (expanded)
-            {
-                SyncDetailsLayout();
-                detailsHost.Focus();
-            }
-        }
-
         logsButton.Click += (_, _) => TryOpenResultFolder(logsFolder, "UI.RESULT.LOGS");
         backupsButton.Click += (_, _) => TryOpenResultFolder(backupFolder, "UI.RESULT.BACKUPS");
         if (detailsButton is not null)
-        {
-            detailsButton.Click += (_, _) =>
-            {
-                bool expand = !detailsHost.Visible;
-                detailsButton.Text = expand ? UiLanguage.Text("HIDE DETAILS") : UiLanguage.Text("DETAILS");
-                detailsButton.Width = expand ? UiScale(150) : UiScale(116);
-                RelayoutExpanded(expand);
-            };
-        }
+            detailsButton.Click += (_, _) => ShowOperationDetailsDialog(dialog, technicalText);
 
         dialog.AcceptButton = okButton;
         int successCount = report.Issues.Count(issue => issue.Severity == OperationIssueSeverity.Success);
+        string previewScope = report.IsDeveloperPreview ? " scope=qa-dialog-preview" : string.Empty;
         WriteLog(
             $"UI.RESULT.SUMMARY: operation=\"{SanitizeLogValue(operation)}\" state={state} " +
             $"results={report.Issues.Count} successes={successCount} warnings={report.Warnings.Count} " +
             $"errors={report.Errors.Count} noChanges={report.NoChangesMade} " +
-            $"backup=\"{SanitizeLogValue(report.BackupPath)}\" backupsFolder=\"{SanitizeLogValue(backupFolder)}\"");
+            $"backup=\"{SanitizeLogValue(report.BackupPath)}\" backupsFolder=\"{SanitizeLogValue(backupFolder)}\"{previewScope}");
         foreach (OperationIssue issue in report.Issues)
         {
             WriteLog(
                 $"UI.RESULT.ITEM: severity={issue.Severity} component=\"{SanitizeLogValue(issue.Component)}\" " +
                 $"message=\"{SanitizeLogValue(issue.UserMessage)}\" " +
-                $"technicalDetails=\"{SanitizeLogValue(issue.TechnicalDetails)}\"");
+                $"technicalDetails=\"{SanitizeLogValue(issue.TechnicalDetails)}\"{previewScope}");
         }
         ShowDialogDimmed(dialog);
+    }
+
+    private void AddCenteredDialogText(Form dialog, string text, int width, int padding, ref int y, Color color)
+    {
+        Label label = new()
+        {
+            Text = text, Font = _dialogFont, ForeColor = color, BackColor = _bgForm,
+            Location = new Point(padding, y),
+            TextAlign = ContentAlignment.MiddleCenter, UseMnemonic = false,
+        };
+        // Keep the same line count while narrowing the paragraph. This balances
+        // centered lines instead of leaving a few words alone on the final line.
+        int height = label.GetPreferredSize(new Size(width, 0)).Height;
+        int lower = width * 3 / 5, upper = width;
+        if (!text.Contains('\n') && height > label.GetPreferredSize(new Size(int.MaxValue, 0)).Height)
+        {
+            while (lower < upper)
+            {
+                int candidate = lower + (upper - lower) / 2;
+                if (label.GetPreferredSize(new Size(candidate, 0)).Height <= height)
+                    upper = candidate;
+                else
+                    lower = candidate + 1;
+            }
+        }
+        int paragraphWidth = Math.Min(width, upper + UiScale(4));
+        label.MaximumSize = new Size(paragraphWidth, 0);
+        label.Location = new Point(padding + (width - paragraphWidth) / 2, y);
+        label.Size = new Size(paragraphWidth, label.GetPreferredSize(new Size(paragraphWidth, 0)).Height);
+        dialog.Controls.Add(label);
+        y = label.Bottom + UiScale(14);
+    }
+
+    private void ShowOperationDetailsDialog(Form owner, string text)
+    {
+        using Form dialog = new ThemedDialogForm
+        {
+            Name = "OPERATION_DETAILS_DIALOG", Text = UiLanguage.Text("DETAILS"),
+            FormBorderStyle = FormBorderStyle.FixedDialog, StartPosition = FormStartPosition.CenterParent,
+            MaximizeBox = false, MinimizeBox = false, ShowInTaskbar = false,
+            AutoScaleMode = AutoScaleMode.None, Font = _dialogFont, Icon = Icon,
+            BackColor = _bgForm, ForeColor = _fgMain,
+        };
+        WireThemedTitleBar(dialog);
+        int padding = UiScale(24), width = UiScale(680);
+        int maxHeight = Math.Min(UiScale(360), Screen.FromControl(owner).WorkingArea.Height - UiScale(180));
+        Panel viewport = new() { BackColor = _bgForm, Location = new Point(padding, padding), Size = new Size(width - padding * 2, maxHeight) };
+        Panel content = new() { BackColor = _bgForm };
+        Label body = new() { Text = NormalizeDialogMessage(text), Font = _technicalFont, ForeColor = _mutedText, BackColor = _bgForm, UseMnemonic = false };
+        int bodyWidth = viewport.Width - UiScale(22);
+        body.MaximumSize = new Size(bodyWidth, 0);
+        body.Size = new Size(bodyWidth, body.GetPreferredSize(new Size(bodyWidth, 0)).Height);
+        int height = Math.Min(maxHeight, Math.Max(UiScale(64), body.Height));
+        viewport.Height = height;
+        content.Size = body.Size;
+        content.Controls.Add(body);
+        ThemedScrollBar scroll = new()
+        {
+            Name = "DETAILS_SCROLL", Width = UiScale(14), Dock = DockStyle.Right, BackColor = _bgForm, TrackColor = _bgForm, RailColor = _bgForm,
+            RailWidth = 0, ThumbWidth = UiScale(8), ThumbCornerRadius = UiScale(6),
+            ThumbColor = Color.FromArgb(48, 48, 56), ThumbHoverColor = Color.FromArgb(80, 80, 92), ThumbDragColor = Color.FromArgb(120, 120, 135),
+            Maximum = Math.Max(1, content.Height), ViewportSize = height, SmallChange = UiScale(40), Visible = content.Height > height,
+        };
+        scroll.ValueChanged += (_, _) => content.Top = -scroll.Value;
+        dialog.KeyPreview = true;
+        dialog.KeyDown += (_, e) =>
+        {
+            int? next = e.KeyCode switch
+            {
+                Keys.Home => 0, Keys.End => Math.Max(0, content.Height - height),
+                Keys.PageUp => scroll.Value - height, Keys.PageDown => scroll.Value + height,
+                Keys.Up => scroll.Value - scroll.SmallChange, Keys.Down => scroll.Value + scroll.SmallChange,
+                _ => null,
+            };
+            if (next is null) return;
+            scroll.Value = next.Value;
+            e.Handled = true; e.SuppressKeyPress = true;
+        };
+        body.MouseWheel += (_, e) => scroll.Value += e.Delta > 0 ? -scroll.SmallChange : scroll.SmallChange;
+        viewport.Controls.Add(content); viewport.Controls.Add(scroll); dialog.Controls.Add(viewport);
+        Button ok = NewDialogButton(UiLanguage.Text("OK"), UiScale(32), UiScale(96), isPrimary: true);
+        ok.Name = "OK"; ok.DialogResult = DialogResult.OK;
+        AttachThemedDialogFooter(dialog, [ok]);
+        dialog.ClientSize = new Size(width, viewport.Bottom + padding + UiScale(50));
+        dialog.AcceptButton = ok; dialog.CancelButton = ok;
+        LocalizeControlTree(dialog);
+        dialog.ShowDialog(owner);
     }
 
     private string ResolveResultBackupFolder(string? backupPath)
@@ -705,6 +571,7 @@ public sealed partial class MainForm
 
     private void TryOpenResultFolder(string folderPath, string logPrefix)
     {
+        if (QaRun.TryBlock("EXTERNAL FOLDER")) return;
         try
         {
             if (string.IsNullOrWhiteSpace(folderPath))
@@ -727,13 +594,16 @@ public sealed partial class MainForm
         }
     }
 
+    private int DialogButtonTextWidth(string text)
+        => TextRenderer.MeasureText(text, _buttonFont, Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Width + UiScale(24);
+
     private Button NewDialogButton(string text, int height, int? width = null, bool isPrimary = false)
     {
         Button button = new ThemedButton
         {
             Name = text,
             Text = text,
-            Size = new Size(width ?? UiScale(100), height),
+            Size = new Size(Math.Max(width ?? UiScale(100), DialogButtonTextWidth(text)), height),
             FlatStyle = FlatStyle.Flat,
             Font = _buttonFont,
             Margin = Padding.Empty,
@@ -762,6 +632,8 @@ public sealed partial class MainForm
         Color hoverBg = isPrimary ? Color.FromArgb(34, 34, 40) : Color.FromArgb(24, 24, 30);
         Color hoverFg = Color.White;
         Color hoverBorder = isPrimary ? Color.FromArgb(255, 255, 255) : Color.FromArgb(135, 135, 145);
+        button.FlatAppearance.MouseOverBackColor = hoverBg;
+        button.FlatAppearance.MouseDownBackColor = Color.FromArgb(38, 38, 44);
 
         Color disabledBg = Color.FromArgb(10, 10, 13);
         Color disabledFg = Color.FromArgb(85, 85, 92);
@@ -817,14 +689,8 @@ public sealed partial class MainForm
         int index = 0;
         foreach (OperationIssue issue in report.Issues)
         {
-            if (issue.Severity == OperationIssueSeverity.Success
-                && string.IsNullOrWhiteSpace(issue.TechnicalDetails))
-            {
-                continue;
-            }
-
             index++;
-            string severity = UiLanguage.Text(issue.Severity.ToString().ToUpperInvariant());
+            string severity = UiLanguage.Text(issue.IsSkipped ? "SKIPPED" : issue.Severity.ToString().ToUpperInvariant());
             string title = $"{index}. [{severity}] {UiLanguage.Text(issue.Component)}";
             string? userMsg = !string.IsNullOrWhiteSpace(issue.UserMessage)
                 ? UiLanguage.Text(issue.UserMessage)
@@ -842,7 +708,8 @@ public sealed partial class MainForm
             }
             else
             {
-                body = techDetails ?? userMsg ?? UiLanguage.Text("No additional details.");
+                body = techDetails ?? userMsg ?? UiLanguage.Text(issue.Severity == OperationIssueSeverity.Success
+                    ? "Applied" : "No additional details.");
             }
             sections.Add($"{title}{Environment.NewLine}{body}");
         }
@@ -850,7 +717,7 @@ public sealed partial class MainForm
         return string.Join(Environment.NewLine + Environment.NewLine, sections);
     }
 
-    private bool ShowThemedConfirm(string message, string title, string yesText = "YES", string noText = "NO")
+    private bool ShowThemedConfirm(string message, string title, string yesText = "YES", string noText = "NO", DriverEnvironmentSnapshot? driverEnvironment = null)
     {
         using Form dialog = new ThemedDialogForm();
         dialog.Name = "CONFIRM_DIALOG";
@@ -870,7 +737,7 @@ public sealed partial class MainForm
         string normalized = NormalizeDialogMessage(UiLanguage.Text(message));
 
         int padding = UiScale(20);
-        int clientWidth = UiScale(640);
+        int clientWidth = UiScale(driverEnvironment is null ? 640 : 600);
         int innerWidth = clientWidth - (padding * 2);
         int buttonWidth = UiScale(110);
         int buttonHeight = UiScale(32);
@@ -884,168 +751,9 @@ public sealed partial class MainForm
             .Where(p => p.Length > 0)
             .ToArray();
 
-        if (paragraphs.Length <= 1)
-        {
-            string singleText = paragraphs.Length == 1 ? paragraphs[0] : normalized;
-            bool hasMultipleLines = singleText.Contains('\n');
-            Label msgLabel = new()
-            {
-                AutoSize = true,
-                MaximumSize = new Size(innerWidth, 0),
-                Text = singleText,
-                ForeColor = _fgMain,
-                BackColor = _bgForm,
-                UseMnemonic = false,
-                TextAlign = hasMultipleLines ? ContentAlignment.TopLeft : ContentAlignment.MiddleCenter,
-                Font = _dialogFont,
-            };
-
-            Size textSize = msgLabel.GetPreferredSize(new Size(innerWidth, 0));
-            int actualWidth = Math.Max(UiScale(520), textSize.Width + (padding * 2));
-            int actualInner = actualWidth - (padding * 2);
-
-            msgLabel.MaximumSize = new Size(actualInner, 0);
-            textSize = msgLabel.GetPreferredSize(new Size(actualInner, 0));
-            msgLabel.AutoSize = false;
-            msgLabel.Size = new Size(actualInner, textSize.Height);
-            msgLabel.Location = new Point(padding, currentY);
-            dialog.Controls.Add(msgLabel);
-            currentY = msgLabel.Bottom + UiScale(14);
-            clientWidth = actualWidth;
-        }
-        else if (paragraphs.Length == 2 && (paragraphs[0].EndsWith("?") || paragraphs[0].EndsWith("?\n")))
-        {
-            // Case: Question on top, details below (e.g. Reset Adapter Settings)
-            Label qLabel = new()
-            {
-                AutoSize = true,
-                MaximumSize = new Size(innerWidth, 0),
-                Text = paragraphs[0],
-                Font = _blockTitleFont,
-                ForeColor = _fgMain,
-                BackColor = _bgForm,
-                TextAlign = ContentAlignment.TopLeft,
-                UseMnemonic = false,
-                Location = new Point(padding, currentY),
-            };
-            Size qSz = qLabel.GetPreferredSize(new Size(innerWidth, 0));
-            qLabel.AutoSize = false;
-            qLabel.Size = new Size(innerWidth, qSz.Height);
-            dialog.Controls.Add(qLabel);
-            currentY = qLabel.Bottom + UiScale(10);
-
-            Label detailLabel = new()
-            {
-                AutoSize = true,
-                MaximumSize = new Size(innerWidth, 0),
-                Text = paragraphs[1],
-                Font = _dialogFont,
-                ForeColor = Color.FromArgb(170, 175, 188),
-                BackColor = _bgForm,
-                TextAlign = ContentAlignment.TopLeft,
-                UseMnemonic = false,
-                Location = new Point(padding, currentY),
-            };
-            Size dSz = detailLabel.GetPreferredSize(new Size(innerWidth, 0));
-            detailLabel.AutoSize = false;
-            detailLabel.Size = new Size(innerWidth, dSz.Height);
-            dialog.Controls.Add(detailLabel);
-            currentY = detailLabel.Bottom + UiScale(16);
-        }
-        else
-        {
-            // Multi-part structured message (Lead Context, Advisory/Notice Card, Action Prompt)
-            // 1. Lead paragraph
-            string leadText = paragraphs[0];
-            Label leadLabel = new()
-            {
-                AutoSize = true,
-                MaximumSize = new Size(innerWidth, 0),
-                Text = leadText,
-                Font = _dialogFont,
-                ForeColor = _fgMain,
-                BackColor = _bgForm,
-                TextAlign = ContentAlignment.TopLeft,
-                UseMnemonic = false,
-                Location = new Point(padding, currentY),
-            };
-            Size leadSz = leadLabel.GetPreferredSize(new Size(innerWidth, 0));
-            leadLabel.AutoSize = false;
-            leadLabel.Size = new Size(innerWidth, leadSz.Height);
-            dialog.Controls.Add(leadLabel);
-            currentY = leadLabel.Bottom + UiScale(12);
-
-            // 2. Middle paragraph(s): Advisory / Warning card
-            for (int i = 1; i < paragraphs.Length - 1; i++)
-            {
-                string noticeText = paragraphs[i];
-                int cardPad = UiScale(12);
-                int cardInnerW = innerWidth - (cardPad * 2);
-
-                DeviceCardPanel card = new()
-                {
-                    Location = new Point(padding, currentY),
-                    BackColor = Color.FromArgb(16, 18, 25),
-                    BorderColor = Color.FromArgb(44, 48, 62),
-                };
-
-                int cardY = cardPad;
-                Label noticeTag = new()
-                {
-                    AutoSize = true,
-                    Text = UiLanguage.IsRussian ? "ВНИМАНИЕ" : "NOTICE",
-                    Font = _technicalFont,
-                    ForeColor = Color.FromArgb(235, 180, 75),
-                    BackColor = Color.FromArgb(30, 26, 18),
-                    Location = new Point(cardPad, cardY),
-                    Padding = new Padding(UiScale(6), UiScale(2), UiScale(6), UiScale(2)),
-                    UseMnemonic = false,
-                };
-                card.Controls.Add(noticeTag);
-                cardY = noticeTag.Bottom + UiScale(6);
-
-                Label noticeLabel = new()
-                {
-                    AutoSize = true,
-                    MaximumSize = new Size(cardInnerW, 0),
-                    Text = noticeText,
-                    Font = _dialogFont,
-                    ForeColor = Color.FromArgb(215, 218, 228),
-                    BackColor = Color.Transparent,
-                    TextAlign = ContentAlignment.TopLeft,
-                    UseMnemonic = false,
-                    Location = new Point(cardPad, cardY),
-                };
-                Size nSz = noticeLabel.GetPreferredSize(new Size(cardInnerW, 0));
-                noticeLabel.AutoSize = false;
-                noticeLabel.Size = new Size(cardInnerW, nSz.Height);
-                card.Controls.Add(noticeLabel);
-
-                card.Size = new Size(innerWidth, noticeLabel.Bottom + cardPad);
-                dialog.Controls.Add(card);
-                currentY = card.Bottom + UiScale(12);
-            }
-
-            // 3. Action prompt (last paragraph)
-            string promptText = paragraphs[^1];
-            Label promptLabel = new()
-            {
-                AutoSize = true,
-                MaximumSize = new Size(innerWidth, 0),
-                Text = promptText,
-                Font = _blockTitleFont,
-                ForeColor = Color.FromArgb(245, 248, 255),
-                BackColor = _bgForm,
-                TextAlign = ContentAlignment.TopLeft,
-                UseMnemonic = false,
-                Location = new Point(padding, currentY),
-            };
-            Size pSz = promptLabel.GetPreferredSize(new Size(innerWidth, 0));
-            promptLabel.AutoSize = false;
-            promptLabel.Size = new Size(innerWidth, pSz.Height);
-            dialog.Controls.Add(promptLabel);
-            currentY = promptLabel.Bottom + UiScale(14);
-        }
+        foreach (string paragraph in paragraphs)
+            AddCenteredDialogText(dialog, paragraph, innerWidth, padding, ref currentY,
+                currentY == padding ? _fgMain : _mutedText);
 
         Button yesButton = NewDialogButton(UiLanguage.Text(yesText), buttonHeight, buttonWidth, isPrimary: true);
         yesButton.Name = yesText;
@@ -1055,7 +763,17 @@ public sealed partial class MainForm
         noButton.Name = noText;
         noButton.DialogResult = DialogResult.No;
 
-        AttachThemedDialogFooter(dialog, [yesButton, noButton], UiScale(12));
+        List<Button> confirmButtons = [yesButton, noButton];
+        if (driverEnvironment is not null)
+        {
+            Button checkButton = NewDialogButton(UiLanguage.Text("SYSTEM CHECK"), buttonHeight, UiScale(116));
+            checkButton.Name = "SYSTEM_CHECK_TOGGLE";
+            checkButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(24, 24, 30);
+            checkButton.FlatAppearance.MouseDownBackColor = Color.FromArgb(34, 34, 40);
+            checkButton.Click += (_, _) => ShowDriverEnvironmentDetails(dialog, driverEnvironment);
+            confirmButtons.Add(checkButton);
+        }
+        AttachThemedDialogFooter(dialog, confirmButtons, UiScale(12));
 
         dialog.ClientSize = new Size(clientWidth, currentY + footerHeight);
         dialog.AcceptButton = yesButton;
@@ -1064,13 +782,93 @@ public sealed partial class MainForm
         return ShowDialogDimmed(dialog) == DialogResult.Yes;
     }
 
+    private void ShowDriverEnvironmentDetails(Form owner, DriverEnvironmentSnapshot snapshot)
+    {
+        using Form dialog = new ThemedDialogForm
+        {
+            Name = "DRIVER_ENVIRONMENT_DIALOG", Text = UiLanguage.Text("SYSTEM CHECK"),
+            FormBorderStyle = FormBorderStyle.FixedDialog, StartPosition = FormStartPosition.CenterParent,
+            MaximizeBox = false, MinimizeBox = false, ShowInTaskbar = false,
+            AutoScaleMode = AutoScaleMode.None, Font = _dialogFont, Icon = Icon,
+            BackColor = _bgForm, ForeColor = _fgMain,
+        };
+        WireThemedTitleBar(dialog);
+        int padding = UiScale(24), width = UiScale(740), inner = width - padding * 2;
+        int y = padding;
+        string RegistryState(DriverRegistryState state) => state.Value is uint value
+            ? UiLanguage.Text(value == 0 ? "Off" : "On") + $" ({value})"
+            : UiLanguage.Text(state.Evidence == "missing" ? "No registry setting" : "Could not read");
+        string ServiceState(DriverServiceState service) => UiLanguage.Text(service.Exists switch
+        {
+            false => "Service not installed", null => "Could not read",
+            _ => service.State switch
+            {
+                "running" => "Service running", "stopped" => "Service stopped", "starting" => "Starting", "stopping" => "Stopping",
+                "continuing" => "Continuing", "pausing" => "Pausing", "paused" => "Paused", _ => "Could not read",
+            },
+        });
+        (string Label, string Value)[] rows =
+        [
+            ("Vulnerable driver blocklist", RegistryState(snapshot.Blocklist)),
+            ("Memory integrity (HVCI)", UiLanguage.Text(snapshot.HvciRunning switch { true => "On", false => "Off", _ => "Could not read" })),
+            ("HVCI registry setting", RegistryState(snapshot.HvciConfigured)),
+            ("Microsoft Defender", ServiceState(snapshot.Defender)),
+            ("FACEIT", ServiceState(snapshot.Faceit)),
+            ("Vanguard (vgk)", ServiceState(snapshot.VanguardDriver)),
+            ("Vanguard (vgc)", ServiceState(snapshot.VanguardService)),
+        ];
+        for (int i = 0; i < rows.Length; i++)
+        {
+            if (i is 0 or 3)
+            {
+                if (i == 3) y += UiScale(12);
+                Label section = new() { Text = UiLanguage.Text(i == 0 ? "Windows settings" : "Services"),
+                    Font = _blockTitleFont, ForeColor = _mutedText, BackColor = _bgForm,
+                    AutoSize = true, Location = new Point(padding, y) };
+                dialog.Controls.Add(section);
+                y += section.Height + UiScale(12);
+            }
+            Label name = new() { Name = $"SYSTEM_CHECK_NAME_{i}", Text = UiLanguage.Text(rows[i].Label), Font = _dialogFont,
+                ForeColor = _fgMain, BackColor = _bgForm, UseMnemonic = false, Location = new Point(padding, y), Size = new Size(UiScale(390), UiScale(26)) };
+            Label value = new() { Name = $"SYSTEM_CHECK_VALUE_{i}", Text = rows[i].Value, Font = _dialogFont,
+                ForeColor = _mutedText, BackColor = _bgForm, UseMnemonic = false, Location = new Point(padding + UiScale(390), y), Size = new Size(inner - UiScale(390), UiScale(26)) };
+            dialog.Controls.Add(name); dialog.Controls.Add(value);
+            y += UiScale(28);
+        }
+        y += UiScale(12);
+        foreach (string text in new[]
+        {
+            "This check reads settings and service status. It does not test DTIMOD.sys loading.",
+        })
+        {
+            Label note = new()
+            {
+                Name = "SYSTEM_CHECK_NOTE_" + y, Text = NormalizeDialogMessage(UiLanguage.Text(text)),
+                Font = _technicalFont, ForeColor = _mutedText, BackColor = _bgForm, UseMnemonic = false,
+                Location = new Point(padding, y), MaximumSize = new Size(inner, 0),
+            };
+            note.Size = new Size(inner, note.GetPreferredSize(new Size(inner, 0)).Height);
+            dialog.Controls.Add(note);
+            y = note.Bottom + UiScale(12);
+        }
+        Button closeButton = NewDialogButton(UiLanguage.Text("OK"), UiScale(32), UiScale(96), isPrimary: true);
+        closeButton.Name = "OK"; closeButton.DialogResult = DialogResult.OK;
+        AttachThemedDialogFooter(dialog, [closeButton]);
+        dialog.ClientSize = new Size(width, y + UiScale(6) + UiScale(50));
+        dialog.AcceptButton = closeButton; dialog.CancelButton = closeButton;
+        LocalizeControlTree(dialog);
+        WriteLog("UI.IMOD.PREFLIGHT.DETAILS: opened separate system check");
+        dialog.ShowDialog(owner);
+    }
+
     private bool ShowThemedConfirm(string message)
     {
         return ShowThemedConfirm(message, "DEVICE TWEAKER");
     }
 
-    private RestoreChoice ShowRestoreChoiceDialog(IReadOnlyList<BackupSnapshotInfo> backups, out string? selectedBackupPath)
+    private RestoreChoice ShowRestoreChoiceDialog(IReadOnlyList<BackupSnapshotInfo> sourceBackups, out string? selectedBackupPath, Func<BackupSnapshotInfo, int>? deleteBackup = null)
     {
+        List<BackupSnapshotInfo> backups = sourceBackups.ToList();
         selectedBackupPath = null;
         string? selectedPath = null;
         using Form dialog = new ThemedDialogForm();
@@ -1090,6 +888,11 @@ public sealed partial class MainForm
 
         bool hasBackup = backups.Count > 0;
         Button? deleteButton = null;
+        Button? latestButton = null;
+        Button? backupButton = null;
+        Label? menuStatus = null;
+        ThemedScrollBar? listScroll = null;
+        int visibleCount = Math.Min(backups.Count, 5);
 
         int padding = UiScale(20);
         int clientWidth = UiScale(hasBackup ? 940 : 620);
@@ -1107,10 +910,10 @@ public sealed partial class MainForm
         // Prompt Header
         string titleText = hasBackup
             ? (UiLanguage.IsRussian
-                ? "Выберите точку восстановления для отката настроек:"
-                : "Select a snapshot to restore system configuration:")
+                ? "Выберите бекап для восстановления настроек:"
+                : "Select a backup to restore settings:")
             : (UiLanguage.IsRussian
-                ? "Точки восстановления конфигурации не найдены."
+                ? "Бекапы не найдены."
                 : "No backup snapshots were found.");
 
         Label promptTitle = new()
@@ -1130,11 +933,11 @@ public sealed partial class MainForm
 
         string subText = hasBackup
             ? (UiLanguage.IsRussian
-                ? "Откатывает службы, реестр и системные параметры к зафиксированному моменту времени."
-                : "Reverts services, registry values, and device parameters back to captured state.")
+                ? "Настройки устройств / сохранённый профиль IMOD и NIC ITR."
+                : "Device settings / saved IMOD and NIC ITR profile.")
             : (UiLanguage.IsRussian
-                ? "Вы можете выполнить безопасный сброс настроек к стандартным значениям Windows."
-                : "RESET WINDOWS DEFAULT restores supported settings back to clean Windows defaults.");
+                ? "Сброс возвращает поддерживаемые настройки к значениям Windows."
+                : "Reset restores supported settings to Windows defaults.");
 
         Label promptSub = new()
         {
@@ -1156,7 +959,6 @@ public sealed partial class MainForm
         if (hasBackup)
         {
             int itemHeight = UiScale(34);
-            int visibleCount = Math.Min(backups.Count, 5);
             int listHeight = Math.Max(UiScale(68), (visibleCount * itemHeight) + UiScale(4));
             bool needsScroll = backups.Count > visibleCount;
             int scrollWidth = UiScale(14);
@@ -1174,7 +976,6 @@ public sealed partial class MainForm
                 e.Graphics.DrawRectangle(pen, 0, 0, listPanel.Width - 1, listPanel.Height - 1);
             };
 
-            ThemedScrollBar? listScroll = null;
             if (needsScroll)
             {
                 listScroll = new ThemedScrollBar
@@ -1210,6 +1011,7 @@ public sealed partial class MainForm
 
             backupList = new ListBox
             {
+                Name = "BACKUP_LIST",
                 BorderStyle = BorderStyle.None,
                 BackColor = Color.FromArgb(10, 10, 14),
                 ForeColor = _fgMain,
@@ -1284,7 +1086,7 @@ public sealed partial class MainForm
                 // Column 3: Type & Description (clean semantic contrast, no emoji shields)
                 if (info.IsOriginal)
                 {
-                    string origText = "BASELINE";
+                    string origText = UiLanguage.Text("ORIGINAL");
                     Size origSz = TextRenderer.MeasureText(e.Graphics, origText, _blockTitleFont, Size.Empty, TextFormatFlags.NoPadding);
                     int origW = origSz.Width + UiScale(14);
                     Rectangle origRect = new(x, badgeY, origW, badgeH);
@@ -1295,12 +1097,12 @@ public sealed partial class MainForm
                     TextRenderer.DrawText(e.Graphics, origText, _blockTitleFont, origRect, Color.FromArgb(255, 195, 70), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                     x += origW + UiScale(12);
 
-                    string desc = UiLanguage.IsRussian ? "Исходная конфигурация Windows (защищена)" : "Original Windows Baseline (Protected)";
+                    string desc = UiLanguage.IsRussian ? "Исходные настройки устройств (защищены)" : "Original device settings (protected)";
                     TextRenderer.DrawText(e.Graphics, desc, _technicalFont, new Point(x, textY + UiScale(1)), Color.FromArgb(215, 220, 230), TextFormatFlags.NoPadding);
                 }
                 else
                 {
-                    string snapText = "SNAPSHOT";
+                    string snapText = UiLanguage.Text("BACKUP");
                     Size snapSz = TextRenderer.MeasureText(e.Graphics, snapText, _blockTitleFont, Size.Empty, TextFormatFlags.NoPadding);
                     int snapW = snapSz.Width + UiScale(14);
                     Rectangle snapRect = new(x, badgeY, snapW, badgeH);
@@ -1311,7 +1113,7 @@ public sealed partial class MainForm
                     TextRenderer.DrawText(e.Graphics, snapText, _blockTitleFont, snapRect, Color.FromArgb(180, 185, 200), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                     x += snapW + UiScale(12);
 
-                    TextRenderer.DrawText(e.Graphics, info.Reason, _dialogFont, new Point(x, textY), Color.FromArgb(240, 244, 252), TextFormatFlags.NoPadding);
+                    TextRenderer.DrawText(e.Graphics, UiLanguage.Text(info.Reason), _dialogFont, new Point(x, textY), Color.FromArgb(240, 244, 252), TextFormatFlags.NoPadding);
                 }
             };
 
@@ -1367,16 +1169,18 @@ public sealed partial class MainForm
             {
                 AutoSize = false,
                 Text = UiLanguage.IsRussian
-                    ? "Исходный снимок (BASELINE) защищен от удаления."
-                    : "Original baseline snapshot is permanently protected.",
+                    ? "Бекап исходных настроек защищён от удаления."
+                    : "The original-settings backup is protected from deletion.",
                 Font = _technicalFont,
                 ForeColor = _statusInactive,
                 BackColor = _bgForm,
                 TextAlign = ContentAlignment.MiddleLeft,
                 UseMnemonic = false,
                 Location = new Point(padding, currentY),
-                Size = new Size(innerWidth, UiScale(20)),
+                Size = new Size(innerWidth, UiScale(40)),
             };
+            menuStatus = noteLabel;
+            noteLabel.Name = "BACKUP_MENU_STATUS";
             dialog.Controls.Add(noteLabel);
             currentY = noteLabel.Bottom + UiScale(8);
         }
@@ -1389,27 +1193,28 @@ public sealed partial class MainForm
             }
 
             int index = backupList.SelectedIndex;
-            bool canDelete = index >= 0 && index < backups.Count && !backups[index].IsOriginal;
-            deleteButton.Enabled = canDelete;
+            bool selected = index >= 0 && index < backups.Count;
+            deleteButton.Enabled = selected && !backups[index].IsOriginal;
+            if (latestButton is not null) latestButton.Enabled = backups.Count > 0;
+            if (backupButton is not null) backupButton.Enabled = selected;
         }
 
         List<Button> footerButtons = [];
 
-        Button? latestButton = null;
         if (hasBackup)
         {
             latestButton = NewDialogButton(UiLanguage.Text("RESTORE LAST"), buttonHeight, standardButtonWidth, isPrimary: true);
             latestButton.Name = "RESTORE LAST";
             latestButton.Click += (_, _) =>
             {
-                choice = RestoreChoice.RestoreLatest;
+                selectedPath = backups.FirstOrDefault()?.Path;
+                choice = RestoreChoice.RestoreBackup;
                 dialog.DialogResult = DialogResult.OK;
                 dialog.Close();
             };
             footerButtons.Add(latestButton);
         }
 
-        Button? backupButton = null;
         if (hasBackup)
         {
             backupButton = NewDialogButton(UiLanguage.Text("RESTORE SELECTED"), buttonHeight, selectedButtonWidth, isPrimary: false);
@@ -1439,9 +1244,49 @@ public sealed partial class MainForm
             deleteButton.Name = "DELETE SELECTED";
             deleteButton.Click += (_, _) =>
             {
-                choice = RestoreChoice.DeleteBackup;
-                dialog.DialogResult = DialogResult.OK;
-                dialog.Close();
+                if (deleteBackup is null)
+                {
+                    choice = RestoreChoice.DeleteBackup;
+                    dialog.DialogResult = DialogResult.OK;
+                    dialog.Close();
+                    return;
+                }
+                int index = backupList!.SelectedIndex;
+                if (index < 0 || index >= backups.Count || backups[index].IsOriginal) return;
+                BackupSnapshotInfo selected = backups[index];
+                try
+                {
+                    int deleted = deleteBackup(selected);
+                    if (deleted == 0)
+                    {
+                        menuStatus!.Text = UiLanguage.Text("The backup could not be deleted. See LOGS for details.");
+                        return;
+                    }
+                    backupList.BeginUpdate();
+                    try
+                    {
+                        backups.RemoveAt(index);
+                        backupList.Items.RemoveAt(index);
+                        backupList.SelectedIndex = backups.Count == 0 ? -1 : Math.Min(index, backups.Count - 1);
+                        selectedPath = backupList.SelectedItem is BackupSnapshotInfo remaining ? remaining.Path : null;
+                    }
+                    finally { backupList.EndUpdate(); }
+                    menuStatus!.Text = UiLanguage.Text(backups.Count == 0
+                        ? "Backup deleted. No backups remain."
+                        : "Backup deleted. Select another backup or close this window.");
+                    if (listScroll is not null)
+                    {
+                        listScroll.Maximum = Math.Max(1, backups.Count);
+                        listScroll.Value = Math.Min(listScroll.Value, Math.Max(0, backups.Count - visibleCount));
+                        listScroll.Visible = backups.Count > visibleCount;
+                    }
+                    UpdateDeleteButtonState();
+                }
+                catch (Exception ex)
+                {
+                    WriteLog($"BACKUP.DELETE: failed path={selected.Path} error={FlattenLogText(ex.ToString())}");
+                    menuStatus!.Text = UiLanguage.Text("The backup could not be deleted. See LOGS for details.");
+                }
             };
             UpdateDeleteButtonState();
             footerButtons.Add(deleteButton);
@@ -1489,217 +1334,15 @@ public sealed partial class MainForm
         int buttonWidth = UiScale(140);
         int buttonHeight = UiScale(32);
         int footerHeight = UiScale(50);
-        int clientWidth = UiScale(680);
+        int clientWidth = UiScale(600);
         int innerWidth = clientWidth - (padding * 2);
 
         AutoBackupChoice choice = AutoBackupChoice.Cancel;
         int currentY = padding;
 
-        Label promptLabel = new()
-        {
-            AutoSize = false,
-            Text = UiLanguage.Text("Where should DEVICE TWEAKER save the pre-auto backup?"),
-            Font = _blockTitleFont,
-            ForeColor = _fgMain,
-            BackColor = _bgForm,
-            TextAlign = ContentAlignment.MiddleLeft,
-            UseMnemonic = false,
-            Location = new Point(padding, currentY),
-            Size = new Size(innerWidth, UiScale(24)),
-        };
-        dialog.Controls.Add(promptLabel);
-        currentY = promptLabel.Bottom + UiScale(4);
-
-        Label subLabel = new()
-        {
-            AutoSize = false,
-            Text = UiLanguage.IsRussian
-                ? "Выберите расположение для создания точки отката:"
-                : "Select backup snapshot storage before applying optimizations:",
-            Font = _dialogFont,
-            ForeColor = Color.FromArgb(155, 160, 175),
-            BackColor = _bgForm,
-            TextAlign = ContentAlignment.MiddleLeft,
-            UseMnemonic = false,
-            Location = new Point(padding, currentY),
-            Size = new Size(innerWidth, UiScale(20)),
-        };
-        dialog.Controls.Add(subLabel);
-        currentY = subLabel.Bottom + UiScale(12);
-
-        (string badge, string badgeText, string desc, AutoBackupChoice optChoice, Color badgeFg, Color badgeBg, Color badgeBorder)[] options =
-        [
-            (
-                "EXE FOLDER",
-                UiLanguage.Text("EXE FOLDER"),
-                UiLanguage.IsRussian ? "Портативный бэкап рядом с исполняемым файлом" : "Portable backup next to application executable",
-                AutoBackupChoice.Local,
-                Color.FromArgb(130, 195, 245),
-                Color.FromArgb(20, 28, 40),
-                Color.FromArgb(45, 65, 95)
-            ),
-            (
-                "APPDATA",
-                UiLanguage.Text("APPDATA"),
-                UiLanguage.IsRussian ? "Хранилище профиля пользователя (сохранится при переносе)" : "User profile storage surviving folder moves/cleanups",
-                AutoBackupChoice.Roaming,
-                Color.FromArgb(180, 195, 225),
-                Color.FromArgb(24, 26, 36),
-                Color.FromArgb(50, 56, 76)
-            ),
-            (
-                "SKIP",
-                UiLanguage.Text("SKIP"),
-                UiLanguage.IsRussian ? "Продолжить без создания новой точки отката" : "Continue without creating an additional snapshot",
-                AutoBackupChoice.Skip,
-                Color.FromArgb(160, 165, 178),
-                Color.FromArgb(22, 24, 30),
-                Color.FromArgb(45, 48, 60)
-            ),
-        ];
-
-        int cardHeight = UiScale(42);
-        foreach (var opt in options)
-        {
-            DeviceCardPanel card = new()
-            {
-                Location = new Point(padding, currentY),
-                Size = new Size(innerWidth, cardHeight),
-                BackColor = Color.FromArgb(14, 16, 22),
-                BorderColor = Color.FromArgb(34, 38, 50),
-                Cursor = Cursors.Hand,
-            };
-
-            int pillPaddingH = UiScale(10);
-            int pillH = UiScale(24);
-            int pillY = (cardHeight - pillH) / 2;
-            int pillX = UiScale(10);
-            Size badgeSz = TextRenderer.MeasureText(opt.badgeText, _blockTitleFont, Size.Empty, TextFormatFlags.NoPadding);
-            int pillW = badgeSz.Width + (pillPaddingH * 2);
-
-            DeviceCardPanel pillPanel = new()
-            {
-                Location = new Point(pillX, pillY),
-                Size = new Size(pillW, pillH),
-                BackColor = opt.badgeBg,
-                BorderColor = opt.badgeBorder,
-                Cursor = Cursors.Hand,
-            };
-            Label pillLabel = new()
-            {
-                AutoSize = false,
-                Dock = DockStyle.Fill,
-                Text = opt.badgeText,
-                Font = _blockTitleFont,
-                ForeColor = opt.badgeFg,
-                BackColor = Color.Transparent,
-                TextAlign = ContentAlignment.MiddleCenter,
-                UseMnemonic = false,
-                Cursor = Cursors.Hand,
-            };
-            pillPanel.Controls.Add(pillLabel);
-            card.Controls.Add(pillPanel);
-
-            int dividerX = pillX + pillW + UiScale(10);
-            Panel divider = new()
-            {
-                Location = new Point(dividerX, pillY + UiScale(2)),
-                Size = new Size(1, pillH - UiScale(4)),
-                BackColor = Color.FromArgb(42, 46, 60),
-            };
-            card.Controls.Add(divider);
-
-            int descX = dividerX + UiScale(10);
-            Label descLabel = new()
-            {
-                AutoSize = false,
-                Location = new Point(descX, 0),
-                Size = new Size(innerWidth - descX - UiScale(8), cardHeight),
-                Text = opt.desc,
-                Font = _dialogFont,
-                ForeColor = Color.FromArgb(220, 224, 235),
-                BackColor = Color.Transparent,
-                TextAlign = ContentAlignment.MiddleLeft,
-                UseMnemonic = false,
-                Cursor = Cursors.Hand,
-            };
-            card.Controls.Add(descLabel);
-
-            void SelectChoice()
-            {
-                choice = opt.optChoice;
-                dialog.DialogResult = DialogResult.OK;
-                dialog.Close();
-            }
-
-            void OnEnter()
-            {
-                card.BorderColor = Color.FromArgb(65, 75, 100);
-                card.BackColor = Color.FromArgb(18, 22, 30);
-                card.Invalidate();
-            }
-
-            void OnLeave()
-            {
-                card.BorderColor = Color.FromArgb(34, 38, 50);
-                card.BackColor = Color.FromArgb(14, 16, 22);
-                card.Invalidate();
-            }
-
-            card.MouseEnter += (_, _) => OnEnter();
-            card.MouseLeave += (_, _) => OnLeave();
-            pillPanel.MouseEnter += (_, _) => OnEnter();
-            pillPanel.MouseLeave += (_, _) => OnLeave();
-            pillLabel.MouseEnter += (_, _) => OnEnter();
-            pillLabel.MouseLeave += (_, _) => OnLeave();
-            descLabel.MouseEnter += (_, _) => OnEnter();
-            descLabel.MouseLeave += (_, _) => OnLeave();
-
-            card.Click += (_, _) => SelectChoice();
-            pillPanel.Click += (_, _) => SelectChoice();
-            pillLabel.Click += (_, _) => SelectChoice();
-            descLabel.Click += (_, _) => SelectChoice();
-
-            dialog.Controls.Add(card);
-            currentY = card.Bottom + UiScale(6);
-        }
-
-        currentY += UiScale(8);
-
-        Panel notePanel = new()
-        {
-            Location = new Point(padding, currentY),
-            Size = new Size(innerWidth, UiScale(22)),
-            BackColor = _bgForm,
-        };
-
-        Label noteTag = new()
-        {
-            AutoSize = true,
-            Text = UiLanguage.IsRussian ? "ИНФО:" : "NOTE:",
-            Font = _technicalFont,
-            ForeColor = Color.FromArgb(100, 150, 210),
-            BackColor = _bgForm,
-            Location = new Point(0, 0),
-            UseMnemonic = false,
-        };
-        notePanel.Controls.Add(noteTag);
-
-        Label noteDesc = new()
-        {
-            AutoSize = true,
-            Text = UiLanguage.IsRussian
-                ? "Снимок исходного состояния Windows сохраняется независимо от выбора."
-                : "Original Windows baseline snapshot is always retained independently.",
-            Font = _technicalFont,
-            ForeColor = Color.FromArgb(145, 150, 165),
-            BackColor = _bgForm,
-            Location = new Point(noteTag.PreferredWidth + UiScale(8), 0),
-            UseMnemonic = false,
-        };
-        notePanel.Controls.Add(noteDesc);
-        dialog.Controls.Add(notePanel);
-        currentY = notePanel.Bottom + UiScale(14);
+        AddCenteredDialogText(dialog, UiLanguage.Text("Where should the additional backup be saved?"), innerWidth, padding, ref currentY, _fgMain);
+        AddCenteredDialogText(dialog, UiLanguage.Text("The EXE folder keeps the backup next to the program.\nAppData keeps it in your user profile."), innerWidth, padding, ref currentY, _mutedText);
+        AddCenteredDialogText(dialog, UiLanguage.Text("Skipping this copy keeps the original-settings backup."), innerWidth, padding, ref currentY, _mutedText);
 
         Button exeButton = NewDialogButton(UiLanguage.Text("EXE FOLDER"), buttonHeight, buttonWidth, isPrimary: true);
         exeButton.Name = "EXE FOLDER";
@@ -1777,7 +1420,7 @@ public sealed partial class MainForm
         // Bind short Russian prepositions (в, во, на, с, со, к, по, для, не, или, и, от, до, за, из, о, об) to the next word
         result = System.Text.RegularExpressions.Regex.Replace(
             result,
-            @"(?<=(?:^|[\s(«""]))([вВ][оО]?|[нН][аА]|[сС][оО]?|[кК]|[пП][оО]|[дД][лЛ][яЯ]|[нН][еЕ]|[иИ][лЛ][иИ]|[иИ]|[оО][тТ]|[дД][оО]|[зЗ][аА]|[иИ][зЗ]|[оО][бБ]?)\s+",
+            @"(?<=(?:^|[\s(\u00AB""]))([вВ][оО]?|[нН][аА]|[сС][оО]?|[кК]|[пП][оО]|[дД][лЛ][яЯ]|[нН][еЕ]|[иИ][лЛ][иИ]|[иИ]|[оО][тТ]|[дД][оО]|[зЗ][аА]|[иИ][зЗ]|[оО][бБ]?)[ \t]+",
             "$1\u00A0");
 
         return result;

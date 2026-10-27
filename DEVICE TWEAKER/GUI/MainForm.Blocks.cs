@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text.RegularExpressions;
 
 namespace DeviceTweakerCS;
@@ -105,7 +105,7 @@ public sealed partial class MainForm
         else if (device.Kind == DeviceKind.USB && !string.IsNullOrWhiteSpace(usbRoles))
         {
             string chip = device.UsbChipPath is { } path ? $" | {path.CompactTag}" : string.Empty;
-            title = $"{device.Name} [{usbRoles}{chip}]";
+            title = $"{device.Name} [{UsbRoleDisplay.Format(usbRoles)}{chip}]";
         }
         else if (device.Kind == DeviceKind.USB)
         {
@@ -154,25 +154,25 @@ public sealed partial class MainForm
             || string.Equals(device.StorageTag, "NVMe", StringComparison.OrdinalIgnoreCase);
         if (isNvme)
         {
-            return ("[NVMe]", Color.FromArgb(140, 200, 255));
+            return ("[NVMe]", DeviceBadgePalette.Storage);
         }
 
         if (string.Equals(device.StorageTag, "SSD", StringComparison.OrdinalIgnoreCase))
         {
-            return ("[SSD]", Color.FromArgb(120, 220, 200));
+            return ("[SSD]", DeviceBadgePalette.Storage);
         }
 
         if (string.Equals(device.StorageTag, "HDD", StringComparison.OrdinalIgnoreCase))
         {
-            return ("[HDD]", Color.FromArgb(180, 180, 190));
+            return ("[HDD]", DeviceBadgePalette.Storage);
         }
 
         if (Regex.IsMatch(device.Name ?? string.Empty, "(?i)\\bSATA\\b|\\bAHCI\\b"))
         {
-            return ("[SATA]", Color.FromArgb(160, 200, 220));
+            return ("[SATA]", DeviceBadgePalette.Storage);
         }
 
-        return ("[STORAGE]", Color.FromArgb(190, 190, 200));
+        return ("[STORAGE]", DeviceBadgePalette.Storage);
     }
 
     private static (string kindText, Color kindColor) GetGpuKindBadge(DeviceInfo device)
@@ -206,7 +206,7 @@ public sealed partial class MainForm
             return ("[GPU]", Color.FromArgb(45, 155, 255));
         }
 
-        return ("[GPU]", Color.FromArgb(195, 150, 255));
+        return ("[GPU]", DeviceBadgePalette.Unknown);
     }
 
     private void NewDeviceBlock(
@@ -248,10 +248,10 @@ public sealed partial class MainForm
 
         (string kindText, Color kindColor) = device.Kind switch
         {
-            DeviceKind.USB => ("[USB]", Color.FromArgb(120, 210, 255)),
+            DeviceKind.USB => ("[USB]", DeviceBadgePalette.Usb),
             DeviceKind.GPU => GetGpuKindBadge(device),
-            DeviceKind.NET_NDIS or DeviceKind.NET_CX => ("[NET]", Color.FromArgb(100, 225, 155)),
-            DeviceKind.AUDIO => ("[AUDIO]", Color.FromArgb(255, 155, 125)),
+            DeviceKind.NET_NDIS or DeviceKind.NET_CX => ("[NET]", DeviceBadgePalette.Network),
+            DeviceKind.AUDIO => ("[AUDIO]", DeviceBadgePalette.Audio),
             DeviceKind.STOR => GetStorageKindBadge(device),
             _ => ("[DEV]", _statusPrefix)
         };
@@ -286,12 +286,12 @@ public sealed partial class MainForm
 
         Label modifiedBadge = new()
         {
-            Text = UiLanguage.Text("[ MODIFIED ]"),
-            Font = _blockTitleFont,
-            ForeColor = _statusWarn,
+            Text = UiLanguage.Text("Changed"),
+            Font = _blockFont,
+            ForeColor = _mutedText,
             AutoSize = true,
             Visible = false,
-            Margin = new Padding(UiScale(8), 0, 0, 0),
+            Margin = new Padding(UiScale(12), UiScale(1), 0, 0),
         };
         headerPanel.Controls.Add(modifiedBadge);
 
@@ -582,7 +582,7 @@ public sealed partial class MainForm
         if (device.Kind == DeviceKind.STOR)
         {
             lblMask.ForeColor = _mutedText;
-            _copyToolTip.SetToolTip(lblMask, "Affinity editing is disabled for storage devices. Windows and the storage driver manage their queues; this setting does not measure SSD performance.");
+            _copyToolTip.SetToolTip(lblMask, "Storage affinity is managed by Windows / the storage driver. Editing it here is disabled.");
         }
         else if (device.Kind == DeviceKind.AUDIO && (IsDisplayHdmiaudio(device.InstanceId, device.Name) || IsDisplayAudioEndpointsText(device.AudioEndpoints)))
         {
@@ -591,7 +591,7 @@ public sealed partial class MainForm
         }
         else
         {
-            _copyToolTip.SetToolTip(lblMask, "AssignmentSetOverride selects logical CPUs eligible for this device's interrupts. A driver may queue DPCs on another CPU; use a trace to check actual ISR/DPC placement.");
+            _copyToolTip.SetToolTip(lblMask, "AssignmentSetOverride selects CPUs for device interrupts. The driver can send DPCs to other CPUs; check actual ISR / DPC placement with a trace.");
         }
 
         Label lblIrq = new()
@@ -602,7 +602,7 @@ public sealed partial class MainForm
             ForeColor = _mutedText,
             Location = new Point(UiScale(18), maskY + UiScale(20)),
         };
-        _copyToolTip.SetToolTip(lblIrq, "IRQ count comes from WMI. WMI hint estimates MSI/MSI-X from IRQ numbers above 999; this does not verify the driver's interrupt resource type or distinguish MSI from MSI-X. HW shows device capability.");
+        _copyToolTip.SetToolTip(lblIrq, "IRQ count comes from WMI. IRQ Mode uses Windows allocated resources. HW lists supported modes. Refresh updates the readings without loading a driver.");
 
         // Longest common left labels: "Mouse Throttle:", "IRQ Priority:", "Power Saving:".
         int valueX = UiScale(140);
@@ -617,6 +617,29 @@ public sealed partial class MainForm
             AutoSize = false,
             BackColor = Color.Transparent,
         };
+
+        Label lblInterruptMode = new()
+        {
+            Text = "not read", AutoSize = false, AutoEllipsis = true, ForeColor = _mutedText,
+            Font = _blockFont, Padding = new Padding(UiScale(6), 0, UiScale(4), 0),
+            TextAlign = ContentAlignment.MiddleLeft, Size = UiScale(116, 26),
+            Dock = DockStyle.Fill, Name = "IRQ_MODE_VALUE",
+        };
+        Panel interruptModeStatus = new()
+        {
+            Name = "IRQ_MODE_STATUS", BackColor = _bgGroup, Padding = new Padding(1),
+            Location = new Point(valueX, rowTop), Size = UiScale(150, 26),
+            TabStop = false,
+        };
+        interruptModeStatus.Paint += (_, e) =>
+        {
+            using Pen pen = new(Color.FromArgb(58, 58, 66));
+            e.Graphics.DrawRectangle(pen, 0, 0, interruptModeStatus.Width - 1, interruptModeStatus.Height - 1);
+        };
+        interruptModeStatus.Controls.Add(lblInterruptMode);
+        Label interruptModeTitle = new() { Text = "IRQ Mode:", AutoSize = true, Location = new Point(0, rowTop + labelOffset) };
+        settingsPanel.Controls.AddRange([interruptModeTitle, interruptModeStatus]);
+        rowTop = interruptModeStatus.Bottom + rowGap;
 
         Label lblMsi = new()
         {
@@ -635,7 +658,7 @@ public sealed partial class MainForm
         cmbMsi.DropDownWidth = cmbMsi.Width;
         cmbMsi.MaxDropDownItems = 2;
 
-        const string msiTip = "MSISupported requests message-signaled interrupts for this device. The active MSI/MSI-X mode depends on the device and driver; this setting alone does not measure latency or DPC behavior.";
+        const string msiTip = "MSISupported requests MSI for the device. The active MSI / MSI-X mode depends on the hardware / driver.";
         _copyToolTip.SetToolTip(lblMsi, msiTip);
         _copyToolTip.SetToolTip(cmbMsi, msiTip);
 
@@ -669,7 +692,7 @@ public sealed partial class MainForm
             Location = new Point(txtLimit.Right + UiScale(8), txtLimit.Top + UiScale(4)),
         };
 
-        const string limitTip = "MessageNumberLimit (registry: MessageSignaledInterruptProperties). Unlimited removes this registry limit; Windows and the driver determine the allocated message count within device capabilities. Legacy input 0 is accepted as Unlimited.";
+        const string limitTip = "MessageNumberLimit sets the requested message limit. Unlimited removes this limit (0 is also accepted). Hardware / Windows / the driver determine the actual message count.";
         _copyToolTip.SetToolTip(lblLimit, limitTip);
         _copyToolTip.SetToolTip(txtLimit, limitTip);
         _copyToolTip.SetToolTip(lblLimitHint, limitTip);
@@ -718,7 +741,7 @@ public sealed partial class MainForm
         cmbPrio.DropDownWidth = cmbPrio.Width;
         cmbPrio.MaxDropDownItems = 4;
 
-        const string prioTip = "DevicePriority is a requested interrupt priority for Windows to consider. High does not set game or DPC priority and does not guarantee the order or latency of interrupt handling.";
+        const string prioTip = "DevicePriority requests interrupt priority. High applies to interrupts, not game or DPC priority; actual scheduling depends on Windows / the driver.";
         _copyToolTip.SetToolTip(lblPrio, prioTip);
         _copyToolTip.SetToolTip(cmbPrio, prioTip);
 
@@ -793,7 +816,7 @@ public sealed partial class MainForm
         if (device.Kind == DeviceKind.NET_NDIS)
         {
             settingsPanel.Controls.AddRange([lblNdisMode, cmbNdisMode]);
-            _copyToolTip.SetToolTip(cmbNdisMode, "RSS assigns receive queues to CPUs. IRQ writes interrupt-affinity policy. BOTH writes both settings when the adapter and driver support RSS.");
+            _copyToolTip.SetToolTip(cmbNdisMode, "RSS: receive queues / CPUs. IRQ: interrupt affinity. BOTH: both settings, if RSS is supported by the adapter / driver.");
             rowTop = cmbNdisMode.Bottom + rowGap;
         }
 
@@ -825,7 +848,7 @@ public sealed partial class MainForm
         if (device.Kind == DeviceKind.NET_NDIS)
         {
             settingsPanel.Controls.AddRange([lblRssQueues, nudRssQueues]);
-            _copyToolTip.SetToolTip(nudRssQueues, "Number of RSS receive queues to configure. The adapter and driver determine the supported range. The plan starts at the selected base CPU.");
+            _copyToolTip.SetToolTip(nudRssQueues, "RSS receive queue count. The adapter / driver sets the supported range. Assignment starts at RSS Base CPU.");
             rowTop = nudRssQueues.Bottom + rowGap;
         }
 
@@ -863,8 +886,8 @@ public sealed partial class MainForm
             rowTop = Math.Max(lblPowerSaving.Bottom, chkPowerSaving.Bottom) + rowGap;
 
             string powerTip = device.Kind == DeviceKind.USB
-                ? "Same idea as Device Manager → Power Management → 'Allow the computer to turn off this device to save power'.\n" +
-                  "For USB this disables Selective Suspend on the controller + root hubs and the power-plan USB SS setting.\n" +
+                ? "Device Manager → Power Management → 'Allow the computer to turn off this device to save power'.\n" +
+                  "For USB: controller / root hubs / power-plan Selective Suspend.\n" +
                   "Unchecked = Disabled. Applied with APPLY / AUTO. A reboot may be required."
                 : "Device Manager → Power Management → 'Allow the computer to turn off this device to save power'.\n" +
                   "Unchecked sets PnPCapabilities bit 0x08 (do-not-turn-off) and clears MSPower_DeviceEnable on the wired NIC.\n" +
@@ -1031,10 +1054,13 @@ public sealed partial class MainForm
                 + btnNicItrCheck.Width;
             int inputAvailable = Math.Max(UiScale(100), usableSettingsWidth - nicValueX - UiScale(8));
             int inlineAvailable = usableSettingsWidth - nicValueX - nicInlineGap - buttonsWidth - UiScale(8);
-            bool inline = inlineAvailable >= nicInputMinWidth;
+            // The card can move beside or below the CPU list after a resize.
+            // Do not retain a minimum calculated for its previous, wider panel.
+            int currentInputMinimum = Math.Min(nicInputMinBase, inputAvailable);
+            bool inline = inlineAvailable >= currentInputMinimum;
             int inputWidth = inline
-                ? Math.Min(nicInputDesiredWidth, Math.Max(nicInputMinWidth, inlineAvailable))
-                : Math.Min(nicInputDesiredWidth, Math.Max(nicInputMinWidth, inputAvailable));
+                ? Math.Min(nicInputDesiredWidth, Math.Max(currentInputMinimum, inlineAvailable))
+                : Math.Min(nicInputDesiredWidth, Math.Max(currentInputMinimum, inputAvailable));
 
             txtNicItr.Size = new Size(inputWidth, UiScale(24));
             btnNicItr.Location = inline
@@ -1052,13 +1078,24 @@ public sealed partial class MainForm
             lblNicItrTime.Size = new Size(statusWidth, nicDetailHeight);
         }
 
+        int GetSettingsSideWidth()
+        {
+            if (hasImod) return UiScale(460);
+            if (!showNicItr) return UiScale(360);
+            int inputLeft = Math.Max(valueX, lblNicItr.PreferredWidth + UiScale(14));
+            int buttonsWidth = btnNicItr.Width + nicButtonGap + btnNicItrSave.Width + nicButtonGap + btnNicItrCheck.Width;
+            // The editor and the entire translated button row must fit even
+            // when buttons wrap below it. Otherwise stack under the CPU list.
+            return Math.Max(UiScale(360), inputLeft + Math.Max(nicInputMinBase, buttonsWidth) + UiScale(12));
+        }
+
         LayoutNicItrRow();
 
         if (showNicItr)
         {
             settingsPanel.Controls.AddRange([lblNicItr, txtNicItr, btnNicItr, btnNicItrSave, btnNicItrCheck, lblNicItrStatus, lblNicItrTime]);
             rowTop = lblNicItrTime.Bottom + rowGap;
-            _copyToolTip.SetToolTip(btnNicItrCheck, "Load DTIMOD.sys (IMOD driver) and re-read current NIC ITR values.");
+            _copyToolTip.SetToolTip(btnNicItrCheck, "Load DTIMOD.sys and read current NIC ITR values.");
         }
 
         bool showRawMouseThrottle = HasMouseThrottleContext(device);
@@ -1456,6 +1493,7 @@ public sealed partial class MainForm
 
                 ThemedTextBox roleBox = new()
                 {
+                    Name = "IMOD_ROLE_" + role.ToUpperInvariant(),
                     Size = new Size(editorBoxWidth, UiScale(24)),
                     Location = new Point(roleLabel.Right + UiScale(4), editorY),
                     BackColor = Color.FromArgb(18, 18, 22),
@@ -1655,7 +1693,7 @@ public sealed partial class MainForm
         void UpdateImodDetailsVisibility()
         {
             bool showDetails = chkImod.Visible
-                && (chkImod.Checked || IsImodAttentionStatus(GetSourceControlText(lblImodCurrent)));
+                && (chkImod.Checked || createdBlock?.ImodReadbackRequested == true || IsImodAttentionStatus(GetSourceControlText(lblImodCurrent)));
             lblImodCurrent.Visible = showDetails;
             lblImodDefault.Visible = showDetails;
             btnImodDetails.Visible = showDetails;
@@ -1919,12 +1957,12 @@ public sealed partial class MainForm
             imodReadbackPanel.Controls.AddRange([lblImodCurrent, lblImodDefault, btnImodDetails, lblImodMap]);
             settingsPanel.Controls.AddRange([lblImodMode, cmbImodMode, lblImodModeHint, chkImod, lblImod, txtImod, btnImodApply, btnImodDelete, btnImodCheck, imodDeviceEditorPanel, imodReadbackPanel]);
             _copyToolTip.SetToolTip(txtImod, $"Supported IMOD input:\n0xC8\n0xC8, 0xFA0\n{imodRoleTemplate}");
-            _copyToolTip.SetToolTip(cmbImodMode, "XHCI applies one value to all interrupters on this USB host controller. Device mapping attempts to match detected devices to interrupters and falls back to a controller-wide value when the mapping is uncertain. Interrupter mode applies values by index.");
-            _copyToolTip.SetToolTip(lblImodModeHint, "Shows how the selected IMOD mode interprets the IMOD Value field.");
-            _copyToolTip.SetToolTip(btnImodApply, "Apply the current IMOD configuration and read back hardware values.");
-            _copyToolTip.SetToolTip(btnImodCheck, "Load DTIMOD.sys (IMOD driver) and re-read current hardware IMOD values.");
-            _copyToolTip.SetToolTip(lblImodDefault, "Click to copy the default IMOD interval into the input field.");
-            _copyToolTip.SetToolTip(btnImodDetails, "Show or hide the detailed device and interrupter IMOD readback.");
+            _copyToolTip.SetToolTip(cmbImodMode, "XHCI: one value for all controller interrupters. Device mapping: values by device role; uses one controller-wide value if mapping is uncertain. Interrupter: values by index.");
+            _copyToolTip.SetToolTip(lblImodModeHint, "Input format for the selected IMOD mode.");
+            _copyToolTip.SetToolTip(btnImodApply, "Apply IMOD and re-read the values to check the write.");
+            _copyToolTip.SetToolTip(btnImodCheck, "Load DTIMOD.sys and read current IMOD values.");
+            _copyToolTip.SetToolTip(lblImodDefault, "Click to use the default IMOD interval.");
+            _copyToolTip.SetToolTip(btnImodDetails, "Show / hide IMOD values by device and interrupter.");
             _copyToolTip.SetToolTip(lblImodMap, string.Empty);
             UpdateImodDetailsVisibility();
             rowTop = imodReadbackBottomInSettings + rowGap;
@@ -1967,7 +2005,7 @@ public sealed partial class MainForm
         }
         settingsContentBottom = Math.Max(settingsContentBottom, imodReadbackBottomInSettings);
 
-        desiredSettingsSideWidth = showImod ? UiScale(460) : UiScale(360);
+        desiredSettingsSideWidth = GetSettingsSideWidth();
         UpdateResponsivePlacement();
 
         int settingsMinWidth = Math.Min(UiScale(360), availableSettingsWidth);
@@ -2031,7 +2069,14 @@ public sealed partial class MainForm
                 WriteLog($"UI: Copied registry path: {txt}");
             }
         };
-        _copyToolTip.SetToolTip(lblInfo, "Click to copy full registry path to clipboard");
+        _copyToolTip.SetToolTip(lblInfo, "Click to copy the registry path.");
+        Panel infoDivider = new()
+        {
+            Name = "DEVICE_INFO_RULE", BackColor = Color.FromArgb(38, 38, 44),
+            Location = new Point(lblInfo.Left, infoY - UiScale(8)),
+            Size = new Size(lblInfo.Width, 1), TabStop = false,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+        };
 
         void RelayoutDeviceBlockChrome()
         {
@@ -2086,7 +2131,7 @@ public sealed partial class MainForm
                 return bottom;
             }
 
-            desiredSettingsSideWidth = showImod ? UiScale(460) : UiScale(360);
+            desiredSettingsSideWidth = GetSettingsSideWidth();
             UpdateResponsivePlacement();
             LayoutMsiLimitHint();
             LayoutNicItrRow();
@@ -2116,6 +2161,8 @@ public sealed partial class MainForm
             int currentInfoHeight = Math.Max(UiScale(70), GetPreferredTextHeight(lblInfo, currentInfoWidth) + UiScale(20));
             lblInfo.Location = new Point(lblInfo.Left, lowerContentBottom + UiScale(18));
             lblInfo.Size = new Size(currentInfoWidth, currentInfoHeight);
+            infoDivider.Location = new Point(lblInfo.Left, lblInfo.Top - UiScale(9));
+            infoDivider.Width = currentInfoWidth;
 
             grp.Height = lblInfo.Bottom + UiScale(20);
         }
@@ -2139,6 +2186,7 @@ public sealed partial class MainForm
             lblMask,
             lblIrq,
             settingsPanel,
+            infoDivider,
             lblInfo,
         ];
         grp.Controls.AddRange(chrome.ToArray());
@@ -2160,6 +2208,7 @@ public sealed partial class MainForm
             CpuBoxes = cpuBoxes,
             AffinityLabel = lblMask,
             IrqLabel = lblIrq,
+            InterruptModeLabel = lblInterruptMode,
             MsiCombo = cmbMsi,
             PowerSavingCheck = chkPowerSaving,
             LimitBox = txtLimit.Inner,
@@ -2185,6 +2234,7 @@ public sealed partial class MainForm
             ImodMapLabel = lblImodMap,
             ImodDetailsButton = showImod ? btnImodDetails : null,
             ImodDetailsExpanded = imodDetailsExpanded,
+            ImodReadbackPanel = imodReadbackPanel,
             RawMouseThrottleCheck = showRawMouseThrottle ? chkRawMouseThrottle : null,
             RawMouseThrottleCombo = showRawMouseThrottle ? cmbRawMouseThrottle : null,
             RawMouseThrottleStatusLabel = showRawMouseThrottle ? lblRawMouseThrottleStatus : null,
@@ -2367,6 +2417,7 @@ public sealed partial class MainForm
 
     private void LayoutBlocks()
     {
+        if (_uiDisposing || IsDisposed || Disposing) return;
         int paddingX = UiScale(24);
         int gapY = UiScale(18);
         int y = UiScale(18);
@@ -2641,6 +2692,11 @@ public sealed partial class MainForm
                 button.Enabled = enabled;
             }
         }
+        if (_interruptModesReadButton is not null && !_interruptModesReadButton.IsDisposed)
+        {
+            _interruptModesReadButton.Enabled = enabled && !_interruptModeCheckRunning
+                && _blocks.Any(block => block.Device.InstanceId.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase));
+        }
     }
 
     private bool TryBlockBusyHardwareWrite(string operation)
@@ -2854,6 +2910,7 @@ public sealed partial class MainForm
                 _devicesPanel.ResumeLayout();
             }
 
+            ApplyRawPollingOverridesToBlocks();
             AdjustInitialDeviceViewportHeight();
             _devicesPanel.Invalidate(true);
             _devicesHost.Invalidate(true);
@@ -2894,6 +2951,8 @@ public sealed partial class MainForm
             RebuildFilterCategoryButtons();
             ApplyDeviceFilter();
             UpdateApplyButtonDirtyCount();
+
+            UpdateInterruptModesStatus();
 
             WriteLog(
                 $"REFRESH.DONE: includeImodReadback={includeImodReadback} blocks={_blocks.Count} " +
@@ -3074,6 +3133,7 @@ public sealed partial class MainForm
         foreach (DeviceBlock b in _blocks)
         {
             b.IrqLabel.Text = "IRQ Count: reading...";
+            SetInterruptModeResult(b, b.Device.IsTestDevice ? CreateTestInterruptMode(b.Device) : InterruptModeResult.Pending);
         }
 
         WriteLog($"IRQ.REFRESH: reason={reason} blocks={_blocks.Count}");
@@ -3085,6 +3145,12 @@ public sealed partial class MainForm
                 ? new Dictionary<string, DeviceIrqInfo>(StringComparer.OrdinalIgnoreCase)
                 : await Task.Run(GetDeviceIrqCounts);
             capabilitiesById = await Task.Run(() => ReadInterruptCapabilities(_blocks));
+            // Read PCI through an existing device, or Windows allocation if absent. Never load a driver here.
+            DeviceBlock[] snapshot = _blocks.ToArray();
+            var modes = await Task.Run(() => snapshot.Where(b => !b.Device.IsTestDevice)
+                .Select(b => (Block: b, Result: PciInterruptReader.QueryLoaded(b.Device.InstanceId))).ToArray());
+            if (IsDisposed || generation != _irqRefreshGeneration) return;
+            foreach (var mode in modes) SetInterruptModeResult(mode.Block, mode.Result);
         }
         catch (Exception ex)
         {
@@ -3099,7 +3165,7 @@ public sealed partial class MainForm
                 string regMsiStatus = ReadMsiStatusFromRegistry(b);
                 b.IrqCount = null;
                 b.InterruptCapabilities = null;
-                b.IrqLabel.Text = $"IRQ: unavailable | WMI hint: {FormatWmiInterruptHint(null, regMsiStatus)} | HW: unknown";
+                b.IrqLabel.Text = "IRQ: unavailable | HW: unknown";
             }
             return;
         }
@@ -3144,7 +3210,7 @@ public sealed partial class MainForm
                 b.IrqCount = isNetwork ? null : 0;
                 b.InterruptCapabilities = capabilities;
                 string countText = isNetwork ? "N/A" : "0";
-                b.IrqLabel.Text = $"IRQ: {countText} | WMI hint: {FormatWmiInterruptHint(null, regMsiStatus)} | HW: {FormatInterruptCapabilities(capabilities)}";
+                b.IrqLabel.Text = $"IRQ: {countText} | HW: {FormatInterruptCapabilities(capabilities)}";
                 string triedKeys = string.Join(", ", BuildIrqLookupKeys(b));
                 WriteLog($"IRQ.MAP: {b.Device.InstanceId} ({shortPnp}) -> {(isNetwork ? "N/A" : "0")} wmiMsiHint=Unknown registryMsi={regMsiStatus} irqs=[none] source=registry-fallback keys=[{triedKeys}]");
             }
@@ -3227,7 +3293,7 @@ public sealed partial class MainForm
 
     private static string FormatIrqLabel(DeviceIrqInfo info, string registryStatus = "Unknown")
     {
-        string label = $"IRQ: {info.Count} | WMI hint: {FormatWmiInterruptHint(info, registryStatus)} | HW: {FormatInterruptCapabilities(info.Capabilities)}";
+        string label = $"IRQ: {info.Count} | HW: {FormatInterruptCapabilities(info.Capabilities)}";
         if (!info.IsAmbiguous)
         {
             return label;

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1, "id": "dtimod-status", "preset": "Intel14900K", "language": "EN", "filter": "USB", "width": 1200, "height": 900,
+  "steps": [
+    { "id": "initial", "action": "capture" },
+    { "id": "incompatible", "action": "model-error", "value": "dtimod-incompatible" },
+    { "id": "dialog", "action": "wait", "target": "@active", "value": "USB IMOD", "durationMs": 3000 },
+    { "id": "restart-en", "action": "capture", "target": "@active" },
+    { "id": "close-en", "action": "click", "target": "id:OK" },
+    { "id": "idle-en", "action": "wait", "target": "@main", "property": "enabled", "value": "true", "durationMs": 2000 },
+    { "id": "timeout-en", "action": "model-error", "value": "dtimod-pending" },
+    { "id": "pending-en", "action": "wait", "target": "@active", "value": "USB IMOD", "durationMs": 3000 },
+    { "id": "timeout-shot-en", "action": "capture", "target": "@active" },
+    { "id": "close-timeout-en", "action": "click", "target": "id:OK" },
+    { "id": "idle-timeout", "action": "wait", "target": "@main", "property": "enabled", "value": "true", "durationMs": 2000 },
+    { "id": "russian", "action": "language", "value": "RU" },
+    { "id": "incompatible-ru", "action": "model-error", "value": "dtimod-incompatible" },
+    { "id": "dialog-ru", "action": "wait", "target": "@active", "value": "USB IMOD", "durationMs": 3000 },
+    { "id": "restart-ru", "action": "capture", "target": "@active" },
+    { "id": "close-ru", "action": "click", "target": "id:OK" },
+    { "id": "idle-ru", "action": "wait", "target": "@main", "property": "enabled", "value": "true", "durationMs": 2000 },
+    { "id": "timeout-ru", "action": "model-error", "value": "dtimod-pending" },
+    { "id": "pending-ru", "action": "wait", "target": "@active", "value": "USB IMOD", "durationMs": 3000 },
+    { "id": "timeout-shot-ru", "action": "capture", "target": "@active" },
+    { "id": "close-timeout-ru", "action": "click", "target": "id:OK" },
+    { "id": "done", "action": "wait", "target": "@main", "property": "enabled", "value": "true", "durationMs": 2000 }
+  ]
+}

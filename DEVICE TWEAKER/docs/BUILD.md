@@ -1,4 +1,4 @@
-# Сборка DEVICE TWEAKER
+﻿# Сборка DEVICE TWEAKER
 
 ## Требования
 
@@ -9,7 +9,7 @@
 
 ## Сборка обеих версий
 
-Запустите команду из корневой папки проекта.
+Запустите команду из папки `DEVICE TWEAKER/` внутри репозитория. В ней находятся `build.ps1` и `DeviceTweakerCS.csproj`.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Flavor both -Configuration Release -SkipImodDriverBuild
@@ -53,13 +53,18 @@ dotnet build .\DeviceTweakerCS.csproj -c Release -p:BuildImodDriver=false
 
 ## Проверка перед релизом
 
+Для локальной автоматической проверки без применения настроек используйте [dev/qa](../../dev/qa/README.md). Обычная сборка не содержит тест-панель. Она подключается только при `-p:DeveloperQa=true`; публикация принудительно использует `DeveloperQa=false`.
+
+При переупаковке текущей 0.0.4 номер версии сохраняется. Для нового номера релиза:
+
 1. Обновите `Version`, `AssemblyVersion`, `FileVersion` и `InformationalVersion` в `DeviceTweakerCS.csproj`, а также версию в `assets/app.manifest`.
 2. Обновите описание изменений в `CHANGELOG.md` и `docs/releases/v*.md`.
 3. Соберите обе версии через `build.ps1`.
 4. Проверьте, что SHA-256 файла `IMOD/DTIMOD.sys` совпадает с `IMOD/DTIMOD.sys.sha256`.
 5. Запустите автономную версию от имени администратора.
 6. Проверьте загрузку устройств, интерфейс, подсказки и выпадающие списки.
-7. Убедитесь, что без кнопки `CHECK` драйвер не загружается.
+7. Обычный запуск и обновление списка не загружают драйвер. IRQ Mode использует ресурсы Windows или уже загруженный DTIMOD.sys. Общая кнопка СЧИТАТЬ IRQ выполняет прямое чтение PCI; при необходимости загружает драйвер.
+   Для чтения регистров нужен загруженный драйвер. Сборка приложения использует закреплённую пару KDU 1.4.5.2512. Исходники, происхождение бинарников и порядок отдельной компиляции описаны в IMOD/KDU/README.md. Для выпуска с готовым SYS используйте -SkipImodDriverBuild.
 8. Добавьте в GitHub Release два EXE и `SHA256SUMS.txt` из папки сборки в `bin\ReleasePackages\`. Драйвер уже встроен в EXE; папки `logs` и `Backups` не публикуйте.
 9. Перед публикацией сверьте SHA-256 обоих EXE со значениями из `SHA256SUMS.txt`. Для GitHub используйте workflow `Release package`, описанный в [RELEASE.md](RELEASE.md).
 

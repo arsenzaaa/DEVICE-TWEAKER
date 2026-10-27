@@ -1,0 +1,423 @@
+{
+  "schemaVersion": 1,
+  "id": "navigation-audit",
+  "preset": "DevicePalette",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    {
+      "id": "EN-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "EN-header",
+      "action": "capture"
+    },
+    {
+      "id": "EN-msi-reveal",
+      "action": "reveal",
+      "target": "role:msi",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-msi-focus",
+      "action": "focus",
+      "target": "role:msi",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-msi-open",
+      "action": "key",
+      "value": "F4",
+      "target": "role:msi",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-msi-popup",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "EN-msi-down",
+      "action": "key",
+      "value": "Down",
+      "target": "role:msi",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-msi-next",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "EN-msi-cancel",
+      "action": "key",
+      "value": "Escape",
+      "target": "role:msi",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-priority-reveal",
+      "action": "reveal",
+      "target": "role:priority",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-priority-focus",
+      "action": "focus",
+      "target": "role:priority",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-priority-open",
+      "action": "key",
+      "value": "F4",
+      "target": "role:priority",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-priority-popup",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "EN-priority-down",
+      "action": "key",
+      "value": "Down",
+      "target": "role:priority",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-priority-next",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "EN-priority-cancel",
+      "action": "key",
+      "value": "Escape",
+      "target": "role:priority",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-policy-reveal",
+      "action": "reveal",
+      "target": "role:policy",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-policy-focus",
+      "action": "focus",
+      "target": "role:policy",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-policy-open",
+      "action": "key",
+      "value": "F4",
+      "target": "role:policy",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-policy-popup",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "EN-policy-down",
+      "action": "key",
+      "value": "Down",
+      "target": "role:policy",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-policy-next",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "EN-policy-cancel",
+      "action": "key",
+      "value": "Escape",
+      "target": "role:policy",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-GPU-filter",
+      "action": "click",
+      "target": "id:FILTER_GPU"
+    },
+    {
+      "id": "EN-GPU",
+      "action": "capture"
+    },
+    {
+      "id": "EN-NETWORK-filter",
+      "action": "click",
+      "target": "id:FILTER_NETWORK"
+    },
+    {
+      "id": "EN-NETWORK",
+      "action": "capture"
+    },
+    {
+      "id": "EN-AUDIO-filter",
+      "action": "click",
+      "target": "id:FILTER_AUDIO"
+    },
+    {
+      "id": "EN-AUDIO",
+      "action": "capture"
+    },
+    {
+      "id": "EN-STORAGE-filter",
+      "action": "click",
+      "target": "id:FILTER_STORAGE"
+    },
+    {
+      "id": "EN-STORAGE",
+      "action": "capture"
+    },
+    {
+      "id": "EN-USB-filter",
+      "action": "click",
+      "target": "id:FILTER_USB"
+    },
+    {
+      "id": "EN-USB",
+      "action": "capture"
+    },
+    {
+      "id": "EN-ALL-filter",
+      "action": "click",
+      "target": "id:FILTER_ALL"
+    },
+    {
+      "id": "EN-ALL",
+      "action": "capture"
+    },
+    {
+      "id": "EN-end",
+      "action": "scroll",
+      "value": "End"
+    },
+    {
+      "id": "EN-bottom",
+      "action": "capture"
+    },
+    {
+      "id": "EN-home",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "RU-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "RU-header",
+      "action": "capture"
+    },
+    {
+      "id": "RU-msi-reveal",
+      "action": "reveal",
+      "target": "role:msi",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-msi-focus",
+      "action": "focus",
+      "target": "role:msi",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-msi-open",
+      "action": "key",
+      "value": "F4",
+      "target": "role:msi",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-msi-popup",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "RU-msi-down",
+      "action": "key",
+      "value": "Down",
+      "target": "role:msi",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-msi-next",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "RU-msi-cancel",
+      "action": "key",
+      "value": "Escape",
+      "target": "role:msi",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-priority-reveal",
+      "action": "reveal",
+      "target": "role:priority",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-priority-focus",
+      "action": "focus",
+      "target": "role:priority",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-priority-open",
+      "action": "key",
+      "value": "F4",
+      "target": "role:priority",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-priority-popup",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "RU-priority-down",
+      "action": "key",
+      "value": "Down",
+      "target": "role:priority",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-priority-next",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "RU-priority-cancel",
+      "action": "key",
+      "value": "Escape",
+      "target": "role:priority",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-policy-reveal",
+      "action": "reveal",
+      "target": "role:policy",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-policy-focus",
+      "action": "focus",
+      "target": "role:policy",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-policy-open",
+      "action": "key",
+      "value": "F4",
+      "target": "role:policy",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-policy-popup",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "RU-policy-down",
+      "action": "key",
+      "value": "Down",
+      "target": "role:policy",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-policy-next",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "RU-policy-cancel",
+      "action": "key",
+      "value": "Escape",
+      "target": "role:policy",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-GPU-filter",
+      "action": "click",
+      "target": "id:FILTER_GPU"
+    },
+    {
+      "id": "RU-GPU",
+      "action": "capture"
+    },
+    {
+      "id": "RU-NETWORK-filter",
+      "action": "click",
+      "target": "id:FILTER_NETWORK"
+    },
+    {
+      "id": "RU-NETWORK",
+      "action": "capture"
+    },
+    {
+      "id": "RU-AUDIO-filter",
+      "action": "click",
+      "target": "id:FILTER_AUDIO"
+    },
+    {
+      "id": "RU-AUDIO",
+      "action": "capture"
+    },
+    {
+      "id": "RU-STORAGE-filter",
+      "action": "click",
+      "target": "id:FILTER_STORAGE"
+    },
+    {
+      "id": "RU-STORAGE",
+      "action": "capture"
+    },
+    {
+      "id": "RU-USB-filter",
+      "action": "click",
+      "target": "id:FILTER_USB"
+    },
+    {
+      "id": "RU-USB",
+      "action": "capture"
+    },
+    {
+      "id": "RU-ALL-filter",
+      "action": "click",
+      "target": "id:FILTER_ALL"
+    },
+    {
+      "id": "RU-ALL",
+      "action": "capture"
+    },
+    {
+      "id": "RU-end",
+      "action": "scroll",
+      "value": "End"
+    },
+    {
+      "id": "RU-bottom",
+      "action": "capture"
+    },
+    {
+      "id": "RU-home",
+      "action": "scroll",
+      "value": "Home"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1, "id": "device-colors", "preset": "Intel14900K", "language": "EN", "filter": "ALL", "width": 1200, "height": 900,
+  "steps": [
+    { "id": "gpu-title", "action": "reveal", "target": "role:title", "device": "DEV_2684" },
+    { "id": "gpu-en", "action": "capture" },
+    { "id": "net-title", "action": "reveal", "target": "role:title", "device": "DEV_125C" },
+    { "id": "net-en", "action": "capture" },
+    { "id": "russian", "action": "transition", "durationMs": 400, "intervalMs": 100,
+      "trigger": { "action": "language", "value": "RU" } },
+    { "id": "net-ru", "action": "capture" },
+    { "id": "gpu-title-ru", "action": "reveal", "target": "role:title", "device": "DEV_2684" },
+    { "id": "gpu-ru", "action": "capture" },
+    { "id": "usb-title", "action": "reveal", "target": "role:title", "device": "DEV_461E" },
+    { "id": "usb-ru", "action": "capture" },
+    { "id": "storage-title", "action": "reveal", "target": "role:title", "device": "DEV_A80C" },
+    { "id": "storage-ru", "action": "capture" }
+  ]
+}

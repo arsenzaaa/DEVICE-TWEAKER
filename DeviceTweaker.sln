@@ -9,7 +9,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeviceTweakerCS", "DEVICE T
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{224930EE-259D-7F56-19DC-C16273B2AA05}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeviceTweaker.Tests", "DEVICE TWEAKER\tests\DeviceTweaker.Tests\DeviceTweaker.Tests.csproj", "{83C82B41-E863-49C6-AF95-F9FB15A76BE1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeviceTweaker.Tests", "dev\qa\tests\DeviceTweaker.Tests\DeviceTweaker.Tests.csproj", "{83C82B41-E863-49C6-AF95-F9FB15A76BE1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

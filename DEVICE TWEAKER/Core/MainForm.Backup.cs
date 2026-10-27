@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -56,32 +56,6 @@ public sealed partial class MainForm
         }
     }
 
-    private sealed class DeviceTweakerBackup
-    {
-        public int Version { get; set; } = DeviceTweakerBackupVersion;
-        public DateTime CreatedAt { get; set; }
-        public string Reason { get; set; } = string.Empty;
-        public List<RegistryValueBackup> RegistryValues { get; set; } = [];
-        public FileBackup? ImodScript { get; set; }
-    }
-
-    private sealed class RegistryValueBackup
-    {
-        public string Hive { get; set; } = string.Empty;
-        public string Path { get; set; } = string.Empty;
-        public string Name { get; set; } = string.Empty;
-        public bool Exists { get; set; }
-        public string Kind { get; set; } = string.Empty;
-        public string? Data { get; set; }
-    }
-
-    private sealed class FileBackup
-    {
-        public string Path { get; set; } = string.Empty;
-        public bool Exists { get; set; }
-        public string? Text { get; set; }
-    }
-
     private sealed record BackupValidationResult(
         int ValueCount,
         int ExistingCount,
@@ -119,6 +93,7 @@ public sealed partial class MainForm
 
     private bool CreateDeviceTweakerBackup(string reason, bool showDialog, BackupLocation location)
     {
+        DemandRealWrite("CREATE BACKUP");
         try
         {
             if (_blocks.Count == 0)
@@ -157,7 +132,7 @@ public sealed partial class MainForm
 
             if (showDialog)
             {
-                ShowThemedInfo($"Backup saved.\n{path}");
+                ShowBackupFileResult(path, restored: false);
             }
 
             return true;
@@ -183,6 +158,7 @@ public sealed partial class MainForm
 
     private bool EnsureOriginalDeviceTweakerBackup(BackupLocation preferredLocation)
     {
+        DemandRealWrite("CREATE ORIGINAL BACKUP");
         foreach (string directory in EnumerateBackupDirectories())
         {
             string existingPath = Path.Combine(directory, OriginalBackupFileName);
@@ -433,6 +409,13 @@ public sealed partial class MainForm
 
         try
         {
+            if (UsbSelectiveSuspendPolicy.TryParsePowerPlanTarget(backup.Hive, path, name, out Guid scheme, out bool ac))
+            {
+                backup.Exists = true;
+                backup.Kind = RegistryValueKind.DWord.ToString();
+                backup.Data = UsbSelectiveSuspendPolicy.ReadPowerPlanIndex(scheme, ac).ToString(CultureInfo.InvariantCulture);
+                return backup;
+            }
             using RegistryKey baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
             using RegistryKey? key = baseKey.OpenSubKey(path);
             object? value = key?.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
@@ -457,23 +440,20 @@ public sealed partial class MainForm
         return backup;
     }
 
-    private static string EncodeRegistryValue(object value, RegistryValueKind kind)
-    {
-        return kind switch
-        {
-            RegistryValueKind.Binary => Convert.ToBase64String(value as byte[] ?? []),
-            RegistryValueKind.MultiString => JsonSerializer.Serialize(value as string[] ?? []),
-            RegistryValueKind.DWord or RegistryValueKind.QWord => Convert.ToInt64(value, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture),
-            _ => value.ToString() ?? string.Empty,
-        };
-    }
+    private static string EncodeRegistryValue(object value, RegistryValueKind kind) => BackupFormat.EncodeRegistryValue(value, kind);
 
     private void RestoreLatestDeviceTweakerBackup()
     {
         try
         {
             List<BackupSnapshotInfo> backups = GetBackupSnapshots();
-            RestoreChoice choice = ShowRestoreChoiceDialog(backups, out string? path);
+            RestoreChoice choice = ShowRestoreChoiceDialog(backups, out string? path, selected =>
+            {
+                if (TryBlockSandboxHardwareWrite("BACKUP DELETE")) return 0;
+                int deleted = DeleteDeviceTweakerBackups([selected]);
+                WriteLog($"BACKUP.RESTORE: deleted selected backup count={deleted} path={selected.Path}");
+                return deleted;
+            });
             if (choice == RestoreChoice.Cancel)
             {
                 WriteLog("BACKUP.RESTORE: canceled by user");
@@ -486,15 +466,7 @@ public sealed partial class MainForm
                 return;
             }
 
-            if (choice == RestoreChoice.DeleteBackup)
-            {
-                int deleted = string.IsNullOrWhiteSpace(path)
-                    ? 0
-                    : DeleteDeviceTweakerBackups(backups.Where(b => string.Equals(b.Path, path, StringComparison.OrdinalIgnoreCase)).ToList());
-                WriteLog($"BACKUP.RESTORE: deleted selected backup count={deleted} path={path}");
-                ShowThemedInfo($"Backup files deleted: {deleted}");
-                return;
-            }
+            if (TryBlockSandboxHardwareWrite("BACKUP RESTORE / DELETE")) return;
 
             if (choice == RestoreChoice.RestoreLatest)
             {
@@ -525,7 +497,7 @@ public sealed partial class MainForm
                 EndDevicesBusy();
             }
 
-            ShowThemedInfo($"Backup restored.\n{path}\n\nPlease reboot your PC to finish applying restored settings.");
+            ShowBackupFileResult(path, restored: true);
         }
         catch (Exception ex)
         {
@@ -668,6 +640,7 @@ public sealed partial class MainForm
 
     private int DeleteDeviceTweakerBackups(IReadOnlyList<BackupSnapshotInfo> backups)
     {
+        DemandRealWrite("DeleteDeviceTweakerBackups");
         int deleted = 0;
         foreach (BackupSnapshotInfo backup in backups)
         {
@@ -696,6 +669,7 @@ public sealed partial class MainForm
 
     private void PruneDeviceTweakerBackups(string directory, int keepLatest)
     {
+        DemandRealWrite("PruneDeviceTweakerBackups");
         try
         {
             if (!Directory.Exists(directory))
@@ -737,6 +711,9 @@ public sealed partial class MainForm
 
     private void RestoreDeviceTweakerBackup(string path)
     {
+        DemandRealWrite("RestoreDeviceTweakerBackup");
+        using DriverLoadGate gate = DriverLoadGate.Enter();
+        DriverLoadGate.AssertLoaderIdle();
         string json = File.ReadAllText(path, Encoding.UTF8);
         DeviceTweakerBackup? backup = JsonSerializer.Deserialize<DeviceTweakerBackup>(json);
         if (backup is null)
@@ -745,137 +722,38 @@ public sealed partial class MainForm
         }
 
         ValidateDeviceTweakerBackup(backup);
-
-        List<RegistryValueBackup> rollbackValues = [];
-        FileBackup? rollbackScript = null;
-        if (backup.ImodScript is not null)
+        if (backup.ImodScript is { Exists: true, Text: { } oldScript })
         {
-            string startupPath = GetImodStartupPath();
-            rollbackScript = new FileBackup
-            {
-                Path = startupPath,
-                Exists = File.Exists(startupPath),
-                Text = File.Exists(startupPath) ? File.ReadAllText(startupPath, Encoding.UTF8) : null,
-            };
+            backup.ImodScript.Text = UpgradeImodScriptEngine(oldScript);
+            PrepareImodStartupPayload();
         }
 
-        try
-        {
-            foreach (RegistryValueBackup value in backup.RegistryValues)
+        BackupRestoreService service = new(
+            ValidateDeviceTweakerBackup,
+            value =>
             {
-                if (string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
                 if (!TryGetBackupHive(value.Hive, out RegistryHive hive))
-                {
                     throw new InvalidOperationException($"Unsupported registry hive: {value.Hive}.");
-                }
-
-                RegistryValueBackup rollback = CaptureRegistryValue(hive, value.Path, value.Name);
-                if (string.Equals(rollback.Kind, "ReadError", StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InvalidOperationException(
-                        $"Cannot capture rollback value: {value.Hive}\\{value.Path}\\{value.Name}. {rollback.Data}");
-                }
-
-                rollbackValues.Add(rollback);
-                RestoreRegistryValue(value);
-            }
-
-            if (backup.ImodScript is not null)
+                return CaptureRegistryValue(hive, value.Path, value.Name);
+            },
+            RestoreRegistryValue,
+            () =>
             {
-                RestoreFileBackup(backup.ImodScript);
-                InvalidateImodCache();
-            }
-        }
-        catch (Exception restoreError)
-        {
-            WriteLog($"BACKUP.RESTORE.ROLLBACK: starting after error=\"{FlattenLogText(restoreError.ToString())}\"");
-            List<string> rollbackErrors = [];
-            foreach (RegistryValueBackup rollback in rollbackValues.AsEnumerable().Reverse())
-            {
-                try
-                {
-                    RestoreRegistryValue(rollback);
-                }
-                catch (Exception ex)
-                {
-                    rollbackErrors.Add($"{rollback.Hive}\\{rollback.Path}\\{rollback.Name}: {ex.Message}");
-                }
-            }
-
-            if (rollbackScript is not null)
-            {
-                try
-                {
-                    RestoreFileBackup(rollbackScript);
-                    InvalidateImodCache();
-                }
-                catch (Exception ex)
-                {
-                    rollbackErrors.Add($"IMOD script: {ex.Message}");
-                }
-            }
-
-            if (rollbackErrors.Count > 0)
-            {
-                throw new InvalidOperationException(
-                    $"Backup restore failed and rollback was incomplete. Restore error: {restoreError.Message}. "
-                    + $"Rollback errors: {string.Join(" | ", rollbackErrors)}",
-                    restoreError);
-            }
-
-            WriteLog("BACKUP.RESTORE.ROLLBACK: completed");
-            throw;
-        }
+                string startupPath = GetImodStartupPath();
+                bool exists = File.Exists(startupPath);
+                return new FileBackup { Path = startupPath, Exists = exists,
+                    Text = exists ? File.ReadAllText(startupPath, Encoding.UTF8) : null };
+            },
+            script => { RestoreFileBackup(script); InvalidateImodCache(); },
+            WriteLog);
+        service.Restore(backup);
 
         WriteLog($"BACKUP.RESTORE: restored path={path} values={backup.RegistryValues.Count} reason={backup.Reason}");
         SyncLivePowerManagementAfterRestore();
     }
 
     private void ValidateDeviceTweakerBackup(DeviceTweakerBackup backup)
-    {
-        if (backup.Version != DeviceTweakerBackupVersion)
-        {
-            throw new InvalidOperationException($"Unsupported backup version: {backup.Version}.");
-        }
-
-        if (backup.CreatedAt == default)
-        {
-            throw new InvalidOperationException("Backup creation time is missing.");
-        }
-
-        if (backup.RegistryValues is null)
-        {
-            throw new InvalidOperationException("Backup registry data is missing.");
-        }
-
-        HashSet<string> restoreTargets = new(StringComparer.OrdinalIgnoreCase);
-        foreach (RegistryValueBackup value in backup.RegistryValues)
-        {
-            if (value is null || !IsManagedBackupRegistryValue(value))
-            {
-                throw new InvalidOperationException("Backup contains an unmanaged or empty registry target.");
-            }
-
-            string target = $"{value.Hive.Trim()}|{value.Path.Trim().Trim('\\')}|{value.Name.Trim()}";
-            if (!restoreTargets.Add(target))
-            {
-                throw new InvalidOperationException(
-                    $"Backup contains a duplicate registry target: {value.Hive}\\{value.Path}\\{value.Name}");
-            }
-
-            ValidateRegistryValueBackup(value);
-        }
-
-        if (backup.ImodScript is not null
-            && !IsManagedImodScriptPath(backup.ImodScript.Path))
-        {
-            throw new InvalidOperationException("Backup contains an unmanaged IMOD script path.");
-        }
-    }
+        => BackupFormat.ValidateDocument(backup, IsManagedImodScriptPath);
 
     private void ValidateCapturedBackupForWrite(DeviceTweakerBackup backup)
     {
@@ -940,123 +818,26 @@ public sealed partial class MainForm
             sha256);
     }
 
-    private static void ValidateRegistryValueBackup(RegistryValueBackup value)
-    {
-        if (!value.Exists || string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
+    private static void ValidateRegistryValueBackup(RegistryValueBackup value) => BackupFormat.ValidateRegistryValueBackup(value);
 
-        if (!TryParseRegistryValueKind(value.Kind, out RegistryValueKind kind))
-        {
-            throw new InvalidOperationException(
-                $"Backup contains an unsupported registry value kind: {value.Hive}\\{value.Path}\\{value.Name} kind={value.Kind}");
-        }
-
-        try
-        {
-            _ = DecodeRegistryValue(value.Data, kind);
-        }
-        catch (Exception ex) when (ex is FormatException or JsonException or OverflowException)
-        {
-            throw new InvalidOperationException(
-                $"Backup contains invalid registry data: {value.Hive}\\{value.Path}\\{value.Name} kind={value.Kind}",
-                ex);
-        }
-    }
-
-    private static bool IsManagedBackupRegistryValue(RegistryValueBackup value)
-    {
-        string hive = value.Hive.Trim();
-        string path = value.Path.Trim().Trim('\\');
-        string name = value.Name.Trim();
-
-        if (path.Length == 0
-            || name.Length == 0
-            || path.Contains("..", StringComparison.Ordinal)
-            || path.Contains('\0')
-            || name.Contains('\\')
-            || name.Contains('\0'))
-        {
-            return false;
-        }
-
-        if (string.Equals(hive, "HKCU", StringComparison.OrdinalIgnoreCase))
-        {
-            bool isMouseSetting = string.Equals(path, @"Control Panel\Mouse", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(name, RawMouseThrottleValueName, StringComparison.OrdinalIgnoreCase);
-            bool isImodStartup = string.Equals(path, ImodStartupRunKeyPath, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(name, ImodStartupRunValueName, StringComparison.OrdinalIgnoreCase);
-            return isMouseSetting || isImodStartup;
-        }
-
-        if (!string.Equals(hive, "HKLM", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        if (string.Equals(
-                path,
-                @"SYSTEM\CurrentControlSet\Control\Session Manager\Kernel",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return string.Equals(name, "ReservedCpuSets", StringComparison.OrdinalIgnoreCase);
-        }
-
-        const string powerSchemesRoot = @"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes\";
-        string usbSsSuffix =
-            $@"\{UsbSelectiveSuspendPolicy.UsbSettingsSubgroup:D}\{UsbSelectiveSuspendPolicy.UsbSelectiveSuspendSetting:D}";
-        if (path.StartsWith(powerSchemesRoot, StringComparison.OrdinalIgnoreCase)
-            && path.EndsWith(usbSsSuffix, StringComparison.OrdinalIgnoreCase))
-        {
-            return name is "ACSettingIndex" or "DCSettingIndex";
-        }
-
-        const string enumRoot = @"SYSTEM\CurrentControlSet\Enum\";
-        if (path.StartsWith(enumRoot, StringComparison.OrdinalIgnoreCase)
-            && path.EndsWith(@"\Device Parameters", StringComparison.OrdinalIgnoreCase)
-            && !path.Contains(@"\Interrupt Management", StringComparison.OrdinalIgnoreCase))
-        {
-            return name is "SelectiveSuspendEnabled" or "EnhancedPowerManagementEnabled";
-        }
-
-        if (path.StartsWith(enumRoot, StringComparison.OrdinalIgnoreCase)
-            && path.EndsWith(
-                @"\Device Parameters\Interrupt Management\MessageSignaledInterruptProperties",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return name is "MSISupported" or "MessageNumberLimit";
-        }
-
-        if (path.StartsWith(enumRoot, StringComparison.OrdinalIgnoreCase)
-            && path.EndsWith(
-                @"\Device Parameters\Interrupt Management\Affinity Policy",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return name is "DevicePriority" or "DevicePolicy" or "AssignmentSetOverride";
-        }
-
-        const string classRoot = @"SYSTEM\CurrentControlSet\Control\Class\";
-        if (path.StartsWith(classRoot, StringComparison.OrdinalIgnoreCase))
-        {
-            return name is "*RssBaseProcNumber"
-                or "*NumRssQueues"
-                or "*RssBaseProcGroup"
-                or "*MaxRssProcessors"
-                or "*RSSMaxProcGroup"
-                or "*RssMaxProcNumber"
-                or "*NumaNodeId"
-                or "PnPCapabilities";
-        }
-
-        return false;
-    }
+    private static bool IsManagedBackupRegistryValue(RegistryValueBackup value) => BackupFormat.IsManagedBackupRegistryValue(value);
 
     private void RestoreRegistryValue(RegistryValueBackup value)
     {
+        DemandRealWrite("RestoreRegistryValue");
         if (!TryGetBackupHive(value.Hive, out RegistryHive hive))
         {
             throw new InvalidOperationException($"Unsupported registry hive for restore: {value.Hive}.");
+        }
+
+        if (UsbSelectiveSuspendPolicy.TryParsePowerPlanTarget(value.Hive, value.Path, value.Name, out Guid scheme, out bool ac))
+        {
+            uint index = value.Exists
+                ? uint.Parse(value.Data ?? string.Empty, CultureInfo.InvariantCulture)
+                : UsbSelectiveSuspendPolicy.ReadPowerPlanDefaultIndex(scheme, ac);
+            UsbSelectiveSuspendPolicy.RestorePowerPlanIndex(scheme, ac, index);
+            WriteLog($"BACKUP.RESTORE.POWER: scheme={scheme:D} source={(ac ? "AC" : "DC")} index={index} readback=verified");
+            return;
         }
 
         using RegistryKey baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
@@ -1091,50 +872,15 @@ public sealed partial class MainForm
         WriteLog($"BACKUP.RESTORE.REG: set {value.Hive}\\{value.Path}\\{value.Name} kind={kind}");
     }
 
-    private static bool TryGetBackupHive(string text, out RegistryHive hive)
-    {
-        if (string.Equals(text, "HKCU", StringComparison.OrdinalIgnoreCase))
-        {
-            hive = RegistryHive.CurrentUser;
-            return true;
-        }
+    private static bool TryGetBackupHive(string text, out RegistryHive hive) => BackupFormat.TryGetBackupHive(text, out hive);
 
-        if (string.Equals(text, "HKLM", StringComparison.OrdinalIgnoreCase))
-        {
-            hive = RegistryHive.LocalMachine;
-            return true;
-        }
+    private static bool TryParseRegistryValueKind(string text, out RegistryValueKind kind) => BackupFormat.TryParseRegistryValueKind(text, out kind);
 
-        hive = RegistryHive.LocalMachine;
-        return false;
-    }
-
-    private static bool TryParseRegistryValueKind(string text, out RegistryValueKind kind)
-    {
-        return Enum.TryParse(text, ignoreCase: true, out kind)
-            && kind is RegistryValueKind.String
-                or RegistryValueKind.ExpandString
-                or RegistryValueKind.Binary
-                or RegistryValueKind.DWord
-                or RegistryValueKind.MultiString
-                or RegistryValueKind.QWord;
-    }
-
-    private static object DecodeRegistryValue(string? data, RegistryValueKind kind)
-    {
-        string text = data ?? string.Empty;
-        return kind switch
-        {
-            RegistryValueKind.Binary => Convert.FromBase64String(text),
-            RegistryValueKind.MultiString => JsonSerializer.Deserialize<string[]>(text) ?? [],
-            RegistryValueKind.DWord => int.Parse(text, CultureInfo.InvariantCulture),
-            RegistryValueKind.QWord => long.Parse(text, CultureInfo.InvariantCulture),
-            _ => text,
-        };
-    }
+    private static object DecodeRegistryValue(string? data, RegistryValueKind kind) => BackupFormat.DecodeRegistryValue(data, kind);
 
     private void RestoreFileBackup(FileBackup backup)
     {
+        DemandRealWrite("RestoreFileBackup");
         if (string.IsNullOrWhiteSpace(backup.Path))
         {
             return;

@@ -39,17 +39,34 @@ public sealed partial class MainForm : Form
     private int _suppressReservedCpuEvents;
     private bool[]? _pendingReservedCpuSets;
     private bool _reservedCpuSetsDirty;
+#if DEVELOPER_QA
     private bool _testCpuActive;
     private readonly List<DeviceInfo> _testDevices = [];
     private readonly HashSet<string> _testHiddenDeviceIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _testHiddenDeviceLabels = new(StringComparer.OrdinalIgnoreCase);
     private bool _testDevicesEnabled;
     private bool _testDevicesOnly;
-    private bool _testAutoDryRun;
+    private bool _sandboxDryRunRequested;
+    private bool _testAutoDryRun
+    {
+        get => QaRun.IsReadOnly || _sandboxDryRunRequested;
+        set => _sandboxDryRunRequested = value;
+    }
     private readonly TestSandboxRuntime _testSandbox = new();
+#else
+    private readonly bool _testCpuActive = false;
+    private readonly List<DeviceInfo> _testDevices = [];
+    private readonly HashSet<string> _testHiddenDeviceIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _testHiddenDeviceLabels = new(StringComparer.OrdinalIgnoreCase);
+    private readonly bool _testDevicesEnabled = false;
+    private readonly bool _testDevicesOnly = false;
+    private bool _testAutoDryRun => QaRun.IsReadOnly;
+#endif
     private int _dialogDimDepth;
+#if DEVELOPER_QA
     private int _testDeviceSequence;
     private string _testCpuName = string.Empty;
+#endif
     private Label? _cpuHeaderLabel;
     private Label? _htPrefixLabel;
     private Label? _htStatusLabel;
@@ -111,10 +128,12 @@ public sealed partial class MainForm : Form
             $"client={ClientSize.Width}x{ClientSize.Height} dpi={GetCurrentWindowDpi()} " +
             $"screen=\"{Screen.FromControl(this).DeviceName}\" monitors={Screen.AllScreens.Length}");
         InitializeRawPolling();
+#if DEVELOPER_QA
         bool showTestAdmin = string.Equals(
             Environment.GetEnvironmentVariable("DEVICE_TWEAKER_QA_TEST_ADMIN"),
             "1",
             StringComparison.Ordinal);
+#endif
 
         // Let Windows complete the first full paint before synchronous device
         // enumeration starts. Posting RefreshBlocks directly from OnShown can run
@@ -132,16 +151,21 @@ public sealed partial class MainForm : Form
             }
 
             Refresh();
+#if DEVELOPER_QA
             if (CheckAndApplyShowcaseSetup())
             {
+                StartDevWorkbenchIfRequested();
                 return;
             }
 
+#endif
             RefreshBlocks();
+#if DEVELOPER_QA
             if (showTestAdmin && !IsDisposed)
             {
                 BeginInvoke(new Action(ShowTestAdminDialog));
             }
+#endif
         };
         _startupRefreshTimer.Start();
 
@@ -249,6 +273,7 @@ public sealed partial class MainForm : Form
 
     private static void WriteAllTextAtomic(string path, string content, Encoding encoding)
     {
+        QaRun.DemandArtifactPath(path);
         string fullPath = Path.GetFullPath(path);
         string? directory = Path.GetDirectoryName(fullPath);
         if (string.IsNullOrWhiteSpace(directory))
@@ -287,6 +312,7 @@ public sealed partial class MainForm : Form
 
     private static void WriteAllBytesAtomic(string path, byte[] content)
     {
+        QaRun.DemandArtifactPath(path);
         string fullPath = Path.GetFullPath(path);
         string? directory = Path.GetDirectoryName(fullPath);
         if (string.IsNullOrWhiteSpace(directory))
@@ -365,6 +391,11 @@ public sealed partial class MainForm : Form
             $"LOG.SCHEMA: version={AppDiagnostics.SchemaVersion} encoding=UTF-8-BOM " +
             "columns=timestamp,sequence,elapsed,thread,level,category,event continuations=structured");
         WriteLog($"LOG.SESSION.START: path=\"{logPath}\"");
+        if (QaRun.IsReadOnly)
+        {
+            WriteLog("QA.READ_ONLY: locked=True hardwareValidation=SKIPPED");
+            QaRun.WriteReport();
+        }
         WriteLog($"LOG.VERSION: {GetAppVersion()}");
 
         try
@@ -510,7 +541,7 @@ public sealed partial class MainForm : Form
             : _loggingFailureMessage;
         ShowThemedInfo(
             "DIAGNOSTIC LOGGING IS UNAVAILABLE\n\n"
-            + "DEVICE TWEAKER can continue, but this session may not contain enough information for troubleshooting.\n\n"
+            + "The program can continue, but the log may be incomplete. Include this message when reporting an issue.\n\n"
             + detail);
     }
 
@@ -529,23 +560,7 @@ public sealed partial class MainForm : Form
     }
 
     private static string GetAppVersion()
-    {
-        try
-        {
-            Assembly asm = Assembly.GetExecutingAssembly();
-            string product = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-                ?? "unknown";
-            string file = asm.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version
-                ?? "unknown";
-            string assembly = asm.GetName().Version?.ToString()
-                ?? "unknown";
-            return $"product={product} file={file} assembly={assembly}";
-        }
-        catch
-        {
-            return "unknown";
-        }
-    }
+        => AppBuildIdentity.VersionText;
 
     private static string FormatIndexList(List<int> values)
     {
@@ -1781,10 +1796,10 @@ public sealed partial class MainForm : Form
                 string rssMaxProcRaw = ReadRegNumeric(classKey, "*RssMaxProcNumber");
                 string rssNumaRaw = ReadRegNumeric(classKey, "*NumaNodeId");
                 WriteLog($"GUI.BLOCK.RSS: idx={index} baseCore={rssText} queues={rssQueueText} baseGroup={SanitizeLogValue(rssBaseGroupRaw)} maxProcessors={SanitizeLogValue(rssMaxProcessorsRaw)} maxGroup={SanitizeLogValue(rssMaxGroupRaw)} maxProc={SanitizeLogValue(rssMaxProcRaw)} numa={SanitizeLogValue(rssNumaRaw)}");
-                NdisRssRuntimeState runtime = GetNdisRssRuntimeState(instanceId);
+                NdisRssRuntimeState runtime = block.Device.Wifi ? EmptyNdisRssRuntimeState("wifi-preserved") : GetNdisRssRuntimeState(instanceId);
                 block.NdisRssRuntime = runtime;
                 WriteLog($"GUI.BLOCK.RSS.ACTIVE: idx={index} {FormatNdisRssRuntimeState(runtime)}");
-                LogNdisRssComparison("GUI.BLOCK", instanceId, runtime, rssBase, rssQueues, TryParseLeadingInt(rssMaxProcessorsRaw));
+                LogNdisRssComparison("GUI.BLOCK", instanceId, runtime, rssBase, rssQueues, TryParseLeadingInt(rssMaxProcessorsRaw), block.Device.Wifi);
                 issues += LogGuiBlockIssues(block, index, normalizedId, signedDriverMap, wmiMapEmpty, enumProblemRaw, svcImageRaw, svcImageResolved, drvInfo, msiKey, affKey, rssBase);
             }
             else
@@ -1871,14 +1886,10 @@ public sealed partial class MainForm : Form
         if (block.Kind == DeviceKind.NET_NDIS)
         {
             NdisAffinityMode ndisMode = GetSelectedNdisAffinityMode(block);
-            bool expectsRss = ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both;
-            bool expectsIrq = ndisMode is NdisAffinityMode.IrqPolicy or NdisAffinityMode.Both;
+            bool expectsRss = !block.Device.Wifi && (ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both);
+            bool expectsIrq = !block.Device.Wifi && (ndisMode is NdisAffinityMode.IrqPolicy or NdisAffinityMode.Both);
 
-            if (expectsRss && !rssBase.HasValue)
-            {
-                LogIssue("rssBaseMissing");
-            }
-            else if (!expectsRss && rssBase.HasValue)
+            if (!block.Device.Wifi && !expectsRss && rssBase.HasValue)
             {
                 LogIssue("rssBaseUnexpected", $"mode={FormatNdisAffinityMode(ndisMode)} base={rssBase.Value}");
             }
@@ -1905,7 +1916,16 @@ public sealed partial class MainForm : Form
                 selectedCount++;
             }
 
-            if (expectsRss && selectedCount != rssQueues)
+            bool windowsDefaultRss = expectsRss && !rssBase.HasValue && selectedCount == 0;
+            if (windowsDefaultRss)
+            {
+                WriteLog($"GUI.RSS.DEFAULT: id={block.Device.InstanceId} no explicit RSS base override; Windows selects processors");
+            }
+            else if (expectsRss && !rssBase.HasValue)
+            {
+                LogIssue("rssBaseMissing");
+            }
+            else if (expectsRss && selectedCount != rssQueues)
             {
                 LogIssue("rssBaseSelection", $"selected={selectedCount} expected={rssQueues}");
             }
@@ -2018,7 +2038,15 @@ public sealed partial class MainForm : Form
                 {
                     int? regPolicyRaw = TryGetRegInt(affKey, "DevicePolicy");
                     int regPolicy = regPolicyRaw ?? 0;
-                    if (regPolicy != uiPolicy.Value)
+                    ulong regSelection = TryGetAssignmentMask(affKey) ?? 0;
+                    int expectedPolicy = block.Kind != DeviceKind.STOR && block.PolicyCombo.Enabled && block.PolicyCombo.Items.Count > 0
+                        ? NormalizePolicyForSelection(MapPolicyText(FormatPolicyValue(regPolicy)) ?? 0, regSelection)
+                        : regPolicy;
+                    if (regPolicy != expectedPolicy && uiPolicy.Value == expectedPolicy)
+                    {
+                        WriteLog($"GUI.POLICY.NORMALIZED: idx={index} reg={regPolicy} ui={uiPolicy.Value} mask=0x{regSelection:X} reason=cpu-selection");
+                    }
+                    else if (expectedPolicy != uiPolicy.Value)
                     {
                         string suffix = regPolicyRaw.HasValue ? string.Empty : " regMissing=1";
                         LogIssue("policyMismatch", $"ui={SanitizeLogValue(uiPolicyText)} reg={regPolicy}{suffix}");

@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -36,7 +35,7 @@ internal static partial class AppDiagnostics
     }
 
     internal static string LogDirectory => Path.Combine(
-        AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar),
+        QaRun.IsReadOnly ? QaRun.OutputDirectory : AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar),
         LogFolderName);
 
     internal static string? SessionLogPath
@@ -365,6 +364,14 @@ internal static partial class AppDiagnostics
             return DiagnosticLevel.Error;
         }
 
+        // An RSS query can complete without an RSS object. This is not a settings-write error.
+        // Match the event and the entire reason field; never suppress an arbitrary error message.
+        if (eventName.EndsWith(".RSS.ACTIVE", StringComparison.OrdinalIgnoreCase)
+            && Regex.IsMatch(message, """\brssFound=False\b.*\berror="(?:rss-not-found|rss-not-supported|adapter-not-found|wifi-preserved)"(?:\s|$)""", RegexOptions.CultureInvariant))
+        {
+            return DiagnosticLevel.Info;
+        }
+
         if (eventName.EndsWith(".ISSUE", StringComparison.OrdinalIgnoreCase)
             || eventParts.Any(part => part is "WARN" or "WARNING" or "MISMATCH" or "CONFLICT" or "TIMEOUT" or "BLOCKED")
             || WarningMessageRegex().IsMatch(message))
@@ -422,23 +429,7 @@ internal static partial class AppDiagnostics
     }
 
     private static string GetAppVersion()
-    {
-        try
-        {
-            Assembly assembly = Assembly.GetExecutingAssembly();
-            string product = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-                ?? "unknown";
-            string file = assembly.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version
-                ?? "unknown";
-            string assemblyVersion = assembly.GetName().Version?.ToString()
-                ?? "unknown";
-            return $"product={product} file={file} assembly={assemblyVersion}";
-        }
-        catch
-        {
-            return "unknown";
-        }
-    }
+        => AppBuildIdentity.VersionText;
 
     [GeneratedRegex("""\b(?:failed|exception)(?=[:\s]|$)|\bstatus=(?:FAIL|FAILED)\b|\b(?:errors|failures)=[1-9]\d*\b|\bseverity=(?:Error|Fatal)\b|\berror=(?!""|0\b)(?:"[^"]+"|\S+)""", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex FailureMessageRegex();

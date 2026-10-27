@@ -1,0 +1,963 @@
+{
+  "schemaVersion": 1,
+  "id": "irq-check-loading",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "GPU",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    {
+      "id": "four-main-actions",
+      "action": "assert",
+      "target": "@main",
+      "property": "top-action-count",
+      "value": "5"
+    },
+    {
+      "id": "one-global-read-button",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-action-top",
+      "value": "true"
+    },
+    {
+      "id": "initial-other-not-read",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "readAt",
+      "value": ""
+    },
+    {
+      "id": "EN-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "EN-DEV_2684-reveal",
+      "action": "reveal",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-DEV_2684-hover",
+      "action": "hover",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-DEV_2684-hovered",
+      "action": "capture"
+    },
+    {
+      "id": "EN-DEV_2684-leave",
+      "action": "leave",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-DEV_2684-focus",
+      "action": "focus",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-DEV_2684-focused",
+      "action": "capture"
+    },
+    {
+      "id": "EN-DEV_2684-success-model",
+      "action": "irq-check-model",
+      "value": "success",
+      "durationMs": 1400
+    },
+    {
+      "id": "EN-DEV_2684-success",
+      "action": "transition",
+      "durationMs": 2300,
+      "intervalMs": 150,
+      "trigger": {
+        "action": "click",
+        "target": "role:mode-refresh",
+        "device": "DEV_2684"
+      }
+    },
+    {
+      "id": "EN-DEV_2684-success-ready",
+      "action": "wait",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "EN-DEV_2684-success-not-spinning",
+      "action": "assert",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "reading",
+      "value": "false"
+    },
+    {
+      "id": "EN-DEV_2684-success-all-pci-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_2684-success-single-query-target",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_2684-success-hidden-device-queried",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_2684-success-result",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "value": "MSI-X"
+    },
+    {
+      "id": "EN-DEV_2684-success-hidden-usb-read",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_2684-failure-model",
+      "action": "irq-check-model",
+      "value": "failure",
+      "durationMs": 1400
+    },
+    {
+      "id": "EN-DEV_2684-failure",
+      "action": "transition",
+      "durationMs": 2300,
+      "intervalMs": 150,
+      "trigger": {
+        "action": "click",
+        "target": "role:mode-refresh",
+        "device": "DEV_2684"
+      }
+    },
+    {
+      "id": "EN-DEV_2684-failure-ready",
+      "action": "wait",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "EN-DEV_2684-failure-not-spinning",
+      "action": "assert",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "reading",
+      "value": "false"
+    },
+    {
+      "id": "EN-DEV_2684-failure-all-pci-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_2684-failure-single-query-target",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_2684-failure-hidden-device-queried",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_2684-failure-result",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "value": "read failed"
+    },
+    {
+      "id": "EN-DEV_2684-failure-hidden-usb-read",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_2684-retry-model",
+      "action": "irq-check-model",
+      "value": "success",
+      "durationMs": 1400
+    },
+    {
+      "id": "EN-DEV_2684-retry",
+      "action": "transition",
+      "durationMs": 2300,
+      "intervalMs": 150,
+      "trigger": {
+        "action": "click",
+        "target": "role:mode-refresh",
+        "device": "DEV_2684"
+      }
+    },
+    {
+      "id": "EN-DEV_2684-retry-ready",
+      "action": "wait",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "EN-DEV_2684-retry-not-spinning",
+      "action": "assert",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "reading",
+      "value": "false"
+    },
+    {
+      "id": "EN-DEV_2684-retry-all-pci-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_2684-retry-single-query-target",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_2684-retry-hidden-device-queried",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_2684-retry-result",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "value": "MSI-X"
+    },
+    {
+      "id": "EN-DEV_2684-retry-hidden-usb-read",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_461E-reveal",
+      "action": "reveal",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-DEV_461E-hover",
+      "action": "hover",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-DEV_461E-hovered",
+      "action": "capture"
+    },
+    {
+      "id": "EN-DEV_461E-leave",
+      "action": "leave",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-DEV_461E-focus",
+      "action": "focus",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "EN-DEV_461E-focused",
+      "action": "capture"
+    },
+    {
+      "id": "EN-DEV_461E-success-model",
+      "action": "irq-check-model",
+      "value": "success",
+      "durationMs": 1400
+    },
+    {
+      "id": "EN-DEV_461E-success",
+      "action": "transition",
+      "durationMs": 2300,
+      "intervalMs": 150,
+      "trigger": {
+        "action": "click",
+        "target": "role:mode-refresh",
+        "device": "DEV_461E"
+      }
+    },
+    {
+      "id": "EN-DEV_461E-success-ready",
+      "action": "wait",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "EN-DEV_461E-success-not-spinning",
+      "action": "assert",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E",
+      "property": "reading",
+      "value": "false"
+    },
+    {
+      "id": "EN-DEV_461E-success-all-pci-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_461E-success-single-query-target",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_461E-success-hidden-device-queried",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_461E-success-result",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "value": "MSI"
+    },
+    {
+      "id": "EN-DEV_461E-failure-model",
+      "action": "irq-check-model",
+      "value": "failure",
+      "durationMs": 1400
+    },
+    {
+      "id": "EN-DEV_461E-failure",
+      "action": "transition",
+      "durationMs": 2300,
+      "intervalMs": 150,
+      "trigger": {
+        "action": "click",
+        "target": "role:mode-refresh",
+        "device": "DEV_461E"
+      }
+    },
+    {
+      "id": "EN-DEV_461E-failure-ready",
+      "action": "wait",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "EN-DEV_461E-failure-not-spinning",
+      "action": "assert",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E",
+      "property": "reading",
+      "value": "false"
+    },
+    {
+      "id": "EN-DEV_461E-failure-all-pci-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_461E-failure-single-query-target",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_461E-failure-hidden-device-queried",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_461E-failure-result",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "value": "read failed"
+    },
+    {
+      "id": "EN-DEV_461E-retry-model",
+      "action": "irq-check-model",
+      "value": "success",
+      "durationMs": 1400
+    },
+    {
+      "id": "EN-DEV_461E-retry",
+      "action": "transition",
+      "durationMs": 2300,
+      "intervalMs": 150,
+      "trigger": {
+        "action": "click",
+        "target": "role:mode-refresh",
+        "device": "DEV_461E"
+      }
+    },
+    {
+      "id": "EN-DEV_461E-retry-ready",
+      "action": "wait",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "EN-DEV_461E-retry-not-spinning",
+      "action": "assert",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E",
+      "property": "reading",
+      "value": "false"
+    },
+    {
+      "id": "EN-DEV_461E-retry-all-pci-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_461E-retry-single-query-target",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_461E-retry-hidden-device-queried",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "EN-DEV_461E-retry-result",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "value": "MSI"
+    },
+    {
+      "id": "RU-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "RU-DEV_2684-reveal",
+      "action": "reveal",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-DEV_2684-hover",
+      "action": "hover",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-DEV_2684-hovered",
+      "action": "capture"
+    },
+    {
+      "id": "RU-DEV_2684-leave",
+      "action": "leave",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-DEV_2684-focus",
+      "action": "focus",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-DEV_2684-focused",
+      "action": "capture"
+    },
+    {
+      "id": "RU-DEV_2684-success-model",
+      "action": "irq-check-model",
+      "value": "success",
+      "durationMs": 1400
+    },
+    {
+      "id": "RU-DEV_2684-success",
+      "action": "transition",
+      "durationMs": 2300,
+      "intervalMs": 150,
+      "trigger": {
+        "action": "click",
+        "target": "role:mode-refresh",
+        "device": "DEV_2684"
+      }
+    },
+    {
+      "id": "RU-DEV_2684-success-ready",
+      "action": "wait",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "RU-DEV_2684-success-not-spinning",
+      "action": "assert",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "reading",
+      "value": "false"
+    },
+    {
+      "id": "RU-DEV_2684-success-all-pci-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "RU-DEV_2684-success-single-query-target",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "RU-DEV_2684-success-hidden-device-queried",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "RU-DEV_2684-success-result",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "value": "MSI-X"
+    },
+    {
+      "id": "RU-DEV_2684-failure-model",
+      "action": "irq-check-model",
+      "value": "failure",
+      "durationMs": 1400
+    },
+    {
+      "id": "RU-DEV_2684-failure",
+      "action": "transition",
+      "durationMs": 2300,
+      "intervalMs": 150,
+      "trigger": {
+        "action": "click",
+        "target": "role:mode-refresh",
+        "device": "DEV_2684"
+      }
+    },
+    {
+      "id": "RU-DEV_2684-failure-ready",
+      "action": "wait",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "RU-DEV_2684-failure-not-spinning",
+      "action": "assert",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "reading",
+      "value": "false"
+    },
+    {
+      "id": "RU-DEV_2684-failure-all-pci-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "RU-DEV_2684-failure-single-query-target",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "RU-DEV_2684-failure-hidden-device-queried",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "RU-DEV_2684-failure-result",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "value": "ошибка чтения"
+    },
+    {
+      "id": "RU-DEV_2684-retry-model",
+      "action": "irq-check-model",
+      "value": "success",
+      "durationMs": 1400
+    },
+    {
+      "id": "RU-DEV_2684-retry",
+      "action": "transition",
+      "durationMs": 2300,
+      "intervalMs": 150,
+      "trigger": {
+        "action": "click",
+        "target": "role:mode-refresh",
+        "device": "DEV_2684"
+      }
+    },
+    {
+      "id": "RU-DEV_2684-retry-ready",
+      "action": "wait",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "RU-DEV_2684-retry-not-spinning",
+      "action": "assert",
+      "target": "role:mode-refresh",
+      "device": "DEV_2684",
+      "property": "reading",
+      "value": "false"
+    },
+    {
+      "id": "RU-DEV_2684-retry-all-pci-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "RU-DEV_2684-retry-single-query-target",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "RU-DEV_2684-retry-hidden-device-queried",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "RU-DEV_2684-retry-result",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "value": "MSI-X"
+    },
+    {
+      "id": "RU-DEV_461E-reveal",
+      "action": "reveal",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-DEV_461E-hover",
+      "action": "hover",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-DEV_461E-hovered",
+      "action": "capture"
+    },
+    {
+      "id": "RU-DEV_461E-leave",
+      "action": "leave",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-DEV_461E-focus",
+      "action": "focus",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "RU-DEV_461E-focused",
+      "action": "capture"
+    },
+    {
+      "id": "RU-DEV_461E-success-model",
+      "action": "irq-check-model",
+      "value": "success",
+      "durationMs": 1400
+    },
+    {
+      "id": "RU-DEV_461E-success",
+      "action": "transition",
+      "durationMs": 2300,
+      "intervalMs": 150,
+      "trigger": {
+        "action": "click",
+        "target": "role:mode-refresh",
+        "device": "DEV_461E"
+      }
+    },
+    {
+      "id": "RU-DEV_461E-success-ready",
+      "action": "wait",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "RU-DEV_461E-success-not-spinning",
+      "action": "assert",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E",
+      "property": "reading",
+      "value": "false"
+    },
+    {
+      "id": "RU-DEV_461E-success-all-pci-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "RU-DEV_461E-success-single-query-target",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "RU-DEV_461E-success-hidden-device-queried",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "RU-DEV_461E-success-result",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "value": "MSI"
+    },
+    {
+      "id": "RU-DEV_461E-failure-model",
+      "action": "irq-check-model",
+      "value": "failure",
+      "durationMs": 1400
+    },
+    {
+      "id": "RU-DEV_461E-failure",
+      "action": "transition",
+      "durationMs": 2300,
+      "intervalMs": 150,
+      "trigger": {
+        "action": "click",
+        "target": "role:mode-refresh",
+        "device": "DEV_461E"
+      }
+    },
+    {
+      "id": "RU-DEV_461E-failure-ready",
+      "action": "wait",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "RU-DEV_461E-failure-not-spinning",
+      "action": "assert",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E",
+      "property": "reading",
+      "value": "false"
+    },
+    {
+      "id": "RU-DEV_461E-failure-all-pci-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "RU-DEV_461E-failure-single-query-target",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "RU-DEV_461E-failure-hidden-device-queried",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "RU-DEV_461E-failure-result",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "value": "ошибка чтения"
+    },
+    {
+      "id": "RU-DEV_461E-retry-model",
+      "action": "irq-check-model",
+      "value": "success",
+      "durationMs": 1400
+    },
+    {
+      "id": "RU-DEV_461E-retry",
+      "action": "transition",
+      "durationMs": 2300,
+      "intervalMs": 150,
+      "trigger": {
+        "action": "click",
+        "target": "role:mode-refresh",
+        "device": "DEV_461E"
+      }
+    },
+    {
+      "id": "RU-DEV_461E-retry-ready",
+      "action": "wait",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "RU-DEV_461E-retry-not-spinning",
+      "action": "assert",
+      "target": "role:mode-refresh",
+      "device": "DEV_461E",
+      "property": "reading",
+      "value": "false"
+    },
+    {
+      "id": "RU-DEV_461E-retry-all-pci-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "RU-DEV_461E-retry-single-query-target",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "RU-DEV_461E-retry-hidden-device-queried",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "property": "queried",
+      "value": "true"
+    },
+    {
+      "id": "RU-DEV_461E-retry-result",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_461E",
+      "value": "MSI"
+    }
+  ]
+}

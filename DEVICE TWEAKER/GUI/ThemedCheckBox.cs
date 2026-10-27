@@ -99,6 +99,18 @@ internal sealed class ThemedCheckBox : CheckBox
         base.OnEnabledChanged(e);
     }
 
+    protected override void OnGotFocus(EventArgs e)
+    {
+        base.OnGotFocus(e);
+        Invalidate();
+    }
+
+    protected override void OnLostFocus(EventArgs e)
+    {
+        base.OnLostFocus(e);
+        Invalidate();
+    }
+
     protected override void OnPaint(PaintEventArgs e)
     {
         Graphics g = e.Graphics;
@@ -160,6 +172,9 @@ internal sealed class ThemedCheckBox : CheckBox
             | TextFormatFlags.NoPrefix
             | TextFormatFlags.NoPadding
             | TextFormatFlags.EndEllipsis);
+
+        if (Focused && ShowFocusCues && Enabled)
+            ControlPaint.DrawFocusRectangle(g, Rectangle.Inflate(ClientRectangle, -1, -1), ForeColor, BackColor);
     }
 
     private static GraphicsPath CreateRoundRect(RectangleF rect, float radius)

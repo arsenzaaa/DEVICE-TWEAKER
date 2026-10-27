@@ -1,0 +1,271 @@
+{
+  "schemaVersion": 1,
+  "id": "input-filters",
+  "preset": "UsbRoles",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    {
+      "id": "EN-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "EN-MOUSE-click",
+      "action": "click",
+      "target": "id:FILTER_MOUSE"
+    },
+    {
+      "id": "EN-MOUSE-device",
+      "action": "assert",
+      "target": "@main",
+      "property": "visibleDevices",
+      "value": "1"
+    },
+    {
+      "id": "EN-MOUSE",
+      "action": "capture"
+    },
+    {
+      "id": "EN-KEYBOARD-click",
+      "action": "click",
+      "target": "id:FILTER_KEYBOARD"
+    },
+    {
+      "id": "EN-KEYBOARD-device",
+      "action": "assert",
+      "target": "@main",
+      "property": "visibleDevices",
+      "value": "1"
+    },
+    {
+      "id": "EN-KEYBOARD",
+      "action": "capture"
+    },
+    {
+      "id": "EN-GAMEPAD-click",
+      "action": "click",
+      "target": "id:FILTER_GAMEPAD"
+    },
+    {
+      "id": "EN-GAMEPAD-device",
+      "action": "assert",
+      "target": "@main",
+      "property": "visibleDevices",
+      "value": "1"
+    },
+    {
+      "id": "EN-GAMEPAD",
+      "action": "capture"
+    },
+    {
+      "id": "EN-USB-click",
+      "action": "click",
+      "target": "id:FILTER_USB"
+    },
+    {
+      "id": "EN-USB-device",
+      "action": "assert",
+      "target": "@main",
+      "property": "visibleDevices",
+      "value": "1"
+    },
+    {
+      "id": "EN-USB",
+      "action": "capture"
+    },
+    {
+      "id": "EN-ALL-click",
+      "action": "click",
+      "target": "id:FILTER_ALL"
+    },
+    {
+      "id": "EN-ALL-device",
+      "action": "assert",
+      "target": "@main",
+      "property": "visibleDevices",
+      "value": "1"
+    },
+    {
+      "id": "EN-ALL",
+      "action": "capture"
+    },
+    {
+      "id": "EN-search-reveal",
+      "action": "reveal",
+      "target": "@search"
+    },
+    {
+      "id": "EN-search-focus",
+      "action": "focus",
+      "target": "@search"
+    },
+    {
+      "id": "EN-search-type",
+      "action": "text",
+      "target": "@search",
+      "value": "no-such-device-qa"
+    },
+    {
+      "id": "EN-empty-wait",
+      "action": "wait",
+      "target": "@main",
+      "property": "visibleDevices",
+      "value": "0",
+      "durationMs": 3000
+    },
+    {
+      "id": "EN-no-results",
+      "action": "capture"
+    },
+    {
+      "id": "EN-clear",
+      "action": "click",
+      "target": "@clear-filter"
+    },
+    {
+      "id": "EN-restored-wait",
+      "action": "wait",
+      "target": "@main",
+      "property": "visibleDevices",
+      "value": "1",
+      "durationMs": 3000
+    },
+    {
+      "id": "EN-restored",
+      "action": "capture"
+    },
+    {
+      "id": "RU-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "RU-MOUSE-click",
+      "action": "click",
+      "target": "id:FILTER_MOUSE"
+    },
+    {
+      "id": "RU-MOUSE-device",
+      "action": "assert",
+      "target": "@main",
+      "property": "visibleDevices",
+      "value": "1"
+    },
+    {
+      "id": "RU-MOUSE",
+      "action": "capture"
+    },
+    {
+      "id": "RU-KEYBOARD-click",
+      "action": "click",
+      "target": "id:FILTER_KEYBOARD"
+    },
+    {
+      "id": "RU-KEYBOARD-device",
+      "action": "assert",
+      "target": "@main",
+      "property": "visibleDevices",
+      "value": "1"
+    },
+    {
+      "id": "RU-KEYBOARD",
+      "action": "capture"
+    },
+    {
+      "id": "RU-GAMEPAD-click",
+      "action": "click",
+      "target": "id:FILTER_GAMEPAD"
+    },
+    {
+      "id": "RU-GAMEPAD-device",
+      "action": "assert",
+      "target": "@main",
+      "property": "visibleDevices",
+      "value": "1"
+    },
+    {
+      "id": "RU-GAMEPAD",
+      "action": "capture"
+    },
+    {
+      "id": "RU-USB-click",
+      "action": "click",
+      "target": "id:FILTER_USB"
+    },
+    {
+      "id": "RU-USB-device",
+      "action": "assert",
+      "target": "@main",
+      "property": "visibleDevices",
+      "value": "1"
+    },
+    {
+      "id": "RU-USB",
+      "action": "capture"
+    },
+    {
+      "id": "RU-ALL-click",
+      "action": "click",
+      "target": "id:FILTER_ALL"
+    },
+    {
+      "id": "RU-ALL-device",
+      "action": "assert",
+      "target": "@main",
+      "property": "visibleDevices",
+      "value": "1"
+    },
+    {
+      "id": "RU-ALL",
+      "action": "capture"
+    },
+    {
+      "id": "RU-search-reveal",
+      "action": "reveal",
+      "target": "@search"
+    },
+    {
+      "id": "RU-search-focus",
+      "action": "focus",
+      "target": "@search"
+    },
+    {
+      "id": "RU-search-type",
+      "action": "text",
+      "target": "@search",
+      "value": "no-such-device-qa"
+    },
+    {
+      "id": "RU-empty-wait",
+      "action": "wait",
+      "target": "@main",
+      "property": "visibleDevices",
+      "value": "0",
+      "durationMs": 3000
+    },
+    {
+      "id": "RU-no-results",
+      "action": "capture"
+    },
+    {
+      "id": "RU-clear",
+      "action": "click",
+      "target": "@clear-filter"
+    },
+    {
+      "id": "RU-restored-wait",
+      "action": "wait",
+      "target": "@main",
+      "property": "visibleDevices",
+      "value": "1",
+      "durationMs": 3000
+    },
+    {
+      "id": "RU-restored",
+      "action": "capture"
+    }
+  ]
+}

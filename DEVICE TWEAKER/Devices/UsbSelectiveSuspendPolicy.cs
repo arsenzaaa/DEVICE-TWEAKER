@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System.Runtime.InteropServices;
 
 namespace DeviceTweakerCS;
@@ -35,6 +35,77 @@ internal static class UsbSelectiveSuspendPolicy
     public static string PowerPlanSettingPath(Guid schemeGuid)
         => @"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes\" +
            $"{schemeGuid:D}\\{UsbSettingsSubgroup:D}\\{UsbSelectiveSuspendSetting:D}";
+
+    internal static bool TryParsePowerPlanTarget(string hive, string path, string name, out Guid scheme, out bool ac)
+    {
+        scheme = Guid.Empty;
+        ac = string.Equals(name, "ACSettingIndex", StringComparison.OrdinalIgnoreCase);
+        if (!string.Equals(hive, "HKLM", StringComparison.OrdinalIgnoreCase)
+            || (!ac && !string.Equals(name, "DCSettingIndex", StringComparison.OrdinalIgnoreCase))) return false;
+        const string root = @"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes\";
+        if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return false;
+        string[] parts = path[root.Length..].Split('\\');
+        return parts.Length == 3 && Guid.TryParseExact(parts[0], "D", out scheme) && scheme != Guid.Empty
+            && Guid.TryParse(parts[1], out Guid subgroup) && subgroup == UsbSettingsSubgroup
+            && Guid.TryParse(parts[2], out Guid setting) && setting == UsbSelectiveSuspendSetting;
+    }
+
+    internal static uint ReadPowerPlanIndex(Guid scheme, bool ac)
+    {
+        Guid subgroup = UsbSettingsSubgroup, setting = UsbSelectiveSuspendSetting;
+        uint value;
+        uint rc = ac
+            ? PowerReadACValueIndex(IntPtr.Zero, ref scheme, ref subgroup, ref setting, out value)
+            : PowerReadDCValueIndex(IntPtr.Zero, ref scheme, ref subgroup, ref setting, out value);
+        if (rc != 0) throw new InvalidOperationException($"PowerRead{(ac ? "AC" : "DC")}ValueIndex failed (0x{rc:X8}), scheme={scheme:D}.");
+        return value;
+    }
+
+    internal static uint ReadPowerPlanDefaultIndex(Guid scheme, bool ac)
+    {
+        // Defaults depend on the personality, not on an arbitrary custom plan GUID.
+        Guid none = new("fea3413e-7e05-4911-9a71-700331f1c294");
+        Guid personalitySetting = new("245d8541-3943-4422-b025-13a784f679b7");
+        byte[] buffer = new byte[16];
+        uint size = 16;
+        uint rc = PowerReadACValue(IntPtr.Zero, ref scheme, ref none, ref personalitySetting, out _, buffer, ref size);
+        if (rc != 0 || size != 16) throw new InvalidOperationException($"Cannot read power scheme personality (0x{rc:X8}), scheme={scheme:D}.");
+        Guid personality = new(buffer), subgroup = UsbSettingsSubgroup, setting = UsbSelectiveSuspendSetting;
+        uint value;
+        rc = ac
+            ? PowerReadACDefaultIndex(IntPtr.Zero, ref personality, ref subgroup, ref setting, out value)
+            : PowerReadDCDefaultIndex(IntPtr.Zero, ref personality, ref subgroup, ref setting, out value);
+        if (rc != 0) throw new InvalidOperationException($"Cannot read power setting default (0x{rc:X8}), scheme={scheme:D}.");
+        return value;
+    }
+
+    internal static void RestorePowerPlanIndex(Guid scheme, bool ac, uint value)
+    {
+        QaRun.DemandWrite("RestorePowerPlanIndex");
+        PowerPlanRestoreService.Restore(new WindowsPowerPlanBackend(), scheme, ac, value);
+    }
+
+    private sealed class WindowsPowerPlanBackend : IPowerPlanBackend
+    {
+        public Guid GetActiveScheme()
+            => TryGetActiveScheme(out Guid scheme) ? scheme : Guid.Empty;
+        public uint ReadIndex(Guid scheme, bool ac) => ReadPowerPlanIndex(scheme, ac);
+        public void WriteIndex(Guid scheme, bool ac, uint value)
+        {
+            QaRun.DemandWrite("PowerPlan.WriteIndex");
+            Guid subgroup = UsbSettingsSubgroup, setting = UsbSelectiveSuspendSetting;
+            uint rc = ac
+                ? PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref subgroup, ref setting, value)
+                : PowerWriteDCValueIndex(IntPtr.Zero, ref scheme, ref subgroup, ref setting, value);
+            if (rc != 0) throw new InvalidOperationException($"PowerWrite{(ac ? "AC" : "DC")}ValueIndex failed (0x{rc:X8}), scheme={scheme:D}.");
+        }
+        public void Activate(Guid scheme)
+        {
+            QaRun.DemandWrite("PowerPlan.Activate");
+            uint rc = PowerSetActiveScheme(IntPtr.Zero, ref scheme);
+            if (rc != 0) throw new InvalidOperationException($"PowerSetActiveScheme failed (0x{rc:X8}).");
+        }
+    }
 
     public static IReadOnlyList<string> EnumerateRootHubs(string controllerInstanceId)
     {
@@ -80,6 +151,7 @@ internal static class UsbSelectiveSuspendPolicy
 
     public static ApplyResult ApplyControllerAndHubs(string controllerInstanceId, bool enabled)
     {
+        QaRun.DemandWrite("ApplyControllerAndHubs");
         if (string.IsNullOrWhiteSpace(controllerInstanceId))
         {
             throw new InvalidOperationException("USB controller instance id is empty.");
@@ -130,9 +202,9 @@ internal static class UsbSelectiveSuspendPolicy
                 wmiExposed++;
                 wmiSucceeded++;
             }
-            else if (wmiStatus == DevicePowerPolicy.WriteStatus.NotExposed)
+            else if (wmiStatus is DevicePowerPolicy.WriteStatus.NotExposed or DevicePowerPolicy.WriteStatus.NotSupported)
             {
-                notes.Add($"{target}: MSPower_DeviceEnable is not exposed by this driver");
+                notes.Add($"{target}: MSPower_DeviceEnable status={wmiStatus} {wmiError}");
             }
             else
             {
@@ -195,6 +267,7 @@ internal static class UsbSelectiveSuspendPolicy
 
     public static void ActivateCurrentPowerScheme()
     {
+        QaRun.DemandWrite("ActivateCurrentPowerScheme");
         if (!TryGetActiveScheme(out Guid scheme))
         {
             throw new InvalidOperationException("Could not read the active Windows power scheme.");
@@ -209,6 +282,7 @@ internal static class UsbSelectiveSuspendPolicy
 
     public static void SetPowerPlanEnabled(bool enabled)
     {
+        QaRun.DemandWrite("SetPowerPlanEnabled");
         if (!TryGetActiveScheme(out Guid scheme))
         {
             throw new InvalidOperationException("Could not read the active Windows power scheme.");
@@ -258,6 +332,7 @@ internal static class UsbSelectiveSuspendPolicy
 
     public static void SetDeviceParameterDword(string instanceId, string name, int value)
     {
+        QaRun.DemandWrite("SetDeviceParameterDword");
         string path = DeviceParametersPath(instanceId);
         using RegistryKey? key = Registry.LocalMachine.CreateSubKey(path);
         if (key is null)
@@ -282,6 +357,17 @@ internal static class UsbSelectiveSuspendPolicy
 
     [DllImport("powrprof.dll")]
     private static extern uint PowerGetActiveScheme(IntPtr userRootPowerKey, out IntPtr activePolicyGuid);
+
+    [DllImport("powrprof.dll")]
+    private static extern uint PowerReadACValueIndex(IntPtr root, ref Guid scheme, ref Guid subgroup, ref Guid setting, out uint value);
+    [DllImport("powrprof.dll")]
+    private static extern uint PowerReadDCValueIndex(IntPtr root, ref Guid scheme, ref Guid subgroup, ref Guid setting, out uint value);
+    [DllImport("powrprof.dll")]
+    private static extern uint PowerReadACDefaultIndex(IntPtr root, ref Guid personality, ref Guid subgroup, ref Guid setting, out uint value);
+    [DllImport("powrprof.dll")]
+    private static extern uint PowerReadDCDefaultIndex(IntPtr root, ref Guid personality, ref Guid subgroup, ref Guid setting, out uint value);
+    [DllImport("powrprof.dll")]
+    private static extern uint PowerReadACValue(IntPtr root, ref Guid scheme, ref Guid subgroup, ref Guid setting, out uint type, [Out] byte[] buffer, ref uint size);
 
     [DllImport("powrprof.dll")]
     private static extern uint PowerWriteACValueIndex(

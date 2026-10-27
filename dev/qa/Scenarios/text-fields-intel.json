@@ -1,0 +1,12 @@
+{
+  "schemaVersion":1,"id":"text-fields-intel","preset":"Intel14900K","language":"EN","filter":"ALL","width":1200,"height":900,
+  "steps":[
+    {"id":"before","action":"capture"},
+    {"id":"editors-en","action":"audit-editors"},
+    {"id":"audited-en","action":"capture"},
+    {"id":"ru","action":"language","value":"RU"},
+    {"id":"narrow","action":"resize","width":1000,"height":720},
+    {"id":"editors-ru-narrow","action":"audit-editors"},
+    {"id":"audited-ru","action":"capture"}
+  ]
+}

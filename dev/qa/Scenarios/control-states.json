@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1, "id": "control-states", "preset": "Intel14900K", "language": "EN", "filter": "USB", "width": 1200, "height": 900,
+  "steps": [
+    { "id": "show-details", "action": "reveal", "target": "id:IMOD_DETAILS", "device": "DEV_461E" },
+    { "id": "normal", "action": "capture" },
+    { "id": "hover", "action": "hover", "target": "id:IMOD_DETAILS", "device": "DEV_461E" },
+    { "id": "hovered", "action": "capture" },
+    { "id": "leave", "action": "leave", "target": "id:IMOD_DETAILS", "device": "DEV_461E" },
+    { "id": "show-editor", "action": "reveal", "target": "role:limit", "device": "DEV_461E" },
+    { "id": "focus", "action": "focus", "target": "role:limit", "device": "DEV_461E" },
+    { "id": "edit", "action": "text", "target": "role:limit", "device": "DEV_461E", "value": "8" },
+    { "id": "end", "action": "key", "target": "role:limit", "device": "DEV_461E", "value": "End" },
+    { "id": "caret-end", "action": "assert", "target": "role:limit", "device": "DEV_461E", "property": "caret", "value": "1" },
+    { "id": "home", "action": "key", "target": "role:limit", "device": "DEV_461E", "value": "Home" },
+    { "id": "caret", "action": "assert", "target": "role:limit", "device": "DEV_461E", "property": "caret", "value": "0" },
+    { "id": "edited", "action": "capture" },
+    { "id": "ru", "action": "language", "value": "RU" },
+    { "id": "translated", "action": "capture" },
+    { "id": "top", "action": "scroll", "value": "Home" }
+  ]
+}

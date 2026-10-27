@@ -373,6 +373,7 @@ internal static class UsbChipPath
 
     public static void SetSelectiveSuspendEnabled(string instanceId, bool enabled)
     {
+        QaRun.DemandWrite("SetSelectiveSuspendEnabled");
         if (string.IsNullOrWhiteSpace(instanceId) || !instanceId.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("Selective Suspend applies only to PCI USB controllers.");

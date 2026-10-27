@@ -1,0 +1,934 @@
+﻿{
+  "schemaVersion": 1,
+  "repository": "https://github.com/arsenzaaa/DEVICE-TWEAKER",
+  "tag": "v0.0.4",
+  "commit": "6094c866ac2d8baaf362d393f4911b76a4fc7908",
+  "loaderVersion": "1.4.5.2512",
+  "origin": "published-project-vendor-tree",
+  "files": [
+    {
+      "path": "LICENSE.txt",
+      "sha256": "B3EEDE50880A3C31AFA21B155670BB8B856233781B6D89965A0D31AC5E9BA43A"
+    },
+    {
+      "path": "README.upstream.md",
+      "sha256": "027C809CDB8BDE8979E823CEB1145E3FD50ED64C3D355AE25F9D74E9072F79CE"
+    },
+    {
+      "path": "Source/Hamakaze/compress.cpp",
+      "sha256": "82345231A904BFD01E64BB644A4132DB93C34E2DB7BEFC179AD4330176F63B85"
+    },
+    {
+      "path": "Source/Hamakaze/compress.h",
+      "sha256": "09FA3CDAA1416B81BA5EE304CF24897726902B9D33A76D879F604B7FE26B4DCC"
+    },
+    {
+      "path": "Source/Hamakaze/diag.cpp",
+      "sha256": "5DFD3A7B29559C808E29091E8EE108839A716DCE925BEB3DC1434D70DFDD6C06"
+    },
+    {
+      "path": "Source/Hamakaze/diag.h",
+      "sha256": "A4FA97B9F2BE414BC49881450D5935D2B48C1029D3BEE655CD6E77E645327D74"
+    },
+    {
+      "path": "Source/Hamakaze/drvmap.cpp",
+      "sha256": "82E5C16B2403B18B5A3B94E0CB1FCE5E5D95E088BD0F1EF43C7A45D5ACD3D46C"
+    },
+    {
+      "path": "Source/Hamakaze/drvmap.h",
+      "sha256": "C62C75C00882D816856F56005EEC67A82CF56179D2A4629C4C8BF53707C16C25"
+    },
+    {
+      "path": "Source/Hamakaze/dsefix.cpp",
+      "sha256": "52A12513D37744BDC7F0BB77DBB4B19D35BEF424322DF94E2FB2CD8BE4389D01"
+    },
+    {
+      "path": "Source/Hamakaze/dsefix.h",
+      "sha256": "078B4BCD42978BBC05831380A66B0572BF310D2A0764A89733B7AB01A0623A26"
+    },
+    {
+      "path": "Source/Hamakaze/envdetect.cpp",
+      "sha256": "8E9F60ECEA32F25155210FEEC2E359C1F932375776ABA8C24A99F8EDD2013620"
+    },
+    {
+      "path": "Source/Hamakaze/envdetect.h",
+      "sha256": "33E30F79AB03A531C249EA99E0C271E65649B6DF1EA632964E2DDC2C4AEED9E1"
+    },
+    {
+      "path": "Source/Hamakaze/global.h",
+      "sha256": "E72D9D0DCA359DAA825DA01FEA96D4982AF6362702AAB835D47130C5FEECBF4C"
+    },
+    {
+      "path": "Source/Hamakaze/hde/hde64.c",
+      "sha256": "31860C95DB21761086E2979753E981D6435F27435DEAD3ED7E4687E99BB878D4"
+    },
+    {
+      "path": "Source/Hamakaze/hde/hde64.h",
+      "sha256": "FD5B39E2865E12B9525EBDA8FD9E9658B341EAD5932D1BCB412A189F81CA42CA"
+    },
+    {
+      "path": "Source/Hamakaze/hde/pstdint.h",
+      "sha256": "9D37519623D404987300D3F3258148BA9ADDDFE1BED5F89A0E9E47646819C9C7"
+    },
+    {
+      "path": "Source/Hamakaze/hde/table64.h",
+      "sha256": "0B6C69AD498E67907E0C574AB06123AEE4EC30C99FA181099EA929A8D820BFC1"
+    },
+    {
+      "path": "Source/Hamakaze/hvdetect.cpp",
+      "sha256": "78E648D9E36DB7B167CF1119FAC0111BE67798A28B20DA8339FDFD5F381121F9"
+    },
+    {
+      "path": "Source/Hamakaze/hvdetect.h",
+      "sha256": "C59748B125C24C3B2A278D68CB7C07210C1F21606D0FABCBF3F9B21199D8CAD4"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/alcpu.cpp",
+      "sha256": "E2A05D3C5C316CE6AD5FB8439508803A23F2C1CF5C5B7835A4276B5795CF0EF4"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/alcpu.h",
+      "sha256": "98A21DF59CB881C1029A8A6C1AD30C9481075C2E4B1FB43969EE6607816B9C9F"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/amd.cpp",
+      "sha256": "CC04E9861C33FCA6901E2D266AE5BCB2528D428685E99156EF7ECC79E71290F3"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/amd.h",
+      "sha256": "E5FAE0D589D2AB177BE474D69EAD944463D4208DD3D50A47EC3A0449C2DCB8DC"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/asrdrv.cpp",
+      "sha256": "059493362017C12BD6F0ECBC3822EFAEF9DBF798459E990C82CF6514781A4C96"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/asrdrv.h",
+      "sha256": "F3F2F300971D11D3621CF320F8C03279908AFE9E8E2E54E5EB50BFB2938224CC"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/atszio.cpp",
+      "sha256": "B1350783A851E6345B880C8A5313E871D2249AA5524F41406C52FA62483F2229"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/atszio.h",
+      "sha256": "015A6AFF991174A881650C61FE1B28C5BFE3116A02A32ABE5295FF389C5B7099"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/binalyze.cpp",
+      "sha256": "02B6CD266C44C28F9901966B9AA2C64A3DCFB21DD43B32E4CB99A9D49C6FD3FA"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/binalyze.h",
+      "sha256": "A48E25CEAC1420731A97E0F03B79B382E908F773EFC29340C05CB3AEFAB3C34C"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/dbk.cpp",
+      "sha256": "02BB6A0F8986E113C7EBAEAC794EF6A51BD5EF83A27D22FDC7D7D242468994C8"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/dbk.h",
+      "sha256": "1943E01AC63BC3A3C22DEB2626E0498AD746B9980364EAE6FD7D4C70470DAE77"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/dell.cpp",
+      "sha256": "E98066FAB17106973397F85D8599D214961C41BBFD9E2CC0676F06787BA965FA"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/dell.h",
+      "sha256": "1D864CC688E8A2C38DA6B94019F7EFBA771A0E0B7F68E1C3F8700B8CAA76DDA0"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/directio64.cpp",
+      "sha256": "791A4D40F3F5076D0E6ED47E7DB972F448CCC78CA578C35F11DB637962C868A5"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/directio64.h",
+      "sha256": "73A97FA34DF9C0733981536F2079D1EAB89BFAF36B4C5D0003CB87D504764EC3"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/echodrv.cpp",
+      "sha256": "0AF93D37CD29E4E3DBAB48B38E41C0F2E1198AA549B72DD59CC635F5D5822496"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/echodrv.h",
+      "sha256": "94B0D0EF09DA2F802D1DBD1E4E56BFEA96E8C7DC7906CD4D5D1E40323197104E"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/evga.cpp",
+      "sha256": "63A375F30B6727E84C3C91D992A3EEB06BA99CF9038A8918A289DB4DE6823744"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/evga.h",
+      "sha256": "7A0C01E7CA19BA7B80CC329BFF6BE80B0D4C15B6453BC70CB7809E67E9330B5B"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/gmer.cpp",
+      "sha256": "E8D7C1C93512BE4DD846D6C401C8135AE291354DB99C926942176017DB56BC91"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/gmer.h",
+      "sha256": "89D1CFB34AFEC23DBDA6F40030A95386E9BBBC395666E2C0A3D066DC2FA8B0B8"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/hilscher.cpp",
+      "sha256": "865BBA446AD9F202F2BEA58AEC4CF48FA87448105DEE2FB69CAAB37EC54F66E8"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/hilscher.h",
+      "sha256": "DB94F36F0D3B946500352AB07393994F0A09E2737A63E1CDBEDD3DA16C72CB2D"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/hp.cpp",
+      "sha256": "01E3A394690D24F0047BE770CC17B2346EACE761A4925041396620EA5D35C0DA"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/hp.h",
+      "sha256": "3A5558E4E115E3482986BE8A4D2D22FAF91DF47EC8B7157ECA5B13647C2B2BEB"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/intel.cpp",
+      "sha256": "73E4D1A75A00CF917D2605F8016E5E8084AEA91CA39A4E57974BFF3EFFC119E1"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/intel.h",
+      "sha256": "60C0CE1D570811A531BE30F3C36FCEEA2C71AEE0F1A64EA44B9077EC2A4AA5E4"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/ipcdec.cpp",
+      "sha256": "A473107724F8DF672B4498CFE8124DB71BCEAF894801EE8BDF913DD61940E78F"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/ipcdec.h",
+      "sha256": "9F3B8BC6B4EA44BB8E25E7661508D52200ACA6C6C7D901DE561D90053B491FD3"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/kph.cpp",
+      "sha256": "E1B99F38766C30F6B3907F358AC6A1B933E5BB8107049A4F8204C5451C9C57AA"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/kph.h",
+      "sha256": "3F92A8BC64556B1339A4F48ABC2ED1FDBBD49601B0EF6DB1F4911EA542238FCA"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/ldrsc.h",
+      "sha256": "F3C889EDE5142F88B54D3E5E973B46F0FB897D306695DE82DF9C683F72774FB8"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/lenovo.cpp",
+      "sha256": "2CE8E88E31669EC582C3376753775FA7097AB5F4580388D955A1827862B4E653"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/lenovo.h",
+      "sha256": "3037133C76711EED452632516AE1287FADC1709694F9521131D01509A7140D84"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/lha.cpp",
+      "sha256": "895F9FBF94DAD737F812DE5BE1FB0AB600F72D2C4B7B3D784BB14CAAF62B7ABC"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/lha.h",
+      "sha256": "DCB5DA7ACB4997ABBDE8372A8DAF74DAE5727CA5CBF80B26876FDB4CB2A0BC08"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/mapmem.cpp",
+      "sha256": "6A1033CC7A889FDD876E137C05EECAFECD01917C50C30BF8B2C331C21714AF7A"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/mapmem.h",
+      "sha256": "7460714A5BC28C86DC035C3BD426460BA7B005AEFDE81A733151FBEF75C160CD"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/marvinhw.cpp",
+      "sha256": "AA367663A843D7CA621A68A0490877B418A8B31AFA11AD691E1F1AF294C199DC"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/marvinhw.h",
+      "sha256": "27C23F2E7EB5A6EFCEBA108C2551C692F6317D03BFF5563BB38D117D6699EEB4"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/mimidrv.cpp",
+      "sha256": "D281289E0CDA5F4171E999BB1313AA235C54583AA8B0DF3AA187AF35B4BA2057"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/mimidrv.h",
+      "sha256": "395143A2F6451BC4F62A5A8F362E579E35BDC6DE8F3FC4C6AB5F8BCE946CD467"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/netease.cpp",
+      "sha256": "84D329D842A771BDAE86E74ECD207522F1EFE63E5ABE3864E1BA1D1EFA894FED"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/netease.h",
+      "sha256": "C27CE74B0B85C322D6133D90D98F37A0A99D0CF5275DABF7D63AC7B3F7E9A542"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/nvidia.cpp",
+      "sha256": "5DDB0AA08CB7FE1F31011D77B87C73F578FCE2F1173D40836D2431991C7B0282"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/nvidia.h",
+      "sha256": "4A002508E03B4EB379829E7F2EE705E5E02FAD75EFDA8FAF3EE72497C2D599DA"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/phymem.cpp",
+      "sha256": "F9463D258E2528738EE749A86683079E8B870B8C84D292352952BE207B9DAFF5"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/phymem.h",
+      "sha256": "399A9CED700381D0E3641F2D97A3E9F5DD59CBE22098AC9C0178454F9060D412"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/procexp.cpp",
+      "sha256": "D6DA1A4176128E2ED5BCE68E5F3FBD2FBC9C9443E9805C8C493E6518FF9C96B5"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/procexp.h",
+      "sha256": "4FE3B90C79D504038313AB93585AF8C0028ABBA23F1F13BDA7FC8DAAFF52334D"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/rtcore.cpp",
+      "sha256": "BD0C80BC267D1FA0B423A453A22958A8B1AB1EDE29291217CC045A9A877A347F"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/rtcore.h",
+      "sha256": "08F75EA88874A507C132BAFC412C88F9CC9862F78C238DCBD0CC480A04A438F4"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/rzpnk.cpp",
+      "sha256": "20CD87D7CFD55D93A14F90F9E528A911AFCCD6FD34C01412286A5DAB47A4FB03"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/rzpnk.h",
+      "sha256": "BA0ED180985AD51EF20D2E49706DB47C37D2FE10AA8A67E603973E5F1916443D"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/tpup.cpp",
+      "sha256": "432BC88B361D53FFC876DD915403DD328C2E1CE025E8A397B2F82B0857F439DD"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/tpup.h",
+      "sha256": "5F28AC869323929417AE20C81C556195DD9F91A0BFD7E9133B8F41CC3A5A05FA"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/tpw.cpp",
+      "sha256": "62A75A9629D0A9256AD485DBCC8E5006FAE15DCD92B5E615128E58462FD917F7"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/tpw.h",
+      "sha256": "B2D26470F2A2E11AFBF2AE0C7D5AF29FC9E26C64ADBC99425A022E61753604C1"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/winio.cpp",
+      "sha256": "0B2A6D7005B03D28E0509589DC68C35C447C76E689E3057CE6F9EC220B3F707A"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/winio.h",
+      "sha256": "D0E354D2F97E993E5E40FB6BB2B99B5BC753BEB23F8213D44F99C0309210C1E8"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/winring0.cpp",
+      "sha256": "E5E19D2136D37F268D612BBC46AD0B8B84FC899E74E66EB8C7B16FF51CE488EF"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/winring0.h",
+      "sha256": "3B875E0FBE4BB8FAF029CF1CBF15BCC76A7B26B51893F8F8405B0C3789276B83"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/zemana.cpp",
+      "sha256": "578717E7A42287B7A65A8AAE8F504F92D1D525D35D3A84D95BE865EA72E87F00"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/zemana.h",
+      "sha256": "0FA4DF9B19F927F2208EE445F68AEB99AE8267580D92C2F805960E921D9E3E1E"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/zodiacon.cpp",
+      "sha256": "103E3C46A148E415A80057CAF102C837702983A67D6086482030BECF3E429A72"
+    },
+    {
+      "path": "Source/Hamakaze/idrv/zodiacon.h",
+      "sha256": "72BE567129BF43464443801C169EBFF5EA6FC276CDD6B0170044FFEF974DFFE1"
+    },
+    {
+      "path": "Source/Hamakaze/ipcsvc.cpp",
+      "sha256": "96290F173B2D4A5211845AD34F3F6615865E8E07DCA3C51BBD4C2533E23D0E9D"
+    },
+    {
+      "path": "Source/Hamakaze/ipcsvc.h",
+      "sha256": "888A436B666B00592D29E8A2E82A9B5C7F0C1D4890AAAB8CB2F623181AD07092"
+    },
+    {
+      "path": "Source/Hamakaze/KDU.vcxproj",
+      "sha256": "20C83F0CA288E25ABF5CE1B4F8C98AC67865146F6EEAAEF5891AC62F63381EE5"
+    },
+    {
+      "path": "Source/Hamakaze/KDU.vcxproj.filters",
+      "sha256": "85AC60CF1DD3098FB474AFB22900039D2384B25DA09090489E0F7E35EE679602"
+    },
+    {
+      "path": "Source/Hamakaze/kduplist.h",
+      "sha256": "C47189D32F1D62DB972F1443D33ACEAC1588B46AF88706F681E72CF38DBB5AD6"
+    },
+    {
+      "path": "Source/Hamakaze/kduprov.cpp",
+      "sha256": "10A78A21542B8F7F9AB3F0CC80CCBE247DF416B58D3429D7D3032035DB00AB88"
+    },
+    {
+      "path": "Source/Hamakaze/kduprov.h",
+      "sha256": "B267610D88B45AF06C1D64C5CDF8D1780F4527EE4734B1FA00B46274E5AAE26A"
+    },
+    {
+      "path": "Source/Hamakaze/main.cpp",
+      "sha256": "E6D02C41FD89A09C444237228E5DACABBA1478DEE08F5561763FFE7377A3BFE0"
+    },
+    {
+      "path": "Source/Hamakaze/pagewalk.cpp",
+      "sha256": "E1A8DE39E2D3D0BAE5D9BBE1B18E849F5D070FEB1D37F838176EDE5A401F35EC"
+    },
+    {
+      "path": "Source/Hamakaze/pagewalk.h",
+      "sha256": "545ECF7E669B6B28753A02E33FAE6F503750D26CF0BF9089701F401FD24E0DD1"
+    },
+    {
+      "path": "Source/Hamakaze/provdb.cpp",
+      "sha256": "483CEF1511C0A4882471BA963EDC9DAABCC5E6B5CB99CDECEDF731A323EF03AA"
+    },
+    {
+      "path": "Source/Hamakaze/provdb.h",
+      "sha256": "9E6900F74D652C9614E9951C659644457144A789BDCCEBAB9ECA7A24092BB134"
+    },
+    {
+      "path": "Source/Hamakaze/ps.cpp",
+      "sha256": "9F25D1853C9B188D3226E00348904042DFA92D755B3997BDF2FF874A6502B5A1"
+    },
+    {
+      "path": "Source/Hamakaze/ps.h",
+      "sha256": "BE6C9261DF06E2196A543A206C5FEAC82F2D41EFBDE17830682EE5A0377B284E"
+    },
+    {
+      "path": "Source/Hamakaze/res/274.ico",
+      "sha256": "DE7BDF0BD4ACEC31C963B916331399BCE23C155E3002F0A8152A4A36AF13FAF8"
+    },
+    {
+      "path": "Source/Hamakaze/res/SB_SMBUS_SDK.bin",
+      "sha256": "2282BC2B373C8F6923AE7017ADF2F5E50D965063E22AC5939B13D50065AC893F"
+    },
+    {
+      "path": "Source/Hamakaze/res/Taigei32.bin",
+      "sha256": "DAD3096188DB26B36FABAFB4B2E85F90418A4BBEEBF3D22CFF4C92604568C5C1"
+    },
+    {
+      "path": "Source/Hamakaze/resource.h",
+      "sha256": "6AB34CC400E37C37605E0B04B076F9464172C6E1AE749B19F7D0C73F2D7177E3"
+    },
+    {
+      "path": "Source/Hamakaze/resource.rc",
+      "sha256": "6CA89BC9225470DAF61C8AFB2BFA68094C7E3110FEFCC8CF00B678146DFFEEEF"
+    },
+    {
+      "path": "Source/Hamakaze/shellcode.cpp",
+      "sha256": "34023F9658344AA320F5CA3DAD77B6FDB8824196CB3CB2DEAEBE9098664F2FE4"
+    },
+    {
+      "path": "Source/Hamakaze/shellcode.h",
+      "sha256": "87C7274C6E821EB447EC87B63B0A058C59F0E64F0C109CFC1D529FB8E2F25150"
+    },
+    {
+      "path": "Source/Hamakaze/shellmasm.asm",
+      "sha256": "5428B9EB02810DBC4BFD715EC657EE35A5E61E53079C65F05E1EEA4F8A6FA4A0"
+    },
+    {
+      "path": "Source/Hamakaze/sig.h",
+      "sha256": "879EEA1C38C0C408E3634D0ED2EEAE2B8B21E1040B4B0988EA4D802DE0ECD21E"
+    },
+    {
+      "path": "Source/Hamakaze/sup.cpp",
+      "sha256": "78EAD837F315F03F9B102BBC0DDCBA3E8F8A11456A8C8DC6CB0DEEC2AF331AB1"
+    },
+    {
+      "path": "Source/Hamakaze/sup.h",
+      "sha256": "977E91A341A7D8005A0866100F08B41517C0487E18A09D082843DF8C899B74F6"
+    },
+    {
+      "path": "Source/Hamakaze/sym.cpp",
+      "sha256": "B300B9E4347C096B134627790E81C21B912BD22201B4164E60987333847C2E29"
+    },
+    {
+      "path": "Source/Hamakaze/sym.h",
+      "sha256": "292EFAABF3F6223761AEF1FC418EC98108FB529C7260D9D4A72715378C6B7547"
+    },
+    {
+      "path": "Source/Hamakaze/tests.cpp",
+      "sha256": "E4D2981C0F1144CB5193C1E557D7254DEB9E3233A4D2FA357D6194843961D676"
+    },
+    {
+      "path": "Source/Hamakaze/tests.h",
+      "sha256": "AD77AE168188A9748713AB5F7532447CA50A539FA8EBBEC5AC86B273696B028E"
+    },
+    {
+      "path": "Source/Hamakaze/victim.cpp",
+      "sha256": "FF19062F38B7884F9E16AB1F85261F190F67FCFAE116C4B4F6FA0DD200644C13"
+    },
+    {
+      "path": "Source/Hamakaze/victim.h",
+      "sha256": "5B82ACCD00D244D77F107A7B8FF0253548A463E642976C36F76E85649E60FE8E"
+    },
+    {
+      "path": "Source/Hamakaze/wdksup.h",
+      "sha256": "8E1AEF4AE8919EF806BED30FEB59EC532BFF0B6DFD8237457A17022868BD40EC"
+    },
+    {
+      "path": "Source/Shared/consts.h",
+      "sha256": "9B9C55DB2F2024A726CF9F2B03722E1D13F39342D7C00B92A1E00B61BAF841F5"
+    },
+    {
+      "path": "Source/Shared/kdubase.h",
+      "sha256": "916BA0DE9CE9EDBAFBB851C0AF6DCA4E24845011E04402BEAF01078F620F1DDD"
+    },
+    {
+      "path": "Source/Shared/ldr/ldr.cpp",
+      "sha256": "83D13FF6DD53F57E388832547FDA3866FE28C65DFBDD7F5C1426DB63CF8E3250"
+    },
+    {
+      "path": "Source/Shared/ldr/ldr.h",
+      "sha256": "37003367E625E218BF7E4C22850AC7D2EFE926A6A832D29BC20A9F8B19A479AF"
+    },
+    {
+      "path": "Source/Shared/minirtl/_filename.c",
+      "sha256": "C1405B280BACC7566CCD041A74461DE3F8496128FD71E39368905CF8D95268F6"
+    },
+    {
+      "path": "Source/Shared/minirtl/_filename.h",
+      "sha256": "9E3F1386BFB64DBAA3CBB12FD3BF51C734872C2FDF15CF1AAECA52A515767519"
+    },
+    {
+      "path": "Source/Shared/minirtl/_strcat.c",
+      "sha256": "83772AA217508279294D91AF5CFABEC9B5E00B836A2E2F5FE37CF1EBC2905A52"
+    },
+    {
+      "path": "Source/Shared/minirtl/_strcmp.c",
+      "sha256": "2A67C7690EC6DF8E233207116B0E4FE76C02AE43595D9E606E123572B6AC88A1"
+    },
+    {
+      "path": "Source/Shared/minirtl/_strcmpi.c",
+      "sha256": "EF1B18997EA473AC8D516EF60EFC64B9175418B8F078E088D783FDAEF2544969"
+    },
+    {
+      "path": "Source/Shared/minirtl/_strcpy.c",
+      "sha256": "969B35213FA23FF50A169E5498A97F28BC6F5820B447B78EC9DC6910DD8CC3E8"
+    },
+    {
+      "path": "Source/Shared/minirtl/_strend.c",
+      "sha256": "27159B8FF67D3F8E6C7FDB4B57B9F57F899BDFEDF92CF10276269245C6F4E066"
+    },
+    {
+      "path": "Source/Shared/minirtl/_strlen.c",
+      "sha256": "60F19C6B805801E13824C4D9D44748DA8245CD936971411D3D36B873121888EB"
+    },
+    {
+      "path": "Source/Shared/minirtl/_strncmp.c",
+      "sha256": "97E0720ED22D2D99E8148AAB7AB2CB2CC3DF278225669828B2D8D4D9EF856D94"
+    },
+    {
+      "path": "Source/Shared/minirtl/_strncmpi.c",
+      "sha256": "87CC72BB8E3F1534BEE09EE278ECD928D975EBB94AEFFC767B67249815A0BF3A"
+    },
+    {
+      "path": "Source/Shared/minirtl/_strncpy.c",
+      "sha256": "0434D69DAA20FBF87D829FFC17E43DCC2DB3386AFF434AF888011FDEC2F645A4"
+    },
+    {
+      "path": "Source/Shared/minirtl/cmdline.c",
+      "sha256": "893B90B942372928009BAD64F166C7018701497E4F7CD1753CDC44F76DA06707"
+    },
+    {
+      "path": "Source/Shared/minirtl/cmdline.h",
+      "sha256": "BD6FE82852C4FCDFAB559DEFA33EA394B752A4E4A5AC0653AE20C4A94B0175ED"
+    },
+    {
+      "path": "Source/Shared/minirtl/minirtl.h",
+      "sha256": "2A08385892845104B4F07D693CA395EBA3A09E4AA89AD791BE3807919316ED67"
+    },
+    {
+      "path": "Source/Shared/minirtl/rtltypes.h",
+      "sha256": "D7FBFD69DF3840022DAB1F8F2D529CE04ABAC8CEE0234448BFD0A67FEB6AEA22"
+    },
+    {
+      "path": "Source/Shared/minirtl/strtou64.c",
+      "sha256": "D7FE6D011E2337C41FE59100B2DA768829A87D3EB0B69652100132E220140FF1"
+    },
+    {
+      "path": "Source/Shared/minirtl/strtoul.c",
+      "sha256": "C51BECA480D6E6F88174698503C0856C56488A59101D259C068DCCB0902B01EC"
+    },
+    {
+      "path": "Source/Shared/minirtl/u64tohex.c",
+      "sha256": "E56E67B10A67F0D5EF4128C7AB0C6CB9BA9966916720525EDFA6ABF3101DFE13"
+    },
+    {
+      "path": "Source/Shared/minirtl/ultohex.c",
+      "sha256": "F81C975ACD016C97776DD3A8E3218E148682B0336FF3FCD77FAD6D9B86DDF107"
+    },
+    {
+      "path": "Source/Shared/ntos/halamd64.h",
+      "sha256": "9323CC92FC8A04A0FBE740061E4FDB3D808004B11BC71E2F0D39E060E843E9C8"
+    },
+    {
+      "path": "Source/Shared/ntos/ntalpc.h",
+      "sha256": "BE4F87C9AB4CBB9B298C2455AFF2B86F6F59D0ABFA74608A683515767986D227"
+    },
+    {
+      "path": "Source/Shared/ntos/ntbuilds.h",
+      "sha256": "97F8AB2674ECC4619858AFB4FCE51EF7A553237199E51D2B89C7E0C4F01D5950"
+    },
+    {
+      "path": "Source/Shared/ntos/ntos.h",
+      "sha256": "6E681CDF72CBE06E0FFA44544964F2EF4620F0872F13FFB98926BC8B5E8564A9"
+    },
+    {
+      "path": "Source/Shared/ntos/ntsup.c",
+      "sha256": "0AA24FFB258B4C0151AA32DBBB8EAF3BCA06E3D7BF353125E841D6E0E0B41729"
+    },
+    {
+      "path": "Source/Shared/ntos/ntsup.h",
+      "sha256": "51D545C43A24FBE9F33DAF413B23CC8120E234A30C6EAACA31D5105FE94BFE36"
+    },
+    {
+      "path": "Source/Shared/thirdparty/tinyaes/aes.c",
+      "sha256": "261011D0EE9C2D2EE22DAD2CDB45D66449B22B5A831FD60293F315C72968DD32"
+    },
+    {
+      "path": "Source/Shared/thirdparty/tinyaes/aes.h",
+      "sha256": "A68264A684F0C19CAF7F2464544D9E8163362CD919F382D08B82CBEF0497A6F7"
+    },
+    {
+      "path": "Source/Shared/thirdparty/whirlpool/nessie.h",
+      "sha256": "76DFD733E00736AC4B3F6952B2DB471293A96A0E814B287FFD94B5ED93413AC3"
+    },
+    {
+      "path": "Source/Shared/thirdparty/whirlpool/whirlpool.c",
+      "sha256": "49268F8E7136BB19693134BD5DF9512A1243D0034E6BDAF7519A617047D22646"
+    },
+    {
+      "path": "Source/Shared/thirdparty/whirlpool/whirlpool.h",
+      "sha256": "DD9B1BD7E3232E79B1817963150C61C2D128D870085A9B4A0CD635D1C6C2FCBC"
+    },
+    {
+      "path": "Source/Tanikaze/data/AsusCertService.bin",
+      "sha256": "01E8FD11BF7D968C5EDA7AFCFE70C5D24050F6C086AD1BBD6CBF7A826EF8EA6B"
+    },
+    {
+      "path": "Source/Tanikaze/data/dbutilcat.bin",
+      "sha256": "87F8CC02196F2EFC437A47AF6B04412D857DD5A8DDF505E0D95A8FE0884C0724"
+    },
+    {
+      "path": "Source/Tanikaze/data/dbutilinf.bin",
+      "sha256": "6DFF333A76725850CA69A7CDB004BAE4568EA20E959C4DEAFCA4FDAA4D3462EA"
+    },
+    {
+      "path": "Source/Tanikaze/data/KMUEXE.bin",
+      "sha256": "A4DE348A4F36B8C25BACC94BCE5D35F062BEA558F505BA046BEFD426DFECEEC8"
+    },
+    {
+      "path": "Source/Tanikaze/data/KMUSIG.bin",
+      "sha256": "A81215B8B17506A2F0059BC166754D91FACF6382740BCA5FC021D1E4B895E621"
+    },
+    {
+      "path": "Source/Tanikaze/data/NeacSafe64Cat.bin",
+      "sha256": "B864FD9FAB256DD638D9C00B55AD2C21FD32B4CE4322E2F7777711600AA648A3"
+    },
+    {
+      "path": "Source/Tanikaze/drv/ALSysIO64.bin",
+      "sha256": "5F50F236678BE34F6D5E2064AE2544FADCAC2A9EB6119592211C5C53A8CBFCC8"
+    },
+    {
+      "path": "Source/Tanikaze/drv/AMDRyzenMasterDriver.bin",
+      "sha256": "5E6A04B047CEC2318E915274EF2928B51CC8107E8B94BB949B1089FD908414A8"
+    },
+    {
+      "path": "Source/Tanikaze/drv/amsdk.bin",
+      "sha256": "24395AC36FE614DC005E94EE5CE1DCE1B376DA9B665FE77E9C646C155A86C5B4"
+    },
+    {
+      "path": "Source/Tanikaze/drv/AODDriver215.bin",
+      "sha256": "A020FCF4FA0C2EBADCEA8100E1752A36CB3AE74907042D9F9C9C93DDBDD23133"
+    },
+    {
+      "path": "Source/Tanikaze/drv/AppShopDrv103.bin",
+      "sha256": "95124A3B62E369DA178D52DCB437ABD82995A294A90FDE893E7172A44E8BBAD4"
+    },
+    {
+      "path": "Source/Tanikaze/drv/asio2.bin",
+      "sha256": "7D214305AD579D94B28910D84929DEAA768E3B9F78D0E23D131A61582EF17B5E"
+    },
+    {
+      "path": "Source/Tanikaze/drv/AsIO3.bin",
+      "sha256": "C01E08D99D4455242A42A1CE1B1DF929685BD7B4C822174FBA2584D66DE1F692"
+    },
+    {
+      "path": "Source/Tanikaze/drv/AsrDrv106.bin",
+      "sha256": "87EC03C3795AA4866FE6727710AEAABC01E963CCE7BF0E2197C7F1384EA9CC97"
+    },
+    {
+      "path": "Source/Tanikaze/drv/AsrDrv107.bin",
+      "sha256": "BD8030E7DD13AED831D56A2477DCB837026186E542D2C4F6AD3E27C115D29963"
+    },
+    {
+      "path": "Source/Tanikaze/drv/AsrDrv107n.bin",
+      "sha256": "BDD1784D96CD13014C6B2341F92B5517DEAD294C8A16995F8AB966B859D9D3BE"
+    },
+    {
+      "path": "Source/Tanikaze/drv/ATSZIO64.bin",
+      "sha256": "F3B63BCE42A499B3A0B2815A39D553023CCE59D976BCBE8431EE16E275CB2A8B"
+    },
+    {
+      "path": "Source/Tanikaze/drv/AxtuDrv.bin",
+      "sha256": "6B4EE2E0C5AACA554C1BAC726F5650EAE257AF3CC6F14BF549F6FC49A382A1B1"
+    },
+    {
+      "path": "Source/Tanikaze/drv/Cormem.bin",
+      "sha256": "1F8A36520B63911FDAC154E16AF3811AA255A918786A45AF3B5AC2FCA9271125"
+    },
+    {
+      "path": "Source/Tanikaze/drv/dbk64.bin",
+      "sha256": "911109181D41D54EAC2DFF50291AE07AFB34EFBFD0B7746CBEBDDB4547E34CDF"
+    },
+    {
+      "path": "Source/Tanikaze/drv/DbUtil2_3.bin",
+      "sha256": "CC3595E7BE879A3A2268BF0626E69300438B044DC00AF913F6BB754983DE703E"
+    },
+    {
+      "path": "Source/Tanikaze/drv/dbutildrv2.bin",
+      "sha256": "E2FF08BBFA882A6A72D421FE35552FC5DDA41DB5C8D79DC3C1F5D0BB37924531"
+    },
+    {
+      "path": "Source/Tanikaze/drv/DirectIo64.bin",
+      "sha256": "7EDBF34AB08C5CF17BDDFC8C7218F13FB1AA5FFBD6D36A198651D0B1C52C2BF3"
+    },
+    {
+      "path": "Source/Tanikaze/drv/DirectIo64_2.bin",
+      "sha256": "8C6DCB515E7CCDCAF51874850F90E257B397BAED064AB67133610926B4266A5B"
+    },
+    {
+      "path": "Source/Tanikaze/drv/echo_driver.bin",
+      "sha256": "CB334128DBCC25FADC5B234735A751D77CB039123401D80B7B67AA564E905B9B"
+    },
+    {
+      "path": "Source/Tanikaze/drv/eleetx1.bin",
+      "sha256": "F6ED4FD41836813AC694E449ED95A7E8C63670E321C6D2590B2F64AE9D2E0931"
+    },
+    {
+      "path": "Source/Tanikaze/drv/ene2.bin",
+      "sha256": "A932773D516B866CB6AF3C3D5B591AB9AF2E384908F5E5B5BE62A157871F53D7"
+    },
+    {
+      "path": "Source/Tanikaze/drv/EneIo64.bin",
+      "sha256": "F97290F00A817AB515CD89D795729D7C781E3988B78CFDBF00C855F72C868609"
+    },
+    {
+      "path": "Source/Tanikaze/drv/EneTechIo64.bin",
+      "sha256": "D6D4D612CF6BC87BC785484681C7D3787A03C8AEF4BFD203FEA580D304BF5633"
+    },
+    {
+      "path": "Source/Tanikaze/drv/etdsupp.bin",
+      "sha256": "160AF627A0C303B7775D7825B0F07D8D24AEBE5CD81085DB43E4106C65AA58CD"
+    },
+    {
+      "path": "Source/Tanikaze/drv/gdrv.bin",
+      "sha256": "4958BCACD609E92287B579AE0B3152E244BA326E3EE60BEB467590276BA4433D"
+    },
+    {
+      "path": "Source/Tanikaze/drv/GLCKIO2.bin",
+      "sha256": "F83B2D31B94A5523627861649C1896D353A8ABC1249B187B849C6BB7DCD50F91"
+    },
+    {
+      "path": "Source/Tanikaze/drv/gmerdrv.bin",
+      "sha256": "3610189DBE1B24E32E954B3E99B2D8B17C4949E94090363E05BC1A6BD8F89A7A"
+    },
+    {
+      "path": "Source/Tanikaze/drv/heavenluo.bin",
+      "sha256": "77C7BE60B98DCD0DABEE849FAFD35D640F94A5FE2672BBE147473F37E6CBE2EB"
+    },
+    {
+      "path": "Source/Tanikaze/drv/HW64.bin",
+      "sha256": "E61B9DC9C1D11FE37C4E4E53A66F38FFD39B97DB8940C4B7C492D57C72CA48A8"
+    },
+    {
+      "path": "Source/Tanikaze/drv/HwRwDrv.x64.bin",
+      "sha256": "8D856276294BE4D6A34F508E974DD94C9274D80FCCC8F9823D7854EDCF6129C7"
+    },
+    {
+      "path": "Source/Tanikaze/drv/inpoutx64.bin",
+      "sha256": "20964E8D33B65E0896D0E90BA28C92C6271B2772D33E1F4E8CE947BBC525AFEF"
+    },
+    {
+      "path": "Source/Tanikaze/drv/ipctype.bin",
+      "sha256": "311849319EAF1AED5EC41426684ACDBE823EC8CFDA2CEF1618FE48296F9C6FE1"
+    },
+    {
+      "path": "Source/Tanikaze/drv/iQVM64.bin",
+      "sha256": "424444E414C3825C9E493F11FF8F4EF1EDD2AB7C11AA061B431D969982657084"
+    },
+    {
+      "path": "Source/Tanikaze/drv/irec.bin",
+      "sha256": "AAFA29F7C40EE286EFBABA85A639C6AA20182ED1B767911FE398831AF17455FA"
+    },
+    {
+      "path": "Source/Tanikaze/drv/KExplore.bin",
+      "sha256": "9F0B0CDB1B75BA1A8BCB4DE2FEF9B3E6D735AA20743D278EB8D2FBEA32F9CEA6"
+    },
+    {
+      "path": "Source/Tanikaze/drv/KObjExp.bin",
+      "sha256": "FC28FF7EB62762C507DF3A20F531235C31902F2D239774F95618F2622A124656"
+    },
+    {
+      "path": "Source/Tanikaze/drv/kprocesshacker.bin",
+      "sha256": "F5A3A6A38063AC7283855BED058CF20B7432324FF036DD1B3897E97FBADA632B"
+    },
+    {
+      "path": "Source/Tanikaze/drv/KRegExp.bin",
+      "sha256": "1B368985DE520A2EFD97A68B852017D481BF57602DC1C8B46FF347AA56CF7B35"
+    },
+    {
+      "path": "Source/Tanikaze/drv/LDD.bin",
+      "sha256": "C29401F262E1340B1A08324D45785C40A290C2A27705760B21DDDB494E36F254"
+    },
+    {
+      "path": "Source/Tanikaze/drv/lha.bin",
+      "sha256": "6CE1D3AEF08E606E8E6AE78D8CB809D392B84F4D40CBA6CD035BB35004700618"
+    },
+    {
+      "path": "Source/Tanikaze/drv/LnvMSRIO.bin",
+      "sha256": "CFC7A90D3DAE38106ABEC3B0C2183D0669E11665FC9E224F9C06766371351FC9"
+    },
+    {
+      "path": "Source/Tanikaze/drv/mimidrv.bin",
+      "sha256": "F77A6695F4097EDD2F98DEE2513071A09A20953E59F06E66F8B1087E12465958"
+    },
+    {
+      "path": "Source/Tanikaze/drv/MsIo64.bin",
+      "sha256": "C37CF6F8C5E046789754C9A2A39AC140ED8048C3D9E1FBC2389C7B33AB6D362C"
+    },
+    {
+      "path": "Source/Tanikaze/drv/NeacSafe64.bin",
+      "sha256": "E8B2B8C0A6F04C08451EE22893164388E87B7E4CBC5E18EB33DFFE19107B742D"
+    },
+    {
+      "path": "Source/Tanikaze/drv/nvoclock.bin",
+      "sha256": "6059664BF733D22927B7570BD3C06D37CA82BAE43F9E98CA6B517AF60F1028A0"
+    },
+    {
+      "path": "Source/Tanikaze/drv/pcdsrvc_x64.bin",
+      "sha256": "FA2EB22CEF0B949A7E27A1194476D1FDA2BAEE72A47F175CD78D4A06EA2C966A"
+    },
+    {
+      "path": "Source/Tanikaze/drv/PdFwKrnl.bin",
+      "sha256": "97E9A0E6F4DC70DF25209C1B4A50D70C0DCCA98AF26655582334879A35A07F33"
+    },
+    {
+      "path": "Source/Tanikaze/drv/PhyDMACC.bin",
+      "sha256": "220E448DC0AE21AEED6788D6A944CD1261A8EA355DA3B32E0E816251CCE48250"
+    },
+    {
+      "path": "Source/Tanikaze/drv/Phymemx64.bin",
+      "sha256": "38C7EAB72ACD86F787988F3848BAB8A946D6F482E4C41D7B2EC4CAEF6FA053B4"
+    },
+    {
+      "path": "Source/Tanikaze/drv/physmem.bin",
+      "sha256": "C2738E4E2DFAF3A9369DB1767597EED5C059E58DA52CAE7E17CF45A1546EEFCE"
+    },
+    {
+      "path": "Source/Tanikaze/drv/pmxdrv64.bin",
+      "sha256": "9FDA07EA2EAC7B1063448E0A2BAA9310CD4ED03F5C9605DF36DD7E328E00F0E0"
+    },
+    {
+      "path": "Source/Tanikaze/drv/procexp1627.bin",
+      "sha256": "E7D99A52087F13E2F08556F4A6B149B6830FBA0CD607AD50300846B002C0F105"
+    },
+    {
+      "path": "Source/Tanikaze/drv/procexp1702.bin",
+      "sha256": "5653F9093B578801BAF519E9F204BCEF0CC2963F470CB6ECE75506F4949708DC"
+    },
+    {
+      "path": "Source/Tanikaze/drv/RTCore64.bin",
+      "sha256": "522C6E0A2C8CE559FF7D8B69534E83A3BEDF585599A20119F6AB8F3556C32AFF"
+    },
+    {
+      "path": "Source/Tanikaze/drv/rtkio64.bin",
+      "sha256": "06E893B14C496F68B128C9D8A0D2304D31CB9317F4267F55B4B47C03F7C4B7E2"
+    },
+    {
+      "path": "Source/Tanikaze/drv/rzpnk.bin",
+      "sha256": "3DF1306FF1C121329A8B763711382A69AB14A710F46435B5885039F98E078C80"
+    },
+    {
+      "path": "Source/Tanikaze/drv/SysDrv3S.bin",
+      "sha256": "C15A260544699B573643B107FD118C306ADFF760696CFFD82F66AE3A5BB343C2"
+    },
+    {
+      "path": "Source/Tanikaze/drv/ThrottleStop.bin",
+      "sha256": "D0B836F412947A0E33787D16BC53A21D9E54E694ED4561FA13284DF7EBA9FAB5"
+    },
+    {
+      "path": "Source/Tanikaze/drv/TPwSav.bin",
+      "sha256": "BAE9147C395F6925D50EA40E223C8B6A9ADC6DDD3B8F1A9B167B6EBB4DD5787C"
+    },
+    {
+      "path": "Source/Tanikaze/drv/WinHwDrv64.bin",
+      "sha256": "1E9AAF77A94E20AE3618E1BFC8D33AA212AD2DF0F85B167CB6837BD691C998C5"
+    },
+    {
+      "path": "Source/Tanikaze/drv/WinRing0x64.bin",
+      "sha256": "453CBB918DCDBC7252A868F8A23B7D1D364709E3453FA686507E706EE2879521"
+    },
+    {
+      "path": "Source/Tanikaze/drv/wnBios64.bin",
+      "sha256": "FF89024D4015F7EB01779DBDD6C4A4F5B5676AD3F617E39AAE96FFF5311545D2"
+    },
+    {
+      "path": "Source/Tanikaze/export.def",
+      "sha256": "09898924434CD21C9A2C30966A2EE9C1380BB92BB09249639D20EE131BA9D942"
+    },
+    {
+      "path": "Source/Tanikaze/main.cpp",
+      "sha256": "DA3AFB5DE5A1A27DCB09974144191BC0C9B21DD41FDEDC6B4853C05D1238CF7C"
+    },
+    {
+      "path": "Source/Tanikaze/resource.h",
+      "sha256": "A476F2E9DCF53CF693D2855F5AA8C023A9A2527366C50B271827CBA5E5C37FF3"
+    },
+    {
+      "path": "Source/Tanikaze/resource.rc",
+      "sha256": "B20720D9251FBECB2F5A858652B51B7278F41E8EA66C269768FD043FE3A37CD8"
+    },
+    {
+      "path": "Source/Tanikaze/tanikaze.h",
+      "sha256": "AA8F9BB9E4EB9D83BD91E1C9DFEB958F58C0EA3880C738C5B4F33DBE76B80933"
+    },
+    {
+      "path": "Source/Tanikaze/Tanikaze.vcxproj",
+      "sha256": "BC5A32B019314C2F6A0934C13CD2090816649F45721251FF85E522860C6FBDE1"
+    },
+    {
+      "path": "Source/Tanikaze/Tanikaze.vcxproj.filters",
+      "sha256": "03A71296054AE104BA6F0300F9305BE29FE2F11CD9A14E2BDE7EF1148D3D8C6D"
+    },
+    {
+      "path": "Source/Utils/GenAsIo2Unlock/GenAsIo2Unlock.sln",
+      "sha256": "C776BC97EE2FBE48D3E148BB37C887862E6DE212D4391D6DF9B5F149E40ED223"
+    },
+    {
+      "path": "Source/Utils/GenAsIo2Unlock/GenAsIo2Unlock.vcxproj",
+      "sha256": "1CE9D4339C7BA2DE01322563B3B6D1D633FD3326F5FEC11C32B6EF8A6CEA6E08"
+    },
+    {
+      "path": "Source/Utils/GenAsIo2Unlock/GenAsIo2Unlock.vcxproj.filters",
+      "sha256": "0F66125C8A4BEED047C8BFB2EB57F8AA8CE3ACC390B9303B4B2D10815E8D4B9C"
+    },
+    {
+      "path": "Source/Utils/GenAsIo2Unlock/main.cpp",
+      "sha256": "351D5566119C9D193CFF59C4AE70124B68B23C0602F7EBA3E73772F42009844E"
+    }
+  ]
+}

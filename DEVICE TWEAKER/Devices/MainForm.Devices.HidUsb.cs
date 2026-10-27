@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 using System.Globalization;
 
@@ -330,7 +330,7 @@ public sealed partial class MainForm
     private static string FormatUsbPollingRoleSummary(IEnumerable<string> roles)
     {
         List<string> items = [];
-        foreach (string role in roles)
+        foreach (string role in UsbRoleDisplay.Order(roles))
         {
             Match match = Regex.Match(
                 role.Trim(),
@@ -346,12 +346,7 @@ public sealed partial class MainForm
         return string.Join(", ", items.Distinct(StringComparer.OrdinalIgnoreCase));
     }
 
-    private static bool IsUsbRoleText(string text, string role)
-    {
-        string trimmed = text.Trim();
-        return string.Equals(trimmed, role, StringComparison.OrdinalIgnoreCase)
-            || trimmed.StartsWith(role + " ", StringComparison.OrdinalIgnoreCase);
-    }
+    private static bool IsUsbRoleText(string text, string role) => RawPollingService.IsUsbRoleText(text, role);
 
     private static bool IsKnownInternalVendorHid(string productName)
     {

@@ -11,10 +11,14 @@ You need Windows 10/11 x64, the .NET 8 SDK, and PowerShell 5.1 or newer. Run the
 ```powershell
 dotnet restore ".\DEVICE TWEAKER\DeviceTweakerCS.csproj"
 dotnet build ".\DEVICE TWEAKER\DeviceTweakerCS.csproj" -c Release -p:TreatWarningsAsErrors=true
-dotnet test ".\DEVICE TWEAKER\tests\DeviceTweaker.Tests\DeviceTweaker.Tests.csproj" -c Release
+dotnet test ".\dev\qa\tests\DeviceTweaker.Tests\DeviceTweaker.Tests.csproj" -c Release
 ```
 
 The repository already contains `IMOD/DTIMOD.sys`. You only need Visual Studio C++ Build Tools and the Windows Driver Kit if you want to rebuild the driver.
+
+After driver changes, rebuild with `publish-variants.ps1 -BuildDriverOnly`. QA checks source and binary hashes against `IMOD/DTIMOD.build.json` and stops if they differ.
+
+Full QA also uses C++ Build Tools / Windows SDK for a native model without loading a driver. KDU source and binaries have separate build manifests; see [IMOD/KDU](IMOD/KDU/README.md) for rebuilding.
 
 To produce both EXEs and `SHA256SUMS.txt`:
 
@@ -27,12 +31,12 @@ See [BUILD.md](./docs/BUILD.md) and [RELEASE.md](./docs/RELEASE.md) for the buil
 
 ## Where to find the code
 
-- `Affinity` — CPU topology and masks.
-- `Devices` — device detection and classification.
-- `Core` — applying settings, restore, IMOD, NIC ITR, and diagnostics.
-- `GUI` and `Localization` — the interface and RU/EN strings.
-- `Interop` — Windows API calls.
-- `IMOD` — the driver and loader.
-- `tests` — tests.
+- `Affinity`: CPU topology and masks.
+- `Devices`: device detection and classification.
+- `Core`: applying settings, restore, IMOD, NIC ITR, and diagnostics.
+- `GUI` and `Localization`: the interface and RU/EN strings.
+- `Interop`: Windows API calls.
+- `IMOD`: the driver and loader.
+- [`dev/qa`](../dev/qa/README.md). checks and the separate developer build with the test panel.
 
 For bug reports or contributions, see [CONTRIBUTING.md](../.github/CONTRIBUTING.md).

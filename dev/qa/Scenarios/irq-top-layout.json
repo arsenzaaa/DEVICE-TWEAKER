@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "id": "irq-top-layout",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "GPU",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    {
+      "id": "EN-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "EN-1200-resize",
+      "action": "resize",
+      "width": 1200,
+      "height": 900
+    },
+    {
+      "id": "EN-1200-top",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-action-top",
+      "value": "true"
+    },
+    {
+      "id": "EN-1200-fit",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-top-fits",
+      "value": "true"
+    },
+    {
+      "id": "EN-1200-capture",
+      "action": "capture"
+    },
+    {
+      "id": "EN-1000-resize",
+      "action": "resize",
+      "width": 1000,
+      "height": 900
+    },
+    {
+      "id": "EN-1000-top",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-action-top",
+      "value": "true"
+    },
+    {
+      "id": "EN-1000-fit",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-top-fits",
+      "value": "true"
+    },
+    {
+      "id": "EN-1000-capture",
+      "action": "capture"
+    },
+    {
+      "id": "RU-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "RU-1200-resize",
+      "action": "resize",
+      "width": 1200,
+      "height": 900
+    },
+    {
+      "id": "RU-1200-top",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-action-top",
+      "value": "true"
+    },
+    {
+      "id": "RU-1200-fit",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-top-fits",
+      "value": "true"
+    },
+    {
+      "id": "RU-1200-capture",
+      "action": "capture"
+    },
+    {
+      "id": "RU-1000-resize",
+      "action": "resize",
+      "width": 1000,
+      "height": 900
+    },
+    {
+      "id": "RU-1000-top",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-action-top",
+      "value": "true"
+    },
+    {
+      "id": "RU-1000-fit",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-top-fits",
+      "value": "true"
+    },
+    {
+      "id": "RU-1000-capture",
+      "action": "capture"
+    }
+  ]
+}

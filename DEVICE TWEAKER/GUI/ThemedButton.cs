@@ -7,7 +7,6 @@ namespace DeviceTweakerCS;
 internal sealed class ThemedButton : Button
 {
     public Color DisabledForeColor { get; set; } = Color.FromArgb(125, 125, 132);
-
     protected override void OnEnabledChanged(EventArgs e)
     {
         base.OnEnabledChanged(e);

@@ -159,7 +159,7 @@ function Invoke-ImodDriverManualBuild {
     Write-Host "CL:    $($vs.Cl)"
     Write-Host "Link:  $($vs.Link)"
 
-    $compileOutput = & $vs.Cl /nologo /c /TC /GS /Zl /W4 /D_AMD64_ /DAMD64 /DWIN64 /D_KERNEL_MODE /DNTDDI_VERSION=0x0A00000A /D_WIN32_WINNT=0x0A00 /Fo"$driverObj" /I"$($vs.Include)" /I"$($wdk.Include)\km" /I"$($wdk.Include)\shared" /I"$($wdk.Include)\ucrt" /I"$($wdk.Include)\um" $driverSource
+    $compileOutput = & $vs.Cl /nologo /c /TC /GS /Zl /W4 /WX /D_AMD64_ /DAMD64 /DWIN64 /D_KERNEL_MODE /DNTDDI_VERSION=0x0A00000A /D_WIN32_WINNT=0x0A00 /Fo"$driverObj" /I"$($vs.Include)" /I"$($wdk.Include)\km" /I"$($wdk.Include)\shared" /I"$($wdk.Include)\ucrt" /I"$($wdk.Include)\um" $driverSource
     $compileExitCode = $LASTEXITCODE
     $compileOutput | ForEach-Object { Write-Host $_ }
     if ($compileExitCode -ne 0) {
@@ -442,6 +442,12 @@ function Invoke-ImodDriverBuild {
 
     $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $driverOutPath).Hash.ToUpperInvariant()
     Set-Content -LiteralPath $driverHashPath -Value $hash -Encoding ASCII
+    $driverInputs = @('IMOD\Driver\imod_driver.c', 'IMOD\Driver\imod_driver.h', 'IMOD\Driver\ImodDriver.vcxproj', 'publish-variants.ps1')
+    $sourceHashes = @($driverInputs | ForEach-Object {
+        [ordered]@{ path = $_; sha256 = (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot $_) -Algorithm SHA256).Hash }
+    })
+    [ordered]@{ schemaVersion = 1; configuration = $Configuration; binarySha256 = $hash; sources = $sourceHashes } |
+        ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $driverOutDir 'DTIMOD.build.json') -Encoding UTF8
 
     $signature = Get-AuthenticodeSignature -LiteralPath $driverOutPath
 
@@ -548,6 +554,7 @@ function Invoke-PublishFlavor {
         "-p:DebugType=None",
         "-p:DebugSymbols=false",
         "-p:BuildImodDriver=false",
+        "-p:DeveloperQa=false",
         "-p:UseAppHost=true",
         "-o", $OutputDir
     )
@@ -575,7 +582,12 @@ function New-ReleasePackage {
     )
 
     $packageRoot = Join-Path $PSScriptRoot "bin\ReleasePackages"
-    $packageDir = Join-Path $packageRoot "v$Version"
+    $packageRoot = [IO.Path]::GetFullPath($packageRoot).TrimEnd('\')
+    if ($Version -notmatch '^\d+\.\d+\.\d+(?:\.\d+)?$') { throw "Invalid package version: $Version" }
+    $packageDir = [IO.Path]::GetFullPath((Join-Path $packageRoot "v$Version"))
+    if (-not $packageDir.StartsWith($packageRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Package path escapes the release directory: $packageDir"
+    }
 
     # Fresh package directory only. Never ship local run logs or loose driver copies —
     # DTIMOD/KDU are already EmbeddedResource inside both EXEs.

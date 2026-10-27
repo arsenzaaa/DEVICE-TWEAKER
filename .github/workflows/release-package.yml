@@ -1,8 +1,6 @@
 name: Release package
 
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
     inputs:
       tag:
@@ -21,7 +19,7 @@ jobs:
       - name: Check out the tagged source
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ inputs.tag }}
           fetch-depth: 0
 
       - name: Set up .NET 8
@@ -32,7 +30,7 @@ jobs:
       - name: Verify tag and project version
         shell: pwsh
         env:
-          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
           $tag = $env:RELEASE_TAG
           if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw "Invalid release tag: $tag" }
@@ -54,7 +52,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Restore failed' }
           dotnet build 'DEVICE TWEAKER/DeviceTweakerCS.csproj' -c Release --no-restore -p:TreatWarningsAsErrors=true
           if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
-          dotnet test 'DEVICE TWEAKER/tests/DeviceTweaker.Tests/DeviceTweaker.Tests.csproj' -c Release --no-restore
+          dotnet test 'dev/qa/tests/DeviceTweaker.Tests/DeviceTweaker.Tests.csproj' -c Release --no-restore
           if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
 
       - name: Build both release EXEs
@@ -76,6 +74,11 @@ jobs:
             $actual = (Get-FileHash -LiteralPath "$package/$name" -Algorithm SHA256).Hash
             if ($actual -ne $line[0].Substring(0, 64)) { throw "Checksum mismatch: $name" }
           }
+          $sourceName = "DEVICE.TWEAKER.Source.$env:RELEASE_TAG.zip"
+          git archive --format=zip --output="$package/$sourceName" HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Source archive failed' }
+          $sourceHash = (Get-FileHash -LiteralPath "$package/$sourceName" -Algorithm SHA256).Hash
+          "$sourceHash  $sourceName" | Set-Content -LiteralPath "$package/SOURCE-SHA256SUMS.txt" -Encoding ascii
           $notes = Get-Content -LiteralPath "DEVICE TWEAKER/docs/releases/$env:RELEASE_TAG.md" -Raw
           $notes += "`n`nSource commit: ``$env:SOURCE_COMMIT``.`n"
           Set-Content -LiteralPath "$env:RUNNER_TEMP/release-notes.md" -Value $notes -Encoding utf8
@@ -93,5 +96,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $package = "DEVICE TWEAKER/bin/ReleasePackages/$env:RELEASE_TAG"
-          gh release create $env:RELEASE_TAG "$package/DEVICE.TWEAKER.exe" "$package/DEVICE.TWEAKER.SelfContained.exe" "$package/SHA256SUMS.txt" --draft --verify-tag --title "DEVICE TWEAKER $env:RELEASE_TAG" --notes-file "$env:RUNNER_TEMP/release-notes.md"
+          gh release create $env:RELEASE_TAG "$package/DEVICE.TWEAKER.exe" "$package/DEVICE.TWEAKER.SelfContained.exe" "$package/SHA256SUMS.txt" "$package/DEVICE.TWEAKER.Source.$env:RELEASE_TAG.zip" "$package/SOURCE-SHA256SUMS.txt" --draft --verify-tag --title "DEVICE TWEAKER $env:RELEASE_TAG" --notes-file "$env:RUNNER_TEMP/release-notes.md"
           if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed; an existing release is never overwritten' }

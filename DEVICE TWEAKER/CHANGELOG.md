@@ -1,3 +1,3 @@
-# Changelog
+# История изменений / Changelog
 
-The canonical changelog is maintained at [`../CHANGELOG.md`](../CHANGELOG.md). An English version is available at [`../CHANGELOG.en.md`](../CHANGELOG.en.md).
+История изменений находится в [корне репозитория](../CHANGELOG.md). [English](../CHANGELOG.en.md).

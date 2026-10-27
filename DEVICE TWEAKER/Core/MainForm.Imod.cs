@@ -18,7 +18,7 @@ public sealed partial class MainForm
     private const string ImodScriptMarkerEnd = "$imodSettingsEnd = $true";
     private const string ImodScriptVersionMarker = "$imodScriptVersion = 30";
     private const string ImodScriptConfigToken = "{{IMOD_CONFIG_BLOCK}}";
-    private const bool ImodStartupScriptLoggingEnabled = false;
+    private const bool ImodStartupScriptLoggingEnabled = true;
     private const bool ImodStartupScriptVerboseLoggingEnabled = false;
     private static readonly string ImodScriptTemplate = """
     param(
@@ -2685,24 +2685,7 @@ public sealed partial class MainForm
             config.HasScript = true;
             string existing = File.ReadAllText(scriptPath, Encoding.UTF8);
             if (!existing.Contains(ImodScriptVersionMarker, StringComparison.Ordinal))
-            {
-                try
-                {
-                    string managedPath = GetImodStartupPath();
-                    WriteImodScript(config, managedPath);
-                    if (!string.Equals(scriptPath, managedPath, StringComparison.OrdinalIgnoreCase))
-                    {
-                        File.Delete(scriptPath);
-                    }
-
-                    WriteLog($"IMOD.STARTUP.UPGRADE: source=\"{scriptPath}\" target=\"{managedPath}\" version=29 status=success");
-                    scriptPath = managedPath;
-                }
-                catch (Exception ex)
-                {
-                    WriteLog($"IMOD.STARTUP.UPGRADE.WARN: path=\"{scriptPath}\" version=29 error=\"{FlattenLogText(ex.ToString())}\"");
-                }
-            }
+                WriteLog($"IMOD.STARTUP.UPGRADE: pending path=\"{scriptPath}\"; update on next explicit driver / settings action");
 
             return config;
         }
@@ -2814,6 +2797,11 @@ public sealed partial class MainForm
 
     private bool EnsureImodStartupRegistration(out string? error)
     {
+        if (QaRun.TryBlock("IMOD STARTUP REGISTRATION"))
+        {
+            error = "QA read-only session";
+            return false;
+        }
         try
         {
             string expected = GetImodStartupRunCommand();
@@ -2905,9 +2893,8 @@ public sealed partial class MainForm
         {
             return false;
         }
-
-        error = null;
-        return true;
+        return TryVerifyEmbeddedImodResourceFile("DeviceTweakerCS.IMOD.Loader.kdu.exe", ".kdu.exe", kduPath, out error)
+            && TryVerifyEmbeddedImodResourceFile("DeviceTweakerCS.IMOD.Loader.drv64.dll", ".drv64.dll", dbPath, out error);
     }
 
     private static bool IsImodDriverSystemPath(string? path)
@@ -2931,6 +2918,12 @@ public sealed partial class MainForm
     private void ResolveImodPaths(out string? scriptPath)
     {
         string managedPath = GetImodStartupPath();
+        if (QaRun.IsReadOnly)
+        {
+            string legacy = GetLegacyImodStartupPath();
+            scriptPath = File.Exists(managedPath) ? managedPath : File.Exists(legacy) ? legacy : null;
+            return;
+        }
         if (File.Exists(managedPath))
         {
             if (!EnsureImodStartupRegistration(out string? registrationError))
@@ -2977,6 +2970,7 @@ public sealed partial class MainForm
 
     private void RemoveImodPersistenceFiles(OperationReport? report = null)
     {
+        DemandRealWrite("RemoveImodPersistenceFiles");
         DeleteImodStartupRegistration(report);
         DeleteFileIfExists(GetImodStartupPath(), "IMOD.CONFIG", report);
         DeleteFileIfExists(GetLegacyImodStartupPath(), "IMOD.CONFIG.LEGACY", report);
@@ -2987,6 +2981,7 @@ public sealed partial class MainForm
 
     private void DeleteImodStartupRegistration(OperationReport? report = null)
     {
+        DemandRealWrite("DeleteImodStartupRegistration");
         try
         {
             using RegistryKey? key = Registry.CurrentUser.OpenSubKey(ImodStartupRunKeyPath, writable: true);
@@ -3007,6 +3002,7 @@ public sealed partial class MainForm
 
     private void DeleteFileIfExists(string? path, string label, OperationReport? report = null)
     {
+        DemandRealWrite("DeleteFileIfExists");
         if (string.IsNullOrWhiteSpace(path))
         {
             return;
@@ -3764,8 +3760,12 @@ public sealed partial class MainForm
 
     private void WriteImodScript(ImodConfig config, string path)
     {
+        DemandRealWrite("WriteImodScript");
+        using DriverLoadGate gate = DriverLoadGate.Enter();
+        DriverLoadGate.AssertLoaderIdle();
+        PrepareImodStartupPayload();
         string configBlock = BuildImodConfigBlock(config);
-        string scriptBody = ImodScriptTemplate.Replace(ImodScriptConfigToken, configBlock, StringComparison.Ordinal);
+        string scriptBody = CreateImodScriptTemplate().Replace(ImodScriptConfigToken, configBlock, StringComparison.Ordinal);
 
         if (File.Exists(path))
         {
@@ -3792,12 +3792,8 @@ public sealed partial class MainForm
 
     private string BuildImodConfigBlock(ImodConfig config)
     {
-        string kduPath = string.Empty;
-        string kduDbPath = string.Empty;
-        if (!EnsureImodStartupKduPayload(out kduPath, out kduDbPath, out string? kduError))
-        {
-            WriteLog($"IMOD.CONFIG.KDU.WARN: payload unavailable: {kduError}");
-        }
+        string kduPath = Path.Combine(GetImodStartupKduDirectory(), ImodKduFileName);
+        string kduDbPath = Path.Combine(GetImodStartupKduDirectory(), ImodKduDatabaseFileName);
 
         StringBuilder sb = new();
         sb.AppendLine(ImodScriptMarkerStart);
@@ -4290,7 +4286,7 @@ public sealed partial class MainForm
             case ImodApplyOutcome.SkippedNoUsb:
             case ImodApplyOutcome.SkippedNoController:
             case ImodApplyOutcome.SkippedNoConfig:
-                report.AddWarning(component, userMessage ?? "No eligible target was found.", technicalDetails);
+                report.AddSkipped(component, userMessage ?? "No eligible target was found.", technicalDetails);
                 break;
             default:
                 report.AddSuccess(component, userMessage ?? "Applied");

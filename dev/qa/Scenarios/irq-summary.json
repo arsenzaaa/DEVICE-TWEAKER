@@ -1,0 +1,403 @@
+{
+  "schemaVersion": 1,
+  "id": "irq-summary",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "GPU",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    {
+      "id": "EN-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "EN-reveal",
+      "action": "reveal",
+      "target": "role:mode",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "EN-irq-action-summary",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-action-top",
+      "value": "true"
+    },
+    {
+      "id": "EN-irq-summary-fits",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-top-fits",
+      "value": "true"
+    },
+    {
+      "id": "EN-caption",
+      "action": "assert",
+      "target": "id:IRQ_MODE_CHECK",
+      "value": "READ IRQ MODE"
+    },
+    {
+      "id": "EN-idle",
+      "action": "capture"
+    },
+    {
+      "id": "EN-hover",
+      "action": "hover",
+      "target": "id:IRQ_MODE_CHECK"
+    },
+    {
+      "id": "EN-hovered",
+      "action": "capture"
+    },
+    {
+      "id": "EN-leave",
+      "action": "leave",
+      "target": "id:IRQ_MODE_CHECK"
+    },
+    {
+      "id": "EN-focus",
+      "action": "focus",
+      "target": "id:IRQ_MODE_CHECK"
+    },
+    {
+      "id": "EN-focused",
+      "action": "capture"
+    },
+    {
+      "id": "EN-success-model",
+      "action": "irq-check-model",
+      "value": "success",
+      "durationMs": 500
+    },
+    {
+      "id": "EN-success",
+      "action": "transition",
+      "durationMs": 1200,
+      "intervalMs": 200,
+      "trigger": {
+        "action": "click",
+        "target": "id:IRQ_MODE_CHECK"
+      }
+    },
+    {
+      "id": "EN-success-ready",
+      "action": "wait",
+      "target": "id:IRQ_MODE_CHECK",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "EN-success-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "EN-success-result",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "value": "MSI-X"
+    },
+    {
+      "id": "EN-failure-model",
+      "action": "irq-check-model",
+      "value": "failure",
+      "durationMs": 500
+    },
+    {
+      "id": "EN-failure",
+      "action": "transition",
+      "durationMs": 1200,
+      "intervalMs": 200,
+      "trigger": {
+        "action": "click",
+        "target": "id:IRQ_MODE_CHECK"
+      }
+    },
+    {
+      "id": "EN-failure-ready",
+      "action": "wait",
+      "target": "id:IRQ_MODE_CHECK",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "EN-failure-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "EN-failure-result",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "value": "read failed"
+    },
+    {
+      "id": "EN-retry-model",
+      "action": "irq-check-model",
+      "value": "success",
+      "durationMs": 500
+    },
+    {
+      "id": "EN-retry",
+      "action": "transition",
+      "durationMs": 1200,
+      "intervalMs": 200,
+      "trigger": {
+        "action": "key",
+        "target": "id:IRQ_MODE_CHECK",
+        "value": "Space"
+      }
+    },
+    {
+      "id": "EN-retry-ready",
+      "action": "wait",
+      "target": "id:IRQ_MODE_CHECK",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "EN-retry-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "EN-retry-result",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "value": "MSI-X"
+    },
+    {
+      "id": "EN-narrow",
+      "action": "resize",
+      "width": 1000,
+      "height": 900
+    },
+    {
+      "id": "EN-narrow-fit",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-top-fits",
+      "value": "true"
+    },
+    {
+      "id": "EN-narrow-view",
+      "action": "capture"
+    },
+    {
+      "id": "EN-restore",
+      "action": "resize",
+      "width": 1200,
+      "height": 900
+    },
+    {
+      "id": "RU-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "RU-reveal",
+      "action": "reveal",
+      "target": "role:mode",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "RU-irq-action-summary",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-action-top",
+      "value": "true"
+    },
+    {
+      "id": "RU-irq-summary-fits",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-top-fits",
+      "value": "true"
+    },
+    {
+      "id": "RU-caption",
+      "action": "assert",
+      "target": "id:IRQ_MODE_CHECK",
+      "value": "СЧИТАТЬ IRQ"
+    },
+    {
+      "id": "RU-idle",
+      "action": "capture"
+    },
+    {
+      "id": "RU-hover",
+      "action": "hover",
+      "target": "id:IRQ_MODE_CHECK"
+    },
+    {
+      "id": "RU-hovered",
+      "action": "capture"
+    },
+    {
+      "id": "RU-leave",
+      "action": "leave",
+      "target": "id:IRQ_MODE_CHECK"
+    },
+    {
+      "id": "RU-focus",
+      "action": "focus",
+      "target": "id:IRQ_MODE_CHECK"
+    },
+    {
+      "id": "RU-focused",
+      "action": "capture"
+    },
+    {
+      "id": "RU-success-model",
+      "action": "irq-check-model",
+      "value": "success",
+      "durationMs": 500
+    },
+    {
+      "id": "RU-success",
+      "action": "transition",
+      "durationMs": 1200,
+      "intervalMs": 200,
+      "trigger": {
+        "action": "click",
+        "target": "id:IRQ_MODE_CHECK"
+      }
+    },
+    {
+      "id": "RU-success-ready",
+      "action": "wait",
+      "target": "id:IRQ_MODE_CHECK",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "RU-success-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "RU-success-result",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "value": "MSI-X"
+    },
+    {
+      "id": "RU-failure-model",
+      "action": "irq-check-model",
+      "value": "failure",
+      "durationMs": 500
+    },
+    {
+      "id": "RU-failure",
+      "action": "transition",
+      "durationMs": 1200,
+      "intervalMs": 200,
+      "trigger": {
+        "action": "click",
+        "target": "id:IRQ_MODE_CHECK"
+      }
+    },
+    {
+      "id": "RU-failure-ready",
+      "action": "wait",
+      "target": "id:IRQ_MODE_CHECK",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "RU-failure-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "RU-failure-result",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "value": "ошибка чтения"
+    },
+    {
+      "id": "RU-retry-model",
+      "action": "irq-check-model",
+      "value": "success",
+      "durationMs": 500
+    },
+    {
+      "id": "RU-retry",
+      "action": "transition",
+      "durationMs": 1200,
+      "intervalMs": 200,
+      "trigger": {
+        "action": "key",
+        "target": "id:IRQ_MODE_CHECK",
+        "value": "Space"
+      }
+    },
+    {
+      "id": "RU-retry-ready",
+      "action": "wait",
+      "target": "id:IRQ_MODE_CHECK",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "RU-retry-once",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-all-pci-queried-once",
+      "value": "true"
+    },
+    {
+      "id": "RU-retry-result",
+      "action": "assert",
+      "target": "role:mode",
+      "device": "DEV_2684",
+      "value": "MSI-X"
+    },
+    {
+      "id": "RU-narrow",
+      "action": "resize",
+      "width": 1000,
+      "height": 900
+    },
+    {
+      "id": "RU-narrow-fit",
+      "action": "assert",
+      "target": "@main",
+      "property": "irq-top-fits",
+      "value": "true"
+    },
+    {
+      "id": "RU-narrow-view",
+      "action": "capture"
+    },
+    {
+      "id": "RU-restore",
+      "action": "resize",
+      "width": 1200,
+      "height": 900
+    }
+  ]
+}
