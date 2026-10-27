@@ -65,6 +65,7 @@ public sealed class QaArtifactTests
 
     [Fact] public async Task ReportReaderWaitsForReportNameHandoff()
     {
+        Directory.CreateDirectory(QaRun.OutputDirectory);
         string path = Path.Combine(QaRun.OutputDirectory, $"reader-{Guid.NewGuid():N}.json");
         try
         {
@@ -80,6 +81,7 @@ public sealed class QaArtifactTests
 
     [Fact] public async Task ReportReaderFailsWhenReportRemainsMissing()
     {
+        Directory.CreateDirectory(QaRun.OutputDirectory);
         string path = Path.Combine(QaRun.OutputDirectory, $"reader-{Guid.NewGuid():N}.json");
         await Assert.ThrowsAsync<FileNotFoundException>(() => ReadReportWithHandoffRetryAsync(path, TimeSpan.FromMilliseconds(100)));
     }
