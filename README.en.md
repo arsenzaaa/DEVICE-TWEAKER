@@ -7,7 +7,7 @@
 
 <p align="center"><strong>DEVICE TWEAKER is a utility for configuring device interrupts on Windows 10/11 x64.</strong></p>
 
-MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + IMOD / ITR controls in one interface with intelligent auto-optimization.
+MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + IMOD / ITR controls in one interface with intelligent auto-optimization.
 
 <p align="center">
   <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4#gh-dark-mode-only"><img src="./assets/branding/download-en-dark.svg" alt="Download 0.0.4" width="170"></a>
@@ -21,7 +21,7 @@ MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + IMOD
 <p align="center"><a href="./assets/screenshots/showcase_intel_14900k_full_en.png"><img src="./assets/screenshots/showcase_intel_14900k_full_en.png" alt="USB IMOD / Intel Core i9-14900K" width="860"></a></p>
 
 <table width="100%">
-  <tr><th><samp>USB / AMD</samp></th><th><samp>GPU</samp></th><th><samp>NIC ITR</samp></th></tr>
+  <tr><th><samp>USB / AMD</samp></th><th><samp>GPU</samp></th><th><samp>NIC ITR</samp></th></tr>
 <tr>
   <td width="33%" valign="top"><a href="./assets/screenshots/showcase_amd_imod_full_en.png" title="USB IMOD / AMD Ryzen 9 9950X3D"><img src="./assets/screenshots/showcase_amd_imod_full_en.png" alt="USB IMOD / AMD Ryzen 9 9950X3D" width="100%"></a></td>
   <td width="33%" valign="top"><a href="./assets/screenshots/showcase_gpu_full_en.png" title="GPU / NVIDIA GeForce RTX 4090"><img src="./assets/screenshots/showcase_gpu_full_en.png" alt="GPU / NVIDIA GeForce RTX 4090" width="100%"></a></td>
@@ -33,44 +33,54 @@ MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + IMOD
 
 ## <samp>[ FEATURES ]</samp>
 
-### <samp>Devices / CPU</samp>
+### <samp>Devices / CPU</samp>
 
-- Automatically detects GPUs / USB controllers / network adapters / audio controllers / storage controllers.
-- Automatically identifies which USB controller hosts the mouse / keyboard / gamepad / microphone / audio. If multiple devices share a controller, all detected roles are displayed.
-- Automatically detects and displays P-Core / E-Core, SMT / HT, AMD CCD / CCX, and available CPPC rankings. Shows which physical core each logical thread belongs to.
+- Automatically detects GPUs / USB controllers / network adapters / audio controllers / storage controllers.
+- Automatically identifies which USB controller hosts the mouse / keyboard / gamepad / microphone / audio / camera. If multiple devices share a controller, all detected roles are displayed.
+- Automatically detects and displays P-Core / E-Core, SMT / HT, AMD CCD / CCX, and available CPPC rankings. Shows which physical core each logical thread belongs to.
 
 ### <samp>Intelligent auto-optimization</samp>
 
-- Supports intelligent auto-optimization with a planning engine that accounts for P-Core / E-Core, SMT / HT, CPPC rankings, CCD / CCX, device count, and device roles. A discrete GPU gets two distinct physical cores; USB / network / audio devices have separate allocation rules.
+- Supports intelligent auto-optimization with a planning engine that accounts for P-Core / E-Core, SMT / HT, CPPC rankings, CCD / CCX, device count, and device roles. A discrete GPU gets two distinct physical cores; USB / network / audio devices have separate allocation rules.
 - Supports reserving selected CPUs through ReservedCpuSets.
 
-### <samp>MSI / IRQ / Interrupt Affinity</samp>
+### <samp>MSI / IRQ / Interrupt Affinity</samp>
 
-- Supports MSI Mode / MSI Limit / IRQ Priority / IRQ Policy / Interrupt Affinity settings.
-- Displays the MSI Mode registry setting separately from the current interrupt mode in IRQ Mode. On opening, it uses an already loaded DTIMOD.sys or Windows resources without loading the driver. If Windows resources cannot distinguish MSI from MSI-X, it shows MSI/MSI-X. The READ IRQ MODE button at the top reads the modes of all displayed PCI devices through DTIMOD.sys, loading the driver if needed. HW lists the modes supported by the device.
+- Supports MSI Mode / MSI Limit / IRQ Priority / IRQ Policy / Interrupt Affinity settings.
+- Displays the MSI Mode registry setting separately from the current interrupt mode in IRQ Mode. HW lists the modes supported by the device.
 
-### <samp>USB IMOD / NIC ITR / RSS</samp>
+  On opening, it uses an already loaded DTIMOD.sys or Windows resources without loading the driver. If Windows resources cannot distinguish MSI from MSI-X, it shows MSI/MSI-X.
 
-- Reads and displays IMOD on supported xHCI USB controllers. Set one value for the whole controller or different values for individual interrupters. Uses the custom DTIMOD.sys driver for reads and writes, then reads the values again after writing. Supports saving custom values for the next Windows sign-in.
-- Reads and displays NIC ITR on supported network adapters. Queue and RX/TX information depends on the controller family. Change current values and save a profile for automatic reapplication at the next Windows sign-in.
+  **READ IRQ MODE** at the top reads the modes of all displayed PCI devices through DTIMOD.sys, loading the driver if needed.
+
+### <samp>USB IMOD / NIC ITR / RSS</samp>
+
+- Reads and displays IMOD on supported xHCI USB controllers. **Devices** sets a profile by USB role, **XHCI** uses one value for the controller, and **Interrupters** allows values by index.
+
+  Uses the custom DTIMOD.sys driver for reads and writes, then reads the values again after writing. Supports saving custom values for the next Windows sign-in.
+- Reads and displays NIC ITR on supported Intel / Realtek network adapters, including compatible Killer models. Queue and RX/TX information depends on the controller family. Change current values and save a profile for automatic reapplication at the next Windows sign-in.
 - Supports RSS settings on wired NDIS network adapters: base CPU, queue count, and RSS/IRQ mode.
 
-### <samp>Polling Rate / power saving</samp>
+### <samp>Polling Rate / power saving</samp>
 
-- Displays mouse / keyboard Polling Rate information and supports measuring Raw Input event frequency.
-- Supports RawMouseThrottleDuration settings on compatible Windows 11 builds, with the current value displayed in the interface.
-- Supports power-saving settings for USB controllers / root USB hubs / wired network adapters.
+- Displays mouse / keyboard Polling Rate information and supports measuring Raw Input event frequency. Keyboard event frequency depends on key activity.
+- Supports RawMouseThrottleDuration settings on compatible Windows 11 builds, with the current value displayed in the interface.
+- Supports power-saving settings for USB controllers / root USB hubs / wired network adapters.
 
-### <samp>Backups / logs</samp>
+### <samp>Interface / navigation</samp>
+
+- Supports device search, category navigation and RU/EN switching without restarting.
+
+### <samp>Backups / logs</samp>
 
 - Supports creating backups, restoring a selected backup, deleting old backups, and settings reset.
-- Writes detailed logs of device detection and settings changes (what was applied / what was skipped / why).
+- Writes detailed logs of device detection and settings changes (what was applied / what was skipped / why).
 
 ## <samp>[ DOWNLOAD ]</samp>
 
 The [release](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4) has two builds:
 
-- **DEVICE.TWEAKER.exe** requires the [.NET 8 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/8.0).
+- **DEVICE.TWEAKER.exe** requires the [.NET 8 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/8.0).
 - **DEVICE.TWEAKER.SelfContained.exe** includes .NET, so no separate installation is needed.
 
 Both builds include the DTIMOD.sys driver and KDU loader. The SHA-256 hash of each EXE is listed in SHA256SUMS.txt.
@@ -81,23 +91,24 @@ Download the build you need and run the program as administrator.
 
 For intelligent auto-optimization, click **AUTO-OPTIMIZATION**. If eligible xHCI USB controllers are detected, the program offers to include IMOD tuning before applying settings. NIC ITR is configured manually.
 
-For manual configuration, choose the settings and click **APPLY**. This button applies interrupt, ReservedCpuSets, RSS, Mouse Throttle, power-saving, and USB IMOD settings.
+For manual configuration, choose the settings and click **APPLY**. This button applies interrupt, ReservedCpuSets, RSS, Mouse Throttle, power-saving, and USB IMOD settings.
 
-IMOD / NIC ITR also have separate buttons:
+IMOD / NIC ITR also have separate buttons:
 
 - IMOD: **SET** applies settings and saves values that differ from the defaults for the next Windows sign-in.
 - NIC ITR: **SET** changes current values; **SAVE** stores a profile for the next Windows sign-in.
-- **CHECK** reads current IMOD / NIC ITR values.
+- **CHECK** reads current IMOD / NIC ITR values.
+- IMOD: **DELETE** removes the shared IMOD / NIC ITR startup entry and returns the IMOD fields to their default value. Restart the PC to finish resetting.
 
 **REFRESH** detects devices again. To roll back settings, click **RESTORE** and select the backup you need.
 
-After **APPLY** / **AUTO-OPTIMIZATION**, restart the PC to finish applying the settings.
+After **APPLY** / **AUTO-OPTIMIZATION**, restart the PC to finish applying the settings.
 
 The program creates a backup before manual apply and reset. Intelligent auto-optimization preserves the original settings.
 
 Detailed settings description: [SETTINGS.en.md](./DEVICE%20TWEAKER/docs/SETTINGS.en.md).
 
-## <samp>[ BUGS / TESTING ]</samp>
+## <samp>[ BUGS / TESTING ]</samp>
 
 Report bugs or other problems in [issues](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=bug_report.yml). Include a log, the program version, Windows build, and PC configuration. Also describe what you did and what happened.
 
