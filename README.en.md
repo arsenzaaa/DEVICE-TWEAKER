@@ -1,18 +1,11 @@
-<p align="right"><a href="./README.md">Русский</a></p>
-
-<p align="center">
-  <img src="./assets/branding/readme-header.svg" alt="DEVICE TWEAKER" width="1200">
-</p>
+<h1 align="center">DEVICE TWEAKER</h1>
 
 <p align="center">
   <strong>Device interrupt configuration for Windows 10/11 x64.</strong><br>
   MSI Utility V3 + IAPT + ReservedCpuSets + IMOD / ITR<br>
   in one interface with intelligent auto-optimization.
+  <br><a href="./README.md">Русский</a>
 </p>
-
-![DEVICE TWEAKER / USB IMOD / Intel Core i9-14900K](./assets/screenshots/showcase_intel_14900k_full_en.png)
-
-[All screenshots](./SCREENSHOTS.en.md)
 
 ## Download
 
@@ -22,6 +15,12 @@
 | [**Standard**](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/download/v0.0.4/DEVICE.TWEAKER.exe) | Requires the [.NET 8 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/8.0). |
 
 Both builds include DTIMOD.sys. Files and SHA-256 checksums are available in [release 0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4).
+
+## Interface
+
+![DEVICE TWEAKER / USB IMOD / Intel Core i9-14900K](./assets/screenshots/showcase_intel_14900k_full_en.png)
+
+[All screenshots](./SCREENSHOTS.en.md)
 
 ## Features
 
