@@ -1,21 +1,33 @@
-# DEVICE TWEAKER screenshots
+# Screenshots
 
-[README](./README.en.md) · [Русский](./SCREENSHOTS.md)
+[DEVICE TWEAKER](./README.en.md) · [Русский](./SCREENSHOTS.md)
 
-## USB IMOD / Intel Core i9-14900K
+<details open>
+<summary><strong>USB IMOD / Intel Core i9-14900K</strong></summary>
 
-![USB IMOD settings on Intel Core i9-14900K](./assets/screenshots/showcase_intel_14900k_full_en.png)
+![USB IMOD / Intel Core i9-14900K](./assets/screenshots/showcase_intel_14900k_full_en.png)
 
-## USB IMOD / AMD Ryzen 9 9950X3D
+</details>
 
-![USB IMOD settings on AMD Ryzen 9 9950X3D](./assets/screenshots/showcase_amd_imod_full_en.png)
+<details>
+<summary><strong>USB IMOD / AMD Ryzen 9 9950X3D</strong></summary>
 
-## GPU / Intel Core i9-14900K / NVIDIA GeForce RTX 4090
+![USB IMOD / AMD Ryzen 9 9950X3D](./assets/screenshots/showcase_amd_imod_full_en.png)
 
-![GPU settings on Intel Core i9-14900K](./assets/screenshots/showcase_gpu_full_en.png)
+</details>
 
-## NIC ITR / RSS / AMD Ryzen 9 9950X3D / Intel I226-V
+<details>
+<summary><strong>GPU / Intel Core i9-14900K / NVIDIA GeForce RTX 4090</strong></summary>
 
-![NIC ITR and RSS settings on AMD Ryzen 9 9950X3D](./assets/screenshots/showcase_nic_full_en.png)
+![GPU / Intel Core i9-14900K / NVIDIA GeForce RTX 4090](./assets/screenshots/showcase_gpu_full_en.png)
 
-The screenshots use the developer build’s test panel with predefined devices and values.
+</details>
+
+<details>
+<summary><strong>NIC ITR / RSS / AMD Ryzen 9 9950X3D / Intel I226-V</strong></summary>
+
+![NIC ITR / RSS / AMD Ryzen 9 9950X3D / Intel I226-V](./assets/screenshots/showcase_nic_full_en.png)
+
+</details>
+
+The screenshots use the developer build's test panel with predefined devices and values.
