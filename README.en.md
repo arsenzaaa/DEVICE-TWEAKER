@@ -20,61 +20,77 @@ MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + IMOD
 
 <p align="center"><a href="./assets/screenshots/showcase_intel_14900k_full_en.png"><img src="./assets/screenshots/showcase_intel_14900k_full_en.png" alt="USB IMOD / Intel Core i9-14900K" width="860"></a></p>
 
-<table width="100%">
-  <tr><th><samp>USB / AMD</samp></th><th><samp>GPU</samp></th><th><samp>NIC ITR</samp></th></tr>
-<tr>
-  <td width="33%" valign="top"><a href="./assets/screenshots/showcase_amd_imod_full_en.png" title="USB IMOD / AMD Ryzen 9 9950X3D"><img src="./assets/screenshots/showcase_amd_imod_full_en.png" alt="USB IMOD / AMD Ryzen 9 9950X3D" width="100%"></a></td>
-  <td width="33%" valign="top"><a href="./assets/screenshots/showcase_gpu_full_en.png" title="GPU / NVIDIA GeForce RTX 4090"><img src="./assets/screenshots/showcase_gpu_full_en.png" alt="GPU / NVIDIA GeForce RTX 4090" width="100%"></a></td>
-  <td width="33%" valign="top"><a href="./assets/screenshots/showcase_nic_full_en.png" title="NIC ITR / RSS / Intel I226-V"><img src="./assets/screenshots/showcase_nic_full_en.png" alt="NIC ITR / RSS / Intel I226-V" width="100%"></a></td>
-</tr>
-</table>
-
-<sub>Screenshots from the test panel, with test devices and values.</sub>
+<sub>Screenshots show test devices and values.</sub>
 
 ## <samp>[ FEATURES ]</samp>
 
-### <samp>Devices / CPU</samp>
+### <samp>Device detection</samp>
 
-- Automatically detects GPUs / USB controllers / network adapters / audio controllers / storage controllers.
-- Automatically identifies which USB controller hosts the mouse / keyboard / gamepad / microphone / audio / camera. If multiple devices share a controller, all detected roles are displayed.
-- Automatically detects and displays P-Core / E-Core, SMT / HT, AMD CCD / CCX, and available CPPC rankings. Shows which physical core each logical thread belongs to.
+Automatically detects GPUs / USB controllers / network adapters / audio controllers / storage controllers.
+
+Automatically identifies which USB controller hosts the mouse / keyboard / gamepad / microphone / audio / camera. If multiple devices share a controller, all detected roles are displayed.
+
+### <samp>CPU topology</samp>
+
+Automatically detects and displays P-Core / E-Core, SMT / HT, AMD CCD / CCX, and available CPPC rankings. Shows which physical core each logical thread belongs to.
 
 ### <samp>Intelligent auto-optimization</samp>
 
-- Supports intelligent auto-optimization with a planning engine that accounts for P-Core / E-Core, SMT / HT, CPPC rankings, CCD / CCX, device count, and device roles. A discrete GPU gets two distinct physical cores; USB / network / audio devices have separate allocation rules.
-- Supports reserving selected CPUs through ReservedCpuSets.
+Intelligent auto-optimization accounts for P-Core / E-Core, SMT / HT, CPPC rankings, CCD / CCX, device count, and device roles. A discrete GPU gets two distinct physical cores; USB / network / audio devices have separate allocation rules.
 
-### <samp>MSI / IRQ / Interrupt Affinity</samp>
+### <samp>Interrupt settings</samp>
 
-- Supports MSI Mode / MSI Limit / IRQ Priority / IRQ Policy / Interrupt Affinity settings.
-- Displays the MSI Mode registry setting separately from the current interrupt mode in IRQ Mode. HW lists the modes supported by the device.
+Supports MSI Mode / MSI Limit / IRQ Priority / IRQ Policy / Interrupt Affinity settings.
 
-  On opening, it uses an already loaded DTIMOD.sys or Windows resources without loading the driver. If Windows resources cannot distinguish MSI from MSI-X, it shows MSI/MSI-X.
+Displays the MSI Mode registry setting separately from the current interrupt mode in IRQ Mode. HW lists the modes supported by the device.
 
-  **READ IRQ MODE** at the top reads the modes of all displayed PCI devices through DTIMOD.sys, loading the driver if needed.
+On opening, it uses an already loaded DTIMOD.sys or Windows resources without loading the driver. If Windows resources cannot distinguish MSI from MSI-X, it shows MSI/MSI-X.
 
-### <samp>USB IMOD / NIC ITR / RSS</samp>
+**READ IRQ MODE** at the top reads the modes of all displayed PCI devices through DTIMOD.sys, loading the driver if needed.
 
-- Reads and displays IMOD on supported xHCI USB controllers. **Devices** sets a profile by USB role, **XHCI** uses one value for the controller, and **Interrupters** allows values by index.
+<p align="center"><a href="./assets/screenshots/showcase_gpu_full_en.png"><img src="./assets/screenshots/showcase_gpu_full_en.png" alt="GPU / NVIDIA GeForce RTX 4090" width="860"></a></p>
 
-  Uses the custom DTIMOD.sys driver for reads and writes, then reads the values again after writing. Supports saving custom values for the next Windows sign-in.
-- Reads and displays NIC ITR on supported Intel / Realtek network adapters, including compatible Killer models. Queue and RX/TX information depends on the controller family. Change current values and save a profile for automatic reapplication at the next Windows sign-in.
-- Supports RSS settings on wired NDIS network adapters: base CPU, queue count, and RSS/IRQ mode.
+### <samp>CPU reservation</samp>
 
-### <samp>Polling Rate / power saving</samp>
+Supports reserving selected CPUs through ReservedCpuSets.
 
-- Displays mouse / keyboard Polling Rate information and supports measuring Raw Input event frequency. Keyboard event frequency depends on key activity.
-- Supports RawMouseThrottleDuration settings on compatible Windows 11 builds, with the current value displayed in the interface.
-- Supports power-saving settings for USB controllers / root USB hubs / wired network adapters.
+### <samp>USB IMOD</samp>
 
-### <samp>Interface / navigation</samp>
+Reads and displays IMOD on supported xHCI USB controllers. **Devices** sets a profile by USB role, **XHCI** uses one value for the controller, and **Interrupters** allows values by index.
 
-- Supports device search, category navigation and RU/EN switching without restarting.
+Uses the custom DTIMOD.sys driver for reads and writes, then reads the values again after writing. Supports saving custom values for the next Windows sign-in.
 
-### <samp>Backups / logs</samp>
+<p align="center"><a href="./assets/screenshots/showcase_amd_imod_full_en.png"><img src="./assets/screenshots/showcase_amd_imod_full_en.png" alt="USB IMOD / AMD Ryzen 9 9950X3D" width="860"></a></p>
 
-- Supports creating backups, restoring a selected backup, deleting old backups, and settings reset.
-- Writes detailed logs of device detection and settings changes (what was applied / what was skipped / why).
+### <samp>Network settings</samp>
+
+Reads and displays NIC ITR on supported Intel / Realtek network adapters, including compatible Killer models. Queue and RX/TX information depends on the controller family. Change current values and save a profile for automatic reapplication at the next Windows sign-in.
+
+Supports RSS settings on wired NDIS network adapters: base CPU, queue count, and RSS/IRQ mode.
+
+<p align="center"><a href="./assets/screenshots/showcase_nic_full_en.png"><img src="./assets/screenshots/showcase_nic_full_en.png" alt="NIC ITR / RSS / Intel I226-V" width="860"></a></p>
+
+### <samp>Polling Rate</samp>
+
+Displays mouse / keyboard Polling Rate information and supports measuring Raw Input event frequency. Keyboard event frequency depends on key activity.
+
+### <samp>Mouse Throttle</samp>
+
+Supports RawMouseThrottleDuration settings on compatible Windows 11 builds, with the current value displayed in the interface.
+
+### <samp>Power saving</samp>
+
+Supports power-saving settings for USB controllers / root USB hubs / wired network adapters.
+
+### <samp>Interface / navigation</samp>
+
+Supports device search, category navigation and RU/EN switching without restarting.
+
+### <samp>Backups / logs</samp>
+
+Supports creating backups, restoring a selected backup, deleting old backups, and settings reset.
+
+Writes detailed logs of device detection and settings changes (what was applied / what was skipped / why).
 
 ## <samp>[ DOWNLOAD ]</samp>
 
