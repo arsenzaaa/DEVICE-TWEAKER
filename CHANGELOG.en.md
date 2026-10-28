@@ -1,46 +1,85 @@
-# Changelog
+# <samp>[ CHANGELOG ]</samp>
 
-[Русский](./CHANGELOG.md) · [DEVICE TWEAKER](./README.en.md)
+[Русский](./CHANGELOG.md) / [DEVICE TWEAKER](./README.en.md)
 
-## [0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4)
+## <samp>[ 0.0.4 ]</samp>
 
-A major update since 0.0.3.
+[Download 0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4). Changes since 0.0.3.
 
-- Added IRQ Mode, separate from the MSI Mode setting and device capabilities. Opening the app reads Windows data without loading the driver. The shared READ IRQ MODE button checks PCI MSI / MSI-X Enable bits through DTIMOD.sys.
-- Fixed USB selective suspend restore: settings are written through the Windows Power API to the saved power plan, with separate AC and DC values. The active plan stays selected; written values are verified.
-- Fixed mouse rate display: a confirmed Raw Input rate replaces the maximum USB endpoint rate. Keyboard readings account for key activity. Duplicate polling labels have been removed.
-- Updated IMOD / NIC ITR handling for saved profiles. Concurrent requests stage the driver file sequentially; logs distinguish file preparation from connection to a loaded driver.
-- Refined RSS diagnostics: skipped settings, unsupported features, read failures and apply failures are reported separately. Successful reads require returned data. Increased the active RSS query timeout.
-- Reworked result, restore and system check dialogs. Backup paths are separate from messages; deleting backups keeps the restore menu open.
-- Improved input fields, dropdowns and keyboard navigation. Fixed clipped text, white flashes during refresh and an error when closing the window.
-- Updated RU/EN wording, backup labels and the changed-settings indicator. Fixed language switching for dynamic text and the Power Saving state.
-- Ordered USB roles: mouse, keyboard, gamepad, microphone, audio, camera. Updated category colors and device capability display.
-- Added a Windows settings and anti-cheat service summary before USB IMOD configuration.
-- Added application build identity, IRQ Mode data sources, RSS query duration and query results to logs.
-- Separated restore, CPU planning, MSI / affinity writes, IMOD, NIC ITR and polling from MainForm. CPU allocation rules are preserved.
-- Moved checks and the test panel to dev/qa. Production EXEs exclude the panel. The separate developer build does not apply Windows settings; the workbench records screenshots, transitions and reproducible scenario results.
-- Updated the README, screenshot gallery and build documentation. Git preserves exact file bytes for SHA-256 manifest checks.
+### <samp>MSI / IRQ Mode</samp>
 
-## [0.0.3](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.3) · October 1, 2026
+- Added IRQ Mode. The MSI Mode registry setting, current interrupt mode and supported HW modes are displayed separately.
+- On opening, the interrupt mode is read from allocated Windows resources or an already loaded DTIMOD.sys. Opening and normal list refresh do not load the driver. The interface indicates when the data cannot distinguish MSI from MSI-X.
+- Added one READ IRQ MODE button for all displayed PCI devices. It reads MSI / MSI-X Enable through DTIMOD.sys, loading the driver if needed.
+- Reading runs in the background. Results from an earlier request are not inserted into a refreshed device list.
+
+### <samp>USB IMOD / NIC ITR</samp>
+
+- CHECK in the IMOD block reveals the values and table. Viewing the result no longer requires enabling the IMOD apply checkbox.
+- Background IMOD reads use only an available driver; they do not stage or replace its file.
+- When restoring a saved IMOD / NIC ITR script, its code is updated to the current template while retaining device values. Required loader files are prepared before restoration.
+
+### <samp>Backups / power saving</samp>
+
+- Fixed USB Selective Suspend restoration: Windows Power API replaces direct registry writes. AC and battery values are restored separately to the power plan saved in the backup.
+- Power-plan values are read back after restoration. An inactive plan is not activated.
+- Improved WMI power-saving verification: Windows is queried again after a write. Unsupported functions, query failures, write failures and readback mismatches are distinguished.
+- Backup dialogs separate the filename from the message. The full path can be viewed and copied, and a separate button opens the backup folder.
+- The restore menu stays open after deleting backups. The extra deletion-result dialog has been removed.
+
+### <samp>Devices / Polling Rate / RSS</samp>
+
+- Fixed mouse frequency display: a confirmed Raw Input measurement replaces the USB endpoint maximum. Low keyboard activity does not replace the device frequency.
+- Removed duplicate polling labels. USB roles are ordered as mouse, keyboard, gamepad, microphone, audio and camera.
+- RSS now distinguishes unsupported functions, missing data, read failures, apply failures and skipped settings. A match with active settings is reported only from retrieved values.
+- Removed unwarranted warnings for Wi-Fi and the default Windows CPU selection. Wi-Fi remains skipped. Active RSS queries have a longer timeout.
+
+### <samp>Interface / RU / EN</samp>
+
+- Reworked result, confirmation, backup-location and system-check dialogs. The main message is separated from technical details.
+- Fixed clipped field text, dialog wrapping and block layout. Current and saved value labels have been clarified.
+- Improved dropdowns and keyboard navigation. Home / End / Page Up / Page Down and Ctrl+Z in an editor are handled by that editor.
+- Removed the white block flash during IRQ Mode reads. Fixed resource disposal order when closing the window.
+- Updated RU/EN wording, backup-reason labels and the modified-settings indicator. Fixed language switching for dynamic strings and Power Saving.
+- Updated device-category colours to make GPU and network easier to distinguish.
+
+### <samp>Logs / system check</samp>
+
+- Added an application build identifier while keeping version 0.0.4. Logs can distinguish different EXEs of the same version.
+- Logs now include the IRQ Mode read source and time, RSS query duration and detailed read / apply statuses.
+- Added a system check before USB IMOD tuning: Blocklist / HVCI / Microsoft Defender and FACEIT / Vanguard service states.
+
+### <samp>Source / development</samp>
+
+- Extracted the CPU planner, MSI / affinity writer, restoration, NIC ITR and polling logic from MainForm. Existing CPU allocation rules are retained.
+- Moved checks and the test panel to dev/qa. The panel is included only in a separate developer build, not the normal EXE.
+- Expanded the development workbench with reproducible scenarios, GUI and transition captures, RU/EN, layout-scale models, test files and frame comparison. Autonomous runs use a hidden desktop without applying Windows settings.
+- Added test-sensitivity checks using deliberate faults and SHA-256 verification of sources / built components. Updated build documentation, the program description and screenshots.
+
+## <samp>[ 0.0.3 ]</samp>
+
+[Release](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.3) · October 1, 2026
 
 A larger update after 0.0.2:
 
 - Moved xHCI IMOD from WinIO to DTIMOD.sys and KDU. You can inspect values per interrupter, configure the whole controller or individual indexes, map USB devices, and read registers back after writing. Saved-profile reapplication uses the new driver too.
-- Added NIC ITR for recognized Intel and Realtek controllers: register reads and writes, queue information, and a profile for the next Windows sign-in. Writing is unavailable for unknown PCI IDs.
+- Added NIC ITR for recognized Intel and Realtek controllers: register reads and writes, queue information, and a profile for the next Windows sign-in. Writing is unavailable for unknown PCI IDs.
 - Reworked intelligent auto-optimization around physical cores, P/E cores, SMT/HT, CPPC, and AMD CCD/CCX. A discrete GPU gets two different physical cores. If the device role or CPU topology cannot be identified reliably, the assignment is skipped with a reason in the report.
 - Added RSS queue count alongside base CPU. Saved settings and active Get-NetAdapterRss state appear separately.
-- Separated the MSI Mode setting, the estimate based on allocated IRQ numbers, and hardware capability. The IRQ estimate is only a hint and cannot distinguish MSI from MSI-X.
-- Added Unlimited for MSI Limit and validation of numeric values against detected device capabilities. An empty mask for a regular device restores MachineDefault and removes AssignmentSetOverride.
+- Separated the MSI Mode setting, the estimate based on allocated IRQ numbers, and hardware capability. The IRQ estimate is only a hint and cannot distinguish MSI from MSI-X.
+- Added Unlimited for MSI Limit and validation of numeric values against detected device capabilities. An empty mask for a regular device restores MachineDefault and removes AssignmentSetOverride.
 - Fixed the AllClose and All mappings to DevicePolicy values 1 and 3. Their labels were reversed in 0.0.2.
-- Added mouse and keyboard event-rate estimates from Raw Input and RawMouseThrottleDuration controls on supported Windows 11 builds. This setting affects background Raw Input listeners, not USB polling rate.
+- Added mouse and keyboard event-rate estimates from Raw Input and RawMouseThrottleDuration controls on supported Windows 11 builds. This setting affects background Raw Input listeners, not USB polling rate.
 - Added power settings for USB controllers and root hubs. Wired network adapters gained control over whether Windows may turn them off to save power.
-- Improved HDMI/DisplayPort and S/PDIF audio detection. USB controllers with a custom Interrupt Affinity policy stay visible even without a detected HID role.
+- Improved HDMI/DisplayPort and S/PDIF audio detection. USB controllers with a custom Interrupt Affinity policy stay visible even without a detected HID role.
 - Added RU/EN switching without restart and reworked device display, IMOD/ITR panels, and category navigation.
 - Reworked backups: choose a folder, restore a specific backup, delete old backups, or reset settings. Manual apply, IMOD/ITR writes, and reset require a validated backup; intelligent auto-optimization saves the original settings first.
 - Reports now show applied, skipped, and failed actions. A normal device refresh does not load the driver; CHECK rereads registers.
 
 
-## [0.0.2](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.2) · January 15, 2026
+## <samp>[ 0.0.2 ]</samp>
+
+[Release](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.2) · January 15, 2026
 
 After 0.0.1:
 
@@ -49,6 +88,8 @@ After 0.0.1:
 - Changed CPU allocation order across device roles in intelligent auto-optimization.
 - Removed duplicate USB-role log lines for alternative keys of one controller.
 
-## [0.0.1](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.1) · January 14, 2026
+## <samp>[ 0.0.1 ]</samp>
 
-First public release for Windows 10/11 x64: MSI Mode and Limit, IRQ Priority, Interrupt Affinity, ReservedCpuSets, RSS base CPU, and xHCI IMOD through WinIO. The dark interface lists devices and lets you search them.
+[Release](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.1) · January 14, 2026
+
+First public release for Windows 10/11 x64: MSI Mode and Limit, IRQ Priority, Interrupt Affinity, ReservedCpuSets, RSS base CPU, and xHCI IMOD through WinIO. The dark interface lists devices and lets you search them.
