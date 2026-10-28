@@ -1,3 +1,5 @@
+<p align="right"><a href="./README.md">Русский</a></p>
+
 <p align="center">
   <img src="./assets/branding/readme-header.svg" alt="DEVICE TWEAKER" width="1200">
 </p>
@@ -8,47 +10,9 @@
   in one interface with intelligent auto-optimization.
 </p>
 
-<p align="center">
-  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/download/v0.0.4/DEVICE.TWEAKER.SelfContained.exe"><strong>Download 0.0.4</strong></a> ·
-  <a href="./SCREENSHOTS.en.md">Screenshots</a> ·
-  <a href="./CHANGELOG.en.md">What's new</a> ·
-  <a href="./README.md">Русский</a> ·
-  <a href="https://t.me/arsenzaa">Telegram</a>
-</p>
-
 ![DEVICE TWEAKER / USB IMOD / Intel Core i9-14900K](./assets/screenshots/showcase_intel_14900k_full_en.png)
 
-## Features
-
-**Intelligent auto-optimization**
-
-Automatically assigns devices to CPUs based on P-Core / E-Core, SMT / HT, CPPC rankings, AMD CCD / CCX and each device's role. A discrete GPU gets two distinct physical cores; USB, network and audio devices use their own allocation rules.
-
-**MSI / IRQ / Interrupt Affinity**
-
-- MSI Mode, MSI Limit, IRQ Priority, IRQ Policy and Interrupt Affinity settings.
-- Current interrupt mode in IRQ Mode, with supported modes listed separately in HW.
-- CPU reservation through ReservedCpuSets.
-
-**USB IMOD / NIC ITR / RSS**
-
-- Read and configure IMOD on supported xHCI controllers: one value for the controller or individual values per interrupter.
-- Read and configure NIC ITR on supported network adapters, with queue and RX/TX information.
-- Save IMOD / NIC ITR profiles for the next Windows sign-in.
-- Configure the base CPU, queue count and RSS/IRQ mode on NDIS network adapters.
-
-**Device detection and Polling Rate**
-
-Automatically detects GPUs, USB controllers, network adapters, audio and storage controllers. Shows which USB controller hosts the mouse, keyboard, gamepad, microphone and audio. Displays mouse / keyboard Polling Rate information and measures Raw Input event frequency.
-
-**Other settings**
-
-- RawMouseThrottleDuration on compatible Windows 11 builds.
-- Power saving for USB controllers, root hubs and wired network adapters.
-- Backups, restoration of a selected backup, deletion of old backups and settings reset.
-- Detailed logs: what was detected, applied or skipped, and why.
-
-[Settings explained](./DEVICE%20TWEAKER/docs/SETTINGS.en.md)
+[All screenshots](./SCREENSHOTS.en.md)
 
 ## Download
 
@@ -58,6 +22,38 @@ Automatically detects GPUs, USB controllers, network adapters, audio and storage
 | [**Standard**](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/download/v0.0.4/DEVICE.TWEAKER.exe) | Requires the [.NET 8 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/8.0). |
 
 Both builds include DTIMOD.sys. Files and SHA-256 checksums are available in [release 0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4).
+
+## Features
+
+**Intelligent auto-optimization**
+
+Automatically assigns devices to CPUs based on P-Core / E-Core, SMT / HT, CPPC rankings, AMD CCD / CCX and each device's role. A discrete GPU gets two distinct physical cores; USB, network and audio devices use their own allocation rules.
+
+**MSI / IRQ / Interrupt Affinity**
+
+- Supports MSI Mode / MSI Limit / IRQ Priority / IRQ Policy / Interrupt Affinity settings.
+- Displays the current interrupt mode in IRQ Mode. Supported modes are listed separately in HW.
+- Supports CPU reservation through ReservedCpuSets.
+
+**USB IMOD / NIC ITR / RSS**
+
+- Reads and displays IMOD on supported xHCI controllers. Set one value for the controller or individual values per interrupter.
+- Reads and configures NIC ITR on supported network adapters. Queue and RX/TX information depends on the adapter model.
+- Saves IMOD / NIC ITR profiles for the next Windows sign-in.
+- Configures the base CPU, queue count and RSS/IRQ mode on wired NDIS network adapters.
+
+**Device detection and Polling Rate**
+
+Automatically detects GPUs, USB controllers, network adapters, audio and storage controllers. Shows which USB controller hosts the mouse, keyboard, gamepad, microphone and audio. Displays mouse / keyboard Polling Rate information and measures Raw Input event frequency.
+
+**Other settings**
+
+- Supports RawMouseThrottleDuration settings on compatible Windows 11 builds.
+- Supports power-saving settings for USB controllers, root hubs and wired network adapters.
+- Creates backups, restores a selected backup, deletes old backups and resets settings.
+- Writes detailed logs: what was detected, applied or skipped, and why.
+
+[Settings explained](./DEVICE%20TWEAKER/docs/SETTINGS.en.md)
 
 ## Usage
 
@@ -103,3 +99,5 @@ Report bugs or other problems in [issues](https://github.com/arsenzaaa/DEVICE-TW
 ## Development
 
 [Build](./DEVICE%20TWEAKER/README.en.md) · [QA / test panel](./dev/qa/README.md) · [Changelog](./CHANGELOG.en.md) · [GPL-3.0](./LICENSE)
+
+Project updates and discussion: [Telegram](https://t.me/arsenzaa).
