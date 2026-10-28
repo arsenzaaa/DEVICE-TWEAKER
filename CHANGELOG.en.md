@@ -6,63 +6,129 @@
 
 [Download 0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4). Changes since 0.0.3.
 
-### <samp>Interrupt modes</samp>
+<table width="100%">
+<tr><th align="left" width="860"><strong>Interrupt modes</strong></th></tr>
+<tr><td width="860">
 
-- Added IRQ Mode. The MSI Mode registry setting, current interrupt mode and supported HW modes are displayed separately.
-- On opening, the interrupt mode is read from allocated Windows resources or an already loaded DTIMOD.sys. Opening and normal list refresh do not load the driver. The interface indicates when the data cannot distinguish MSI from MSI-X.
-- Added one **READ IRQ MODE** button for all PCI devices in the list. It reads MSI / MSI-X Enable through DTIMOD.sys, loading the driver if needed.
-- IRQ Mode reads run in the background. Results from an earlier request are discarded after the device list is refreshed.
+<ul>
+<li>Added IRQ Mode. The MSI Mode registry setting, current interrupt mode and supported HW modes are displayed separately.</li>
+<li>On opening, the interrupt mode is read from allocated Windows resources or an already loaded DTIMOD.sys. Opening and normal list refresh do not load the driver. The interface indicates when the data cannot distinguish MSI from MSI-X.</li>
+<li>Added one <strong>READ IRQ MODE</strong> button for all PCI devices in the list. It reads MSI / MSI-X Enable through DTIMOD.sys, loading the driver if needed.</li>
+<li>IRQ Mode reads run in the background. Results from an earlier request are discarded after the device list is refreshed.</li>
+</ul>
 
-### <samp>IMOD and NIC ITR</samp>
+</td></tr>
+</table>
 
-- **CHECK** in the IMOD block reveals the values and table. Viewing the result no longer requires enabling the IMOD apply checkbox.
-- Background IMOD reads no longer stage or replace the driver file. They use an already loaded DTIMOD.sys.
-- Restoring IMOD / NIC ITR profiles retains device values and updates the saved script code. Required loader files are prepared before restoration.
+<table width="100%">
+<tr><th align="left" width="860"><strong>IMOD and NIC ITR</strong></th></tr>
+<tr><td width="860">
 
-### <samp>Backups and restoration</samp>
+<ul>
+<li><strong>CHECK</strong> in the IMOD block reveals the values and table. Viewing the result no longer requires enabling the IMOD apply checkbox.</li>
+<li>Background IMOD reads no longer stage or replace the driver file. They use an already loaded DTIMOD.sys.</li>
+<li>Restoring IMOD / NIC ITR profiles retains device values and updates the saved script code. Required loader files are prepared before restoration.</li>
+</ul>
 
-- Fixed USB Selective Suspend restoration: Windows Power API replaces direct registry writes. AC and battery values are restored separately to the power plan saved in the backup.
-- Power-plan values are verified by reading them back after restoration; the active plan is not switched.
-- Backup dialogs separate the filename from the message. The full path can be viewed and copied, and a separate button opens the backup folder.
-- Deleting a backup no longer closes the restore menu or opens a separate result dialog.
+</td></tr>
+</table>
 
-### <samp>Power saving</samp>
+<table width="100%">
+<tr><th align="left" width="860"><strong>Backups and restoration</strong></th></tr>
+<tr><td width="860">
 
-- Power-saving writes through WMI now read the value back from Windows. Unsupported functions, query / write errors and mismatched values are reported separately.
+<ul>
+<li>Fixed USB Selective Suspend restoration: Windows Power API replaces direct registry writes. AC and battery values are restored separately to the power plan saved in the backup.</li>
+<li>Power-plan values are verified by reading them back after restoration; the active plan is not switched.</li>
+<li>Backup dialogs separate the filename from the message. The full path can be viewed and copied, and a separate button opens the backup folder.</li>
+<li>Deleting a backup no longer closes the restore menu or opens a separate result dialog.</li>
+</ul>
 
-### <samp>Device information</samp>
+</td></tr>
+</table>
 
-- Fixed mouse Polling Rate: after a confirmed Raw Input measurement, the interface shows the measured frequency even when it is below the USB endpoint maximum. Low keyboard activity does not replace the device frequency.
-- Removed duplicate polling labels. USB roles are ordered as mouse, keyboard, gamepad, microphone, audio and camera.
+<table width="100%">
+<tr><th align="left" width="860"><strong>Power saving</strong></th></tr>
+<tr><td width="860">
 
-### <samp>RSS</samp>
+<ul>
+<li>Power-saving writes through WMI now read the value back from Windows. Unsupported functions, query / write errors and mismatched values are reported separately.</li>
+</ul>
 
-- RSS diagnostics distinguish unsupported functions, missing data, read failures, apply failures and skipped settings. Saved and active parameters are marked as matching only after a confirmed read.
-- Removed unwarranted warnings for Wi-Fi and adapters where Windows selects RSS CPUs. Wi-Fi settings remain skipped. Active RSS queries have a longer timeout.
+</td></tr>
+</table>
 
-### <samp>Interface / navigation</samp>
+<table width="100%">
+<tr><th align="left" width="860"><strong>Device information</strong></th></tr>
+<tr><td width="860">
 
-- Reworked result, confirmation, backup-location and system-check dialogs. The main message is separated from technical details.
-- Fixed clipped field text, dialog wrapping and block layout. Current and saved value labels have been clarified.
-- Improved dropdowns and keyboard navigation. Home / End / Page Up / Page Down and Ctrl+Z in an editor are handled by that editor.
-- Removed the white block flash during IRQ Mode reads. Fixed resource disposal order when closing the window.
-- Updated RU/EN wording, backup-reason labels and the modified-settings indicator. Fixed language switching for dynamic strings and Power Saving.
-- Updated device-category colours to make GPU and network easier to distinguish.
+<ul>
+<li>Fixed mouse Polling Rate: after a confirmed Raw Input measurement, the interface shows the measured frequency even when it is below the USB endpoint maximum. Low keyboard activity does not replace the device frequency.</li>
+<li>Removed duplicate polling labels. USB roles are ordered as mouse, keyboard, gamepad, microphone, audio and camera.</li>
+</ul>
 
-### <samp>Diagnostics</samp>
+</td></tr>
+</table>
 
-- Added an application build identifier while keeping version 0.0.4. Logs can distinguish different EXEs of the same version.
-- Logs now include the IRQ Mode read source and time, RSS query duration and detailed read / apply statuses.
-- Added a system check before USB IMOD tuning: Blocklist / HVCI / Microsoft Defender and FACEIT / Vanguard service states.
+<table width="100%">
+<tr><th align="left" width="860"><strong>RSS</strong></th></tr>
+<tr><td width="860">
 
-### <samp>Development and testing</samp>
+<ul>
+<li>RSS diagnostics distinguish unsupported functions, missing data, read failures, apply failures and skipped settings. Saved and active parameters are marked as matching only after a confirmed read.</li>
+<li>Removed unwarranted warnings for Wi-Fi and adapters where Windows selects RSS CPUs. Wi-Fi settings remain skipped. Active RSS queries have a longer timeout.</li>
+</ul>
 
-- Extracted the CPU planner, MSI / affinity writer, restoration, NIC ITR and polling logic from MainForm. Existing CPU allocation rules are retained.
-- Moved checks and the test panel to dev/qa. The panel is included only in a separate developer build, not the normal EXE.
-- Expanded the development workbench with reproducible scenarios, GUI and transition captures, RU/EN, layout-scale models, test files and frame comparison. Autonomous runs use a hidden desktop without applying Windows settings.
-- Added test-sensitivity checks using deliberate faults and SHA-256 verification of sources / built components. Updated build documentation, the program description and screenshots.
+</td></tr>
+</table>
 
-## <samp>[ 0.0.3 ]</samp>
+<table width="100%">
+<tr><th align="left" width="860"><strong>Interface / navigation</strong></th></tr>
+<tr><td width="860">
+
+<ul>
+<li>Reworked result, confirmation, backup-location and system-check dialogs. The main message is separated from technical details.</li>
+<li>Fixed clipped field text, dialog wrapping and block layout. Current and saved value labels have been clarified.</li>
+<li>Improved dropdowns and keyboard navigation. Home / End / Page Up / Page Down and Ctrl+Z in an editor are handled by that editor.</li>
+<li>Removed the white block flash during IRQ Mode reads. Fixed resource disposal order when closing the window.</li>
+<li>Updated RU/EN wording, backup-reason labels and the modified-settings indicator. Fixed language switching for dynamic strings and Power Saving.</li>
+<li>Updated device-category colours to make GPU and network easier to distinguish.</li>
+</ul>
+
+</td></tr>
+</table>
+
+<table width="100%">
+<tr><th align="left" width="860"><strong>Diagnostics</strong></th></tr>
+<tr><td width="860">
+
+<ul>
+<li>Added an application build identifier while keeping version 0.0.4. Logs can distinguish different EXEs of the same version.</li>
+<li>Logs now include the IRQ Mode read source and time, RSS query duration and detailed read / apply statuses.</li>
+<li>Added a system check before USB IMOD tuning: Blocklist / HVCI / Microsoft Defender and FACEIT / Vanguard service states.</li>
+</ul>
+
+</td></tr>
+</table>
+
+<table width="100%">
+<tr><th align="left" width="860"><strong>Development and testing</strong></th></tr>
+<tr><td width="860">
+
+<ul>
+<li>Extracted the CPU planner, MSI / affinity writer, restoration, NIC ITR and polling logic from MainForm. Existing CPU allocation rules are retained.</li>
+<li>Moved checks and the test panel to dev/qa. The panel is included only in a separate developer build, not the normal EXE.</li>
+<li>Expanded the development workbench with reproducible scenarios, GUI and transition captures, RU/EN, layout-scale models, test files and frame comparison. Autonomous runs use a hidden desktop without applying Windows settings.</li>
+<li>Added test-sensitivity checks using deliberate faults and SHA-256 verification of sources / built components. Updated build documentation, the program description and screenshots.</li>
+</ul>
+
+</td></tr>
+</table>
+
+## <samp>[ PREVIOUS VERSIONS ]</samp>
+
+<details>
+<summary><samp>0.0.3</samp></summary>
 
 [Release](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.3) · October 1, 2026
 
@@ -82,8 +148,10 @@ A larger update after 0.0.2:
 - Reworked backups: choose a folder, restore a specific backup, delete old backups, or reset settings. Manual apply, IMOD/ITR writes, and reset require a validated backup; intelligent auto-optimization saves the original settings first.
 - Reports now show applied, skipped, and failed actions. A normal device refresh does not load the driver; CHECK rereads registers.
 
+</details>
 
-## <samp>[ 0.0.2 ]</samp>
+<details>
+<summary><samp>0.0.2</samp></summary>
 
 [Release](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.2) · January 15, 2026
 
@@ -94,8 +162,13 @@ After 0.0.1:
 - Changed CPU allocation order across device roles in intelligent auto-optimization.
 - Removed duplicate USB-role log lines for alternative keys of one controller.
 
-## <samp>[ 0.0.1 ]</samp>
+</details>
+
+<details>
+<summary><samp>0.0.1</samp></summary>
 
 [Release](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.1) · January 14, 2026
 
 First public release for Windows 10/11 x64: MSI Mode and Limit, IRQ Priority, Interrupt Affinity, ReservedCpuSets, RSS base CPU, and xHCI IMOD through WinIO. The dark interface lists devices and lets you search them.
+
+</details>

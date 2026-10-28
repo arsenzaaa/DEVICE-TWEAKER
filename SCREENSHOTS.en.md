@@ -1,21 +1,33 @@
-# <samp>SCREENSHOTS</samp>
+# <samp>[ SCREENSHOTS ]</samp>
 
-[DEVICE TWEAKER](./README.en.md) / [Русский](./SCREENSHOTS.md)
+[Main page](./README.en.md) / [Русский](./SCREENSHOTS.md)
 
-### <samp>USB IMOD / Intel Core i9-14900K</samp>
+<table width="100%">
+<tr><th align="left" width="860"><strong>USB IMOD / Intel Core i9-14900K</strong></th></tr>
+<tr><td width="860">
+<p><a href="./assets/screenshots/showcase_intel_14900k_full_en.png"><img src="./assets/screenshots/showcase_intel_14900k_full_en.png" alt="USB IMOD / Intel Core i9-14900K" width="100%"></a></p>
+</td></tr>
+</table>
 
-[![USB IMOD / Intel Core i9-14900K](./assets/screenshots/showcase_intel_14900k_full_en.png)](./assets/screenshots/showcase_intel_14900k_full_en.png)
+<table width="100%">
+<tr><th align="left" width="860"><strong>USB IMOD / AMD Ryzen 9 9950X3D</strong></th></tr>
+<tr><td width="860">
+<p><a href="./assets/screenshots/showcase_amd_imod_full_en.png"><img src="./assets/screenshots/showcase_amd_imod_full_en.png" alt="USB IMOD / AMD Ryzen 9 9950X3D" width="100%"></a></p>
+</td></tr>
+</table>
 
-### <samp>USB IMOD / AMD Ryzen 9 9950X3D</samp>
+<table width="100%">
+<tr><th align="left" width="860"><strong>GPU / NVIDIA GeForce RTX 4090</strong></th></tr>
+<tr><td width="860">
+<p><a href="./assets/screenshots/showcase_gpu_full_en.png"><img src="./assets/screenshots/showcase_gpu_full_en.png" alt="GPU / NVIDIA GeForce RTX 4090" width="100%"></a></p>
+</td></tr>
+</table>
 
-[![USB IMOD / AMD Ryzen 9 9950X3D](./assets/screenshots/showcase_amd_imod_full_en.png)](./assets/screenshots/showcase_amd_imod_full_en.png)
+<table width="100%">
+<tr><th align="left" width="860"><strong>NIC ITR / RSS / Intel I226-V</strong></th></tr>
+<tr><td width="860">
+<p><a href="./assets/screenshots/showcase_nic_full_en.png"><img src="./assets/screenshots/showcase_nic_full_en.png" alt="NIC ITR / RSS / Intel I226-V" width="100%"></a></p>
+</td></tr>
+</table>
 
-### <samp>GPU / NVIDIA GeForce RTX 4090</samp>
-
-[![GPU / NVIDIA GeForce RTX 4090](./assets/screenshots/showcase_gpu_full_en.png)](./assets/screenshots/showcase_gpu_full_en.png)
-
-### <samp>NIC ITR / RSS / Intel I226-V</samp>
-
-[![NIC ITR / RSS / Intel I226-V](./assets/screenshots/showcase_nic_full_en.png)](./assets/screenshots/showcase_nic_full_en.png)
-
-<sub>Screenshots from the test panel, with test devices and values.</sub>
+<sub>Screenshots show test devices and values.</sub>
