@@ -5,7 +5,7 @@ namespace DeviceTweakerCS;
 
 static class Program
 {
-    private const string SingleInstanceMutexName = @"Global\DEVICE_TWEAKER_0_0_4_SINGLE_INSTANCE";
+    private const string SingleInstanceMutexName = @"Global\DEVICE_TWEAKER_SINGLE_INSTANCE";
     private static int _handlingFatalUiException;
 
     [STAThread]
@@ -29,13 +29,10 @@ static class Program
         }
 
         UiLanguage.Initialize();
+        // The manifest requires elevation; this only triggers when UAC is off
+        // and the account is not an administrator, where relaunching cannot help.
         if (!QaRun.IsReadOnly && !WindowsSecurity.IsAdministrator())
         {
-            if (WindowsSecurity.TryRelaunchAsAdministrator())
-            {
-                return;
-            }
-
             MessageBox.Show(
                 UiLanguage.Text("Run DEVICE TWEAKER as administrator to apply settings.\n\nRight-click the EXE and choose 'Run as administrator'."),
                 "DEVICE TWEAKER",
