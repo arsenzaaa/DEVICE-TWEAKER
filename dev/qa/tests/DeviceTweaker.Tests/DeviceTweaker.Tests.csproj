@@ -21,7 +21,7 @@
   <ItemGroup>
     <None Update="WindowsResourceCaptures.json" CopyToOutputDirectory="PreserveNewest" />
     <None Update="WindowsIrqCaptures.json" CopyToOutputDirectory="PreserveNewest" />
-    <ProjectReference Include="..\..\..\..\DEVICE TWEAKER\DeviceTweakerCS.csproj" />
+    <ProjectReference Include="..\..\..\..\src\DeviceTweakerCS.csproj" />
     <Compile Include="..\..\Workbench\*.cs" Link="Workbench\%(Filename)%(Extension)" />
   </ItemGroup>
 

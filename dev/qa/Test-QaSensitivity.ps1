@@ -3,7 +3,7 @@
 param([Parameter(Mandatory = $true)][string]$OutputDirectory)
 
 $ErrorActionPreference = 'Stop'
-$root = (Resolve-Path (Join-Path $PSScriptRoot '..\..\DEVICE TWEAKER')).Path
+$root = (Resolve-Path (Join-Path $PSScriptRoot '..\..\src')).Path
 $output = [IO.Path]::GetFullPath($OutputDirectory)
 $rootPrefix = $root.TrimEnd('\') + '\'
 if (($output.TrimEnd('\').Equals($root, [StringComparison]::OrdinalIgnoreCase) -or
@@ -78,7 +78,7 @@ foreach ($mutation in $mutations) {
     # Keep the testhost path below Win32 MAX_PATH even in a nested QA snapshot.
     $caseDir = Join-Path $output ('m{0:D2}_{1}' -f $results.Count, [Guid]::NewGuid().ToString('N').Substring(0, 8))
     $copyRepo = Join-Path $caseDir 'repo'
-    $copyRoot = Join-Path $copyRepo 'DEVICE TWEAKER'
+    $copyRoot = Join-Path $copyRepo 'src'
     New-Item -ItemType Directory -Path $copyRoot -Force | Out-Null
     foreach ($folder in @('Affinity', 'Core', 'Devices', 'GUI', 'Interop', 'Localization', 'Models', 'Tweaks')) {
         foreach ($file in (Get-ChildItem -LiteralPath (Join-Path $root $folder) -Filter '*.cs' -Recurse -File)) {

@@ -28,10 +28,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-Qa.ps1
 
 Обычный `DEVICE TWEAKER.exe` не содержит тест-панель, Showcase, пресеты железа или Scenario Lab.
 
-Для тест-панели тот же проект собирается с `-p:DeveloperQa=true`. Он подключает `dev/qa/Panel`, использует общий код программы и создаёт отдельный `DEVICE TWEAKER QA.exe` в `DEVICE TWEAKER/bin/DeveloperQa/Release/net8.0-windows/win-x64/`. Эта сборка всегда запрещает запись настроек, включая ручной запуск. Выход из эмуляции не разрешает запись.
+Для тест-панели тот же проект собирается с `-p:DeveloperQa=true`. Он подключает `dev/qa/Panel`, использует общий код программы и создаёт отдельный `DEVICE TWEAKER QA.exe` в `src/bin/DeveloperQa/Release/net8.0-windows/win-x64/`. Эта сборка всегда запрещает запись настроек, включая ручной запуск. Выход из эмуляции не разрешает запись.
 
 ```powershell
-dotnet build ".\DEVICE TWEAKER\DeviceTweakerCS.csproj" -c Release -p:DeveloperQa=true -p:BuildImodDriver=false
+dotnet build ".\src\DeviceTweakerCS.csproj" -c Release -p:DeveloperQa=true -p:BuildImodDriver=false
 ```
 
 Обычный EXE можно проверить с `--qa-read-only`. Режим фиксируется на весь процесс: запрещены изменения реестра, WMI, плана питания, автозапуска и настоящих бекапов, загрузка и доступ к драйверу. Логи и отчёты пишутся в папку запуска. Для нового пути записи нужна отдельная проверка блокировки.
@@ -76,7 +76,7 @@ dotnet build ".\DEVICE TWEAKER\DeviceTweakerCS.csproj" -c Release -p:DeveloperQa
 
 ## Результаты
 
-В `DEVICE TWEAKER/tmp/qa/run_*/` сохраняются `qa.json`, `inputs.json`, копия входных файлов, TRX, логи, отчёты намеренных поломок, скриншоты GUI, `layout/layout.json`, `resources/resources.json`, `desktop-contracts/contracts.json`, `isolation/desktop.json` и `evidence.json`. В `desktop.json` записываются имя desktop, проверки активного desktop и подтверждение уборки потомков.
+В `src/tmp/qa/run_*/` сохраняются `qa.json`, `inputs.json`, копия входных файлов, TRX, логи, отчёты намеренных поломок, скриншоты GUI, `layout/layout.json`, `resources/resources.json`, `desktop-contracts/contracts.json`, `isolation/desktop.json` и `evidence.json`. В `desktop.json` записываются имя desktop, проверки активного desktop и подтверждение уборки потомков.
 
 Отсутствующий результат, пропущенные обязательные тесты, изменённый снимок исходников, ненулевой код worker или неподтверждённый цикл не считаются успешной проверкой. `evidence.json` проверяет полноту и соответствие артефактов. Достоверность результата зависит от целостности самих проверок и отчётов. Скриншоты требуется просмотреть отдельно: автоматическая проверка изображения и геометрии не оценивает весь дизайн.
 
@@ -87,7 +87,7 @@ dotnet build ".\DEVICE TWEAKER\DeviceTweakerCS.csproj" -c Release -p:DeveloperQa
 Готовый локальный набор EXE проверяется отдельно:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Test-ReleasePackage.ps1 -PackageDirectory ".\DEVICE TWEAKER\bin\ReleasePackages\v0.0.4"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Test-ReleasePackage.ps1 -PackageDirectory ".\src\bin\ReleasePackages\v0.0.4"
 ```
 
 Проверяются SHA-256, версия, запуск обоих EXE в probe, встроенный драйвер и отсутствие тест-панели. Главное окно и применение настроек не запускаются.

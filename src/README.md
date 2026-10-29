@@ -9,8 +9,8 @@
 Нужны Windows 10/11 x64, .NET 8 SDK и PowerShell 5.1 или новее. Запускайте команды из корня репозитория:
 
 ```powershell
-dotnet restore ".\DEVICE TWEAKER\DeviceTweakerCS.csproj"
-dotnet build ".\DEVICE TWEAKER\DeviceTweakerCS.csproj" -c Release -p:TreatWarningsAsErrors=true
+dotnet restore ".\src\DeviceTweakerCS.csproj"
+dotnet build ".\src\DeviceTweakerCS.csproj" -c Release -p:TreatWarningsAsErrors=true
 dotnet test ".\dev\qa\tests\DeviceTweaker.Tests\DeviceTweaker.Tests.csproj" -c Release
 ```
 
@@ -23,7 +23,7 @@ dotnet test ".\dev\qa\tests\DeviceTweaker.Tests\DeviceTweaker.Tests.csproj" -c R
 Два EXE и `SHA256SUMS.txt` собираются так:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\DEVICE TWEAKER\publish-variants.ps1" `
+powershell -ExecutionPolicy Bypass -File ".\src\publish-variants.ps1" `
   -Flavor both -Configuration Release -SkipImodDriverBuild
 ```
 

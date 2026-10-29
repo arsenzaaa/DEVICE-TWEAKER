@@ -12,8 +12,8 @@ MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + уп
 <p align="center">
   <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4#gh-dark-mode-only"><img src="./assets/branding/download-ru-dark.svg" alt="Скачать 0.0.4" width="170"></a>
   <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4#gh-light-mode-only"><img src="./assets/branding/download-ru-light.svg" alt="Скачать 0.0.4" width="170"></a>
-  <a href="./DEVICE%20TWEAKER/docs/SETTINGS.md#gh-dark-mode-only"><img src="./assets/branding/settings-ru-dark.svg" alt="Настройки" width="140"></a>
-  <a href="./DEVICE%20TWEAKER/docs/SETTINGS.md#gh-light-mode-only"><img src="./assets/branding/settings-ru-light.svg" alt="Настройки" width="140"></a>
+  <a href="./src/docs/SETTINGS.md#gh-dark-mode-only"><img src="./assets/branding/settings-ru-dark.svg" alt="Настройки" width="140"></a>
+  <a href="./src/docs/SETTINGS.md#gh-light-mode-only"><img src="./assets/branding/settings-ru-light.svg" alt="Настройки" width="140"></a>
 </p>
 
 ## <samp>[ ИНТЕРФЕЙС ]</samp>
@@ -40,7 +40,7 @@ MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + уп
 <table width="100%">
 <tr><th align="left" width="860"><strong>Интеллектуальная авто-оптимизация</strong></th></tr>
 <tr><td width="860">
-<p>Интеллектуальная авто-оптимизация учитывает P-Core / E-Core, SMT / HT, CPPC-рейтинг, CCD / CCX, количество устройств и их роли. Для дискретной GPU подбираются два разных физических ядра, для USB / сети / аудио используются свои правила распределения.</p><p align="center"><a href="./DEVICE%20TWEAKER/docs/SETTINGS.md#gh-dark-mode-only"><img src="./assets/branding/cpu-allocation-ru-dark.svg" alt="Два физических ядра для дискретной GPU" width="360"></a><a href="./DEVICE%20TWEAKER/docs/SETTINGS.md#gh-light-mode-only"><img src="./assets/branding/cpu-allocation-ru-light.svg" alt="Два физических ядра для дискретной GPU" width="360"></a></p>
+<p>Интеллектуальная авто-оптимизация учитывает P-Core / E-Core, SMT / HT, CPPC-рейтинг, CCD / CCX, количество устройств и их роли. Для дискретной GPU подбираются два разных физических ядра, для USB / сети / аудио используются свои правила распределения.</p><p align="center"><a href="./src/docs/SETTINGS.md#gh-dark-mode-only"><img src="./assets/branding/cpu-allocation-ru-dark.svg" alt="Два физических ядра для дискретной GPU" width="360"></a><a href="./src/docs/SETTINGS.md#gh-light-mode-only"><img src="./assets/branding/cpu-allocation-ru-light.svg" alt="Два физических ядра для дискретной GPU" width="360"></a></p>
 </td></tr>
 </table>
 
@@ -156,7 +156,7 @@ MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + уп
 <p><strong>ОБНОВИТЬ</strong> повторно определяет устройства. Для отката настроек нажмите <strong>ВОССТАНОВЛЕНИЕ</strong> и выберите нужный бекап.</p>
 <p>После <strong>ПРИМЕНИТЬ</strong> / <strong>АВТООПТИМИЗАЦИЯ</strong> перезагрузите компьютер, чтобы завершить применение настроек.</p>
 <p>Перед ручным применением и сбросом программа создаёт бекап. При интеллектуальной авто-оптимизации сохраняются исходные настройки.</p>
-<p>Подробное описание настроек: <a href="./DEVICE%20TWEAKER/docs/SETTINGS.md">SETTINGS.md</a>.</p>
+<p>Подробное описание настроек: <a href="./src/docs/SETTINGS.md">SETTINGS.md</a>.</p>
 
 </td></tr>
 </table>
@@ -181,6 +181,6 @@ MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + уп
 <tr><th align="left" width="860"><strong>Исходники</strong></th></tr>
 <tr><td width="860">
 
-<p><a href="./DEVICE%20TWEAKER/README.md">Сборка и проверки</a> · <a href="./CHANGELOG.md">История изменений</a> · <a href="./LICENSE">GPL-3.0</a></p>
+<p><a href="./src/README.md">Сборка и проверки</a> · <a href="./CHANGELOG.md">История изменений</a> · <a href="./LICENSE">GPL-3.0</a></p>
 </td></tr>
 </table>

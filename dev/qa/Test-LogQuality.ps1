@@ -7,7 +7,7 @@
 $ErrorActionPreference = 'Stop'
 
 if ([string]::IsNullOrWhiteSpace($LogPath)) {
-    $candidates = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot '..\..\DEVICE TWEAKER\bin') -Recurse -File -Filter 'DeviceTweaker_*.log' -ErrorAction SilentlyContinue |
+    $candidates = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot '..\..\src\bin') -Recurse -File -Filter 'DeviceTweaker_*.log' -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTimeUtc -Descending)
     if ($candidates.Count -eq 0) {
         throw 'No DEVICE TWEAKER session log was found.'

@@ -54,15 +54,15 @@ $results | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutputDirectory
 . (Join-Path $PSScriptRoot 'Input-Snapshot.ps1')
 $workspace = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $copy = Join-Path $OutputDirectory 'driver-artifact-copy'
-$app = Join-Path $copy 'DEVICE TWEAKER'
+$app = Join-Path $copy 'src'
 foreach ($name in @('IMOD\Driver\imod_driver.c', 'IMOD\Driver\imod_driver.h', 'IMOD\Driver\ImodDriver.vcxproj',
     'publish-variants.ps1', 'IMOD\DTIMOD.sys', 'IMOD\DTIMOD.sys.sha256', 'IMOD\DTIMOD.build.json')) {
     $target = Join-Path $app $name
     New-Item -ItemType Directory -Force -Path (Split-Path $target) | Out-Null
-    Copy-Item -LiteralPath (Join-Path (Join-Path $workspace 'DEVICE TWEAKER') $name) -Destination $target
+    Copy-Item -LiteralPath (Join-Path (Join-Path $workspace 'src') $name) -Destination $target
 }
 foreach ($file in (Get-QaInputFiles $workspace | Where-Object { $_.FullName.Contains('\IMOD\KDU\') -or $_.FullName.Contains('\IMOD\Loader\') })) {
-    $relative = $file.FullName.Substring((Join-Path $workspace 'DEVICE TWEAKER').Length + 1)
+    $relative = $file.FullName.Substring((Join-Path $workspace 'src').Length + 1)
     $target = Join-Path $app $relative
     New-Item -ItemType Directory -Force -Path (Split-Path $target) | Out-Null
     Copy-Item -LiteralPath $file.FullName -Destination $target

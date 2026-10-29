@@ -1,30 +1,28 @@
 # Build output and intermediate artifacts
-DEVICE TWEAKER/bin/
-DEVICE TWEAKER/obj/
+src/bin/
+src/obj/
 dev/**/bin/
 dev/**/obj/
 tmp/
 local/
-DEVICE TWEAKER/artifacts/
-DEVICE TWEAKER/IMOD/Driver/build/
-DEVICE TWEAKER/IMOD/Driver/obj/
-DEVICE TWEAKER/IMOD/build/
-DEVICE TWEAKER/IMOD/IMOD/intermediates/
-DEVICE TWEAKER/IMOD/IMOD/intermidates/
+src/artifacts/
+src/IMOD/Driver/build/
+src/IMOD/Driver/obj/
+src/IMOD/build/
 
 # Logs and local publish checks
-DEVICE TWEAKER/**/*.log
-DEVICE TWEAKER/**/size-check/
-DEVICE TWEAKER/**/*.tmp
-DEVICE TWEAKER/**/*.bak
-DEVICE TWEAKER/**/*.pdb
-DEVICE TWEAKER/**/*.ilk
-DEVICE TWEAKER/**/*.idb
-DEVICE TWEAKER/**/*.iobj
-DEVICE TWEAKER/**/*.ipdb
-DEVICE TWEAKER/**/*.recipe
-DEVICE TWEAKER/**/*.tlog
-DEVICE TWEAKER/**/*.lastbuildstate
+src/**/*.log
+src/**/size-check/
+src/**/*.tmp
+src/**/*.bak
+src/**/*.pdb
+src/**/*.ilk
+src/**/*.idb
+src/**/*.iobj
+src/**/*.ipdb
+src/**/*.recipe
+src/**/*.tlog
+src/**/*.lastbuildstate
 
 # IDE/user-local files
 /.playwright-cli/
@@ -37,15 +35,15 @@ DEVICE TWEAKER/**/*.lastbuildstate
 *.sln.docstates
 
 # Secrets
-DEVICE TWEAKER/**/*.pfx
-DEVICE TWEAKER/**/*.p12
-DEVICE TWEAKER/**/*.snk
+src/**/*.pfx
+src/**/*.p12
+src/**/*.snk
 
 # Runtime data and local documentation
-DEVICE TWEAKER/tmp/
-DEVICE TWEAKER/**/Backups/
-DEVICE TWEAKER/**/logs/
-DEVICE TWEAKER/**/last-crash.txt
+src/tmp/
+src/**/Backups/
+src/**/logs/
+src/**/last-crash.txt
 /docs/
-DEVICE TWEAKER/docs/*.pdf
-DEVICE TWEAKER/docs/*.txt
+src/docs/*.pdf
+src/docs/*.txt

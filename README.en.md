@@ -12,8 +12,8 @@ MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + IMOD
 <p align="center">
   <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4#gh-dark-mode-only"><img src="./assets/branding/download-en-dark.svg" alt="Download 0.0.4" width="170"></a>
   <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4#gh-light-mode-only"><img src="./assets/branding/download-en-light.svg" alt="Download 0.0.4" width="170"></a>
-  <a href="./DEVICE%20TWEAKER/docs/SETTINGS.en.md#gh-dark-mode-only"><img src="./assets/branding/settings-en-dark.svg" alt="Settings" width="140"></a>
-  <a href="./DEVICE%20TWEAKER/docs/SETTINGS.en.md#gh-light-mode-only"><img src="./assets/branding/settings-en-light.svg" alt="Settings" width="140"></a>
+  <a href="./src/docs/SETTINGS.en.md#gh-dark-mode-only"><img src="./assets/branding/settings-en-dark.svg" alt="Settings" width="140"></a>
+  <a href="./src/docs/SETTINGS.en.md#gh-light-mode-only"><img src="./assets/branding/settings-en-light.svg" alt="Settings" width="140"></a>
 </p>
 
 ## <samp>[ INTERFACE ]</samp>
@@ -40,7 +40,7 @@ MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + IMOD
 <table width="100%">
 <tr><th align="left" width="860"><strong>Intelligent auto-optimization</strong></th></tr>
 <tr><td width="860">
-<p>Intelligent auto-optimization accounts for P-Core / E-Core, SMT / HT, CPPC rankings, CCD / CCX, device count, and device roles. A discrete GPU gets two distinct physical cores; USB / network / audio devices have separate allocation rules.</p><p align="center"><a href="./DEVICE%20TWEAKER/docs/SETTINGS.en.md#gh-dark-mode-only"><img src="./assets/branding/cpu-allocation-en-dark.svg" alt="Two physical cores for a discrete GPU" width="360"></a><a href="./DEVICE%20TWEAKER/docs/SETTINGS.en.md#gh-light-mode-only"><img src="./assets/branding/cpu-allocation-en-light.svg" alt="Two physical cores for a discrete GPU" width="360"></a></p>
+<p>Intelligent auto-optimization accounts for P-Core / E-Core, SMT / HT, CPPC rankings, CCD / CCX, device count, and device roles. A discrete GPU gets two distinct physical cores; USB / network / audio devices have separate allocation rules.</p><p align="center"><a href="./src/docs/SETTINGS.en.md#gh-dark-mode-only"><img src="./assets/branding/cpu-allocation-en-dark.svg" alt="Two physical cores for a discrete GPU" width="360"></a><a href="./src/docs/SETTINGS.en.md#gh-light-mode-only"><img src="./assets/branding/cpu-allocation-en-light.svg" alt="Two physical cores for a discrete GPU" width="360"></a></p>
 </td></tr>
 </table>
 
@@ -156,7 +156,7 @@ MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + IMOD
 <p><strong>REFRESH</strong> detects devices again. To roll back settings, click <strong>RESTORE</strong> and select the backup you need.</p>
 <p>After <strong>APPLY</strong> / <strong>AUTO-OPTIMIZATION</strong>, restart the PC to finish applying the settings.</p>
 <p>The program creates a backup before manual apply and reset. Intelligent auto-optimization preserves the original settings.</p>
-<p>Detailed settings description: <a href="./DEVICE%20TWEAKER/docs/SETTINGS.en.md">SETTINGS.en.md</a>.</p>
+<p>Detailed settings description: <a href="./src/docs/SETTINGS.en.md">SETTINGS.en.md</a>.</p>
 
 </td></tr>
 </table>
@@ -181,6 +181,6 @@ MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + IMOD
 <tr><th align="left" width="860"><strong>Source</strong></th></tr>
 <tr><td width="860">
 
-<p><a href="./DEVICE%20TWEAKER/README.en.md">Build and checks</a> · <a href="./CHANGELOG.en.md">Changelog</a> · <a href="./LICENSE">GPL-3.0</a></p>
+<p><a href="./src/README.en.md">Build and checks</a> · <a href="./CHANGELOG.en.md">Changelog</a> · <a href="./LICENSE">GPL-3.0</a></p>
 </td></tr>
 </table>

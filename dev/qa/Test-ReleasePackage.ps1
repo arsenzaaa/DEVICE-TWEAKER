@@ -50,7 +50,7 @@ try {
         }
     }
     if ($results.Count -ne 2 -or $results[0].driverSha256 -ne $results[1].driverSha256) { throw 'Expected two production EXEs with identical driver payloads' }
-    $sourceDriver = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..\DEVICE TWEAKER\IMOD\DTIMOD.sys')).Path
+    $sourceDriver = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..\src\IMOD\DTIMOD.sys')).Path
     if ($results[0].driverSha256 -ne (Get-FileHash -LiteralPath $sourceDriver -Algorithm SHA256).Hash) { throw 'Embedded driver differs from the source build artifact' }
     foreach ($file in $results) {
         foreach ($name in @('DeviceTweakerCS.IMOD.DTIMOD.sys', 'DeviceTweakerCS.IMOD.DTIMOD.sys.sha256', 'DeviceTweakerCS.IMOD.Loader.kdu.exe', 'DeviceTweakerCS.IMOD.Loader.drv64.dll')) {

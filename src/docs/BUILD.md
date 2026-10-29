@@ -9,7 +9,7 @@
 
 ## Сборка обеих версий
 
-Запустите команду из папки `DEVICE TWEAKER/` внутри репозитория. В ней находятся `build.ps1` и `DeviceTweakerCS.csproj`.
+Запустите команду из папки `src/` внутри репозитория. В ней находятся `build.ps1` и `DeviceTweakerCS.csproj`.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Flavor both -Configuration Release -SkipImodDriverBuild

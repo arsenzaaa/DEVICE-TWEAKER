@@ -6,7 +6,7 @@ $workspace = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $output = Join-Path $workspace 'local\tools\TestPanel'
 $build = Join-Path $workspace ('local\work\TestPanel\build_' + [Guid]::NewGuid().ToString('N'))
 $snapshot = New-QaInputSnapshot $workspace $build
-$project = Join-Path $snapshot 'DEVICE TWEAKER\DeviceTweakerCS.csproj'
+$project = Join-Path $snapshot 'src\DeviceTweakerCS.csproj'
 & dotnet publish $project -c Release -r win-x64 -o $output `
     -p:DeveloperQa=true -p:BuildImodDriver=false -p:SelfContained=true `
     -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `

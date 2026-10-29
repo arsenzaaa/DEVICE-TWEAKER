@@ -11,7 +11,7 @@ param(
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Private-Desktop.ps1')
 if (-not $VisibleGui) {
-    if (-not $OutputRoot) { $OutputRoot = Join-Path $PSScriptRoot '..\..\DEVICE TWEAKER\tmp\qa-gui' }
+    if (-not $OutputRoot) { $OutputRoot = Join-Path $PSScriptRoot '..\..\src\tmp\qa-gui' }
     $OutputRoot = [IO.Path]::GetFullPath($OutputRoot)
     $workerParameters = @{} + $PSBoundParameters
     $workerParameters.OutputRoot = $OutputRoot
@@ -65,7 +65,7 @@ public static class SmokeNative {
 '@
 
 $root = if ([string]::IsNullOrWhiteSpace($Root)) {
-    (Resolve-Path (Join-Path $PSScriptRoot '..\..\DEVICE TWEAKER')).Path
+    (Resolve-Path (Join-Path $PSScriptRoot '..\..\src')).Path
 } else {
     (Resolve-Path $Root).Path
 }

@@ -17,7 +17,7 @@ if (-not $Worker) {
     $workspace = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
     if (-not $OutputRoot) { $OutputRoot = Join-Path $workspace 'local\dev-sessions' }
     $outputFull = [IO.Path]::GetFullPath($OutputRoot).TrimEnd('\')
-    $appRoot = Join-Path $workspace 'DEVICE TWEAKER'
+    $appRoot = Join-Path $workspace 'src'
     if (($outputFull -eq $appRoot -or $outputFull.StartsWith($appRoot+'\',[StringComparison]::OrdinalIgnoreCase)) -and
         -not $outputFull.StartsWith($appRoot+'\tmp\',[StringComparison]::OrdinalIgnoreCase) -and
         -not $outputFull.StartsWith($appRoot+'\bin\',[StringComparison]::OrdinalIgnoreCase)) { throw 'Use local/dev-sessions or app tmp/bin for output' }
@@ -25,10 +25,10 @@ if (-not $Worker) {
     New-Item -ItemType Directory -Path $run | Out-Null
     Copy-Item -LiteralPath (Resolve-Path -LiteralPath $Scenario).Path -Destination (Join-Path $run 'scenario.json')
     $snapshot = New-QaInputSnapshot $workspace $run
-    & dotnet build (Join-Path $snapshot 'DEVICE TWEAKER\DeviceTweakerCS.csproj') -c Release -p:DeveloperQa=true -p:BuildImodDriver=false -p:TreatWarningsAsErrors=true --nologo *> (Join-Path $run 'build.log')
+    & dotnet build (Join-Path $snapshot 'src\DeviceTweakerCS.csproj') -c Release -p:DeveloperQa=true -p:BuildImodDriver=false -p:TreatWarningsAsErrors=true --nologo *> (Join-Path $run 'build.log')
     if ($LASTEXITCODE -ne 0) { throw "Developer build failed; see $run\build.log" }
     $parameters = @{ Worker = $true; RunDirectory = $run; Scenario = (Join-Path $run 'scenario.json');
-        ExePath = (Join-Path $snapshot 'DEVICE TWEAKER\bin\DeveloperQa\Release\net8.0-windows\win-x64\DEVICE TWEAKER QA.exe') }
+        ExePath = (Join-Path $snapshot 'src\bin\DeveloperQa\Release\net8.0-windows\win-x64\DEVICE TWEAKER QA.exe') }
     if ($CompareWith) { $parameters.CompareWith = [IO.Path]::GetFullPath($CompareWith) }
     $code = Invoke-QaPrivateDesktop -ScriptPath (Join-Path $snapshot 'dev\qa\Invoke-DevSession.ps1') -Parameters $parameters -ReportDirectory (Join-Path $run 'isolation') -TimeoutSeconds 240
     Test-QaInputSnapshot $run

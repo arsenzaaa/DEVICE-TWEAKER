@@ -12,7 +12,7 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Private-Desktop.ps1')
 if (-not $AllowForeground) {
-    if (-not $OutputDirectory) { $OutputDirectory = Join-Path $PSScriptRoot '..\..\DEVICE TWEAKER\tmp\showcase' }
+    if (-not $OutputDirectory) { $OutputDirectory = Join-Path $PSScriptRoot '..\..\src\tmp\showcase' }
     $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
     $workerParameters = @{} + $PSBoundParameters
     $workerParameters.OutputDirectory = $OutputDirectory
@@ -45,7 +45,7 @@ public static class SmokeNative {
 '@
 }
 
-$root = (Resolve-Path (Join-Path $PSScriptRoot '..\..\DEVICE TWEAKER')).Path
+$root = (Resolve-Path (Join-Path $PSScriptRoot '..\..\src')).Path
 $exe = if ($ExePath) {
     (Resolve-Path -LiteralPath $ExePath).Path
 } else {

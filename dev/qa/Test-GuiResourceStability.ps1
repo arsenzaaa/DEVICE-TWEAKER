@@ -9,7 +9,7 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Private-Desktop.ps1')
 if (-not $VisibleGui) {
-    if (-not $OutputDirectory) { $OutputDirectory = Join-Path $PSScriptRoot ('..\..\DEVICE TWEAKER\tmp\qa-resources\' + [Guid]::NewGuid().ToString('N')) }
+    if (-not $OutputDirectory) { $OutputDirectory = Join-Path $PSScriptRoot ('..\..\src\tmp\qa-resources\' + [Guid]::NewGuid().ToString('N')) }
     $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
     $workerParameters = @{} + $PSBoundParameters
     $workerParameters.OutputDirectory = $OutputDirectory
@@ -77,7 +77,7 @@ public static class DeviceTweakerResourceQaNative {
 }
 '@
 
-$root = (Resolve-Path (Join-Path $PSScriptRoot '..\..\DEVICE TWEAKER')).Path
+$root = (Resolve-Path (Join-Path $PSScriptRoot '..\..\src')).Path
 $exe = if ([string]::IsNullOrWhiteSpace($ExePath)) {
     Join-Path $root 'bin\Release\net8.0-windows\win-x64\DEVICE TWEAKER.exe'
 } else {

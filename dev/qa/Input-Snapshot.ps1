@@ -1,5 +1,5 @@
 ﻿function Get-QaInputFiles([string]$Workspace) {
-    $app = Join-Path $Workspace 'DEVICE TWEAKER'
+    $app = Join-Path $Workspace 'src'
     $files = @()
     foreach ($folder in @('Affinity', 'Core', 'Devices', 'GUI', 'Interop', 'Localization', 'Models', 'Tweaks')) {
         $files += @(Get-ChildItem -LiteralPath (Join-Path $app $folder) -Recurse -File -Filter '*.cs')
@@ -63,7 +63,7 @@ function Test-QaInputSnapshot([string]$RunDirectory) {
 }
 
 function Test-QaDriverArtifact([string]$Workspace) {
-    $app = Join-Path $Workspace 'DEVICE TWEAKER'
+    $app = Join-Path $Workspace 'src'
     $manifest = Get-Content -LiteralPath (Join-Path $app 'IMOD\DTIMOD.build.json') -Raw | ConvertFrom-Json
     $expected = @('IMOD\Driver\imod_driver.c', 'IMOD\Driver\imod_driver.h', 'IMOD\Driver\ImodDriver.vcxproj', 'publish-variants.ps1')
     if ($manifest.schemaVersion -ne 1 -or @(Compare-Object $expected @($manifest.sources.path)).Count) {
@@ -81,7 +81,7 @@ function Test-QaDriverArtifact([string]$Workspace) {
 }
 
 function Test-QaLoaderArtifact([string]$Workspace) {
-    $app = Join-Path $Workspace 'DEVICE TWEAKER'
+    $app = Join-Path $Workspace 'src'
     $vendorRoot = Join-Path $app 'IMOD\KDU'
     $sourcePath = Join-Path $vendorRoot 'upstream.json'
     $source = Get-Content -LiteralPath $sourcePath -Raw | ConvertFrom-Json

@@ -37,10 +37,10 @@ jobs:
           $tagCommit = (git rev-list -n 1 "refs/tags/$tag").Trim()
           $head = (git rev-parse HEAD).Trim()
           if ($LASTEXITCODE -ne 0 -or $tagCommit -ne $head) { throw "Checkout does not match $tag" }
-          [xml]$project = Get-Content -LiteralPath 'DEVICE TWEAKER/DeviceTweakerCS.csproj'
+          [xml]$project = Get-Content -LiteralPath 'src/DeviceTweakerCS.csproj'
           $version = [string]$project.Project.PropertyGroup.Version
           if ($tag -ne "v$version") { throw "Tag $tag differs from project version $version" }
-          $notes = "DEVICE TWEAKER/docs/releases/$tag.md"
+          $notes = "src/docs/releases/$tag.md"
           if (-not (Test-Path -LiteralPath $notes)) { throw "Release notes missing: $notes" }
           "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
           "SOURCE_COMMIT=$head" >> $env:GITHUB_ENV
@@ -50,7 +50,7 @@ jobs:
         run: |
           dotnet restore DeviceTweaker.sln
           if ($LASTEXITCODE -ne 0) { throw 'Restore failed' }
-          dotnet build 'DEVICE TWEAKER/DeviceTweakerCS.csproj' -c Release --no-restore -p:TreatWarningsAsErrors=true
+          dotnet build 'src/DeviceTweakerCS.csproj' -c Release --no-restore -p:TreatWarningsAsErrors=true
           if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
           dotnet test 'dev/qa/tests/DeviceTweaker.Tests/DeviceTweaker.Tests.csproj' -c Release --no-restore
           if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
@@ -58,13 +58,13 @@ jobs:
       - name: Build both release EXEs
         shell: pwsh
         run: |
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'DEVICE TWEAKER/build.ps1' -Flavor both -Configuration Release -SkipImodDriverBuild
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'src/build.ps1' -Flavor both -Configuration Release -SkipImodDriverBuild
           if ($LASTEXITCODE -ne 0) { throw 'Release package build failed' }
 
       - name: Verify package and prepare notes
         shell: pwsh
         run: |
-          $package = "DEVICE TWEAKER/bin/ReleasePackages/$env:RELEASE_TAG"
+          $package = "src/bin/ReleasePackages/$env:RELEASE_TAG"
           $expectedNames = @('DEVICE.TWEAKER.exe', 'DEVICE.TWEAKER.SelfContained.exe')
           $sumLines = @(Get-Content -LiteralPath "$package/SHA256SUMS.txt")
           if ($sumLines.Count -ne 2) { throw 'Expected two checksum lines' }
@@ -79,7 +79,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Source archive failed' }
           $sourceHash = (Get-FileHash -LiteralPath "$package/$sourceName" -Algorithm SHA256).Hash
           "$sourceHash  $sourceName" | Set-Content -LiteralPath "$package/SOURCE-SHA256SUMS.txt" -Encoding ascii
-          $notes = Get-Content -LiteralPath "DEVICE TWEAKER/docs/releases/$env:RELEASE_TAG.md" -Raw
+          $notes = Get-Content -LiteralPath "src/docs/releases/$env:RELEASE_TAG.md" -Raw
           $notes += "`n`nSource commit: ``$env:SOURCE_COMMIT``.`n"
           Set-Content -LiteralPath "$env:RUNNER_TEMP/release-notes.md" -Value $notes -Encoding utf8
 
@@ -87,7 +87,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: DEVICE-TWEAKER-${{ env.RELEASE_TAG }}-${{ env.SOURCE_COMMIT }}
-          path: DEVICE TWEAKER/bin/ReleasePackages/${{ env.RELEASE_TAG }}/
+          path: src/bin/ReleasePackages/${{ env.RELEASE_TAG }}/
           if-no-files-found: error
 
       - name: Create draft release
@@ -95,6 +95,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $package = "DEVICE TWEAKER/bin/ReleasePackages/$env:RELEASE_TAG"
+          $package = "src/bin/ReleasePackages/$env:RELEASE_TAG"
           gh release create $env:RELEASE_TAG "$package/DEVICE.TWEAKER.exe" "$package/DEVICE.TWEAKER.SelfContained.exe" "$package/SHA256SUMS.txt" "$package/DEVICE.TWEAKER.Source.$env:RELEASE_TAG.zip" "$package/SOURCE-SHA256SUMS.txt" --draft --verify-tag --title "DEVICE TWEAKER $env:RELEASE_TAG" --notes-file "$env:RUNNER_TEMP/release-notes.md"
           if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed; an existing release is never overwritten' }

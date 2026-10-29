@@ -4,8 +4,8 @@
 param([Parameter(Mandatory=$true)][string]$OutputDirectory, [switch]$InjectUnloadRegression)
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$driver = Join-Path $root 'DEVICE TWEAKER\IMOD\Driver\imod_driver.c'
-$header = Join-Path $root 'DEVICE TWEAKER\IMOD\Driver\imod_driver.h'
+$driver = Join-Path $root 'src\IMOD\Driver\imod_driver.c'
+$header = Join-Path $root 'src\IMOD\Driver\imod_driver.h'
 $text = Get-Content -LiteralPath $driver -Raw
 $functions = @('ImodDriverUnload','DriverEntry','ImodDriverCreateDriver','ImodDriverInitialize','ImodDriverDispatch',
     'ImodIsValidAccessSize','ImodMapPhysicalMemory','ImodUnmapPhysicalMemory','ImodReadPhysicalMemory','ImodWritePhysicalMemory')

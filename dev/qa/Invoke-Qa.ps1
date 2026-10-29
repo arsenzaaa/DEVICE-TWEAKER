@@ -15,7 +15,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Private-Desktop.ps1')
 . (Join-Path $PSScriptRoot 'Input-Snapshot.ps1')
 . (Join-Path $PSScriptRoot 'Test-QaEvidence.ps1')
-$root = (Resolve-Path (Join-Path $PSScriptRoot '..\..\DEVICE TWEAKER')).Path
+$root = (Resolve-Path (Join-Path $PSScriptRoot '..\..\src')).Path
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) { $OutputRoot = Join-Path $root 'tmp\qa' }
 $outputFull = [IO.Path]::GetFullPath($OutputRoot).TrimEnd('\')
 if (($outputFull.Equals($root, [StringComparison]::OrdinalIgnoreCase) -or
@@ -70,7 +70,7 @@ Test-QaInputSnapshot $runDir
 $savedReadOnly = $env:DEVICE_TWEAKER_QA_READ_ONLY
 $savedOutput = $env:DEVICE_TWEAKER_QA_OUTPUT
 $savedBackups = $env:DEVICE_TWEAKER_QA_BACKUPS
-$backupDirectory = Join-Path $SourceWorkspace 'DEVICE TWEAKER\bin\Publish\DEVICE TWEAKER (SELF-CONTAINED)\Backups'
+$backupDirectory = Join-Path $SourceWorkspace 'src\bin\Publish\DEVICE TWEAKER (SELF-CONTAINED)\Backups'
 if (Test-Path -LiteralPath $backupDirectory) { $env:DEVICE_TWEAKER_QA_BACKUPS = $backupDirectory }
 $env:DEVICE_TWEAKER_QA_READ_ONLY = '1'
 $env:DEVICE_TWEAKER_QA_OUTPUT = Join-Path $runDir 'unit-processes'

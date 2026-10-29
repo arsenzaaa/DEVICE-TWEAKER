@@ -9,8 +9,8 @@ This directory contains the Windows Forms source. If you need a ready-to-run EXE
 You need Windows 10/11 x64, the .NET 8 SDK, and PowerShell 5.1 or newer. Run these commands from the repository root:
 
 ```powershell
-dotnet restore ".\DEVICE TWEAKER\DeviceTweakerCS.csproj"
-dotnet build ".\DEVICE TWEAKER\DeviceTweakerCS.csproj" -c Release -p:TreatWarningsAsErrors=true
+dotnet restore ".\src\DeviceTweakerCS.csproj"
+dotnet build ".\src\DeviceTweakerCS.csproj" -c Release -p:TreatWarningsAsErrors=true
 dotnet test ".\dev\qa\tests\DeviceTweaker.Tests\DeviceTweaker.Tests.csproj" -c Release
 ```
 
@@ -23,7 +23,7 @@ Full QA also uses C++ Build Tools / Windows SDK for a native model without loadi
 To produce both EXEs and `SHA256SUMS.txt`:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\DEVICE TWEAKER\publish-variants.ps1" `
+powershell -ExecutionPolicy Bypass -File ".\src\publish-variants.ps1" `
   -Flavor both -Configuration Release -SkipImodDriverBuild
 ```
 
