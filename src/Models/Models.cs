@@ -242,6 +242,8 @@ internal sealed class DeviceBlock
     public int SuppressCpuEvents { get; set; }
     public int SuppressImodEvents { get; set; }
     public int? RssBaseCore { get; set; }
+    public IReadOnlyList<int>? RssQueueOptions { get; set; }
+    public int RssQueueLast { get; set; } = 1;
     public int NicItrOperationGeneration { get; set; }
     public NdisRssRuntimeState? NdisRssRuntime { get; set; }
 

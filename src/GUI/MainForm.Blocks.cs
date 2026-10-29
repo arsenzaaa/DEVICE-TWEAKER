@@ -2285,7 +2285,10 @@ public sealed partial class MainForm
                 }
 
                 int baseCore = block.RssBaseCore ?? GetFirstCheckedCore(block) ?? 0;
-                int queues = ClampRssQueueCount((int)block.RssQueueBox.Value);
+                int requested = ClampRssQueueCount((int)block.RssQueueBox.Value);
+                int queues = block.RssQueueOptions is { Count: > 0 } options
+                    ? NdisRssLayout.Snap(options, block.RssQueueLast, requested)
+                    : requested;
                 ApplyNdisSelection(block, baseCore, queues);
             };
         }
@@ -3214,6 +3217,9 @@ public sealed partial class MainForm
                 string triedKeys = string.Join(", ", BuildIrqLookupKeys(b));
                 WriteLog($"IRQ.MAP: {b.Device.InstanceId} ({shortPnp}) -> {(isNetwork ? "N/A" : "0")} wmiMsiHint=Unknown registryMsi={regMsiStatus} irqs=[none] source=registry-fallback keys=[{triedKeys}]");
             }
+
+            // MSI-X support is known only now; it limits how many RSS queues are useful.
+            UpdateRssQueueOptions(b);
         }
 
         LogGuiSnapshot("irq-refresh");

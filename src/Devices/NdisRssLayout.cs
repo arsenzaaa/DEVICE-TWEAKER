@@ -26,6 +26,60 @@ internal static class NdisRssLayout
     internal static int GetMaxQueues(IReadOnlyCollection<CpuLpInfo>? lps, int maxLogical)
         => Math.Max(1, GetCorePrimaryProcessors(lps, maxLogical).Count);
 
+    // Queue counts the adapter can actually use: the driver's *NumRssQueues enum
+    // (when present), at most one queue per physical core, and a single queue
+    // without MSI-X because every queue would share one interrupt vector.
+    internal static List<int> GetAllowedQueueCounts(
+        IEnumerable<int>? driverValues,
+        PciInterruptCapabilities? capabilities,
+        int maxQueues)
+    {
+        maxQueues = Math.Max(1, maxQueues);
+        if (capabilities is not null && (capabilities.Support & PciInterruptSupport.MsiX) == 0)
+        {
+            return [1];
+        }
+
+        if (capabilities?.MessageMaximum is uint messages && messages > 0)
+        {
+            maxQueues = Math.Min(maxQueues, (int)Math.Min(messages, int.MaxValue));
+        }
+
+        List<int> driver = driverValues?.Where(value => value > 0).Distinct().ToList() ?? [];
+        IEnumerable<int> candidates = driver.Count > 0 ? driver : Enumerable.Range(1, maxQueues);
+        List<int> allowed = candidates.Where(value => value <= maxQueues).Append(1).Distinct().Order().ToList();
+        return allowed;
+    }
+
+    // Moves a spinner value to an allowed count in the direction the user stepped.
+    internal static int Snap(IReadOnlyList<int> allowed, int previous, int requested)
+    {
+        if (allowed.Count == 0 || allowed.Contains(requested))
+        {
+            return allowed.Count == 0 ? Math.Max(1, requested) : requested;
+        }
+
+        if (requested > previous)
+        {
+            int up = allowed.FirstOrDefault(value => value > previous);
+            return up > 0 ? up : allowed[^1];
+        }
+
+        return Floor(allowed, requested);
+    }
+
+    // Largest allowed count not above the value; used for saved or AUTO values.
+    internal static int Floor(IReadOnlyList<int> allowed, int value)
+    {
+        if (allowed.Count == 0)
+        {
+            return Math.Max(1, value);
+        }
+
+        int floor = allowed.LastOrDefault(candidate => candidate <= value);
+        return floor > 0 ? floor : allowed[0];
+    }
+
     internal static Layout Select(IReadOnlyCollection<CpuLpInfo>? lps, int maxLogical, int requestedBase, int queues)
     {
         List<int> primaries = GetCorePrimaryProcessors(lps, maxLogical);

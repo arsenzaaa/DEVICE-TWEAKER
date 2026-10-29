@@ -318,11 +318,56 @@ public sealed partial class MainForm
     private NdisRssLayout.Layout GetNdisRssLayout(int baseCore, int queues)
         => NdisRssLayout.Select(_cpuInfo?.Topology.LPs, _maxLogical, Math.Max(0, baseCore), ClampRssQueueCount(queues));
 
+    private void UpdateRssQueueOptions(DeviceBlock block)
+    {
+        if (block.Kind != DeviceKind.NET_NDIS)
+        {
+            return;
+        }
+
+        List<int> driverValues = block.Device.IsTestDevice ? [] : GetNdisRssQueueDriverValues(block.Device.InstanceId);
+        List<int> options = NdisRssLayout.GetAllowedQueueCounts(
+            driverValues,
+            block.InterruptCapabilities,
+            NdisRssLayout.GetMaxQueues(_cpuInfo?.Topology.LPs, _maxLogical));
+        block.RssQueueOptions = options;
+        WriteLog($"RSS.QUEUES.OPTIONS: {block.Device.InstanceId} driver=[{string.Join(',', driverValues)}] hw={FormatInterruptCapabilities(block.InterruptCapabilities)} allowed=[{string.Join(',', options)}]");
+
+        if (block.RssQueueBox is null)
+        {
+            return;
+        }
+
+        block.SuppressCpuEvents++;
+        try
+        {
+            block.RssQueueBox.Maximum = options[^1];
+        }
+        finally
+        {
+            block.SuppressCpuEvents--;
+        }
+
+        int current = (int)block.RssQueueBox.Value;
+        if (!options.Contains(current) && block.RssBaseCore is int baseCore)
+        {
+            ApplyNdisSelection(block, baseCore, current);
+        }
+    }
+
+    private int FloorRssQueueCount(DeviceBlock block, int queues)
+    {
+        int clamped = ClampRssQueueCount(queues);
+        return block.RssQueueOptions is { Count: > 0 } options ? NdisRssLayout.Floor(options, clamped) : clamped;
+    }
+
     private NdisRssLayout.Layout ApplyNdisSelection(DeviceBlock block, int baseCore, int queues)
     {
-        int clampedQueues = ClampRssQueueCount(queues);
+        int clampedQueues = FloorRssQueueCount(block, queues);
         NdisRssLayout.Layout layout = GetNdisRssLayout(baseCore, clampedQueues);
+        clampedQueues = layout.Processors.Count;
         block.RssBaseCore = layout.BaseProcessor;
+        block.RssQueueLast = clampedQueues;
 
         if (block.RssQueueBox is not null && (int)block.RssQueueBox.Value != clampedQueues)
         {
@@ -527,8 +572,8 @@ public sealed partial class MainForm
                     ? testState!.RssBaseCore
                     : GetNdisBaseCore(block.Device.InstanceId);
             int? registryQueues = isTestDevice ? testState!.RssQueues : GetNdisRssQueues(block.Device.InstanceId);
-            int queues = registryQueues ?? 1;
-            queues = ClampRssQueueCount(queues);
+            UpdateRssQueueOptions(block);
+            int queues = FloorRssQueueCount(block, registryQueues ?? 1);
             block.NdisRssRuntime = isTestDevice
                 ? new NdisRssRuntimeState(
                     AdapterFound: true,
@@ -598,7 +643,7 @@ public sealed partial class MainForm
                     block.SuppressCpuEvents++;
                     try
                     {
-                        block.RssQueueBox.Value = ClampRssQueueCount(selectedCount);
+                        block.RssQueueBox.Value = FloorRssQueueCount(block, selectedCount);
                     }
                     finally
                     {
@@ -1178,6 +1223,7 @@ public sealed partial class MainForm
             int queues = ClampRssQueueCount(block.RssQueueBox?.Value is decimal val ? (int)val : 1);
             NdisRssLayout.Layout layout = ApplyNdisSelection(block, block.RssBaseCore ?? GetFirstCheckedCore(block) ?? 0, queues);
             int baseCore = layout.BaseProcessor;
+            queues = layout.Processors.Count;
 
             NdisAffinityMode ndisMode = GetSelectedNdisAffinityMode(block);
             if (ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both)

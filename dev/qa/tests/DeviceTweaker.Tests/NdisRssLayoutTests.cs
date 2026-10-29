@@ -84,6 +84,58 @@ public class NdisRssLayoutTests
     }
 
     [Fact]
+    public void AllowedQueues_UseDriverEnumWithinCoreLimit()
+    {
+        PciInterruptCapabilities msix = new(PciInterruptSupport.Msi | PciInterruptSupport.MsiX, 5);
+
+        Assert.Equal([1, 2, 4], NdisRssLayout.GetAllowedQueueCounts([4, 1, 2], msix, maxQueues: 8));
+        Assert.Equal([1, 2], NdisRssLayout.GetAllowedQueueCounts([1, 2, 4], msix, maxQueues: 2));
+    }
+
+    [Fact]
+    public void AllowedQueues_WithoutMsiX_AreSingleQueue()
+    {
+        PciInterruptCapabilities msiOnly = new(PciInterruptSupport.LineBased | PciInterruptSupport.Msi, 1);
+
+        Assert.Equal([1], NdisRssLayout.GetAllowedQueueCounts([1, 2], msiOnly, maxQueues: 8));
+    }
+
+    [Fact]
+    public void AllowedQueues_LimitedByMsiXMessages()
+    {
+        PciInterruptCapabilities msix = new(PciInterruptSupport.MsiX, 3);
+
+        Assert.Equal([1, 2, 3], NdisRssLayout.GetAllowedQueueCounts(null, msix, maxQueues: 8));
+    }
+
+    [Fact]
+    public void AllowedQueues_UnknownCapabilitiesKeepDriverValues()
+    {
+        Assert.Equal([1, 2, 4], NdisRssLayout.GetAllowedQueueCounts([1, 2, 4], null, maxQueues: 8));
+        Assert.Equal([1, 2, 3], NdisRssLayout.GetAllowedQueueCounts([], null, maxQueues: 3));
+    }
+
+    [Theory]
+    [InlineData(2, 3, 4)]
+    [InlineData(4, 3, 2)]
+    [InlineData(4, 5, 4)]
+    [InlineData(1, 0, 1)]
+    [InlineData(2, 2, 2)]
+    public void Snap_FollowsStepDirection(int previous, int requested, int expected)
+    {
+        Assert.Equal(expected, NdisRssLayout.Snap([1, 2, 4], previous, requested));
+    }
+
+    [Theory]
+    [InlineData(3, 2)]
+    [InlineData(8, 4)]
+    [InlineData(0, 1)]
+    public void Floor_PicksLargestAllowedNotAbove(int value, int expected)
+    {
+        Assert.Equal(expected, NdisRssLayout.Floor([1, 2, 4], value));
+    }
+
+    [Fact]
     public void Select_IgnoresOtherProcessorGroups()
     {
         List<CpuLpInfo> lps = [.. NoSmt(4), new CpuLpInfo(1, 0, 100, 0, 0, 0)];

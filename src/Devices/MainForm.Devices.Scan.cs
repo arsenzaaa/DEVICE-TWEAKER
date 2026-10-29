@@ -1,5 +1,6 @@
 using Microsoft.Win32;
 using System.Diagnostics;
+using System.Globalization;
 using System.Management;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -164,6 +165,35 @@ public sealed partial class MainForm
         }
 
         return null;
+    }
+
+    // Values the driver INF offers for *NumRssQueues (Ndi\params\*NumRssQueues\enum).
+    private List<int> GetNdisRssQueueDriverValues(string instanceId)
+    {
+        List<int> values = [];
+        string? ckPath = GetClassKeyForDevice(instanceId);
+        if (string.IsNullOrWhiteSpace(ckPath))
+        {
+            return values;
+        }
+
+        try
+        {
+            using RegistryKey? enumKey = Registry.LocalMachine.OpenSubKey(ckPath + @"\Ndi\params\*NumRssQueues\enum");
+            foreach (string name in enumKey?.GetValueNames() ?? [])
+            {
+                if (int.TryParse(name, NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) && value > 0)
+                {
+                    values.Add(value);
+                }
+            }
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or IOException or UnauthorizedAccessException)
+        {
+            WriteLog($"RSS.QUEUES.ENUM.WARN: {instanceId} {ex.Message}");
+        }
+
+        return values;
     }
 
     private string? GetNdisNetCfgInstanceId(string instanceId)
