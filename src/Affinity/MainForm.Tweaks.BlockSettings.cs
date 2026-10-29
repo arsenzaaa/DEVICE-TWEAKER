@@ -64,9 +64,10 @@ public sealed partial class MainForm
             value = 1;
         }
 
-        if (value > _maxLogical)
+        int maxQueues = NdisRssLayout.GetMaxQueues(_cpuInfo?.Topology.LPs, _maxLogical);
+        if (value > maxQueues)
         {
-            value = _maxLogical;
+            value = maxQueues;
         }
 
         return value;
@@ -314,20 +315,14 @@ public sealed partial class MainForm
         }
     }
 
-    private void ApplyNdisSelection(DeviceBlock block, int baseCore, int queues)
+    private NdisRssLayout.Layout GetNdisRssLayout(int baseCore, int queues)
+        => NdisRssLayout.Select(_cpuInfo?.Topology.LPs, _maxLogical, Math.Max(0, baseCore), ClampRssQueueCount(queues));
+
+    private NdisRssLayout.Layout ApplyNdisSelection(DeviceBlock block, int baseCore, int queues)
     {
         int clampedQueues = ClampRssQueueCount(queues);
-        int maxBase = Math.Max(0, _maxLogical - clampedQueues);
-        if (baseCore < 0)
-        {
-            baseCore = 0;
-        }
-        else if (baseCore > maxBase)
-        {
-            baseCore = maxBase;
-        }
-
-        block.RssBaseCore = baseCore;
+        NdisRssLayout.Layout layout = GetNdisRssLayout(baseCore, clampedQueues);
+        block.RssBaseCore = layout.BaseProcessor;
 
         if (block.RssQueueBox is not null && (int)block.RssQueueBox.Value != clampedQueues)
         {
@@ -342,11 +337,7 @@ public sealed partial class MainForm
             }
         }
 
-        HashSet<int> selected = [];
-        for (int i = 0; i < clampedQueues; i++)
-        {
-            selected.Add(baseCore + i);
-        }
+        HashSet<int> selected = [.. layout.Processors];
 
         block.SuppressCpuEvents++;
         try
@@ -368,6 +359,7 @@ public sealed partial class MainForm
         }
 
         RecalcAffinityMask(block);
+        return layout;
     }
 
     private void HandleNdisCheckboxChanged(DeviceBlock block, CheckBox sender)
@@ -1184,21 +1176,15 @@ public sealed partial class MainForm
         if (block.Kind == DeviceKind.NET_NDIS)
         {
             int queues = ClampRssQueueCount(block.RssQueueBox?.Value is decimal val ? (int)val : 1);
-            int baseCore = block.RssBaseCore ?? GetFirstCheckedCore(block) ?? 0;
-            int maxBase = Math.Max(0, _maxLogical - queues);
-            if (baseCore > maxBase)
-            {
-                baseCore = maxBase;
-            }
-
-            ApplyNdisSelection(block, baseCore, queues);
+            NdisRssLayout.Layout layout = ApplyNdisSelection(block, block.RssBaseCore ?? GetFirstCheckedCore(block) ?? 0, queues);
+            int baseCore = layout.BaseProcessor;
 
             NdisAffinityMode ndisMode = GetSelectedNdisAffinityMode(block);
             if (ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both)
             {
                 SetNdisRssQueues(block.Device.InstanceId, queues, report, block.Device.Name);
                 SetNdisBaseCore(block.Device.InstanceId, baseCore, report, block.Device.Name);
-                SetNdisRssExtraValues(block.Device.InstanceId, baseCore, queues, report, block.Device.Name);
+                SetNdisRssExtraValues(block.Device.InstanceId, layout, report, block.Device.Name);
             }
             else
             {

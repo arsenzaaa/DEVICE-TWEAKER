@@ -834,7 +834,7 @@ public sealed partial class MainForm
             Location = new Point(valueX, rowTop),
             Size = UiScale(70, 26),
             Minimum = 1,
-            Maximum = Math.Max(1, _maxLogical),
+            Maximum = NdisRssLayout.GetMaxQueues(_cpuInfo?.Topology.LPs, _maxLogical),
             Value = 1,
             BackColor = Color.FromArgb(18, 18, 22),
             ForeColor = _fgMain,

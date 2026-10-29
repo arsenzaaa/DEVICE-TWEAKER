@@ -526,23 +526,13 @@ public sealed partial class MainForm
 
     private void SetNdisRssExtraValues(
         string instanceId,
-        int baseCore,
-        int queues,
+        NdisRssLayout.Layout layout,
         OperationReport? report = null,
         string? deviceName = null)
     {
         DemandRealWrite("SetNdisRssExtraValues");
-        if (baseCore < 0)
-        {
-            baseCore = 0;
-        }
-
-        if (queues < 1)
-        {
-            queues = 1;
-        }
-
-        int maxCore = Math.Max(baseCore, baseCore + queues - 1);
+        int queues = layout.Processors.Count;
+        int maxCore = layout.MaxProcessor;
         string? ckPath = GetClassKeyForDevice(instanceId);
         if (string.IsNullOrWhiteSpace(ckPath))
         {
@@ -569,7 +559,7 @@ public sealed partial class MainForm
             // preserves the existing group-0 RSS policy without breaking
             // multi-node systems.
             ck.DeleteValue("*NumaNodeId", throwOnMissingValue: false);
-            WriteLog($"RSS.EXTRA.SET: {instanceId} group=0 maxProcessors={queues} maxProc={maxCore} numa=automatic");
+            WriteLog($"RSS.EXTRA.SET: {instanceId} group=0 maxProcessors={queues} maxProc={maxCore} cpus=[{string.Join(',', layout.Processors)}] numa=automatic");
         }
         catch (Exception ex)
         {

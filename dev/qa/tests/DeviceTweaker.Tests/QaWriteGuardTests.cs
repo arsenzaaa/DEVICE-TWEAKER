@@ -98,7 +98,7 @@ public sealed class QaWriteGuardTests
         AssertBlocked("SetReservedCpuSets", (object?)null);
         AssertBlocked("SetNdisBaseCore", "", 0, null, null);
         AssertBlocked("SetNdisRssQueues", "", 0, null, null);
-        AssertBlocked("SetNdisRssExtraValues", "", 0, 0, null, null);
+        AssertBlocked("SetNdisRssExtraValues", "", null, null, null);
         AssertBlocked("ClearNdisBaseCore", "", null, null);
         AssertBlocked("ClearNdisRssQueues", "", null, null);
         AssertBlocked("ClearNdisRssExtraValues", "", null, null);
