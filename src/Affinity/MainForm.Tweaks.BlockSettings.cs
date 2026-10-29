@@ -789,6 +789,23 @@ public sealed partial class MainForm
         UpdateBlockInfoText(block);
     }
 
+    private void AppendNicItrInfo(StringBuilder info, DeviceBlock block)
+    {
+        if (TryGetNicItrProfile(block.Device.InstanceId) is not NicItrProfile nicProfile)
+        {
+            return;
+        }
+
+        info.AppendLine();
+        info.Append($"NIC ITR: {nicProfile.FamilyName}");
+        if (!block.Device.IsTestDevice
+            && NicDriverModeration.Describe(ReadNicDriverModeration(block.Device.InstanceId)) is string moderation)
+        {
+            info.AppendLine();
+            info.Append($"Interrupt Moderation: {moderation}");
+        }
+    }
+
     private void UpdateBlockInfoText(
         DeviceBlock block,
         string? usbRolesOverride = null,
@@ -894,11 +911,7 @@ public sealed partial class MainForm
                 info.AppendLine();
                 info.Append($"RSS: {FormatNdisRuntimeBool(runtime.Enabled)} base {FormatNdisRuntimeValue(runtime.BaseProcessorNumber)} queues {FormatNdisRuntimeValue(runtime.NumberOfReceiveQueues)}");
             }
-            if (TryGetNicItrProfile(block.Device.InstanceId) is NicItrProfile nicProfile)
-            {
-                info.AppendLine();
-                info.Append($"NIC ITR: {nicProfile.FamilyName}");
-            }
+            AppendNicItrInfo(info, block);
 
             if (!block.Device.Wifi && !string.IsNullOrWhiteSpace(block.Device.NicPowerSaving))
             {
@@ -910,11 +923,7 @@ public sealed partial class MainForm
         {
             info.AppendLine();
             info.Append("Net type: NetAdapterCx");
-            if (TryGetNicItrProfile(block.Device.InstanceId) is NicItrProfile nicProfile)
-            {
-                info.AppendLine();
-                info.Append($"NIC ITR: {nicProfile.FamilyName}");
-            }
+            AppendNicItrInfo(info, block);
 
             if (!block.Device.Wifi && !string.IsNullOrWhiteSpace(block.Device.NicPowerSaving))
             {

@@ -1,6 +1,8 @@
 ﻿using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Security;
 using System.Text.RegularExpressions;
+using Microsoft.Win32;
 
 namespace DeviceTweakerCS;
 
@@ -8,6 +10,128 @@ public sealed partial class MainForm
 {
     internal static NicItrProfile? TryGetNicItrProfile(string instanceId)
         => NicItrService.TryGetNicItrProfile(instanceId);
+
+    private List<NicDriverModeration.Keyword> ReadNicDriverModeration(string instanceId)
+    {
+        List<NicDriverModeration.Keyword> keywords = [];
+        string? classKey = GetClassKeyForDevice(instanceId);
+        if (string.IsNullOrWhiteSpace(classKey))
+        {
+            return keywords;
+        }
+
+        try
+        {
+            using RegistryKey? adapterKey = Registry.LocalMachine.OpenSubKey(classKey);
+            if (adapterKey is null)
+            {
+                return keywords;
+            }
+
+            foreach (string name in NicDriverModeration.KeywordNames)
+            {
+                using RegistryKey? paramKey = adapterKey.OpenSubKey($@"Ndi\params\{name}");
+                if (paramKey is null)
+                {
+                    continue;
+                }
+
+                Dictionary<string, string> options = new(StringComparer.Ordinal);
+                using (RegistryKey? enumKey = paramKey.OpenSubKey("enum"))
+                {
+                    foreach (string value in enumKey?.GetValueNames() ?? [])
+                    {
+                        options[value] = enumKey!.GetValue(value)?.ToString() ?? value;
+                    }
+                }
+
+                keywords.Add(new NicDriverModeration.Keyword(
+                    name,
+                    options,
+                    paramKey.GetValue("default")?.ToString(),
+                    adapterKey.GetValue(name)?.ToString()));
+            }
+        }
+        catch (Exception ex) when (ex is SecurityException or IOException or UnauthorizedAccessException)
+        {
+            WriteLog($"NIC.MODERATION.READ.WARN: {instanceId} {ex.Message}");
+        }
+
+        return keywords;
+    }
+
+    private bool WriteNicDriverModeration(
+        string instanceId,
+        IReadOnlyList<NicDriverModeration.Change> changes,
+        string reason,
+        OperationReport? report = null)
+    {
+        DemandRealWrite("WriteNicDriverModeration");
+        if (changes.Count == 0)
+        {
+            return true;
+        }
+
+        string? classKey = GetClassKeyForDevice(instanceId);
+        try
+        {
+            if (string.IsNullOrWhiteSpace(classKey))
+            {
+                throw new InvalidOperationException("NDIS class key was not found");
+            }
+
+            using RegistryKey adapterKey = Registry.LocalMachine.OpenSubKey(classKey, writable: true)
+                ?? throw new InvalidOperationException("NDIS class key is unavailable");
+            foreach (NicDriverModeration.Change change in changes)
+            {
+                // Advanced properties are REG_SZ; keep another kind if the INF chose one.
+                RegistryValueKind kind = adapterKey.GetValue(change.Name) is null
+                    ? RegistryValueKind.String
+                    : adapterKey.GetValueKind(change.Name);
+                object value = kind == RegistryValueKind.DWord
+                    ? int.Parse(change.After, NumberStyles.Integer, CultureInfo.InvariantCulture)
+                    : change.After;
+                adapterKey.SetValue(change.Name, value, kind);
+                WriteLog($"NIC.MODERATION.{reason}: {instanceId} {change.Name} {change.Before ?? "(none)"} -> {change.After} (applies after restart)");
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"NIC.MODERATION.{reason}.ERROR: {instanceId} {FlattenLogText(ex.ToString())}");
+            report?.AddError($"{instanceId}: driver interrupt moderation", ex.Message);
+            return false;
+        }
+    }
+
+    // Removing the saved NIC ITR profile hands moderation back to the driver.
+    private void RestoreNicDriverModerationForSavedProfiles(OperationReport? report)
+    {
+        HashSet<string> savedKeys = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string path in new[] { GetImodStartupPath(), GetLegacyImodStartupPath() })
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    savedKeys.UnionWith(ParseImodScriptFile(path).NicItrEntries.Select(entry => entry.Hwid));
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+            {
+                WriteLog($"NIC.MODERATION.RESTORE.WARN: cannot read saved profile {path}: {ex.Message}");
+            }
+        }
+
+        foreach (DeviceBlock block in _blocks.Where(block => block.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX
+            && !block.Device.IsTestDevice
+            && savedKeys.Contains(GetNicItrPersistenceKey(block.Device.InstanceId))))
+        {
+            List<NicDriverModeration.Change> changes = NicDriverModeration.PlanRestoreDefault(ReadNicDriverModeration(block.Device.InstanceId));
+            WriteNicDriverModeration(block.Device.InstanceId, changes, "RESTORE", report);
+        }
+    }
 
     private async void RefreshNicItrBlock(DeviceBlock block, bool showReadingStatus = true)
     {
@@ -399,6 +523,16 @@ public sealed partial class MainForm
             block.NicItrStatusLabel.ForeColor = _statusActive;
             UpdateNicItrInputTimeLabel(block);
             WriteLog($"NIC.ITR.SAVE: {block.Device.InstanceId} key={hwid} profile=\"{profile.FamilyName}\" values={FormatNicItrValueList(values, profile)} path={scriptPath}");
+
+            // Adaptive driver moderation would overwrite the saved register value.
+            List<NicDriverModeration.Change> moderation = NicDriverModeration.PlanDisable(ReadNicDriverModeration(block.Device.InstanceId));
+            if (!WriteNicDriverModeration(block.Device.InstanceId, moderation, "OFF"))
+            {
+                block.NicItrStatusLabel.Text = "current: saved; driver moderation unchanged";
+                block.NicItrStatusLabel.ForeColor = _statusDanger;
+            }
+
+            UpdateBlockInfoText(block);
         }
         catch (Exception ex)
         {

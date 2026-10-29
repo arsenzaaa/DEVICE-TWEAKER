@@ -520,6 +520,10 @@ internal static partial class UiLanguage
         if (source.StartsWith("Power Saving: ", StringComparison.Ordinal))
             return "Power Saving: " + TranslateInlineStatus(source[14..]);
 
+        // The value is the driver's own option text, already in the system language.
+        if (source.StartsWith("Interrupt Moderation: ", StringComparison.Ordinal))
+            return source;
+
         if (source.StartsWith("Topology: estimated ", StringComparison.Ordinal))
             return "Топология: ориентировочно " + source[20..];
 
@@ -1444,6 +1448,7 @@ internal static partial class UiLanguage
             ["backup failed"] = "ошибка бекапа",
             ["applying..."] = "применение...",
             ["saved for startup"] = "сохранено для автозапуска",
+            ["saved; driver moderation unchanged"] = "сохранено; модерация драйвера не изменена",
             ["save failed"] = "ошибка сохранения",
             ["off"] = "выключено",
             ["on"] = "включено",

@@ -99,6 +99,7 @@ public sealed class QaWriteGuardTests
         AssertBlocked("SetNdisBaseCore", "", 0, null, null);
         AssertBlocked("SetNdisRssQueues", "", 0, null, null);
         AssertBlocked("SetNdisRssExtraValues", "", null, null, null);
+        AssertBlocked("WriteNicDriverModeration", "", null, "OFF", null);
         AssertBlocked("ClearNdisBaseCore", "", null, null);
         AssertBlocked("ClearNdisRssQueues", "", null, null);
         AssertBlocked("ClearNdisRssExtraValues", "", null, null);

@@ -325,7 +325,7 @@ public sealed partial class MainForm
                     AddValues(
                         RegistryHive.LocalMachine,
                         classKey,
-                        DevicePowerPolicy.PnPCapabilitiesName);
+                        [DevicePowerPolicy.PnPCapabilitiesName, .. NicDriverModeration.KeywordNames]);
                 }
             }
         }

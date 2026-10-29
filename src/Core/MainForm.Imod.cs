@@ -2971,6 +2971,7 @@ public sealed partial class MainForm
     private void RemoveImodPersistenceFiles(OperationReport? report = null)
     {
         DemandRealWrite("RemoveImodPersistenceFiles");
+        RestoreNicDriverModerationForSavedProfiles(report);
         DeleteImodStartupRegistration(report);
         DeleteFileIfExists(GetImodStartupPath(), "IMOD.CONFIG", report);
         DeleteFileIfExists(GetLegacyImodStartupPath(), "IMOD.CONFIG.LEGACY", report);

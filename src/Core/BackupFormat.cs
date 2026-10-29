@@ -121,7 +121,9 @@ internal static class BackupFormat
                 or "*RSSMaxProcGroup"
                 or "*RssMaxProcNumber"
                 or "*NumaNodeId"
-                or "PnPCapabilities";
+                or "PnPCapabilities"
+                or "*InterruptModeration"
+                or "ITR";
         }
 
         return false;
