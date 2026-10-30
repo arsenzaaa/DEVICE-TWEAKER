@@ -1,7 +1,8 @@
 ﻿# Compile the actual DTIMOD entry/dispatch/MMIO functions against user-mode fake kernel APIs.
 # No SYS is executed, no driver/service is loaded, no physical memory is accessed.
 [CmdletBinding()]
-param([Parameter(Mandatory=$true)][string]$OutputDirectory, [switch]$InjectUnloadRegression)
+param([Parameter(Mandatory=$true)][string]$OutputDirectory,
+    [ValidateSet('unload', 'write-past-device-end')][string]$InjectRegression)
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $driver = Join-Path $root 'src\IMOD\Driver\imod_driver.c'
@@ -17,10 +18,18 @@ $bodies = foreach ($name in $functions) {
     while ($depth -gt 0) { if ($text[$end] -eq '{') { $depth++ }; if ($text[$end] -eq '}') { $depth-- }; $end++ }
     $text.Substring($match.Index,$end-$match.Index)
 }
-if ($InjectUnloadRegression) {
+# Deliberate regressions in the actual driver code; the model must fail with an assertion.
+$regressions = @{
+    'unload' = @{ old = 'DriverObject->DriverUnload = ImodDriverUnload;'; new = 'DriverObject->DriverUnload = NULL;';
+        detected = 'missing unload assignment in actual driver initialization' }
+    'write-past-device-end' = @{ old = 'address - start <= length - size'; new = 'address - start <= length';
+        detected = 'device write accepted although it crosses the end of the memory range' }
+}
+if ($InjectRegression) {
+    $regression = $regressions[$InjectRegression]
     $joined = $bodies -join "`n`n"
-    if (-not $joined.Contains('DriverObject->DriverUnload = ImodDriverUnload;')) { throw 'Unload mutation anchor missing' }
-    $bodies = @($joined.Replace('DriverObject->DriverUnload = ImodDriverUnload;', 'DriverObject->DriverUnload = NULL;'))
+    if ([regex]::Matches($joined, [regex]::Escape($regression.old)).Count -ne 1) { throw "Mutation anchor must occur once: $InjectRegression" }
+    $bodies = @($joined.Replace($regression.old, $regression.new))
 }
 $stub = @'
 #include <assert.h>
@@ -238,13 +247,13 @@ if ($LASTEXITCODE -ne 0) { throw "Native model compilation failed: $OutputDirect
 $savedPreference = $ErrorActionPreference
 try { $ErrorActionPreference = 'Continue'; & $exe *> (Join-Path $OutputDirectory 'run.log'); $runCode = $LASTEXITCODE }
 finally { $ErrorActionPreference = $savedPreference }
-if ($InjectUnloadRegression) {
-    if ($runCode -eq 0) { throw 'Native unload regression escaped the model' }
-    # Assertion from actual initialization is required, not a compiler failure.
-    if (-not ((Get-Content (Join-Path $OutputDirectory 'run.log') -Raw) -match 'Assertion failed')) { throw 'Expected initialization assertion was not observed' }
-    [ordered]@{ status='DETECTED'; expected='resident initialization assertion'; kernelExecuted=$false } |
+if ($InjectRegression) {
+    if ($runCode -eq 0) { throw "Native regression escaped the model: $InjectRegression" }
+    # An assertion from the actual driver code is required, not a compiler failure.
+    if (-not ((Get-Content (Join-Path $OutputDirectory 'run.log') -Raw) -match 'Assertion failed')) { throw "Expected assertion was not observed: $InjectRegression" }
+    [ordered]@{ status='DETECTED'; regression=$InjectRegression; expected=$regression.detected; kernelExecuted=$false } |
         ConvertTo-Json | Set-Content (Join-Path $OutputDirectory 'mutation.json') -Encoding UTF8
-    Write-Output 'DETECTED: missing unload assignment in actual driver initialization'
+    Write-Output ('DETECTED: ' + $regression.detected)
     exit 0
 }
 if ($runCode -ne 0) { throw "Native model failed: $OutputDirectory\run.log" }

@@ -76,38 +76,32 @@ $mutations = @(
         expected = 'EndpointTargetWinsOverSlotTargetAndHubsAreSkipped' }
 )
 
+. (Join-Path $PSScriptRoot 'Input-Snapshot.ps1')
+$workspace = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path.TrimEnd('\')
+$workspacePrefix = $workspace + '\'
+# Each case builds the app and the unit tests; vendor KDU sources, docs and GUI-only QA
+# tooling are not part of that build.
+$caseInputs = @(Get-QaInputFiles $workspace | Where-Object {
+    $relative = $_.FullName.Substring($workspacePrefix.Length)
+    ($relative.StartsWith('src\', [StringComparison]::OrdinalIgnoreCase) -and
+        -not $relative.StartsWith('src\IMOD\KDU\', [StringComparison]::OrdinalIgnoreCase) -and
+        -not $relative.StartsWith('src\docs\', [StringComparison]::OrdinalIgnoreCase)) -or
+    $relative.StartsWith('dev\qa\tests\DeviceTweaker.Tests\', [StringComparison]::OrdinalIgnoreCase) -or
+    $relative.StartsWith('dev\qa\Workbench\', [StringComparison]::OrdinalIgnoreCase)
+})
+
 foreach ($mutation in $mutations) {
     Write-Host ("EXPECTED REGRESSION: " + $mutation.name + ' (isolated source copy)')
     # Keep the testhost path below Win32 MAX_PATH even in a nested QA snapshot.
     $caseDir = Join-Path $output ('m{0:D2}_{1}' -f $results.Count, [Guid]::NewGuid().ToString('N').Substring(0, 8))
     $copyRepo = Join-Path $caseDir 'repo'
     $copyRoot = Join-Path $copyRepo 'src'
-    New-Item -ItemType Directory -Path $copyRoot -Force | Out-Null
-    foreach ($folder in @('Affinity', 'Core', 'Devices', 'GUI', 'Interop', 'Localization', 'Models', 'Tweaks')) {
-        foreach ($file in (Get-ChildItem -LiteralPath (Join-Path $root $folder) -Filter '*.cs' -Recurse -File)) {
-            $relative = $file.FullName.Substring($rootPrefix.Length)
-            $target = Join-Path $copyRoot $relative
-            New-Item -ItemType Directory -Path (Split-Path $target) -Force | Out-Null
-            Copy-Item -LiteralPath $file.FullName -Destination $target
-        }
-    }
-    $extra = @('DeviceTweakerCS.csproj', '.editorconfig', 'assets\DEVICE TWEAKER.ico', 'assets\app.manifest',
-        'Startup\ApplyIMOD.ps1', 'Startup\DeviceTweakerImodRuntime.cs',
-        'IMOD\DTIMOD.sys', 'IMOD\DTIMOD.sys.sha256', 'IMOD\Loader\kdu.exe', 'IMOD\Loader\drv64.dll')
-    $testCopy = Join-Path $copyRepo 'dev\qa\tests\DeviceTweaker.Tests'
-    New-Item -ItemType Directory -Path $testCopy -Force | Out-Null
-    Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'tests\DeviceTweaker.Tests') -File |
-        Where-Object { $_.Extension -in @('.cs', '.csproj', '.json') } |
-        ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $testCopy }
-    foreach ($relative in $extra) {
-        $target = Join-Path $copyRoot $relative
+    foreach ($file in $caseInputs) {
+        $target = Join-Path $copyRepo $file.FullName.Substring($workspacePrefix.Length)
         New-Item -ItemType Directory -Path (Split-Path $target) -Force | Out-Null
-        Copy-Item -LiteralPath (Join-Path $root $relative) -Destination $target
+        Copy-Item -LiteralPath $file.FullName -Destination $target
     }
-    $workbenchCopy = Join-Path $copyRepo 'dev\qa\Workbench'
-    New-Item -ItemType Directory -Force -Path $workbenchCopy | Out-Null
-    Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'Workbench') -File -Filter '*.cs' |
-        ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $workbenchCopy }
+    $testCopy = Join-Path $copyRepo 'dev\qa\tests\DeviceTweaker.Tests'
     $mutatedPath = Join-Path $copyRoot $mutation.file
     $source = [IO.File]::ReadAllText($mutatedPath)
     if ([regex]::Matches($source, [regex]::Escape($mutation.old)).Count -ne 1) {

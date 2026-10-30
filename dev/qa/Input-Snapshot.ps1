@@ -1,27 +1,23 @@
-﻿function Get-QaInputFiles([string]$Workspace) {
-    $app = Join-Path $Workspace 'src'
-    $files = @()
-    foreach ($folder in @('Affinity', 'Core', 'Devices', 'GUI', 'Interop', 'Localization', 'Models', 'Tweaks')) {
-        $files += @(Get-ChildItem -LiteralPath (Join-Path $app $folder) -Recurse -File -Filter '*.cs')
+﻿# QA inputs are the files git tracks or would track under src and dev\qa, so a new
+# source file is covered without editing a list. A snapshot copy has no .git; there
+# every file except build output counts, which is how added files are detected.
+function Get-QaInputFiles([string]$Workspace) {
+    $Workspace = [IO.Path]::GetFullPath($Workspace).TrimEnd('\')
+    if (Test-Path -LiteralPath (Join-Path $Workspace '.git')) {
+        $paths = @(& git -C $Workspace -c core.quotepath=off ls-files --cached --others --exclude-standard -- src dev/qa)
+        if ($LASTEXITCODE -ne 0) { throw 'git could not list the QA input files' }
+        $files = foreach ($path in $paths) {
+            $full = Join-Path $Workspace ($path -replace '/', '\')
+            # A tracked file deleted in the working tree is simply not an input.
+            if (Test-Path -LiteralPath $full -PathType Leaf) { Get-Item -LiteralPath $full -Force }
+        }
+    } else {
+        $files = foreach ($folder in @('src', 'dev\qa')) {
+            Get-ChildItem -LiteralPath (Join-Path $Workspace $folder) -Recurse -File -Force |
+                Where-Object { $_.FullName.Substring($Workspace.Length) -notmatch '\\(bin|obj|tmp|TestResults|\.vs)\\' }
+        }
     }
-    $files += @(Get-ChildItem -LiteralPath (Join-Path $app 'Startup') -File)
-    foreach ($file in @('DeviceTweakerCS.csproj', '.editorconfig', 'assets\DEVICE TWEAKER.ico', 'assets\app.manifest',
-        'IMOD\DTIMOD.sys', 'IMOD\DTIMOD.sys.sha256', 'IMOD\Loader\kdu.exe', 'IMOD\Loader\drv64.dll',
-        'IMOD\Driver\imod_driver.c', 'IMOD\Driver\imod_driver.h', 'IMOD\Driver\ImodDriver.vcxproj',
-        'IMOD\DTIMOD.build.json', 'publish-variants.ps1')) {
-        $files += Get-Item -LiteralPath (Join-Path $app $file)
-    }
-    foreach ($file in @('IMOD\Loader\KDU.build.json', 'IMOD\KDU\upstream.json', 'IMOD\KDU\build-kdu.ps1', 'IMOD\KDU\README.md')) {
-        $files += Get-Item -LiteralPath (Join-Path $app $file)
-    }
-    $vendor = Get-Content -LiteralPath (Join-Path $app 'IMOD\KDU\upstream.json') -Raw | ConvertFrom-Json
-    foreach ($file in $vendor.files) { $files += Get-Item -LiteralPath (Join-Path $app ('IMOD\KDU\' + $file.path)) }
-    $qa = Join-Path $Workspace 'dev\qa'
-    $files += @(Get-ChildItem -LiteralPath $qa -File)
-    foreach ($folder in @('Panel', 'tests\DeviceTweaker.Tests', 'Inspect', 'Workbench', 'Scenarios')) {
-        $files += @(Get-ChildItem -LiteralPath (Join-Path $qa $folder) -File |
-            Where-Object { $_.Extension -in @('.cs', '.csproj', '.json') })
-    }
+    if (@($files).Count -eq 0) { throw "No QA input files under $Workspace" }
     return @($files | Sort-Object FullName -Unique)
 }
 

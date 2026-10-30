@@ -47,12 +47,13 @@ function Test-QaEvidence([string]$RunDirectory) {
     $driverContracts = Read-QaJson (Join-Path $RunDirectory 'script-contracts\driver-artifact-contracts.json')
     if ($driverContracts.Count -ne 5 -or @($driverContracts | Where-Object { -not $_.passed }).Count) { throw 'Driver / KDU source and binary rejection evidence is incomplete' }
     $nativeModel = Read-QaJson (Join-Path $RunDirectory 'native-model\result.json')
-    $nativeMutation = Read-QaJson (Join-Path $RunDirectory 'native-unload-mutant\mutation.json')
+    $nativeMutations = @('native-unload-mutant', 'native-write-range-mutant' | ForEach-Object { Read-QaJson (Join-Path $RunDirectory ($_ + '\mutation.json')) })
     if ($nativeModel.status -ne 'PASS' -or $nativeModel.kernelExecuted -or $nativeModel.hardwareAccessed -or
         $nativeModel.driverSourceSha256 -ne (Get-FileHash (Join-Path $manifest.snapshot 'src\IMOD\Driver\imod_driver.c')).Hash -or
         $nativeModel.driverHeaderSha256 -ne (Get-FileHash (Join-Path $manifest.snapshot 'src\IMOD\Driver\imod_driver.h')).Hash -or
         $nativeModel.modelSourceSha256 -ne (Get-FileHash (Join-Path $RunDirectory 'native-model\driver-model.c')).Hash -or
-        $nativeMutation.status -ne 'DETECTED' -or $nativeMutation.kernelExecuted) { throw 'Native model evidence is incomplete or changed' }
+        @($nativeMutations | Where-Object { $_.status -ne 'DETECTED' -or $_.kernelExecuted }).Count -or $nativeMutations.Count -ne 2) {
+        throw 'Native model evidence is incomplete or changed' }
     if ($contracts.Count -ne 4 -or @($contracts | Where-Object { -not $_.passed }).Count) { throw 'Desktop refusal/exit/cleanup evidence is incomplete' }
     foreach ($identity in $report.artifactsIdentity) {
         if ((Get-FileHash -LiteralPath $identity.path).Hash -ne $identity.sha256) { throw "Tested binary changed: $($identity.path)" }

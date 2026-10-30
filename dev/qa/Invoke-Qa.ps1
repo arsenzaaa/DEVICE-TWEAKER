@@ -133,13 +133,14 @@ try {
     $contractCode = $LASTEXITCODE
     $steps.Add([pscustomobject]@{ name = 'script-contracts'; status = $(if ($contractCode -eq 0) { 'PASS' } else { 'FAIL' }); exitCode = $contractCode })
     if ($contractCode -ne 0) { throw 'QA script contracts failed' }
-    foreach ($nativeCase in @('native-model','native-unload-mutant')) {
+    $nativeCases = [ordered]@{ 'native-model' = $null; 'native-unload-mutant' = 'unload'; 'native-write-range-mutant' = 'write-past-device-end' }
+    foreach ($nativeCase in $nativeCases.Keys) {
         $nativeArguments = @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $PSScriptRoot 'Test-NativeDriverModel.ps1'),'-OutputDirectory',(Join-Path $runDir $nativeCase))
-        if ($nativeCase -eq 'native-unload-mutant') { $nativeArguments += '-InjectUnloadRegression' }
+        if ($nativeCases[$nativeCase]) { $nativeArguments += @('-InjectRegression', $nativeCases[$nativeCase]) }
         & powershell.exe @nativeArguments *> (Join-Path $runDir ($nativeCase+'.log'))
         if ($LASTEXITCODE -ne 0) { throw "Native model stage failed: $nativeCase" }
     }
-    $steps.Add([pscustomobject]@{ name='native-driver'; status='PASS'; scope='Actual native functions with fake kernel APIs; unload mutation detected; no hardware access' })
+    $steps.Add([pscustomobject]@{ name='native-driver'; status='PASS'; scope='Actual native functions with fake kernel APIs; unload and write-range mutations detected; no hardware access' })
     Invoke-DotnetStep 'build-developer' @('build', (Join-Path $root 'DeviceTweakerCS.csproj'), '-c', 'Release',
         '-p:DeveloperQa=true', '-p:TreatWarningsAsErrors=true', '-p:BuildImodDriver=false', '--nologo')
     Invoke-DotnetStep 'source-inventory' @('run', '--project', (Join-Path $PSScriptRoot 'Inspect\Inspect.csproj'), '--',

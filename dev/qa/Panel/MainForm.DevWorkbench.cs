@@ -429,6 +429,28 @@ public sealed partial class MainForm
         }
         public void Delete(string name) { _values.Remove(name); DevFiles.Write(path, _values); }
     }
+    private Bitmap DevCaptureClient(Form window)
+    {
+        Bitmap bitmap = new(window.ClientSize.Width, window.ClientSize.Height, PixelFormat.Format32bppArgb);
+        using Graphics graphics = Graphics.FromImage(bitmap);
+        IntPtr dc = graphics.GetHdc();
+        try { if (!DevPrintWindow(window.Handle, dc, 3)) throw new InvalidOperationException("PrintWindow client capture failed"); }
+        finally { graphics.ReleaseHdc(dc); }
+        return bitmap;
+    }
+
+    private static bool DevIsBlankCapture(Bitmap bitmap)
+    {
+        int min = 765, max = 0, visible = 0, white = 0, samples = 0;
+        for (int y = 0; y < bitmap.Height; y += 6) for (int x = 0; x < bitmap.Width; x += 6)
+        {
+            Color pixel = bitmap.GetPixel(x, y); int sum = pixel.R + pixel.G + pixel.B;
+            min = Math.Min(min, sum); max = Math.Max(max, sum); samples++;
+            if (sum > 90) visible++; if (sum > 720) white++;
+        }
+        return max - min < 45 || visible < 15 || white / (double)samples > .6;
+    }
+
     private void DevCaptureWindow(string id, string selector, bool timeline, string device = "")
     {
         DevFiles.Id(id);
@@ -443,13 +465,19 @@ public sealed partial class MainForm
         if ((uiState & 3) != 0) throw new InvalidOperationException("Owned capture window did not expose keyboard focus cues");
         window.Refresh();
         double captureTime = _devClock.Elapsed.TotalMilliseconds;
-        using Bitmap bitmap = new(window.ClientSize.Width, window.ClientSize.Height, PixelFormat.Format32bppArgb);
-        using (Graphics graphics = Graphics.FromImage(bitmap))
+        Bitmap captured = DevCaptureClient(window);
+        // A dialog that has just opened can still be unpainted: two short retries, then
+        // a blank image is a failure.
+        for (int attempt = 1; DevIsBlankCapture(captured) && attempt < 3; attempt++)
         {
-            IntPtr dc = graphics.GetHdc();
-            try { if (!DevPrintWindow(window.Handle, dc, 3)) throw new InvalidOperationException("PrintWindow client capture failed"); }
-            finally { graphics.ReleaseHdc(dc); }
+            captured.Dispose();
+            Application.DoEvents();
+            Thread.Sleep(150);
+            window.Refresh();
+            captureTime = _devClock.Elapsed.TotalMilliseconds;
+            captured = DevCaptureClient(window);
         }
+        using Bitmap bitmap = captured;
         string png = "images/" + id + ".png", tree = "trees/" + id + ".json";
         Directory.CreateDirectory(Path.GetDirectoryName(DevArtifact(png))!); bitmap.Save(DevArtifact(png), ImageFormat.Png);
         var nodes = DevDescendants(window).Select(c => new { id = c.Name, type = c.GetType().Name, text = c.Text,
@@ -459,14 +487,7 @@ public sealed partial class MainForm
                 field.Inner.PreferredHeight, fontHeight=field.Inner.Font.Height } : null,
             selected = c is ThemedDropDownPicker picker ? picker.SelectedItem?.ToString() : null }).ToArray();
         DevFiles.Write(DevArtifact(tree), new { method = "WinForms control tree", uiState, client = window.ClientSize.ToString(), nodes });
-        int min = 765, max = 0, visible = 0, white = 0, samples = 0;
-        for (int y = 0; y < bitmap.Height; y += 6) for (int x = 0; x < bitmap.Width; x += 6)
-        {
-            Color pixel = bitmap.GetPixel(x, y); int sum = pixel.R + pixel.G + pixel.B;
-            min = Math.Min(min, sum); max = Math.Max(max, sum); samples++;
-            if (sum > 90) visible++; if (sum > 720) white++;
-        }
-        if (max - min < 45 || visible < 15 || white / (double)samples > .6)
+        if (DevIsBlankCapture(bitmap))
             throw new InvalidDataException("Native capture is blank / mostly white; retained for diagnosis");
         _devRun!.Captures.Add(new(id, png, DevFiles.Hash(DevArtifact(png)), bitmap.Width, bitmap.Height, captureTime,
             tree, DevFiles.Hash(DevArtifact(tree)), timeline));
