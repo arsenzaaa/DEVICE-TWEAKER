@@ -1,3 +1,10 @@
+// Hardware core shared by DEVICE TWEAKER and Startup\ApplyIMOD.ps1, which compiles this file
+// with Add-Type in Windows PowerShell 5.1. Keep C# 5 syntax.
+// The app compiles it with nullable annotations on; C# 5 has no #nullable, so the
+// related warnings are silenced instead.
+#if NET8_0_OR_GREATER
+#pragma warning disable CS8600, CS8601, CS8602, CS8603, CS8604, CS8605, CS8618, CS8625
+#endif
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -457,6 +464,22 @@ public static class DeviceTweakerImodRuntime
         }
 
         return devices.ToArray();
+    }
+
+    // Memory range of one exact PCI devnode (no enumeration of the whole bus).
+    public static bool TryGetPciMemoryRange(string instanceId, out ulong baseAddress, out ulong memoryLength, out string error)
+    {
+        baseAddress = 0;
+        memoryLength = 0;
+        uint devInst;
+        int cr = CM_Locate_DevNodeW(out devInst, instanceId, 0);
+        if (cr != CrSuccess)
+        {
+            error = "PCI device not found: " + instanceId + " (CM 0x" + cr.ToString("X") + ")";
+            return false;
+        }
+
+        return TryGetDeviceMemoryRange(devInst, out baseAddress, out memoryLength, out error);
     }
 
     private static bool RangeContains(ulong memoryLength, uint offset, ulong size)

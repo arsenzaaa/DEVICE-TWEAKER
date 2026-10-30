@@ -21,24 +21,7 @@ public sealed partial class MainForm
     private const uint CmProbDisabled = 0x00000016;
 
     private const uint DigcfPresent = 0x00000002;
-    private const uint DigcfAllClasses = 0x00000004;
 
-    private const uint SpdrpDeviceDesc = 0x00000000;
-    private const uint SpdrpHardwareId = 0x00000001;
-    private const uint SpdrpCompatibleIds = 0x00000002;
-    private const uint SpdrpService = 0x00000004;
-    private const uint SpdrpFriendlyName = 0x0000000C;
-
-    private const uint RegSz = 1;
-    private const uint RegMultiSz = 7;
-
-    private const uint AllocLogConf = 0x00000002;
-    private const uint BootLogConf = 0x00000003;
-
-    private const uint ResTypeMem = 0x00000001;
-    private const uint ResTypeMemLarge = 0x00000007;
-
-    private const int CrSuccess = 0x00000000;
     private const int ErrorInsufficientBuffer = 122;
     private const int ErrorNoMoreItems = 259;
 
@@ -101,65 +84,11 @@ public sealed partial class MainForm
         public uint ContextSize { get; set; }
     }
 
-    [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern IntPtr SetupDiGetClassDevsW(
-        IntPtr classGuid,
-        string enumerator,
-        IntPtr hwndParent,
-        uint flags);
-
-    [DllImport("setupapi.dll", SetLastError = true)]
-    private static extern bool SetupDiEnumDeviceInfo(
-        IntPtr deviceInfoSet,
-        uint memberIndex,
-        ref SP_DEVINFO_DATA deviceInfoData);
-
-    [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool SetupDiGetDeviceRegistryPropertyW(
-        IntPtr deviceInfoSet,
-        ref SP_DEVINFO_DATA deviceInfoData,
-        uint property,
-        out uint propertyRegDataType,
-        [Out] byte[]? propertyBuffer,
-        uint propertyBufferSize,
-        out uint requiredSize);
-
-    [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool SetupDiGetDeviceInstanceIdW(
-        IntPtr deviceInfoSet,
-        ref SP_DEVINFO_DATA deviceInfoData,
-        StringBuilder? deviceInstanceId,
-        int deviceInstanceIdSize,
-        out int requiredSize);
-
     [DllImport("setupapi.dll", SetLastError = true)]
     private static extern bool SetupDiDestroyDeviceInfoList(IntPtr deviceInfoSet);
 
     [DllImport("cfgmgr32.dll", SetLastError = true)]
     private static extern int CM_Get_DevNode_Status(out uint status, out uint problem, uint devInst, uint flags);
-
-    [DllImport("cfgmgr32.dll", SetLastError = true)]
-    private static extern int CM_Get_First_Log_Conf(out IntPtr logConf, uint devInst, uint flags);
-
-    [DllImport("cfgmgr32.dll", SetLastError = true)]
-    private static extern int CM_Get_Next_Res_Des(
-        out IntPtr resDes,
-        IntPtr logConfOrResDes,
-        uint forResource,
-        IntPtr resourceId,
-        uint flags);
-
-    [DllImport("cfgmgr32.dll", SetLastError = true)]
-    private static extern int CM_Get_Res_Des_Data_Size(out uint dataSize, IntPtr resDes, uint flags);
-
-    [DllImport("cfgmgr32.dll", SetLastError = true)]
-    private static extern int CM_Get_Res_Des_Data(IntPtr resDes, [Out] byte[] buffer, uint bufferLen, uint flags);
-
-    [DllImport("cfgmgr32.dll", SetLastError = true)]
-    private static extern int CM_Free_Res_Des_Handle(IntPtr resDes);
-
-    [DllImport("cfgmgr32.dll", SetLastError = true)]
-    private static extern int CM_Free_Log_Conf_Handle(IntPtr logConf);
 
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr OpenSCManager(
@@ -770,7 +699,6 @@ public sealed partial class MainForm
 
     private static int CountNonEmptyLines(string value)
         => value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
-
 
     private const string ImodMapStaleSuffix = "devices changed";
     private const string ImodMapStaleHint = "Devices were added or removed after this read. A USB device may now use another interrupter; press CHECK to read again.";
@@ -3005,401 +2933,34 @@ public sealed partial class MainForm
         return $"0x{value:X}";
     }
 
+    // Startup\DeviceTweakerImodRuntime.cs enumerates controllers for the app and the logon script.
     private static bool TryEnumerateXhciControllers(out List<ImodControllerInfo> controllers, out string? error)
     {
         controllers = [];
-        error = null;
-
-        IntPtr devInfoSet = SetupDiGetClassDevsW(IntPtr.Zero, "PCI", IntPtr.Zero, DigcfPresent | DigcfAllClasses);
-        if (devInfoSet == InvalidHandleValue)
-        {
-            error = $"failed to enumerate PCI devices: {GetWin32ErrorMessage(Marshal.GetLastWin32Error())}";
-            return false;
-        }
-
         try
         {
-            for (uint index = 0; ; index++)
+            foreach (DeviceTweakerImodController controller in DeviceTweakerImodRuntime.EnumerateXhciControllers())
             {
-                SP_DEVINFO_DATA devInfo = new()
-                {
-                    cbSize = (uint)Marshal.SizeOf<SP_DEVINFO_DATA>(),
-                };
-
-                if (!SetupDiEnumDeviceInfo(devInfoSet, index, ref devInfo))
-                {
-                    int lastError = Marshal.GetLastWin32Error();
-                    if (lastError == ErrorNoMoreItems)
-                    {
-                        break;
-                    }
-
-                    error = $"failed to enumerate device info: {GetWin32ErrorMessage(lastError)}";
-                    return false;
-                }
-
-                if (!IsXhciDevice(devInfoSet, ref devInfo))
-                {
-                    continue;
-                }
-
-                if (!TryGetDeviceInstanceId(devInfoSet, ref devInfo, out string instanceId))
-                {
-                    continue;
-                }
-
-                string caption = GetDeviceCaption(devInfoSet, ref devInfo);
-                _ = TryGetDeviceProblemCode(devInfo.DevInst, out uint problemCode);
-
-                ulong baseAddress = 0;
-                ulong memoryLength = 0;
-                bool hasBase = TryGetDeviceMemoryRange(devInfo.DevInst, out baseAddress, out memoryLength, out string? baseError);
-
                 controllers.Add(new ImodControllerInfo
                 {
-                    DeviceId = instanceId,
-                    Caption = caption,
-                    ProblemCode = problemCode,
-                    BaseAddress = baseAddress,
-                    MemoryLength = memoryLength,
-                    HasBase = hasBase,
-                    BaseError = baseError ?? string.Empty,
+                    DeviceId = controller.DeviceId,
+                    Caption = controller.Caption ?? string.Empty,
+                    ProblemCode = controller.ProblemCode,
+                    BaseAddress = controller.BaseAddress,
+                    MemoryLength = controller.MemoryLength,
+                    HasBase = controller.HasBase,
+                    BaseError = controller.BaseError ?? string.Empty,
                 });
             }
         }
-        finally
+        catch (InvalidOperationException ex)
         {
-            _ = SetupDiDestroyDeviceInfoList(devInfoSet);
-        }
-
-        return true;
-    }
-
-    private static bool IsXhciDevice(IntPtr devInfoSet, ref SP_DEVINFO_DATA devInfo)
-    {
-        if (TryGetDeviceStringProperty(devInfoSet, ref devInfo, SpdrpService, out string service))
-        {
-            if (string.Equals(service, "USBXHCI", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-
-        if (TryGetDeviceMultiSzProperty(devInfoSet, ref devInfo, SpdrpHardwareId, out List<string> ids)
-            && HasXhciClassCode(ids))
-        {
-            return true;
-        }
-
-        if (TryGetDeviceMultiSzProperty(devInfoSet, ref devInfo, SpdrpCompatibleIds, out ids)
-            && HasXhciClassCode(ids))
-        {
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool HasXhciClassCode(IEnumerable<string> ids)
-    {
-        foreach (string id in ids)
-        {
-            if (id.IndexOf("CC_0C0330", StringComparison.OrdinalIgnoreCase) >= 0
-                || id.IndexOf("CLASS_0C0330", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static string GetDeviceCaption(IntPtr devInfoSet, ref SP_DEVINFO_DATA devInfo)
-    {
-        if (TryGetDeviceStringProperty(devInfoSet, ref devInfo, SpdrpFriendlyName, out string caption))
-        {
-            return caption;
-        }
-
-        if (TryGetDeviceStringProperty(devInfoSet, ref devInfo, SpdrpDeviceDesc, out caption))
-        {
-            return caption;
-        }
-
-        return "Unknown USB Controller";
-    }
-
-    private static bool TryGetDeviceProblemCode(uint devInst, out uint problemCode)
-    {
-        problemCode = 0;
-        int cr = CM_Get_DevNode_Status(out _, out uint problem, devInst, 0);
-        if (cr != CrSuccess)
-        {
+            error = ex.Message;
             return false;
         }
 
-        problemCode = problem;
-        return true;
-    }
-
-    private static bool TryGetDeviceMemoryRange(uint devInst, out ulong baseAddress, out ulong length, out string? error)
-    {
-        baseAddress = 0;
-        length = 0;
         error = null;
-
-        int cr = CM_Get_First_Log_Conf(out IntPtr logConf, devInst, AllocLogConf);
-        if (cr != CrSuccess)
-        {
-            cr = CM_Get_First_Log_Conf(out logConf, devInst, BootLogConf);
-        }
-        if (cr != CrSuccess)
-        {
-            error = $"failed to query logical config (CONFIGRET {cr})";
-            return false;
-        }
-
-        try
-        {
-            foreach (uint resType in new[] { ResTypeMem, ResTypeMemLarge })
-            {
-                int resCr = CM_Get_Next_Res_Des(out IntPtr resDes, logConf, resType, IntPtr.Zero, 0);
-                while (resCr == CrSuccess)
-                {
-                    int sizeCr = CM_Get_Res_Des_Data_Size(out uint dataSize, resDes, 0);
-                    if (sizeCr == CrSuccess && dataSize > 0)
-                    {
-                        byte[] buffer = new byte[dataSize];
-                        if (CM_Get_Res_Des_Data(resDes, buffer, dataSize, 0) == CrSuccess)
-                        {
-                            if (TryExtractMemoryRangeFromResource(resType, buffer, out ulong candidate, out ulong candidateLength))
-                            {
-                                // The controller register BAR is normally the largest allocated
-                                // non-prefetchable memory resource. Selecting by physical address
-                                // can accidentally pick a small auxiliary BAR.
-                                if (candidateLength > length)
-                                {
-                                    baseAddress = candidate;
-                                    length = candidateLength;
-                                }
-                            }
-                        }
-                    }
-
-                    int nextCr = CM_Get_Next_Res_Des(out IntPtr nextResDes, resDes, resType, IntPtr.Zero, 0);
-                    _ = CM_Free_Res_Des_Handle(resDes);
-                    resDes = nextResDes;
-                    resCr = nextCr;
-                }
-            }
-
-            if (baseAddress != 0 && length != 0)
-            {
-                return true;
-            }
-
-            error = "no allocated memory resource found";
-            return false;
-        }
-        finally
-        {
-            _ = CM_Free_Log_Conf_Handle(logConf);
-        }
-    }
-
-    private static bool TryExtractMemoryRangeFromResource(uint resType, byte[] data, out ulong baseAddress, out ulong length)
-    {
-        baseAddress = 0;
-        length = 0;
-
-        if (resType == ResTypeMem)
-        {
-            if (data.Length < Marshal.SizeOf<MemDes>())
-            {
-                return false;
-            }
-
-            MemDes mem = MemoryMarshal.Read<MemDes>(data);
-            ulong candidate = mem.MD_Alloc_Base;
-            ulong candidateEnd = mem.MD_Alloc_End;
-            if (candidate == 0 && mem.MD_Count > 0)
-            {
-                int offset = Marshal.SizeOf<MemDes>();
-                if (data.Length >= offset + Marshal.SizeOf<MemRange>())
-                {
-                    MemRange range = MemoryMarshal.Read<MemRange>(data.AsSpan(offset));
-                    candidate = range.MR_Min;
-                    candidateEnd = range.MR_Max;
-                    if (range.MR_nBytes > 0)
-                    {
-                        candidateEnd = candidate + range.MR_nBytes - 1;
-                    }
-                }
-            }
-
-            if (candidate == 0)
-            {
-                return false;
-            }
-
-            baseAddress = candidate;
-            length = candidateEnd >= candidate ? candidateEnd - candidate + 1 : 0;
-            if (length == 0)
-            {
-                return false;
-            }
-            return true;
-        }
-
-        if (resType == ResTypeMemLarge)
-        {
-            if (data.Length < Marshal.SizeOf<MemLargeDes>())
-            {
-                return false;
-            }
-
-            MemLargeDes mem = MemoryMarshal.Read<MemLargeDes>(data);
-            ulong candidate = mem.MLD_Alloc_Base;
-            ulong candidateEnd = mem.MLD_Alloc_End;
-            if (candidate == 0 && mem.MLD_Count > 0)
-            {
-                int offset = Marshal.SizeOf<MemLargeDes>();
-                if (data.Length >= offset + Marshal.SizeOf<MemLargeRange>())
-                {
-                    MemLargeRange range = MemoryMarshal.Read<MemLargeRange>(data.AsSpan(offset));
-                    candidate = range.MLR_Min;
-                    candidateEnd = range.MLR_Max;
-                    if (range.MLR_nBytes > 0)
-                    {
-                        candidateEnd = candidate + range.MLR_nBytes - 1;
-                    }
-                }
-            }
-
-            if (candidate == 0)
-            {
-                return false;
-            }
-
-            baseAddress = candidate;
-            length = candidateEnd >= candidate ? candidateEnd - candidate + 1 : 0;
-            if (length == 0)
-            {
-                return false;
-            }
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool TryGetDeviceStringProperty(
-        IntPtr devInfoSet,
-        ref SP_DEVINFO_DATA devInfo,
-        uint property,
-        out string value)
-    {
-        value = string.Empty;
-        if (!TryGetDeviceMultiSzProperty(devInfoSet, ref devInfo, property, out List<string> values))
-        {
-            return false;
-        }
-
-        if (values.Count == 0)
-        {
-            return false;
-        }
-
-        value = values[0];
         return true;
-    }
-
-    private static bool TryGetDeviceMultiSzProperty(
-        IntPtr devInfoSet,
-        ref SP_DEVINFO_DATA devInfo,
-        uint property,
-        out List<string> values)
-    {
-        values = [];
-        if (!TryGetDevicePropertyData(devInfoSet, ref devInfo, property, out byte[] data, out uint regType))
-        {
-            return false;
-        }
-
-        if (regType != RegMultiSz && regType != RegSz)
-        {
-            return false;
-        }
-
-        string text = Encoding.Unicode.GetString(data);
-        string[] parts = text.Split('\0', StringSplitOptions.RemoveEmptyEntries);
-        foreach (string part in parts)
-        {
-            string trimmed = part.Trim();
-            if (trimmed.Length > 0)
-            {
-                values.Add(trimmed);
-            }
-        }
-
-        return values.Count > 0;
-    }
-
-    private static bool TryGetDevicePropertyData(
-        IntPtr devInfoSet,
-        ref SP_DEVINFO_DATA devInfo,
-        uint property,
-        out byte[] data,
-        out uint regType)
-    {
-        data = [];
-        regType = 0;
-
-        uint requiredSize = 0;
-        if (!SetupDiGetDeviceRegistryPropertyW(devInfoSet, ref devInfo, property, out regType, null, 0, out requiredSize))
-        {
-            int err = Marshal.GetLastWin32Error();
-            if (err != ErrorInsufficientBuffer)
-            {
-                return false;
-            }
-        }
-
-        if (requiredSize == 0)
-        {
-            return false;
-        }
-
-        data = new byte[requiredSize];
-        if (!SetupDiGetDeviceRegistryPropertyW(devInfoSet, ref devInfo, property, out regType, data, requiredSize, out _))
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    private static bool TryGetDeviceInstanceId(
-        IntPtr devInfoSet,
-        ref SP_DEVINFO_DATA devInfo,
-        out string instanceId)
-    {
-        instanceId = string.Empty;
-        int requiredSize = 0;
-        _ = SetupDiGetDeviceInstanceIdW(devInfoSet, ref devInfo, null, 0, out requiredSize);
-        int err = Marshal.GetLastWin32Error();
-        if (err != ErrorInsufficientBuffer || requiredSize <= 0)
-        {
-            return false;
-        }
-
-        StringBuilder buffer = new(requiredSize);
-        if (!SetupDiGetDeviceInstanceIdW(devInfoSet, ref devInfo, buffer, buffer.Capacity, out _))
-        {
-            return false;
-        }
-
-        instanceId = buffer.ToString();
-        return !string.IsNullOrWhiteSpace(instanceId);
     }
 
     private static bool TryResolveXhciRuntimeLayout(
@@ -4368,15 +3929,6 @@ public sealed partial class MainForm
 
     private static readonly IntPtr InvalidHandleValue = new(-1);
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct SP_DEVINFO_DATA
-    {
-        public uint cbSize;
-        public Guid ClassGuid;
-        public uint DevInst;
-        public IntPtr Reserved;
-    }
-
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     private struct PhysAccessStruct
     {
@@ -4384,50 +3936,6 @@ public sealed partial class MainForm
         public uint accessSizeInBytes;
         public uint reserved;
         public ulong value;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MemDes
-    {
-        public uint MD_Count;
-        public uint MD_Type;
-        public ulong MD_Alloc_Base;
-        public ulong MD_Alloc_End;
-        public uint MD_Flags;
-        public uint MD_Reserved;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MemRange
-    {
-        public ulong MR_Align;
-        public uint MR_nBytes;
-        public ulong MR_Min;
-        public ulong MR_Max;
-        public uint MR_Flags;
-        public uint MR_Reserved;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MemLargeDes
-    {
-        public uint MLD_Count;
-        public uint MLD_Type;
-        public ulong MLD_Alloc_Base;
-        public ulong MLD_Alloc_End;
-        public uint MLD_Flags;
-        public uint MLD_Reserved;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MemLargeRange
-    {
-        public ulong MLR_Align;
-        public ulong MLR_nBytes;
-        public ulong MLR_Min;
-        public ulong MLR_Max;
-        public uint MLR_Flags;
-        public uint MLR_Reserved;
     }
 
     [StructLayout(LayoutKind.Sequential)]

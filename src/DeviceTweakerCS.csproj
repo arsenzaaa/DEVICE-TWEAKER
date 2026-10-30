@@ -55,8 +55,8 @@
 
   <ItemGroup>
     <Compile Remove="IMOD\KDU\**\*.cs" />
-    <!-- The logon script compiles this C# itself; the app only ships it as text. -->
-    <Compile Remove="Startup\**\*.cs" />
+    <!-- Startup\DeviceTweakerImodRuntime.cs is compiled into the app and shipped as text
+         for Startup\ApplyIMOD.ps1, which compiles the same file at logon. -->
     <EmbeddedResource Include="Startup\ApplyIMOD.ps1">
       <LogicalName>DeviceTweakerCS.Startup.ApplyIMOD.ps1</LogicalName>
     </EmbeddedResource>

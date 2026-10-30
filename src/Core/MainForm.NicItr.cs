@@ -688,63 +688,8 @@ public sealed partial class MainForm
     private static bool TryValidateNicItrMemoryRange(NicItrProfile profile, ulong memoryLength, out string? error)
         => NicItrService.TryValidateNicItrMemoryRange(profile, memoryLength, out error);
 
-    private bool TryGetPciMemoryRangeByInstanceId(string instanceId, out ulong baseAddress, out ulong memoryLength, out string? error)
-    {
-        baseAddress = 0;
-        memoryLength = 0;
-        error = null;
-        string target = NormalizeInstanceId(instanceId);
-
-        IntPtr devInfoSet = SetupDiGetClassDevsW(IntPtr.Zero, "PCI", IntPtr.Zero, DigcfPresent | DigcfAllClasses);
-        if (devInfoSet == InvalidHandleValue)
-        {
-            error = $"failed to enumerate PCI devices: {GetWin32ErrorMessage(Marshal.GetLastWin32Error())}";
-            return false;
-        }
-
-        try
-        {
-            for (uint index = 0; ; index++)
-            {
-                SP_DEVINFO_DATA devInfo = new()
-                {
-                    cbSize = (uint)Marshal.SizeOf<SP_DEVINFO_DATA>(),
-                };
-
-                if (!SetupDiEnumDeviceInfo(devInfoSet, index, ref devInfo))
-                {
-                    int lastError = Marshal.GetLastWin32Error();
-                    if (lastError == ErrorNoMoreItems)
-                    {
-                        break;
-                    }
-
-                    error = $"failed to enumerate device info: {GetWin32ErrorMessage(lastError)}";
-                    return false;
-                }
-
-                if (!TryGetDeviceInstanceId(devInfoSet, ref devInfo, out string currentId)
-                    || !string.Equals(NormalizeInstanceId(currentId), target, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                if (!TryGetDeviceMemoryRange(devInfo.DevInst, out baseAddress, out memoryLength, out error))
-                {
-                    return false;
-                }
-
-                return true;
-            }
-        }
-        finally
-        {
-            _ = SetupDiDestroyDeviceInfoList(devInfoSet);
-        }
-
-        error = "PCI device not found";
-        return false;
-    }
+    private static bool TryGetPciMemoryRangeByInstanceId(string instanceId, out ulong baseAddress, out ulong memoryLength, out string? error)
+        => DeviceTweakerImodRuntime.TryGetPciMemoryRange(instanceId, out baseAddress, out memoryLength, out error);
 
     private static bool TryGetPciVenDev(string instanceId, out string vendorId, out string deviceId)
         => NicItrService.TryGetPciVenDev(instanceId, out vendorId, out deviceId);
