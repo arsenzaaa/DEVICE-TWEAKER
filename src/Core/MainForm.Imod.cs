@@ -1294,7 +1294,7 @@ public sealed partial class MainForm
 
             if (stats.WriteFailures > 0 || stats.ControllersFailed > 0 || stats.ReadFailures > 0 || stats.WritesAttempted > 0)
             {
-                note = "USB IMOD was not applied.";
+                note = stats.DriverError ?? "USB IMOD was not applied.";
                 technicalDetails = $"controllersFailed={stats.ControllersFailed}; readFailures={stats.ReadFailures}; writeFailures={stats.WriteFailures}; writesAttempted={stats.WritesAttempted}";
                 WriteLog($"IMOD: {note} {technicalDetails}");
                 return ImodApplyOutcome.Failed;

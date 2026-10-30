@@ -594,6 +594,11 @@ public static class DeviceTweakerImodRuntime
 
         try
         {
+            if (IsOlderDriverLoaded(handle))
+            {
+                return "error: " + OlderDriverMessage;
+            }
+
             DtimodRegisters registers = new DtimodRegisters(handle, writeTarget);
             string ioError;
             uint maxIntrs;
@@ -781,6 +786,11 @@ public static class DeviceTweakerImodRuntime
 
         try
         {
+            if (IsOlderDriverLoaded(handle))
+            {
+                return "error: " + OlderDriverMessage;
+            }
+
             uint size = width == 16 ? 2U : 4U;
             StringBuilder applied = new StringBuilder();
             for (uint q = 0; q < queues; q++)
@@ -1047,6 +1057,21 @@ public static class DeviceTweakerImodRuntime
         return request;
     }
 
+    internal const string OlderDriverMessage = "An older DTIMOD driver is loaded. Restart Windows, then press CHECK again.";
+
+    // The DTIMOD build without device-checked writes is still in memory until Windows
+    // restarts. It does not know IOCTL_IMOD_WRITE_DEVICE (ERROR_INVALID_FUNCTION); the
+    // current driver refuses an empty request with ERROR_INVALID_PARAMETER. Nothing is written.
+    public static bool IsOlderDriverLoaded(IntPtr handle)
+    {
+        int bytesReturned;
+        if (DeviceIoControlBytes(handle, IoctlImodWriteDevice, null, 0, null, 0, out bytesReturned, IntPtr.Zero))
+        {
+            return false;
+        }
+        return Marshal.GetLastWin32Error() == 1;
+    }
+
     internal static string DescribeWriteFailure(int win32Error, ulong address, string instanceId)
     {
         if (win32Error == 5)
@@ -1055,7 +1080,7 @@ public static class DeviceTweakerImodRuntime
         }
         if (win32Error == 1)
         {
-            return "DTIMOD is unavailable.\nRestart Windows, then press CHECK.";
+            return OlderDriverMessage;
         }
         return "failed to write physical memory via driver: " + GetWin32ErrorMessage(win32Error);
     }

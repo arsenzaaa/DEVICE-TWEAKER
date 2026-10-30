@@ -154,6 +154,7 @@ public sealed partial class MainForm
         public int SkippedDisabled { get; set; }
         public int MissingBase { get; set; }
         public int ReadFailures { get; set; }
+        public string? DriverError { get; set; }
     }
 
     private bool TryApplyImod(ImodConfig config, bool persistDriver, out ImodApplyStats stats, out string? error)
@@ -225,6 +226,13 @@ public sealed partial class MainForm
                     {
                         stats.ControllersFailed++;
                         WriteLog($"IMOD: {controller.DeviceId} skipped: {targetError}");
+                        if (imodDriver.OlderDriverLoaded)
+                        {
+                            // Every controller would fail the same way until Windows restarts.
+                            stats.DriverError = targetError;
+                            break;
+                        }
+
                         continue;
                     }
 
@@ -2859,9 +2867,18 @@ public sealed partial class MainForm
         }
         private readonly Action<string>? _log;
 
+        public bool OlderDriverLoaded => _olderDriverLoaded ??= DeviceTweakerImodRuntime.IsOlderDriverLoaded(DriverHandle);
+        private bool? _olderDriverLoaded;
+
         public bool TrySetWriteTarget(string instanceId, out string? error)
         {
             WriteTarget = null;
+            if (OlderDriverLoaded)
+            {
+                error = DeviceTweakerImodRuntime.OlderDriverMessage;
+                return false;
+            }
+
             if (!DeviceTweakerImodRuntime.DeviceWriteTarget.TryResolve(instanceId, out DeviceTweakerImodRuntime.DeviceWriteTarget target, out error))
             {
                 return false;

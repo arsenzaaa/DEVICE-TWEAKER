@@ -24,7 +24,7 @@ namespace DeviceTweakerCS
         public const string DevicePath = @"\\.\DeviceTweakerImod2";
         public const string LegacyServiceName = "DTIMOD";
         public const string LegacyDevicePath = @"\\.\DTIMOD";
-        public const string RestartMessage = "An older DTIMOD driver is loaded. Restart Windows, then press CHECK again.";
+        public const string RestartMessage = DeviceTweakerImodRuntime.OlderDriverMessage;
 
         public static void Prepare(IDriverRenameBackend backend, bool readOnly)
         {
