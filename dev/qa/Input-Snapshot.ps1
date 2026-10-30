@@ -4,6 +4,7 @@
     foreach ($folder in @('Affinity', 'Core', 'Devices', 'GUI', 'Interop', 'Localization', 'Models', 'Tweaks')) {
         $files += @(Get-ChildItem -LiteralPath (Join-Path $app $folder) -Recurse -File -Filter '*.cs')
     }
+    $files += @(Get-ChildItem -LiteralPath (Join-Path $app 'Startup') -File)
     foreach ($file in @('DeviceTweakerCS.csproj', 'assets\DEVICE TWEAKER.ico', 'assets\app.manifest',
         'IMOD\DTIMOD.sys', 'IMOD\DTIMOD.sys.sha256', 'IMOD\Loader\kdu.exe', 'IMOD\Loader\drv64.dll',
         'IMOD\Driver\imod_driver.c', 'IMOD\Driver\imod_driver.h', 'IMOD\Driver\ImodDriver.vcxproj',

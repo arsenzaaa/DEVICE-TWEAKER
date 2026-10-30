@@ -89,6 +89,7 @@ foreach ($mutation in $mutations) {
         }
     }
     $extra = @('DeviceTweakerCS.csproj', 'assets\DEVICE TWEAKER.ico', 'assets\app.manifest',
+        'Startup\ApplyIMOD.ps1', 'Startup\DeviceTweakerImodRuntime.cs',
         'IMOD\DTIMOD.sys', 'IMOD\DTIMOD.sys.sha256', 'IMOD\Loader\kdu.exe', 'IMOD\Loader\drv64.dll')
     $testCopy = Join-Path $copyRepo 'dev\qa\tests\DeviceTweaker.Tests'
     New-Item -ItemType Directory -Path $testCopy -Force | Out-Null

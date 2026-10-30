@@ -4,9 +4,31 @@ namespace DeviceTweakerCS;
 
 public sealed partial class MainForm
 {
+    private const string ImodRuntimeSourceToken = "{{IMOD_RUNTIME_SOURCE}}";
+
     private static string CreateImodScriptTemplate()
     {
         return ImodScriptTemplate;
+    }
+
+    private static string ComposeImodScriptTemplate()
+    {
+        string script = ReadStartupResource("DeviceTweakerCS.Startup.ApplyIMOD.ps1");
+        string runtime = ReadStartupResource("DeviceTweakerCS.Startup.DeviceTweakerImodRuntime.cs");
+        if (script.IndexOf(ImodRuntimeSourceToken, StringComparison.Ordinal) < 0)
+        {
+            throw new InvalidDataException("Startup script template has no runtime source token.");
+        }
+
+        return script.Replace(ImodRuntimeSourceToken, runtime.TrimEnd('\n'), StringComparison.Ordinal);
+    }
+
+    private static string ReadStartupResource(string name)
+    {
+        using Stream stream = typeof(MainForm).Assembly.GetManifestResourceStream(name)
+            ?? throw new InvalidDataException("Missing embedded startup resource: " + name);
+        using StreamReader reader = new(stream, new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true);
+        return reader.ReadToEnd().Replace("\r\n", "\n", StringComparison.Ordinal);
     }
 
     private void UpgradeManagedImodStartupForRename()

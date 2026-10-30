@@ -55,6 +55,14 @@
 
   <ItemGroup>
     <Compile Remove="IMOD\KDU\**\*.cs" />
+    <!-- The logon script compiles this C# itself; the app only ships it as text. -->
+    <Compile Remove="Startup\**\*.cs" />
+    <EmbeddedResource Include="Startup\ApplyIMOD.ps1">
+      <LogicalName>DeviceTweakerCS.Startup.ApplyIMOD.ps1</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Startup\DeviceTweakerImodRuntime.cs">
+      <LogicalName>DeviceTweakerCS.Startup.DeviceTweakerImodRuntime.cs</LogicalName>
+    </EmbeddedResource>
     <PackageReference Include="System.Management" Version="8.0.0" />
     <InternalsVisibleTo Include="DeviceTweaker.Tests" />
   </ItemGroup>
