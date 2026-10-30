@@ -1344,5 +1344,105 @@ public sealed partial class MainForm
                 break;
         }
     }
-}
 
+    // SET on an IMOD card: backup, write the intervals, save autostart, then read them back.
+    private void ApplyImodFromBlock(DeviceBlock? targetBlock)
+    {
+        WriteLog("UI: SET IMOD button clicked");
+        if (targetBlock is not null && targetBlock.Device.IsTestDevice)
+        {
+            RefreshTestImodPreview(targetBlock, "test-imod-set");
+            return;
+        }
+
+        if (TryBlockBusyHardwareWrite("IMOD SET") || TryBlockSandboxHardwareWrite("IMOD SET"))
+        {
+            return;
+        }
+
+        OperationReport report = new();
+        if (!CreateDeviceTweakerBackup("pre-imod", showDialog: false))
+        {
+            report.MarkNoChangesMade();
+            report.AddError("Automatic backup", "backup could not be created; changes were not applied");
+            ShowOperationResult(
+                report,
+                successMessage: string.Empty,
+                partialMessage: "IMOD apply was cancelled because the automatic backup failed.",
+                operationName: "USB IMOD");
+            return;
+        }
+
+        report.SetBackupPath(_lastBackupPath);
+
+        ImodApplyOutcome outcome = ApplyImodSettings(out string? note, out string? technicalDetails);
+        if (outcome is ImodApplyOutcome.SkippedNoUsb or ImodApplyOutcome.SkippedNoController)
+        {
+            ShowThemedInfo(string.IsNullOrWhiteSpace(note)
+                ? "No eligible USB IMOD target for SET."
+                : note);
+            return;
+        }
+
+        WaitForBackgroundUiTasks(RefreshImodCurrentValuesAsync(showReadingStatus: true, reason: "imod-set"));
+        AddImodResultToReport(report, outcome, note, technicalDetails);
+
+        if (report.Succeeded && report.Warnings.Count == 0)
+        {
+            if (!string.IsNullOrWhiteSpace(note))
+            {
+                ShowThemedInfo(note);
+            }
+
+            return;
+        }
+
+        ShowOperationResult(
+            report,
+            successMessage: note ?? "IMOD applied.",
+            partialMessage: "USB IMOD completed with warnings or failed steps.",
+            operationName: "USB IMOD");
+        MaybeOfferVulnerableDriverBlocklistDisable(report);
+    
+    }
+
+    // DELETE on an IMOD card: controller defaults, autostart removed.
+    private void DeleteImodFromBlock(DeviceBlock? targetBlock)
+    {
+        WriteLog("UI: DELETE IMOD button clicked");
+        if (targetBlock is not null && targetBlock.Device.IsTestDevice)
+        {
+            targetBlock.ImodBox.Text = FormatImodValue(ImodDefaultInterval);
+            UpdateImodSelectorsFromText(targetBlock);
+            RefreshTestImodPreview(targetBlock, "test-imod-delete");
+            return;
+        }
+
+        if (TryBlockBusyHardwareWrite("IMOD DELETE") || TryBlockSandboxHardwareWrite("IMOD DELETE"))
+        {
+            return;
+        }
+
+        OperationReport report = new();
+        try
+        {
+            ResetImodIntervalsToDefault("imod-delete", report);
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"IMOD.DELETE: failed: {ex.Message}");
+            report.AddError("IMOD delete", ex.Message);
+        }
+
+        ShowOperationResult(
+            report,
+            successMessage: "IMOD reset to defaults.\nStartup script removed. Reboot your PC to unload DTIMOD.sys from memory if it was loaded.",
+            partialMessage: "IMOD delete finished with errors. Some persistence files may still remain. If the driver was loaded, reboot to unload DTIMOD.sys from memory.",
+            operationName: "USB IMOD DELETE");
+        if (report.Succeeded)
+        {
+            WriteLog("IMOD.DELETE: done; reboot recommended to unload DTIMOD.sys from memory");
+        }
+    
+    }
+}
