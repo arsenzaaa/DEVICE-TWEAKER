@@ -572,12 +572,19 @@ internal static partial class UiLanguage
         }
 
         string content = value[(open + 1)..close];
+        bool changed = false;
         string translated = string.Join(", ", content.Split(',', StringSplitOptions.TrimEntries).Select(part =>
         {
             string[] pipeParts = part.Split('|', StringSplitOptions.TrimEntries);
-            return string.Join(" | ", pipeParts.Select(TranslateRussianRole));
+            return string.Join(" | ", pipeParts.Select(role =>
+            {
+                string russian = TranslateRussianRole(role);
+                changed |= !string.Equals(russian, role, StringComparison.Ordinal);
+                return russian;
+            }));
         }));
-        return value[..(open + 1)] + translated + value[close..];
+        // Brackets without a role ("[ ВСЕ ]", "[02]") keep their exact spacing.
+        return changed ? value[..(open + 1)] + translated + value[close..] : value;
     }
 
     private static string TranslateInlineStatus(string value)

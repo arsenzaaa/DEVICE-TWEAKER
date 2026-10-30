@@ -54,6 +54,27 @@ public class UiLanguageTests
         Assert.Contains(required, translated, StringComparison.Ordinal);
     }
 
+    // Controls keep their source text, but some code assigns already translated text;
+    // translating it again must not change it (e.g. "[ ВСЕ ]" lost its spaces).
+    [Fact]
+    public void TranslatingRussianTextAgainChangesNothing()
+    {
+        var flags = System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic;
+        var translate = typeof(UiLanguage).GetMethod("TranslateRussian", flags)!;
+        var dictionary = (IReadOnlyDictionary<string, string>)typeof(UiLanguage).GetField("Russian", flags)!.GetValue(null)!;
+        List<string> changed = [];
+        foreach (string russian in dictionary.Values.Distinct())
+        {
+            string again = (string)translate.Invoke(null, [russian])!;
+            if (!string.Equals(again, russian, StringComparison.Ordinal))
+            {
+                changed.Add($"{russian} -> {again}");
+            }
+        }
+
+        Assert.True(changed.Count == 0, string.Join("\n", changed));
+    }
+
     [Fact]
     public void RussianTranslationContract_PreservesExpectedTerms()
     {
