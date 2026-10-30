@@ -243,8 +243,9 @@ public sealed partial class MainForm
 
             mask = ReadAffinityMaskValue(affKey.GetValue("AssignmentSetOverride"));
         }
-        catch
+        catch (Exception ex)
         {
+            AppDiagnostics.Warn("AFFINITY.READ", ex);
         }
 
         return (policy, mask);
@@ -463,8 +464,9 @@ public sealed partial class MainForm
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                AppDiagnostics.Warn("MSI.READ", ex);
             }
         }
         else
@@ -536,8 +538,9 @@ public sealed partial class MainForm
                     prioValue = pv;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                AppDiagnostics.Warn("PRIORITY.READ", ex);
             }
         }
         else
@@ -683,8 +686,9 @@ public sealed partial class MainForm
                         mask = ReadAffinityMaskValue(affKey.GetValue("AssignmentSetOverride"));
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    AppDiagnostics.Warn("AFFINITY.READ", ex);
                 }
             }
             else

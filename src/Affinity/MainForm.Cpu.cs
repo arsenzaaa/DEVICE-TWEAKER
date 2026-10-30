@@ -294,8 +294,9 @@ public sealed partial class MainForm
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
+            AppDiagnostics.Warn("CPU.POWER.EVENTS", ex);
         }
 
         return events;
@@ -329,6 +330,7 @@ public sealed partial class MainForm
             }
             catch
             {
+                // Best-effort cleanup; the process may already have exited.
             }
 
             try
@@ -337,6 +339,7 @@ public sealed partial class MainForm
             }
             catch
             {
+                // Best-effort cleanup; the process may already have exited.
             }
 
             try
@@ -345,6 +348,7 @@ public sealed partial class MainForm
             }
             catch
             {
+                // Best-effort cleanup; the process may already have exited.
             }
 
             return string.Empty;
@@ -356,6 +360,7 @@ public sealed partial class MainForm
         }
         catch
         {
+            // Best-effort cleanup; the process may already have exited.
         }
 
         return process.ExitCode == 0 && stdout.IsCompletedSuccessfully
@@ -891,8 +896,9 @@ public sealed partial class MainForm
                 return new CpuVendorInfo(name, vendor);
             }
         }
-        catch
+        catch (Exception ex)
         {
+            AppDiagnostics.Warn("CPU.VENDOR", ex);
         }
 
         return new CpuVendorInfo("Unknown", "Unknown");

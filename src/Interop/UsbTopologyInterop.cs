@@ -151,8 +151,9 @@ internal static class UsbTopologyInterop
                 string rootHubPath = NormalizeUsbSymbolicName(rootHubName);
                 EnumerateHub(rootHub, rootHubPath, hostControllerPath, $"HC{i}", endpoints, 0);
             }
-            catch
+            catch (Exception ex)
             {
+                AppDiagnostics.Warn("USB.TOPOLOGY", ex);
             }
         }
 
@@ -311,8 +312,9 @@ internal static class UsbTopologyInterop
                     EnumerateHub(childHub, NormalizeUsbSymbolicName(childHubName), hostControllerPath, scope, endpoints, depth + 1);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                AppDiagnostics.Warn("USB.TOPOLOGY", ex);
             }
         }
     }

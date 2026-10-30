@@ -124,6 +124,7 @@ internal static class StartupTask
             }
             catch (IOException)
             {
+                // A leftover temporary task XML is harmless.
             }
         }
     }

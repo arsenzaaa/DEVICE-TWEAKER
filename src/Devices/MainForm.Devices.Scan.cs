@@ -55,8 +55,9 @@ public sealed partial class MainForm
                         }
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    AppDiagnostics.Warn("NDIS.REGISTRY", ex);
                 }
 
                 try
@@ -73,8 +74,9 @@ public sealed partial class MainForm
                         }
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    AppDiagnostics.Warn("NDIS.REGISTRY", ex);
                 }
             }
 
@@ -110,8 +112,9 @@ public sealed partial class MainForm
                     return i;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                AppDiagnostics.Warn("NDIS.REGISTRY", ex);
             }
         }
 
@@ -124,8 +127,9 @@ public sealed partial class MainForm
                 return i;
             }
         }
-        catch
+        catch (Exception ex)
         {
+            AppDiagnostics.Warn("NDIS.REGISTRY", ex);
         }
 
         return null;
@@ -146,8 +150,9 @@ public sealed partial class MainForm
                     return result;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                AppDiagnostics.Warn("NDIS.REGISTRY", ex);
             }
         }
 
@@ -160,8 +165,9 @@ public sealed partial class MainForm
                 return result;
             }
         }
-        catch
+        catch (Exception ex)
         {
+            AppDiagnostics.Warn("NDIS.REGISTRY", ex);
         }
 
         return null;
@@ -209,8 +215,9 @@ public sealed partial class MainForm
                     return classGuid.Trim('{', '}');
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                AppDiagnostics.Warn("NDIS.REGISTRY", ex);
             }
         }
 
@@ -222,8 +229,9 @@ public sealed partial class MainForm
                 return enumGuid.Trim('{', '}');
             }
         }
-        catch
+        catch (Exception ex)
         {
+            AppDiagnostics.Warn("NDIS.REGISTRY", ex);
         }
 
         return null;
@@ -308,6 +316,7 @@ public sealed partial class MainForm
                 }
                 catch
                 {
+                    // Best-effort cleanup; the process may already have exited.
                 }
 
                 try
@@ -316,6 +325,7 @@ public sealed partial class MainForm
                 }
                 catch
                 {
+                    // Best-effort cleanup; the process may already have exited.
                 }
 
                 try
@@ -324,6 +334,7 @@ public sealed partial class MainForm
                 }
                 catch
                 {
+                    // Best-effort cleanup; the process may already have exited.
                 }
 
                 WriteLog($"RSS.QUERY: timeout durationMs={queryTime.ElapsedMilliseconds} limitMs=10000 instance={instanceId}");
@@ -336,6 +347,7 @@ public sealed partial class MainForm
             }
             catch
             {
+                // Best-effort cleanup; the process may already have exited.
             }
 
             string output = stdout.IsCompletedSuccessfully ? stdout.Result : string.Empty;
@@ -801,8 +813,9 @@ public sealed partial class MainForm
                 using RegistryKey? enumKey = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Enum\{device.InstanceId}");
                 svcName = enumKey?.GetValue("Service") as string;
             }
-            catch
+            catch (Exception ex)
             {
+                AppDiagnostics.Warn("NDIS.REGISTRY", ex);
             }
         }
 
@@ -829,8 +842,9 @@ public sealed partial class MainForm
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                AppDiagnostics.Warn("NDIS.REGISTRY", ex);
             }
         }
 
@@ -853,8 +867,9 @@ public sealed partial class MainForm
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                AppDiagnostics.Warn("NDIS.REGISTRY", ex);
             }
         }
 
@@ -1587,13 +1602,15 @@ public sealed partial class MainForm
 
                     entry.AddIrq(TryParseIrqNumber(antecedent), deviceId);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    AppDiagnostics.Warn("IRQ.WMI", ex);
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
+            AppDiagnostics.Warn("IRQ.WMI", ex);
         }
 
         foreach (string k in irqCounts.Keys)

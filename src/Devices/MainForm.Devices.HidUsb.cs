@@ -477,16 +477,10 @@ public sealed partial class MainForm
         {
             foreach (string p in patterns)
             {
-                try
+                int count = Regex.Matches(name, Regex.Escape(p), RegexOptions.IgnoreCase | RegexOptions.CultureInvariant).Count;
+                if (count > 0)
                 {
-                    int count = Regex.Matches(name, Regex.Escape(p), RegexOptions.IgnoreCase | RegexOptions.CultureInvariant).Count;
-                    if (count > 0)
-                    {
-                        patternMatches[p] = patternMatches.TryGetValue(p, out int old) ? old + count : count;
-                    }
-                }
-                catch
-                {
+                    patternMatches[p] = patternMatches.TryGetValue(p, out int old) ? old + count : count;
                 }
             }
         }

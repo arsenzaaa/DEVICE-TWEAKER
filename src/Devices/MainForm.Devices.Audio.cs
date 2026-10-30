@@ -60,13 +60,15 @@ public sealed partial class MainForm
                             disabled.Add(friendly.ToLowerInvariant());
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        AppDiagnostics.Warn("AUDIO.ENDPOINTS", ex);
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                AppDiagnostics.Warn("AUDIO.ENDPOINTS", ex);
             }
         }
 

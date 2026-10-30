@@ -54,8 +54,9 @@ internal static class NativeCfgMgr32
             capabilities = new PciInterruptCapabilities((PciInterruptSupport)(supportMask & 0x7), maximum);
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            AppDiagnostics.Warn("PCI.CAPS", ex);
         }
 
         return false;

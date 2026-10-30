@@ -135,6 +135,7 @@ internal sealed class ThemedNumericUpDown : NumericUpDown
             }
             catch
             {
+                // Cosmetic; the edit control can reject alignment while it is recreated.
             }
         }
     }
@@ -192,6 +193,7 @@ internal sealed class ThemedNumericUpDown : NumericUpDown
                 }
                 catch
                 {
+                    // Cosmetic; the window can be destroyed between paint messages.
                 }
 
                 return;

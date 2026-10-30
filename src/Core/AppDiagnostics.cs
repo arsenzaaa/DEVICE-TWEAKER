@@ -199,6 +199,12 @@ internal static partial class AppDiagnostics
         }
     }
 
+    // Best-effort probes treat a failure like a missing value; the reason still reaches the log.
+    internal static void Warn(string area, Exception ex)
+    {
+        _ = Write($"{area}.WARN: {ex.GetType().Name}: {ex.Message}");
+    }
+
     internal static void WriteFatal(string source, Exception ex)
     {
         lock (Sync)

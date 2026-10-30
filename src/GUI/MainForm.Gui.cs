@@ -921,6 +921,7 @@ public sealed partial class MainForm
             }
             catch
             {
+                // Dark scroll bars are cosmetic; older Windows builds lack these theme APIs.
             }
         }
 
@@ -1172,6 +1173,7 @@ public sealed partial class MainForm
         }
         catch
         {
+            // Tooltip only; the control can already be disposed.
         }
     }
 

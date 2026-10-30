@@ -691,6 +691,7 @@ public sealed partial class MainForm
         }
         catch
         {
+            // Tooltip only; the control can already be disposed.
         }
     }
 

@@ -438,8 +438,9 @@ public sealed partial class MainForm : Form
                 break;
             }
         }
-        catch
+        catch (Exception ex)
         {
+            AppDiagnostics.Warn("OS.INFO", ex);
         }
 
         if (_cpuInfo is not null)
@@ -975,8 +976,9 @@ public sealed partial class MainForm : Form
                 return FileVersionInfo.GetVersionInfo(path);
             }
         }
-        catch
+        catch (Exception ex)
         {
+            AppDiagnostics.Warn("FILE.VERSION", ex);
         }
 
         return null;
@@ -1023,6 +1025,7 @@ public sealed partial class MainForm : Form
         }
         catch
         {
+            // The provider does not expose this property as a string array.
         }
 
         try
