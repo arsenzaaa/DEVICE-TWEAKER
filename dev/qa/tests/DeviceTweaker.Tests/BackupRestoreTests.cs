@@ -77,7 +77,7 @@ public sealed class BackupRestoreTests
     [Fact] public void ScriptFailureRestoresScriptAndRegistry()
     {
         Memory m = new() { FailScript = true }; m.Seed(Value("first", "AA=="));
-        var b = Document(Value("first", "AQ==")); b.ImodScript = new() { Path = "managed", Exists = true, Text = "new" };
+        var b = Document(Value("first", "AQ==")); b.StartupProfile = new() { Path = "managed", Exists = true, Text = "new" };
         Assert.Throws<IOException>(() => m.Service().Restore(b));
         Assert.Equal("original", m.Script.Text); Assert.Equal("AA==", m.Read(Value("first")).Data);
     }
@@ -113,6 +113,6 @@ public sealed class BackupRestoreTests
         foreach (var v in b.RegistryValues) { var before = new RegistryValueBackup { Hive = v.Hive, Path = v.Path, Name = v.Name, Exists = false }; m.Seed(before); }
         m.Service().Restore(b);
         foreach (var v in b.RegistryValues.Where(v => v.Kind != "ReadError")) { var restored = m.Read(v); Assert.Equal(v.Exists, restored.Exists); Assert.Equal(v.Data, restored.Data); }
-        if (b.ImodScript is not null) { Assert.Equal(b.ImodScript.Exists, m.Script.Exists); Assert.Equal(b.ImodScript.Text, m.Script.Text); }
+        if (b.StartupProfile is not null) { Assert.Equal(b.StartupProfile.Exists, m.Script.Exists); Assert.Equal(b.StartupProfile.Text, m.Script.Text); }
     }
 }

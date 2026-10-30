@@ -1,4 +1,4 @@
-// Also compiled by Windows PowerShell 5.1 in the saved startup script. Keep C# 5 syntax.
+// Refuses to work next to the DTIMOD build that used the old device name.
 #if NET8_0_OR_GREATER
 #nullable disable
 #endif

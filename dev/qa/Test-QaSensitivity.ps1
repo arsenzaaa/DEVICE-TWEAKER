@@ -68,9 +68,9 @@ $mutations = @(
         new = '// pending loader guard deliberately removed'; expected = 'PendingKduStopsServiceEvenIfDeviceAppeared' },
     @{ name = 'accept-incompatible-driver-protocol'; file = 'Core\DriverRuntime.cs'; filter = 'DriverRuntimeTests';
         old = 'protocol != ProtocolVersion'; new = 'protocol == 0'; expected = 'MalformedOrIncompatibleReplyIsRejected(offset: 4' },
-    @{ name = 'skip-startup-loader-staging'; file = 'Core\ImodStartupUpgrade.cs'; filter = 'DriverRuntimeTests';
-        old = 'preparePayload();'; new = '// required loader staging deliberately skipped';
-        expected = 'SavedScriptPayloadIsPreparedBeforeReplacementAndFailureRetainsScript' }
+    @{ name = 'drop-nic-values-from-startup-profile'; file = 'Core\MainForm.Startup.cs'; filter = 'StartupScriptTests';
+        old = 'Values = entry.Values.Select(StartupProfile.Hex).ToList(),'; new = 'Values = [],';
+        expected = 'ImportImodProfileGivesTheScriptTheSavedValues' }
 )
 
 foreach ($mutation in $mutations) {

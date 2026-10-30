@@ -30,7 +30,7 @@ public sealed class DriverRenameTests
         const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Static;
         Assert.Equal("DeviceTweakerImod2", typeof(MainForm).GetField("ImodDriverServiceName", flags)!.GetRawConstantValue());
         Assert.Equal(@"\\.\DeviceTweakerImod2", typeof(MainForm).GetField("ImodDriverDevicePath", flags)!.GetRawConstantValue());
-        string script = (string)typeof(MainForm).GetField("ImodScriptTemplate", flags)!.GetValue(null)!;
+        string script = StartupScriptTests.ReadResource("DeviceTweakerCS.Startup.ApplyIMOD.ps1");
         Assert.Contains("-drvn DeviceTweakerImod2 -drvr DeviceTweakerImod2", script);
         Assert.DoesNotContain("-drvn DTIMODMapped", script);
     }
@@ -89,19 +89,4 @@ public sealed class DriverRenameTests
         Backend b = new() { FailDelete = true }; DriverRename.Complete(b, false); Assert.Equal(0, b.Reads); Assert.Equal(0, b.Deletes);
     }
 
-    private const string Old = "private const string ImodDriverServiceName = \"DeviceTweakerImod2\";\n$imodSettingsBegin = $true\n$ImodDriverSha256 = 'OLD'\n$globalInterval = 0xC8\n$nicItr = @{'PCI'=0x12}\n$imodSettingsEnd = $true\nOLD BODY";
-    [Fact] public void StartupUpgradePreservesDeviceValuesAndUpdatesEngineAndHash()
-    {
-        string result = ImodStartupUpgrade.Upgrade(Old, "NEW ENGINE\n{{IMOD_CONFIG_BLOCK}}\nEND", new string('A', 64));
-        Assert.Contains("NEW ENGINE", result); Assert.DoesNotContain("OLD BODY", result);
-        Assert.Contains("$globalInterval = 0xC8", result); Assert.Contains("$nicItr = @{'PCI'=0x12}", result);
-        Assert.Contains("$ImodDriverSha256 = '" + new string('A', 64) + "'", result);
-        Assert.Equal(result, ImodStartupUpgrade.Upgrade(result, "OTHER", new string('B', 64)));
-    }
-
-    [Fact] public void InvalidLegacyScriptFailsBeforeAnyWrite()
-    {
-        Assert.Throws<InvalidDataException>(() => ImodStartupUpgrade.Upgrade(Old.Replace("$imodSettingsEnd", "$broken"), "NEW", new string('A', 64)));
-        Assert.Throws<InvalidDataException>(() => ImodStartupUpgrade.Upgrade(Old, "NO CONFIG TOKEN", new string('A', 64)));
-    }
 }

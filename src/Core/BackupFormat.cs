@@ -205,10 +205,12 @@ internal static class BackupFormat
             ValidateRegistryValueBackup(value);
         }
 
-        if (backup.ImodScript is not null
-            && !isManagedScriptPath(backup.ImodScript.Path))
+        foreach (FileBackup? file in new[] { backup.StartupProfile, backup.ImodScript })
         {
-            throw new InvalidOperationException("Backup contains an unmanaged IMOD script path.");
+            if (file is not null && !isManagedScriptPath(file.Path))
+            {
+                throw new InvalidOperationException("Backup contains an unmanaged startup file path.");
+            }
         }
     }
 

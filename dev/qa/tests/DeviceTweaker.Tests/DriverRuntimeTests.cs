@@ -99,21 +99,6 @@ public sealed class DriverRuntimeTests
             () => throw new Exception("must not map"), () => throw new Exception("must not start")));
 
     [Fact]
-    public void Version31ProfileUpgradesAllPayloadHashesWithoutChangingDeviceValues()
-    {
-        const string config = "$imodSettingsBegin = $true\n$ImodDriverSha256 = 'old'\n$ImodKduSha256 = 'old'\n$ImodKduDbSha256 = 'old'\n$globalInterval = 0xC8\n$userDefinedData = @{'PCI\\VEN_8086'= @{INTERVAL=0;ENABLED=$true}}\n$nicItrEntries = @(@{VALUES=@(0,8,12)})\n$imodSettingsEnd = $true";
-        string old = "$imodScriptVersion = 31\n" + config + "\nOLD ENGINE";
-        string template = "$imodScriptVersion = 32\n{{IMOD_CONFIG_BLOCK}}\nCURRENT ENGINE";
-        string upgraded = ImodStartupUpgrade.Upgrade(old, template, new string('A',64),new string('B',64),new string('C',64));
-        Assert.Contains("CURRENT ENGINE", upgraded);Assert.DoesNotContain("OLD ENGINE", upgraded);
-        foreach (string line in config.Split('\n').Where(line => !line.StartsWith("$Imod", StringComparison.Ordinal))) Assert.Contains(line, upgraded);
-        Assert.Contains("$ImodKduSha256 = '"+new string('B',64)+"'",upgraded);
-        Assert.Contains("$ImodKduDbSha256 = '"+new string('C',64)+"'",upgraded);
-        Assert.Equal(upgraded, ImodStartupUpgrade.Upgrade(upgraded,template,new string('A',64),new string('B',64),new string('C',64)));
-        Assert.Throws<InvalidDataException>(() => ImodStartupUpgrade.Upgrade(old.Replace("= 31","= 33"),template,new string('A',64)));
-    }
-
-    [Fact]
     public async Task ProductionMutexLeaseSerializesCompetingOperationsAndReleasesAfterFailure()
     {
         string name = @"Local\DT_QA_" + Guid.NewGuid().ToString("N");
@@ -152,42 +137,6 @@ public sealed class DriverRuntimeTests
         thread.Start(); thread.Join();
         using (DriverOperationLease recovered = DriverOperationLease.Acquire(name, 1000)) { }
         abandoned!.Dispose();
-    }
-
-    [Theory] [InlineData(false)] [InlineData(true)]
-    public void SavedScriptPayloadIsPreparedBeforeReplacementAndFailureRetainsScript(bool fail)
-    {
-        string current = "original profile";
-        List<string> calls = [];
-        bool Update() => ImodStartupUpgrade.UpdateManaged(current, "updated profile",
-            () => { calls.Add("payload"); if (fail) throw new IOException("payload unavailable"); },
-            () => calls.Add("backup"), text => { calls.Add("write"); current = text; });
-        if (fail) Assert.Throws<IOException>((Action)(() => Update()));
-        else Assert.True(Update());
-        Assert.Equal(fail ? "original profile" : "updated profile", current);
-        Assert.Equal(fail ? ["payload"] : new[] { "payload", "backup", "write" }, calls);
-    }
-
-    [Fact]
-    public void CurrentProfileStillRepairsPayloadWithoutUnnecessaryRewrite()
-    {
-        int prepared = 0;
-        Assert.False(ImodStartupUpgrade.UpdateManaged("same", "same", () => prepared++,
-            () => throw new Exception("unnecessary backup"), _ => throw new Exception("unnecessary rewrite")));
-        Assert.Equal(1, prepared);
-    }
-
-    [Fact]
-    public void MigratedProfileUsesCurrentManagedPathsAndRetainsDeviceValues()
-    {
-        const string original = "$imodScriptVersion = 31\n$imodSettingsBegin = $true\n$ImodDriverSha256 = 'old'\n$ImodKduPath = 'C:\\old\\kdu.exe'\n$globalInterval = 0xC8\n$imodSettingsEnd = $true";
-        string updated = ImodStartupUpgrade.Upgrade(original, "$imodScriptVersion = 32\n{{IMOD_CONFIG_BLOCK}}", new string('A',64),
-            driverPath: @"C:\Windows\DTIMOD.sys", kduPath: @"C:\O'Brien\Loader\kdu.exe", databasePath: @"C:\Current\drv64.dll");
-        Assert.Contains("$ImodDriverPath = 'C:\\Windows\\DTIMOD.sys'", updated);
-        Assert.Contains("$ImodKduPath = 'C:\\O''Brien\\Loader\\kdu.exe'", updated);
-        Assert.Contains("$ImodKduDbPath = 'C:\\Current\\drv64.dll'", updated);
-        Assert.Contains("$globalInterval = 0xC8", updated);
-        Assert.DoesNotContain("C:\\old", updated);
     }
 
     [Fact]

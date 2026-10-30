@@ -68,12 +68,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Core\DriverRename.cs">
-      <LogicalName>DeviceTweakerCS.DriverRename.cs</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Core\DriverRuntime.cs">
-      <LogicalName>DeviceTweakerCS.DriverRuntime.cs</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="assets\DEVICE TWEAKER.ico">
       <LogicalName>DeviceTweakerCS.AppIcon</LogicalName>
     </EmbeddedResource>

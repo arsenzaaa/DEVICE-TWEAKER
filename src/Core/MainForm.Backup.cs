@@ -336,11 +336,6 @@ public sealed partial class MainForm
             RawMouseThrottleValueName);
 
         AddValues(
-            RegistryHive.CurrentUser,
-            ImodStartupRunKeyPath,
-            ImodStartupRunValueName);
-
-        AddValues(
             RegistryHive.LocalMachine,
             @"SYSTEM\CurrentControlSet\Control\Session Manager\Kernel",
             "ReservedCpuSets");
@@ -354,14 +349,7 @@ public sealed partial class MainForm
                 "DCSettingIndex");
         }
 
-        string startupScript = GetImodStartupPath();
-        backup.ImodScript = new FileBackup
-        {
-            Path = startupScript,
-            Exists = File.Exists(startupScript),
-            Text = File.Exists(startupScript) ? File.ReadAllText(startupScript, Encoding.UTF8) : null,
-        };
-
+        backup.StartupProfile = CaptureStartupProfileFile();
         return backup;
     }
 
@@ -371,19 +359,10 @@ public sealed partial class MainForm
         {
             DeviceTweakerBackup backup = CaptureDeviceTweakerBackup("qa-imod-persistence");
             ValidateDeviceTweakerBackup(backup);
-            RegistryValueBackup? runValue = backup.RegistryValues.FirstOrDefault(value =>
-                string.Equals(value.Hive, "HKCU", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(value.Path, ImodStartupRunKeyPath, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(value.Name, ImodStartupRunValueName, StringComparison.OrdinalIgnoreCase));
-            if (runValue is null)
+            if (backup.StartupProfile is null
+                || !string.Equals(backup.StartupProfile.Path, GetStartupProfilePath(), StringComparison.OrdinalIgnoreCase))
             {
-                error = "HKCU Run value is not captured";
-                return false;
-            }
-
-            if (backup.ImodScript is null || !IsManagedImodScriptPath(backup.ImodScript.Path))
-            {
-                error = "managed IMOD script state is not captured";
+                error = "startup profile state is not captured";
                 return false;
             }
 
@@ -722,11 +701,7 @@ public sealed partial class MainForm
         }
 
         ValidateDeviceTweakerBackup(backup);
-        if (backup.ImodScript is { Exists: true, Text: { } oldScript })
-        {
-            backup.ImodScript.Text = UpgradeImodScriptEngine(oldScript);
-            PrepareImodStartupPayload();
-        }
+        NormalizeStartupProfileBackup(backup);
 
         BackupRestoreService service = new(
             ValidateDeviceTweakerBackup,
@@ -737,14 +712,8 @@ public sealed partial class MainForm
                 return CaptureRegistryValue(hive, value.Path, value.Name);
             },
             RestoreRegistryValue,
-            () =>
-            {
-                string startupPath = GetImodStartupPath();
-                bool exists = File.Exists(startupPath);
-                return new FileBackup { Path = startupPath, Exists = exists,
-                    Text = exists ? File.ReadAllText(startupPath, Encoding.UTF8) : null };
-            },
-            script => { RestoreFileBackup(script); InvalidateImodCache(); },
+            CaptureStartupProfileFile,
+            profile => { RestoreStartupProfile(profile); InvalidateImodCache(); },
             WriteLog);
         service.Restore(backup);
 
@@ -801,7 +770,7 @@ public sealed partial class MainForm
             string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase));
         using FileStream stream = file.Open(FileMode.Open, FileAccess.Read, FileShare.Read);
         string sha256 = Convert.ToHexString(SHA256.HashData(stream));
-        string imodScriptState = actual.ImodScript switch
+        string imodScriptState = actual.StartupProfile switch
         {
             null => "not-captured",
             { Exists: true } => "present",
@@ -878,42 +847,64 @@ public sealed partial class MainForm
 
     private static object DecodeRegistryValue(string? data, RegistryValueKind kind) => BackupFormat.DecodeRegistryValue(data, kind);
 
-    private void RestoreFileBackup(FileBackup backup)
+    private static FileBackup CaptureStartupProfileFile()
     {
-        DemandRealWrite("RestoreFileBackup");
-        if (string.IsNullOrWhiteSpace(backup.Path))
+        string path = GetStartupProfilePath();
+        bool exists = File.Exists(path);
+        return new FileBackup { Path = path, Exists = exists, Text = exists ? File.ReadAllText(path, Encoding.UTF8) : null };
+    }
+
+    // Brings a backup to the current startup layout before restore: a script saved
+    // by an older version becomes profile.json, and the profile is rebuilt with the
+    // hashes and paths of this build so the restored file matches what is installed.
+    private void NormalizeStartupProfileBackup(DeviceTweakerBackup backup)
+    {
+        backup.RegistryValues.RemoveAll(value =>
+            string.Equals(value.Hive, "HKCU", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(value.Path.Trim('\\'), ImodStartupRunKeyPath, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(value.Name, ImodStartupRunValueName, StringComparison.OrdinalIgnoreCase));
+
+        FileBackup? source = backup.StartupProfile ?? backup.ImodScript;
+        backup.ImodScript = null;
+        if (source is null)
         {
+            backup.StartupProfile = null;
             return;
         }
 
-        if (!IsManagedImodScriptPath(backup.Path))
+        if (!source.Exists || source.Text is null)
+        {
+            backup.StartupProfile = new FileBackup { Path = GetStartupProfilePath(), Exists = false };
+            return;
+        }
+
+        bool legacyScript = !string.Equals(Path.GetFullPath(source.Path), Path.GetFullPath(GetStartupProfilePath()), StringComparison.OrdinalIgnoreCase);
+        ImodConfig config = legacyScript
+            ? ParseImodScriptText(source.Text)
+            : ConvertStartupProfile(StartupProfile.FromJson(source.Text));
+        backup.StartupProfile = new FileBackup
+        {
+            Path = GetStartupProfilePath(),
+            Exists = true,
+            Text = BuildStartupProfile(config, GetImodDriverSystemPath()).ToJson(),
+        };
+    }
+
+    private void RestoreStartupProfile(FileBackup backup)
+    {
+        DemandRealWrite("RestoreStartupProfile");
+        if (!string.Equals(Path.GetFullPath(backup.Path), Path.GetFullPath(GetStartupProfilePath()), StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("Refusing to restore an unmanaged file path.");
         }
 
-        string expectedPath = Path.GetFullPath(GetImodStartupPath());
-
-        if (!backup.Exists)
+        if (!backup.Exists || backup.Text is null)
         {
-            DeleteImodStartupRegistration();
-            File.Delete(expectedPath);
-            File.Delete(GetLegacyImodStartupPath());
+            RemoveStartupBundle(report: null);
             return;
         }
 
-        string? directory = Path.GetDirectoryName(expectedPath);
-        if (!string.IsNullOrWhiteSpace(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        WriteAllTextAtomic(expectedPath, backup.Text ?? string.Empty, new UTF8Encoding(false));
-        if (!EnsureImodStartupRegistration(out string? registrationError))
-        {
-            throw new InvalidOperationException($"IMOD startup registration failed: {registrationError}");
-        }
-
-        File.Delete(GetLegacyImodStartupPath());
+        InstallStartupBundle(ConvertStartupProfile(StartupProfile.FromJson(backup.Text)));
     }
 
     private static string MakeBackupFileReason(string reason)

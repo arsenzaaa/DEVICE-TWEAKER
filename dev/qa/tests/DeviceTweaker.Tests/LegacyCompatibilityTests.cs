@@ -45,9 +45,9 @@ public sealed class LegacyCompatibilityTests
         const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Static;
         Assert.Equal("DeviceTweakerImod2", typeof(MainForm).GetField("ImodDriverServiceName", flags)!.GetRawConstantValue());
         Assert.Equal(@"\\.\DeviceTweakerImod2", typeof(MainForm).GetField("ImodDriverDevicePath", flags)!.GetRawConstantValue());
-        string script = (string)typeof(MainForm).GetMethod("CreateImodScriptTemplate", flags)!.Invoke(null, null)!;
+        string script = StartupScriptTests.ReadResource("DeviceTweakerCS.Startup.ApplyIMOD.ps1");
         Assert.Contains("-drvn DeviceTweakerImod2 -drvr DeviceTweakerImod2", script);
-        Assert.Contains("$imodScriptVersion = 30", script);
+        Assert.Contains("$imodScriptVersion = 31", script);
         Assert.DoesNotContain("-drvn DTIMODMapped", script);
     }
 }

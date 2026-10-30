@@ -1,10 +1,21 @@
+# DEVICE TWEAKER startup script.
+#
+# Applies the saved USB IMOD / NIC ITR profile. Task Scheduler runs it as SYSTEM
+# ("\DEVICE TWEAKER\IMOD") at logon, after resume from sleep and when a USB / HID
+# device starts. It works without DEVICE TWEAKER.exe; everything it uses lies
+# next to it in %ProgramData%\DEVICE TWEAKER\Startup:
+#   profile.json                  saved values and SHA-256 of every file below
+#   DeviceTweakerImodRuntime.cs   C# compiled here with Add-Type (SetupAPI, DTIMOD access)
+#   Loader\kdu.exe, drv64.dll     loader for DTIMOD.sys when it is not running yet
+#   logs\ApplyIMOD_*.log          what was applied or skipped and why
+# Only administrators can change this folder.
 param(
-    [switch]$verbose
+    [switch]$verbose,
+    # Device instance ID passed by the device-start trigger.
+    [string]$TriggerDevice
 )
 
-$imodScriptVersion = 30
-
-{{IMOD_CONFIG_BLOCK}}
+$imodScriptVersion = 31
 
 function Test-IsAdmin {
     try {
@@ -16,30 +27,106 @@ function Test-IsAdmin {
     }
 }
 
-function Start-ElevatedSelf {
+function ConvertFrom-ImodNumber {
+    param($value)
+    if ($null -eq $value) {
+        return $null
+    }
+
+    $text = ([string]$value).Trim()
+    if ($text.StartsWith('0x', [System.StringComparison]::OrdinalIgnoreCase)) {
+        return [Convert]::ToUInt64($text.Substring(2), 16)
+    }
+
+    return [uint64]$text
+}
+
+function Test-ImodFileHash {
     param(
-        [string]$scriptPath,
-        [string[]]$extraArgs
+        [string]$name,
+        [string]$path,
+        [string]$expected
     )
 
-    $psExe = (Get-Process -Id $PID).Path
-    if (-not $psExe) {
-        $psExe = 'powershell.exe'
+    if ([string]::IsNullOrWhiteSpace($expected)) {
+        Write-ImodLog ("error: missing trusted hash for " + $name)
+        return $false
     }
 
-    $args = @(
-        '-NoLogo',
-        '-NoProfile',
-        '-NonInteractive',
-        '-WindowStyle', 'Hidden',
-        '-ExecutionPolicy', 'Bypass',
-        '-File', $scriptPath
-    )
-    if ($extraArgs) {
-        $args += $extraArgs
+    try {
+        $actual = (Get-FileHash -LiteralPath $path -Algorithm SHA256 -ErrorAction Stop).Hash
+    } catch {
+        Write-ImodLog ("error: hash check failed for " + $name + ": " + $_.Exception.Message)
+        return $false
     }
 
-    Start-Process -FilePath $psExe -ArgumentList $args -Verb RunAs | Out-Null
+    if (-not $actual.Equals($expected, [System.StringComparison]::OrdinalIgnoreCase)) {
+        Write-ImodLog ("error: hash mismatch for " + $name + " actual=" + $actual)
+        return $false
+    }
+
+    return $true
+}
+
+# Reads profile.json into the variables the rest of the script uses.
+function Import-ImodProfile {
+    param([string]$path)
+
+    $profileData = [System.IO.File]::ReadAllText($path) | ConvertFrom-Json
+    if ([int]$profileData.schemaVersion -ne 1) {
+        throw ("unsupported profile schemaVersion " + $profileData.schemaVersion)
+    }
+
+    $script:ImodDriverPath = [string]$profileData.driver.path
+    $script:ImodDriverSha256 = [string]$profileData.driver.sha256
+    $script:ImodRuntimeSha256 = [string]$profileData.runtime.sha256
+    $script:ImodKduPath = Join-Path $scriptRoot ([string]$profileData.loader.kdu.file)
+    $script:ImodKduSha256 = [string]$profileData.loader.kdu.sha256
+    $script:ImodKduDbPath = Join-Path $scriptRoot ([string]$profileData.loader.database.file)
+    $script:ImodKduDbSha256 = [string]$profileData.loader.database.sha256
+    $script:ImodStartupLogEnabled = [bool]$profileData.logging.enabled
+    $script:ImodStartupVerboseLogEnabled = [bool]$profileData.logging.verbose
+
+    $usb = $profileData.usb
+    $script:applyUsbImod = [bool]$usb.apply
+    $script:globalInterval = ConvertFrom-ImodNumber $usb.interval
+    $script:globalHCSPARAMSOffset = ConvertFrom-ImodNumber $usb.hcsparamsOffset
+    $script:globalRTSOFF = ConvertFrom-ImodNumber $usb.rtsoff
+    $script:userDefinedData = @{}
+    foreach ($controller in @($usb.controllers)) {
+        if ($null -eq $controller) {
+            continue
+        }
+
+        $entry = @{}
+        if ($null -ne $controller.enabled) { $entry['ENABLED'] = [bool]$controller.enabled }
+        if ($null -ne $controller.interval) { $entry['INTERVAL'] = ConvertFrom-ImodNumber $controller.interval }
+        if ($null -ne $controller.intervals) { $entry['INTERVALS'] = @($controller.intervals | ForEach-Object { ConvertFrom-ImodNumber $_ }) }
+        if ($null -ne $controller.adaptiveRoleBinding) { $entry['ADAPTIVE_ROLE_BINDING'] = [bool]$controller.adaptiveRoleBinding }
+        if ($null -ne $controller.roleIntervals) { $entry['ROLE_INTERVALS'] = [string]$controller.roleIntervals }
+        if ($null -ne $controller.hcsparamsOffset) { $entry['HCSPARAMS_OFFSET'] = ConvertFrom-ImodNumber $controller.hcsparamsOffset }
+        if ($null -ne $controller.rtsoff) { $entry['RTSOFF'] = ConvertFrom-ImodNumber $controller.rtsoff }
+        $script:userDefinedData[[string]$controller.match] = $entry
+    }
+
+    $script:nicItrData = @()
+    foreach ($nic in @($profileData.nicItr)) {
+        if ($null -eq $nic) {
+            continue
+        }
+
+        $script:nicItrData += @{
+            'HWID' = [string]$nic.match
+            'FAMILY' = [string]$nic.family
+            'BASE_OFFSET' = ConvertFrom-ImodNumber $nic.baseOffset
+            'STRIDE' = ConvertFrom-ImodNumber $nic.stride
+            'QUEUES' = [int]$nic.queues
+            'WIDTH' = [int]$nic.width
+            'MASK' = ConvertFrom-ImodNumber $nic.mask
+            'OR_BITS' = ConvertFrom-ImodNumber $nic.orBits
+            'VALUES' = @($nic.values | ForEach-Object { ConvertFrom-ImodNumber $_ })
+        }
+    }
 }
 
 function Write-ImodLog {
@@ -503,27 +590,37 @@ function Resolve-ImodStartupRootPortRoles {
     return (ConvertTo-ImodRootPortRoleText $rolesByPort)
 }
 
-$scriptRoot = $PSCommandPath
-if ($scriptRoot) {
-    $scriptRoot = Split-Path -Parent $scriptRoot
-}
-if (-not $scriptRoot) {
-    $scriptRoot = $PSScriptRoot
-}
-if (-not $scriptRoot) {
-    $scriptRoot = $env:TEMP
-}
-if ([string]::IsNullOrWhiteSpace($ImodLogDirectory)) {
-    $ImodLogDirectory = $scriptRoot
-}
+$scriptRoot = $PSScriptRoot
+$ImodStartupLogEnabled = $true
+$ImodLogDirectory = Join-Path $scriptRoot 'logs'
 try {
     New-Item -ItemType Directory -Path $ImodLogDirectory -Force | Out-Null
+    # Keep two weeks of daily logs.
+    Get-ChildItem -LiteralPath $ImodLogDirectory -Filter 'ApplyIMOD_*.log' -File -ErrorAction SilentlyContinue |
+        Sort-Object Name -Descending | Select-Object -Skip 14 | Remove-Item -Force -ErrorAction SilentlyContinue
 } catch {
     $ImodLogDirectory = $scriptRoot
 }
 $imodLogStamp = Get-Date -Format 'yyyyMMdd'
 $ImodLogPath = Join-Path $ImodLogDirectory ("ApplyIMOD_{0}.log" -f $imodLogStamp)
-Write-ImodLog "startup context: version=$imodScriptVersion pid=$PID root=$scriptRoot driver=$ImodDriverPath kdu=$ImodKduPath db=$ImodKduDbPath" -verboseOnly
+
+# Task Scheduler passes the literal "$(Device)" when another trigger started the task.
+if ($TriggerDevice -like '$(*') {
+    $TriggerDevice = ''
+}
+if ($TriggerDevice -and $TriggerDevice -notmatch '^(USB|HID)\\') {
+    exit 0
+}
+
+try {
+    Import-ImodProfile -path (Join-Path $scriptRoot 'profile.json')
+} catch {
+    Write-ImodLog ("error: cannot read profile.json: " + $_.Exception.Message)
+    exit 1
+}
+
+$triggerText = if ($TriggerDevice) { $TriggerDevice } else { 'logon / resume / manual' }
+Write-ImodLog "startup context: version=$imodScriptVersion pid=$PID root=$scriptRoot trigger=`"$triggerText`" driver=$ImodDriverPath kdu=$ImodKduPath db=$ImodKduDbPath" -verboseOnly
 $usbEntryCount = if ($userDefinedData) { $userDefinedData.Count } else { 0 }
 $nicEntryCount = if ($nicItrData) { @($nicItrData).Count } else { 0 }
 Write-ImodLog ("startup config: applyUsb=$applyUsbImod usbEntries=$usbEntryCount nicEntries=$nicEntryCount globalInterval=$(Format-ImodHex ([uint64]$globalInterval)) hcsparamsOffset=$(Format-ImodHex ([uint64]$globalHCSPARAMSOffset)) rtsoffOffset=$(Format-ImodHex ([uint64]$globalRTSOFF))")
@@ -548,18 +645,8 @@ if ($nicEntryCount -gt 0) {
 }
 
 if (-not (Test-IsAdmin)) {
-    $extraArgs = @()
-    if ($verbose) {
-        $extraArgs += "-verbose"
-    }
-
-    try {
-        Start-ElevatedSelf -scriptPath $PSCommandPath -extraArgs $extraArgs
-        exit 0
-    } catch {
-        Write-Host "error: administrator privileges required"
-        exit 1
-    }
+    Write-ImodLog "error: administrator privileges required; the scheduled task runs this script as SYSTEM"
+    exit 1
 }
 
 if (-not $ImodDriverPath -or -not (Test-Path $ImodDriverPath -PathType Leaf)) {
@@ -567,9 +654,17 @@ if (-not $ImodDriverPath -or -not (Test-Path $ImodDriverPath -PathType Leaf)) {
     exit 1
 }
 
-Add-Type -Language CSharp -TypeDefinition @'
-{{IMOD_RUNTIME_SOURCE}}
-'@
+$ImodRuntimePath = Join-Path $scriptRoot 'DeviceTweakerImodRuntime.cs'
+if (-not (Test-ImodFileHash -name 'DeviceTweakerImodRuntime.cs' -path $ImodRuntimePath -expected $ImodRuntimeSha256)) {
+    exit 1
+}
+
+try {
+    Add-Type -Language CSharp -TypeDefinition ([System.IO.File]::ReadAllText($ImodRuntimePath))
+} catch {
+    Write-ImodLog ("error: runtime compile failed: " + $_.Exception.Message)
+    exit 1
+}
 
 function Invoke-ImodKduLoader {
     if ([DeviceTweakerImodRuntime]::IsDriverDeviceAvailable()) {
@@ -597,18 +692,7 @@ function Invoke-ImodKduLoader {
         @('kdu.exe', $ImodKduPath, $ImodKduSha256),
         @('drv64.dll', $ImodKduDbPath, $ImodKduDbSha256)
     )) {
-        if ([string]::IsNullOrWhiteSpace([string]$payload[2])) {
-            Write-ImodLog ("startup loader: missing trusted hash for " + $payload[0])
-            return $false
-        }
-        try {
-            $actualHash = (Get-FileHash -LiteralPath $payload[1] -Algorithm SHA256 -ErrorAction Stop).Hash
-            if (-not $actualHash.Equals([string]$payload[2], [System.StringComparison]::OrdinalIgnoreCase)) {
-                Write-ImodLog ("startup loader: hash mismatch for " + $payload[0] + " actual=" + $actualHash)
-                return $false
-            }
-        } catch {
-            Write-ImodLog ("startup loader: hash check failed for " + $payload[0] + ": " + $_.Exception.Message)
+        if (-not (Test-ImodFileHash -name $payload[0] -path $payload[1] -expected ([string]$payload[2]))) {
             return $false
         }
     }
@@ -669,6 +753,18 @@ function Invoke-ImodKduLoader {
     }
 
     return $false
+}
+
+# DEVICE TWEAKER holds the same lock while it loads DTIMOD; only one of them may run KDU.
+$imodLoadGate = New-Object System.Threading.Mutex($false, 'Global\DEVICE_TWEAKER_DTIMOD_LOAD')
+try {
+    $imodLoadGateHeld = $imodLoadGate.WaitOne(70000)
+} catch [System.Threading.AbandonedMutexException] {
+    $imodLoadGateHeld = $true
+}
+if (-not $imodLoadGateHeld) {
+    Write-ImodLog "error: another DTIMOD operation is still running; nothing applied"
+    exit 1
 }
 
 try {
@@ -842,8 +938,12 @@ try {
     }
 
     Write-ImodLog "startup apply done; usb=$appliedUsb nic=$appliedNic"
-    exit 0
+    $imodExitCode = 0
 } catch {
     Write-ImodLog ("error: " + $_.Exception.Message)
-    exit 1
+    $imodExitCode = 1
+} finally {
+    $imodLoadGate.ReleaseMutex()
+    $imodLoadGate.Dispose()
 }
+exit $imodExitCode

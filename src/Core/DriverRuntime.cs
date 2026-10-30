@@ -1,4 +1,4 @@
-﻿// Shared with the saved Windows PowerShell 5.1 runtime. Keep C# 5 syntax.
+﻿// DTIMOD loading policy, protocol check and the loader journal.
 #if NET8_0_OR_GREATER
 #nullable disable
 #endif
@@ -73,7 +73,7 @@ namespace DeviceTweakerCS
     }
 
     // The journal survives an app exit; the boot ID prevents a stale timeout surviving a reboot.
-    // All methods are called while holding the same global gate in GUI and saved script.
+    // All methods are called while holding Global\DEVICE_TWEAKER_DTIMOD_LOAD; Startup\ApplyIMOD.ps1 takes the same lock.
     public sealed class DriverOperationLease : System.IDisposable
     {
         private readonly System.Threading.Mutex mutex;

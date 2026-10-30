@@ -108,21 +108,9 @@ public sealed partial class MainForm
     // Removing the saved NIC ITR profile hands moderation back to the driver.
     private void RestoreNicDriverModerationForSavedProfiles(OperationReport? report)
     {
-        HashSet<string> savedKeys = new(StringComparer.OrdinalIgnoreCase);
-        foreach (string path in new[] { GetImodStartupPath(), GetLegacyImodStartupPath() })
-        {
-            try
-            {
-                if (File.Exists(path))
-                {
-                    savedKeys.UnionWith(ParseImodScriptFile(path).NicItrEntries.Select(entry => entry.Hwid));
-                }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
-            {
-                WriteLog($"NIC.MODERATION.RESTORE.WARN: cannot read saved profile {path}: {ex.Message}");
-            }
-        }
+        HashSet<string> savedKeys = new(
+            ReadSavedStartupConfig(out _).NicItrEntries.Select(entry => entry.Hwid),
+            StringComparer.OrdinalIgnoreCase);
 
         foreach (DeviceBlock block in _blocks.Where(block => block.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX
             && !block.Device.IsTestDevice
@@ -488,16 +476,8 @@ public sealed partial class MainForm
 
         try
         {
-            ResolveImodPaths(out string? scriptPath);
-            if (string.IsNullOrWhiteSpace(scriptPath))
-            {
-                scriptPath = GetImodStartupPath();
-            }
-
-            bool scriptExists = File.Exists(scriptPath);
-            ImodConfig config = scriptExists ? ParseImodScriptFile(scriptPath) : new ImodConfig();
-            config.HasScript = scriptExists;
-
+            ImodConfig config = ReadSavedStartupConfig(out _);
+            string scriptPath = GetStartupProfilePath();
             string hwid = GetNicItrPersistenceKey(block.Device.InstanceId);
             config.NicItrEntries.RemoveAll(e => string.Equals(e.Hwid, hwid, StringComparison.OrdinalIgnoreCase));
             config.NicItrEntries.Add(new NicItrConfigEntry
@@ -513,11 +493,7 @@ public sealed partial class MainForm
                 Values = values,
             });
 
-            WriteImodScript(config, scriptPath);
-            config.HasScript = true;
-            _imodConfigCache = config;
-            _imodScriptPath = scriptPath;
-            _imodConfigLoaded = true;
+            SaveStartupProfile(config);
 
             block.NicItrStatusLabel.Text = "current: saved for startup";
             block.NicItrStatusLabel.ForeColor = _statusActive;

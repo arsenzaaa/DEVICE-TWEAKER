@@ -87,11 +87,11 @@ public sealed class QaWriteGuardTests
     {
         AssertBlocked("RestoreDeviceTweakerBackup", "missing-backup.json");
         AssertBlocked("RestoreRegistryValue", (object?)null);
-        AssertBlocked("RestoreFileBackup", (object?)null);
+        AssertBlocked("RestoreStartupProfile", (object?)null);
         AssertBlocked("DeleteDeviceTweakerBackups", (object?)null);
         AssertBlocked("PruneDeviceTweakerBackups", "", 0);
-        AssertBlocked("WriteImodScript", null, "");
-        AssertBlocked("UpgradeManagedImodStartupForRename");
+        AssertBlocked("InstallStartupBundle", (object?)null);
+        AssertBlocked("RemoveStartupBundle", (object?)null);
         AssertBlocked("DeleteImodStartupRegistration", (object?)null);
         AssertBlocked("RemoveImodPersistenceFiles", (object?)null);
         AssertBlocked("SetRawMouseThrottle", false, 0);

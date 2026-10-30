@@ -14,21 +14,13 @@ public sealed partial class MainForm
     private const string ImodStartupRunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string ImodStartupRunValueName = "DEVICE TWEAKER IMOD";
     private const string ImodDriverName = "DTIMOD.sys";
-    private const string ImodScriptMarkerStart = "$imodSettingsBegin = $true";
-    private const string ImodScriptMarkerEnd = "$imodSettingsEnd = $true";
-    private const string ImodScriptVersionMarker = "$imodScriptVersion = 30";
-    private const string ImodScriptConfigToken = "{{IMOD_CONFIG_BLOCK}}";
     private const bool ImodStartupScriptLoggingEnabled = true;
     private const bool ImodStartupScriptVerboseLoggingEnabled = false;
-    // The logon script and the C# runtime it compiles are plain files in src/Startup,
-    // so the code that runs at every logon can be read and reviewed as is.
-    private static readonly string ImodScriptTemplate = ComposeImodScriptTemplate();
 
     private ImodConfig? _imodConfigCache;
-    private string? _imodScriptPath;
     private bool _imodConfigLoaded;
 
-    private sealed class ImodConfigEntry
+    internal sealed class ImodConfigEntry
     {
         public required string Hwid { get; set; }
         public uint? Interval { get; set; }
@@ -40,7 +32,7 @@ public sealed partial class MainForm
         public bool? Enabled { get; set; }
     }
 
-    private sealed class NicItrConfigEntry
+    internal sealed class NicItrConfigEntry
     {
         public required string Hwid { get; set; }
         public string FamilyName { get; set; } = string.Empty;
@@ -53,7 +45,7 @@ public sealed partial class MainForm
         public List<ulong> Values { get; set; } = [];
     }
 
-    private sealed class ImodConfig
+    internal sealed class ImodConfig
     {
         public uint GlobalInterval { get; set; } = ImodDefaultInterval;
         public uint GlobalHcsparamsOffset { get; set; } = ImodDefaultHcsparamsOffset;
@@ -78,7 +70,6 @@ public sealed partial class MainForm
     private void InvalidateImodCache()
     {
         _imodConfigCache = null;
-        _imodScriptPath = null;
         _imodConfigLoaded = false;
     }
 
@@ -90,179 +81,61 @@ public sealed partial class MainForm
         }
 
         _imodConfigLoaded = true;
-        _imodConfigCache = LoadImodConfig(out _imodScriptPath);
+        _imodConfigCache = LoadStartupConfig();
     }
 
-    private ImodConfig LoadImodConfig(out string? scriptPath)
-    {
-        ResolveImodPaths(out scriptPath);
-        if (string.IsNullOrWhiteSpace(scriptPath) || !File.Exists(scriptPath))
-        {
-            return new ImodConfig { HasScript = false };
-        }
-
-        try
-        {
-            ImodConfig config = ParseImodScriptFile(scriptPath);
-            config.HasScript = true;
-            string existing = File.ReadAllText(scriptPath, Encoding.UTF8);
-            if (!existing.Contains(ImodScriptVersionMarker, StringComparison.Ordinal))
-                WriteLog($"IMOD.STARTUP.UPGRADE: pending path=\"{scriptPath}\"; update on next explicit driver / settings action");
-
-            return config;
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"IMOD.CONFIG: failed to parse {scriptPath}: {ex.Message}");
-            return new ImodConfig { HasScript = false };
-        }
-    }
-
-    private string GetImodStartupPath()
-    {
-        string roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        if (string.IsNullOrWhiteSpace(roaming))
-        {
-            roaming = GetScriptRoot();
-        }
-
-        return Path.Combine(roaming, "DEVICE TWEAKER", "IMOD", ImodScriptFileName);
-    }
-
-    private string GetLegacyImodStartupPath()
-    {
-        string startup = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
-        if (string.IsNullOrWhiteSpace(startup))
-        {
-            startup = GetScriptRoot();
-        }
-
-        return Path.Combine(startup, ImodScriptFileName);
-    }
-
-    private bool IsManagedImodScriptPath(string path)
+    // Backups may hold the current profile or a script saved by an older layout.
+    private static bool IsManagedImodScriptPath(string path)
     {
         try
         {
             string fullPath = Path.GetFullPath(path);
-            return string.Equals(fullPath, Path.GetFullPath(GetImodStartupPath()), StringComparison.OrdinalIgnoreCase)
-                || string.Equals(fullPath, Path.GetFullPath(GetLegacyImodStartupPath()), StringComparison.OrdinalIgnoreCase);
+            return new[] { GetStartupProfilePath(), GetLegacyAppDataImodScriptPath(), GetLegacyImodStartupPath() }
+                .Any(candidate => string.Equals(fullPath, Path.GetFullPath(candidate), StringComparison.OrdinalIgnoreCase));
         }
-        catch
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
         {
             return false;
         }
     }
 
-    private static string GetImodStartupRunCommand()
-        => "\"%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\""
-            + " -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden"
-            + " -ExecutionPolicy Bypass -File"
-            + " \"%APPDATA%\\DEVICE TWEAKER\\IMOD\\ApplyIMOD.ps1\"";
-
     private bool ValidateImodStartupPersistenceContract(out string error)
     {
-        string scriptPath = Path.GetFullPath(GetImodStartupPath());
-        string legacyPath = Path.GetFullPath(GetLegacyImodStartupPath());
-        string command = GetImodStartupRunCommand();
-        string[] required =
-        [
-            "powershell.exe\"",
-            "-NoProfile",
-            "-NonInteractive",
-            "-WindowStyle Hidden",
-            "-ExecutionPolicy Bypass",
-            "-File",
-            "%APPDATA%\\DEVICE TWEAKER\\IMOD\\ApplyIMOD.ps1",
-        ];
-
-        if (string.Equals(scriptPath, legacyPath, StringComparison.OrdinalIgnoreCase))
+        string root = GetStartupRoot();
+        string programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        if (!root.StartsWith(programData + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
         {
-            error = "managed script path still resolves to the Startup folder";
+            error = $"startup folder is outside %ProgramData%: {root}";
             return false;
         }
 
-        string? missing = required.FirstOrDefault(token =>
-            !command.Contains(token, StringComparison.OrdinalIgnoreCase));
-        if (missing is not null)
+        string task = StartupTask.BuildXml(GetStartupScriptPath());
+        string[] taskRequirements = ["S-1-5-18", "<LogonTrigger>", "Power-Troubleshooter", "EventID=410", "-TriggerDevice", GetStartupScriptPath()];
+        string? missingTask = taskRequirements.FirstOrDefault(token => !task.Contains(token, StringComparison.Ordinal));
+        if (missingTask is not null)
         {
-            error = $"startup command is missing token: {missing}";
+            error = $"startup task is missing: {missingTask}";
             return false;
         }
 
-        if (command.Length > 260)
+        string script = ReadStartupResource(StartupScriptResource);
+        string runtime = ReadStartupResource(StartupRuntimeResource);
+        string[] scriptRequirements = ["Import-ImodProfile", "Test-ImodFileHash -name 'DeviceTweakerImodRuntime.cs'", "-role 'Audio'", "IMOD readback mismatch"];
+        string? missingScript = scriptRequirements.FirstOrDefault(token => !script.Contains(token, StringComparison.Ordinal));
+        if (missingScript is not null)
         {
-            error = $"startup command exceeds the Run key limit: {command.Length}";
+            error = $"startup script is missing: {missingScript}";
             return false;
         }
 
-        string[] scriptRequirements =
-        [
-            "$wantsAudio = $roleIntervalsText",
-            "$wantsWebcam = $roleIntervalsText",
-            "-role 'Audio'",
-            "-role 'Webcam'",
-            "IMOD readback mismatch",
-            "TryReadPhys32(handle, address, out readBack",
-        ];
-        string? missingScriptToken = scriptRequirements.FirstOrDefault(token =>
-            !ImodScriptTemplate.Contains(token, StringComparison.Ordinal));
-        if (missingScriptToken is not null)
+        if (!runtime.Contains("TryReadPhys32(handle, address, out readBack", StringComparison.Ordinal))
         {
-            error = $"startup script contract is missing token: {missingScriptToken}";
+            error = "startup runtime does not read IMOD back after writing";
             return false;
         }
 
         error = string.Empty;
         return true;
-    }
-
-    private bool EnsureImodStartupRegistration(out string? error)
-    {
-        if (QaRun.TryBlock("IMOD STARTUP REGISTRATION"))
-        {
-            error = "QA read-only session";
-            return false;
-        }
-        try
-        {
-            string expected = GetImodStartupRunCommand();
-            using RegistryKey key = Registry.CurrentUser.CreateSubKey(ImodStartupRunKeyPath, writable: true)
-                ?? throw new InvalidOperationException("HKCU Run key could not be opened.");
-            object? current = key.GetValue(
-                ImodStartupRunValueName,
-                null,
-                RegistryValueOptions.DoNotExpandEnvironmentNames);
-            RegistryValueKind? currentKind = current is null
-                ? null
-                : key.GetValueKind(ImodStartupRunValueName);
-            if (currentKind == RegistryValueKind.ExpandString
-                && string.Equals(current as string, expected, StringComparison.Ordinal))
-            {
-                error = null;
-                return true;
-            }
-
-            key.SetValue(ImodStartupRunValueName, expected, RegistryValueKind.ExpandString);
-            object? written = key.GetValue(
-                ImodStartupRunValueName,
-                null,
-                RegistryValueOptions.DoNotExpandEnvironmentNames);
-            if (!string.Equals(written as string, expected, StringComparison.Ordinal)
-                || key.GetValueKind(ImodStartupRunValueName) != RegistryValueKind.ExpandString)
-            {
-                throw new InvalidOperationException("HKCU Run value verification failed.");
-            }
-
-            WriteLog($"IMOD.STARTUP: registered HKCU\\{ImodStartupRunKeyPath} value=\"{ImodStartupRunValueName}\" command=[{FlattenLogText(expected)}]");
-            error = null;
-            return true;
-        }
-        catch (Exception ex)
-        {
-            error = ex.Message;
-            return false;
-        }
     }
 
     private static string GetImodDriverSystemPath()
@@ -284,25 +157,19 @@ public sealed partial class MainForm
         return Path.Combine(windows, ImodDriverName);
     }
 
-    private static string GetImodStartupKduDirectory()
-    {
-        string root = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        if (string.IsNullOrWhiteSpace(root))
-        {
-            root = AppContext.BaseDirectory;
-        }
-
-        return Path.Combine(root, "DEVICE TWEAKER", "IMOD", "Loader");
-    }
-
     private static bool EnsureImodStartupKduPayload(out string kduPath, out string dbPath, out string? error)
     {
         string directory = GetImodStartupKduDirectory();
         kduPath = Path.Combine(directory, ImodKduFileName);
         dbPath = Path.Combine(directory, ImodKduDatabaseFileName);
 
-        if (!TrySecureImodDriverDirectory(directory, out error))
+        try
         {
+            SecureStartupFolder(directory);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = ex.Message;
             return false;
         }
 
@@ -337,71 +204,17 @@ public sealed partial class MainForm
         }
     }
 
-    private void ResolveImodPaths(out string? scriptPath)
-    {
-        string managedPath = GetImodStartupPath();
-        if (QaRun.IsReadOnly)
-        {
-            string legacy = GetLegacyImodStartupPath();
-            scriptPath = File.Exists(managedPath) ? managedPath : File.Exists(legacy) ? legacy : null;
-            return;
-        }
-        if (File.Exists(managedPath))
-        {
-            if (!EnsureImodStartupRegistration(out string? registrationError))
-            {
-                WriteLog($"IMOD.STARTUP.WARN: registration repair failed: {registrationError}");
-            }
-
-            scriptPath = managedPath;
-            return;
-        }
-
-        string legacyPath = GetLegacyImodStartupPath();
-        if (!File.Exists(legacyPath))
-        {
-            scriptPath = null;
-            return;
-        }
-
-        try
-        {
-            string legacyScript = File.ReadAllText(legacyPath, Encoding.UTF8);
-            string? directory = Path.GetDirectoryName(managedPath);
-            if (!string.IsNullOrWhiteSpace(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            WriteAllTextAtomic(managedPath, legacyScript, new UTF8Encoding(false));
-            if (!EnsureImodStartupRegistration(out string? registrationError))
-            {
-                throw new InvalidOperationException($"startup registration failed: {registrationError}");
-            }
-
-            File.Delete(legacyPath);
-            WriteLog($"IMOD.STARTUP.MIGRATE: source=\"{legacyPath}\" target=\"{managedPath}\" status=success");
-            scriptPath = managedPath;
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"IMOD.STARTUP.MIGRATE: source=\"{legacyPath}\" target=\"{managedPath}\" status=failed error=\"{FlattenLogText(ex.ToString())}\"");
-            scriptPath = legacyPath;
-        }
-    }
-
     private void RemoveImodPersistenceFiles(OperationReport? report = null)
     {
         DemandRealWrite("RemoveImodPersistenceFiles");
         RestoreNicDriverModerationForSavedProfiles(report);
-        DeleteImodStartupRegistration(report);
-        DeleteFileIfExists(GetImodStartupPath(), "IMOD.CONFIG", report);
-        DeleteFileIfExists(GetLegacyImodStartupPath(), "IMOD.CONFIG.LEGACY", report);
+        RemoveStartupBundle(report);
         DeleteFileIfExists(Path.Combine(GetScriptRoot(), "dtimod.sys"), "IMOD.DRIVER.LEGACY", report);
         DeleteFileIfExists(Path.Combine(GetScriptRoot(), ImodDriverName), "IMOD.DRIVER.LEGACY", report);
         WriteLog($"IMOD.DRIVER: keep staged system driver {GetImodDriverSystemPath()}");
     }
 
+    // HKCU\...\Run started the script before the scheduled task replaced it.
     private void DeleteImodStartupRegistration(OperationReport? report = null)
     {
         DemandRealWrite("DeleteImodStartupRegistration");
@@ -467,7 +280,11 @@ public sealed partial class MainForm
         }
     }
 
+    // Reads the settings block of an ApplyIMOD.ps1 saved by an older layout.
     private static ImodConfig ParseImodScriptFile(string path)
+        => ParseImodScriptText(File.ReadAllText(path, Encoding.UTF8));
+
+    internal static ImodConfig ParseImodScriptText(string text)
     {
         ImodConfig config = new();
         ImodConfigEntry? currentDevice = null;
@@ -475,7 +292,7 @@ public sealed partial class MainForm
         bool inOverrides = false;
         bool inNicItr = false;
 
-        string[] lines = File.ReadAllLines(path, Encoding.UTF8);
+        string[] lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
         foreach (string raw in lines)
         {
             string line = StripInlineComment(raw).Trim();
@@ -1085,32 +902,6 @@ public sealed partial class MainForm
         return string.Join(", ", values.Select(FormatImodValue));
     }
 
-    private static string FormatNicItrConfigValue(ulong value)
-    {
-        return $"0x{value:X}";
-    }
-
-    private static string FormatNicItrConfigVector(IReadOnlyList<ulong> values)
-    {
-        return string.Join(", ", values.Select(FormatNicItrConfigValue));
-    }
-
-    private static string FormatPowerShellString(string value)
-    {
-        string escaped = value?.Replace("'", "''") ?? string.Empty;
-        return $"'{escaped}'";
-    }
-
-    private static string FormatPowerShellBool(bool value)
-    {
-        return value ? "$true" : "$false";
-    }
-
-    private static string GetImodDriverSystemPathForScript()
-    {
-        return GetImodDriverSystemPath();
-    }
-
     private static string GetImodOverrideKey(string instanceId)
     {
         if (string.IsNullOrWhiteSpace(instanceId))
@@ -1181,166 +972,12 @@ public sealed partial class MainForm
         return match;
     }
 
-    private void WriteImodScript(ImodConfig config, string path)
-    {
-        DemandRealWrite("WriteImodScript");
-        using DriverLoadGate gate = DriverLoadGate.Enter();
-        DriverLoadGate.AssertLoaderIdle();
-        PrepareImodStartupPayload();
-        string configBlock = BuildImodConfigBlock(config);
-        string scriptBody = CreateImodScriptTemplate().Replace(ImodScriptConfigToken, configBlock, StringComparison.Ordinal);
-
-        if (File.Exists(path))
-        {
-            string existing = File.ReadAllText(path, Encoding.UTF8);
-            if (existing.Contains(ImodScriptVersionMarker, StringComparison.Ordinal)
-                && TryReplaceImodConfigBlock(existing, configBlock, out string updated))
-            {
-                scriptBody = updated;
-            }
-        }
-
-        string? dir = Path.GetDirectoryName(path);
-        if (!string.IsNullOrWhiteSpace(dir))
-        {
-            Directory.CreateDirectory(dir);
-        }
-
-        WriteAllTextAtomic(path, scriptBody, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        if (!EnsureImodStartupRegistration(out string? registrationError))
-        {
-            throw new InvalidOperationException($"IMOD startup registration failed: {registrationError}");
-        }
-    }
-
-    private string BuildImodConfigBlock(ImodConfig config)
-    {
-        string kduPath = Path.Combine(GetImodStartupKduDirectory(), ImodKduFileName);
-        string kduDbPath = Path.Combine(GetImodStartupKduDirectory(), ImodKduDatabaseFileName);
-
-        StringBuilder sb = new();
-        sb.AppendLine(ImodScriptMarkerStart);
-        sb.AppendLine($"$ImodDriverPath = {FormatPowerShellString(GetImodDriverSystemPathForScript())}");
-        sb.AppendLine($"$ImodKduPath = {FormatPowerShellString(kduPath)}");
-        sb.AppendLine($"$ImodKduDbPath = {FormatPowerShellString(kduDbPath)}");
-        sb.AppendLine($"$ImodDriverSha256 = {FormatPowerShellString(ReadEmbeddedImodDriverHash() ?? string.Empty)}");
-        sb.AppendLine($"$ImodKduSha256 = {FormatPowerShellString(ComputeEmbeddedImodResourceHash("DeviceTweakerCS.IMOD.Loader.kdu.exe", ".kdu.exe"))}");
-        sb.AppendLine($"$ImodKduDbSha256 = {FormatPowerShellString(ComputeEmbeddedImodResourceHash("DeviceTweakerCS.IMOD.Loader.drv64.dll", ".drv64.dll"))}");
-        sb.AppendLine($"$ImodLogDirectory = {FormatPowerShellString(AppDiagnostics.LogDirectory)}");
-        sb.AppendLine($"$ImodStartupLogEnabled = {FormatPowerShellBool(ImodStartupScriptLoggingEnabled)}");
-        sb.AppendLine($"$ImodStartupVerboseLogEnabled = {FormatPowerShellBool(ImodStartupScriptVerboseLoggingEnabled)}");
-        sb.AppendLine($"$globalInterval = {FormatImodValue(config.GlobalInterval)}");
-        sb.AppendLine($"$globalHCSPARAMSOffset = {FormatImodValue(config.GlobalHcsparamsOffset)}");
-        sb.AppendLine($"$globalRTSOFF = {FormatImodValue(config.GlobalRtsoff)}");
-        sb.AppendLine($"$applyUsbImod = {FormatPowerShellBool(HasCustomUsbImod(config))}");
-        sb.AppendLine("$userDefinedData = @{");
-
-        foreach (ImodConfigEntry entry in config.Overrides.OrderBy(e => e.Hwid, StringComparer.OrdinalIgnoreCase))
-        {
-            if (string.IsNullOrWhiteSpace(entry.Hwid))
-            {
-                continue;
-            }
-
-            sb.AppendLine($"    \"{entry.Hwid}\" = @{{");
-            if (entry.Enabled.HasValue)
-            {
-                string enabledText = entry.Enabled.Value ? "$true" : "$false";
-                sb.AppendLine($"        \"ENABLED\" = {enabledText}");
-            }
-            if (entry.Interval.HasValue)
-            {
-                sb.AppendLine($"        \"INTERVAL\" = {FormatImodValue(entry.Interval.Value)}");
-            }
-            if (entry.Intervals is { Count: > 0 })
-            {
-                sb.AppendLine($"        \"INTERVALS\" = @({FormatImodVector(entry.Intervals)})");
-            }
-            if (entry.AdaptiveRoleBinding.HasValue)
-            {
-                string adaptiveText = entry.AdaptiveRoleBinding.Value ? "$true" : "$false";
-                sb.AppendLine($"        \"ADAPTIVE_ROLE_BINDING\" = {adaptiveText}");
-            }
-            if (entry.RoleIntervals is { Count: > 0 })
-            {
-                sb.AppendLine($"        \"ROLE_INTERVALS\" = {FormatPowerShellString(FormatImodRoleIntervals(entry.RoleIntervals))}");
-            }
-            if (entry.HcsparamsOffset.HasValue)
-            {
-                sb.AppendLine($"        \"HCSPARAMS_OFFSET\" = {FormatImodValue(entry.HcsparamsOffset.Value)}");
-            }
-            if (entry.Rtsoff.HasValue)
-            {
-                sb.AppendLine($"        \"RTSOFF\" = {FormatImodValue(entry.Rtsoff.Value)}");
-            }
-            sb.AppendLine("    }");
-        }
-
-        sb.AppendLine("}");
-        sb.AppendLine("$nicItrData = @(");
-        foreach (NicItrConfigEntry entry in config.NicItrEntries.OrderBy(e => e.Hwid, StringComparer.OrdinalIgnoreCase))
-        {
-            if (string.IsNullOrWhiteSpace(entry.Hwid) || entry.Values.Count == 0)
-            {
-                continue;
-            }
-
-            sb.AppendLine("    @{");
-            sb.AppendLine($"        \"HWID\" = {FormatPowerShellString(entry.Hwid)}");
-            if (!string.IsNullOrWhiteSpace(entry.FamilyName))
-            {
-                sb.AppendLine($"        \"FAMILY\" = {FormatPowerShellString(entry.FamilyName)}");
-            }
-            sb.AppendLine($"        \"BASE_OFFSET\" = {FormatImodValue(entry.BaseOffset)}");
-            sb.AppendLine($"        \"STRIDE\" = {FormatImodValue(entry.Stride)}");
-            sb.AppendLine($"        \"QUEUES\" = {entry.Queues.ToString(CultureInfo.InvariantCulture)}");
-            sb.AppendLine($"        \"WIDTH\" = {entry.Width.ToString(CultureInfo.InvariantCulture)}");
-            sb.AppendLine($"        \"MASK\" = {FormatNicItrConfigValue(entry.Mask)}");
-            sb.AppendLine($"        \"OR_BITS\" = {FormatNicItrConfigValue(entry.OrBits)}");
-            sb.AppendLine($"        \"VALUES\" = @({FormatNicItrConfigVector(entry.Values)})");
-            sb.AppendLine("    }");
-        }
-        sb.AppendLine(")");
-        sb.AppendLine(ImodScriptMarkerEnd);
-        sb.AppendLine();
-        return sb.ToString();
-    }
-
     private static string ComputeEmbeddedImodResourceHash(string exactName, string suffix)
     {
         using Stream? stream = OpenManifestResourceStreamExactOrSuffix(exactName, suffix);
         return stream is null
             ? string.Empty
             : Convert.ToHexString(SHA256.HashData(stream));
-    }
-
-    private static bool TryReplaceImodConfigBlock(string existing, string configBlock, out string updated)
-    {
-        updated = string.Empty;
-        int startIndex = existing.IndexOf(ImodScriptMarkerStart, StringComparison.Ordinal);
-        if (startIndex < 0)
-        {
-            return false;
-        }
-
-        int endIndex = existing.IndexOf(ImodScriptMarkerEnd, startIndex, StringComparison.Ordinal);
-        if (endIndex < 0)
-        {
-            return false;
-        }
-
-        int newlineIndex = existing.IndexOf('\n', endIndex);
-        if (newlineIndex < 0)
-        {
-            newlineIndex = existing.Length;
-        }
-        else
-        {
-            newlineIndex += 1;
-        }
-
-        updated = existing.Substring(0, startIndex) + configBlock + existing[newlineIndex..];
-        return true;
     }
 
     private static bool HasActiveImod(ImodConfig config)
@@ -1463,15 +1100,7 @@ public sealed partial class MainForm
 
         List<DeviceBlock> targetBlocks = xhciBlocks.Where(b => IsUsbImodTarget(b.Device)).ToList();
 
-        ResolveImodPaths(out string? scriptPath);
-        if (string.IsNullOrWhiteSpace(scriptPath))
-        {
-            scriptPath = GetImodStartupPath();
-        }
-
-        bool scriptExists = File.Exists(scriptPath);
-        ImodConfig config = scriptExists ? ParseImodScriptFile(scriptPath) : new ImodConfig();
-        config.HasScript = scriptExists;
+        ImodConfig config = ReadSavedStartupConfig(out _);
         List<string> invalidInputs = [];
 
         foreach (DeviceBlock block in targetBlocks)
@@ -1600,7 +1229,7 @@ public sealed partial class MainForm
         bool hasCustomUsb = HasCustomUsbImod(config);
         bool hasCustom = hasCustomUsb || config.NicItrEntries.Count > 0;
         bool shouldApplyUsbLive = hasCustomUsb || !hasCustom;
-        string startupPath = GetImodStartupPath();
+        string startupPath = GetStartupProfilePath();
         ImodApplyStats stats = new();
         if (shouldApplyUsbLive && !TryApplyImod(config, hasCustom, out stats, out string? applyError))
         {
@@ -1618,9 +1247,8 @@ public sealed partial class MainForm
         {
             try
             {
-                WriteImodScript(config, startupPath);
-                config.HasScript = true;
-                WriteLog($"IMOD.CONFIG: standalone startup script saved {startupPath}");
+                SaveStartupProfile(config);
+                WriteLog($"IMOD.CONFIG: startup profile saved {startupPath}");
             }
             catch (Exception ex)
             {
@@ -1637,7 +1265,6 @@ public sealed partial class MainForm
         }
 
         _imodConfigCache = config;
-        _imodScriptPath = hasCustom ? startupPath : null;
         _imodConfigLoaded = true;
 
         if (!shouldApplyUsbLive)
@@ -1717,6 +1344,4 @@ public sealed partial class MainForm
         }
     }
 }
-
-
 

@@ -10,6 +10,9 @@ internal static class AppBuildIdentity
     internal static string BuildId => typeof(AppBuildIdentity).Assembly.ManifestModule.ModuleVersionId.ToString("N");
     internal static string ExecutableSha256 => ExecutableHash.Value;
 
+    internal static string ProductVersion
+        => typeof(AppBuildIdentity).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
+
     internal static string VersionText
     {
         get
