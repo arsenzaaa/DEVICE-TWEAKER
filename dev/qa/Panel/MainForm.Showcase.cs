@@ -734,7 +734,9 @@ public sealed partial class MainForm
         foreach (DeviceBlock netBlock in _blocks.Where(b => b.Kind == DeviceKind.NET_NDIS))
         {
             bool isIntel = netBlock.Device.InstanceId.Contains("8086", StringComparison.OrdinalIgnoreCase);
-            int targetLp = isIntel ? 12 : 14;
+            // RSS takes one logical CPU per physical core from the base: both queue sets
+            // stay inside CCD0 (Intel 8/10/12/14, Realtek 4/6).
+            int targetLp = isIntel ? 8 : 4;
 
             netBlock.SuppressCpuEvents++;
             try
@@ -752,7 +754,7 @@ public sealed partial class MainForm
             netBlock.PolicyCombo.SelectedItem = "SpecCPU";
             if (netBlock.RssQueueBox is not null)
             {
-                netBlock.RssQueueBox.Value = 4;
+                netBlock.RssQueueBox.Value = isIntel ? 4 : 2;
             }
 
             if (isIntel)
