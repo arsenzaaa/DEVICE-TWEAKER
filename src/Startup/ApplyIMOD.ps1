@@ -869,7 +869,7 @@ try {
                 $intervalArray = $adaptiveIntervals
             }
 
-            $result = [DeviceTweakerImodRuntime]::ApplyController([uint64]$controller.BaseAddress, [uint64]$controller.MemoryLength, $hcsparamsOffset, $rtsoff, $interval, $intervalArray)
+            $result = [DeviceTweakerImodRuntime]::ApplyController([string]$controller.DeviceId, [uint64]$controller.BaseAddress, [uint64]$controller.MemoryLength, $hcsparamsOffset, $rtsoff, $interval, $intervalArray)
             Write-ImodLog ($controller.DeviceId + " " + $result)
             if (-not $result.StartsWith('error:', [System.StringComparison]::OrdinalIgnoreCase)) {
                 $appliedUsb++
@@ -919,6 +919,7 @@ try {
 
             $values = [uint64[]]@($nic['VALUES'] | ForEach-Object { [uint64]$_ })
             $result = [DeviceTweakerImodRuntime]::ApplyNicItr(
+                [string]$target.DeviceId,
                 [uint64]$target.BaseAddress,
                 [uint64]$target.MemoryLength,
                 [uint32]$nic['BASE_OFFSET'],

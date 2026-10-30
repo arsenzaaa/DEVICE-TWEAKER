@@ -8,7 +8,8 @@ $driver = Join-Path $root 'src\IMOD\Driver\imod_driver.c'
 $header = Join-Path $root 'src\IMOD\Driver\imod_driver.h'
 $text = Get-Content -LiteralPath $driver -Raw
 $functions = @('ImodDriverUnload','DriverEntry','ImodDriverCreateDriver','ImodDriverInitialize','ImodDriverDispatch',
-    'ImodIsValidAccessSize','ImodMapPhysicalMemory','ImodUnmapPhysicalMemory','ImodReadPhysicalMemory','ImodWritePhysicalMemory')
+    'ImodIsValidAccessSize','ImodMapPhysicalMemory','ImodUnmapPhysicalMemory','ImodReadPhysicalMemory','ImodWritePhysicalMemory',
+    'ImodResourcesContainRange')
 $bodies = foreach ($name in $functions) {
     $match = [regex]::Match($text, '(?m)^(?:static )?(?:NTSTATUS|BOOLEAN|void) '+$name+'\([^;]+?\)\s*\{')
     if (-not $match.Success) { throw "Native function missing: $name" }
@@ -54,6 +55,13 @@ $stub = @'
 #define PAGE_SIZE 4096
 #define IMOD_MAX_MAP_SIZE PAGE_SIZE
 #define MAXLONGLONG INT64_MAX
+#define MAXULONGLONG UINT64_MAX
+#define FILE_WRITE_ACCESS 2
+#define CmResourceTypeMemory 3
+#define CmResourceTypeMemoryLarge 7
+#define CM_RESOURCE_MEMORY_LARGE_40 0x0200
+#define CM_RESOURCE_MEMORY_LARGE_48 0x0400
+#define CM_RESOURCE_MEMORY_LARGE_64 0x0800
 #define EXCEPTION_EXECUTE_HANDLER 1
 #define MmNonCached 0
 #define DelayedWorkQueue 0
@@ -96,6 +104,7 @@ static void IoCompleteRequest(PIRP irp,int increment) { (void)irp;(void)incremen
 static PIO_WORKITEM IoAllocateWorkItem(PDEVICE_OBJECT d) { (void)d;return NULL; }
 static void IoMarkIrpPending(PIRP i) { (void)i; }
 static void ImodQueryPciWorker(void *a,void *b,void *c) { (void)a;(void)b;(void)c; }
+static void ImodWriteDeviceWorker(void *a,void *b,void *c) { (void)a;(void)b;(void)c; }
 static void IoQueueWorkItemEx(PIO_WORKITEM w,void (*fn)(void*,void*,void*),int q,void *c) { (void)w;(void)fn;(void)q;(void)c; }
 static void *MmMapIoSpace(PHYSICAL_ADDRESS a,SIZE_T n,int cache) { (void)a;(void)cache;assert(n==4096);mapCalls++;return failMap?NULL:memory; }
 static void MmUnmapIoSpace(void *p,SIZE_T n) { assert(p==memory && n==4096);unmapCalls++; }
@@ -113,6 +122,7 @@ static NTSTATUS ImodMapPhysicalMemory(PHYSICAL_ADDRESS a,SIZE_T s,PVOID *m,PVOID
 static NTSTATUS ImodUnmapPhysicalMemory(PVOID b,SIZE_T s);
 static NTSTATUS ImodReadPhysicalMemory(PHYSICAL_ADDRESS a,ULONG s,ULONGLONG *v);
 static NTSTATUS ImodWritePhysicalMemory(PHYSICAL_ADDRESS a,ULONG s,ULONGLONG v);
+static BOOLEAN ImodResourcesContainRange(const UCHAR *list,ULONG bytes,ULONGLONG address,ULONG size);
 static NTSTATUS IoCreateDriver(PUNICODE_STRING n,NTSTATUS(*fn)(PDRIVER_OBJECT,PUNICODE_STRING)) { (void)n;return fn(&created,NULL); }
 '@
 $main = @'
@@ -164,8 +174,52 @@ static void dispatchTests(void) {
     assert(ImodDriverDispatch(&device,&irp)==STATUS_INSUFFICIENT_RESOURCES);
     irp.stack.Parameters.DeviceIoControl.IoControlCode=0;
     assert(ImodDriverDispatch(&device,&irp)==STATUS_INVALID_DEVICE_REQUEST);
+    /* The former unrestricted physical write (index + 3) no longer exists. */
+    irp.AssociatedIrp.SystemBuffer=&access;
+    irp.stack.Parameters.DeviceIoControl.InputBufferLength=sizeof(access);
+    irp.stack.Parameters.DeviceIoControl.OutputBufferLength=sizeof(access);
+    irp.stack.Parameters.DeviceIoControl.IoControlCode=CTL_CODE(FILE_DEVICE_IMOD,IMOD_IOCTL_INDEX+3,METHOD_BUFFERED,FILE_ANY_ACCESS);
+    reset();assert(ImodDriverDispatch(&device,&irp)==STATUS_INVALID_DEVICE_REQUEST && mapCalls==0 && writes==0);
+    /* Device writes need the full request and reply buffers, then go to a work item. */
+    irp.stack.Parameters.DeviceIoControl.IoControlCode=IOCTL_IMOD_WRITE_DEVICE;
+    reset();assert(ImodDriverDispatch(&device,&irp)==STATUS_INVALID_PARAMETER && mapCalls==0);
+    static struct ImodDeviceWriteReply writeReply;
+    irp.AssociatedIrp.SystemBuffer=&writeReply;
+    irp.stack.Parameters.DeviceIoControl.InputBufferLength=sizeof(struct ImodDeviceWrite);
+    irp.stack.Parameters.DeviceIoControl.OutputBufferLength=sizeof(writeReply);
+    assert(sizeof(struct ImodDeviceWrite)==1048 && offsetof(struct ImodDeviceWrite,instanceId)==536);
+    reset();assert(ImodDriverDispatch(&device,&irp)==STATUS_INSUFFICIENT_RESOURCES && mapCalls==0 && writes==0);
 }
-int main(void) { _set_error_mode(_OUT_TO_STDERR);_set_abort_behavior(0,_WRITE_ABORT_MSG|_CALL_REPORTFAULT);initTests();mmioTests();dispatchTests();puts("PASS: actual driver entry, unload assignment, MMIO width/map/unmap and dispatch; fake kernel only; PCI worker stubbed");return 0; }
+// CM_RESOURCE_LIST bytes: Count, then per full descriptor InterfaceType, BusNumber,
+// Version, Revision, Count and 20-byte partial descriptors.
+static ULONG put32(UCHAR *b,ULONG o,ULONG v) { memcpy(b+o,&v,4); return o+4; }
+static ULONG putPartial(UCHAR *b,ULONG o,UCHAR type,USHORT flags,ULONGLONG start,ULONG length) {
+    memset(b+o,0,20); b[o]=type; memcpy(b+o+2,&flags,2); memcpy(b+o+4,&start,8); memcpy(b+o+12,&length,4); return o+20; }
+static ULONG putFull(UCHAR *b,ULONG o,ULONG partials) { o=put32(b,o,5); o=put32(b,o,0); memset(b+o,0,4); o+=4; return put32(b,o,partials); }
+static void rangeTests(void) {
+    UCHAR list[256]; ULONG n;
+    n=put32(list,0,1); n=putFull(list,n,2);
+    n=putPartial(list,n,1,0,0x3000,0x100);                       /* I/O port: never writable */
+    n=putPartial(list,n,CmResourceTypeMemory,0,0xF7000000ull,0x10000);
+    assert(ImodResourcesContainRange(list,n,0xF7000024ull,4));
+    assert(ImodResourcesContainRange(list,n,0xF700FFFCull,4));
+    assert(!ImodResourcesContainRange(list,n,0xF700FFFDull,4));   /* crosses the end */
+    assert(!ImodResourcesContainRange(list,n,0xF6FFFFFCull,4));   /* before the BAR */
+    assert(!ImodResourcesContainRange(list,n,0x3000,1));          /* port range */
+    assert(!ImodResourcesContainRange(list,n,0xF7000024ull,0));
+    assert(!ImodResourcesContainRange(list,n,UINT64_MAX-1,4));     /* address overflow */
+    assert(!ImodResourcesContainRange(NULL,n,0xF7000024ull,4));
+    assert(!ImodResourcesContainRange(list,n-1,0xF700FFFCull,4));  /* truncated descriptor */
+    assert(!ImodResourcesContainRange(list,3,0xF7000024ull,4));
+    put32(list,16,1000); assert(!ImodResourcesContainRange(list,n,0xF7000024ull,4)); /* count beyond buffer */
+    n=put32(list,0,2); n=putFull(list,n,1); n=putPartial(list,n,CmResourceTypeMemory,0,0x1000,0x1000);
+    n=putFull(list,n,1); n=putPartial(list,n,CmResourceTypeMemoryLarge,CM_RESOURCE_MEMORY_LARGE_64,0x4000000000ull,1);
+    assert(ImodResourcesContainRange(list,n,0x40FFFFFFFCull,4));    /* second list, 4 GiB large range */
+    assert(!ImodResourcesContainRange(list,n,0x4100000000ull,4));
+    n=put32(list,0,1); n=putFull(list,n,1); n=putPartial(list,n,CmResourceTypeMemoryLarge,0,0x5000,0x10);
+    assert(!ImodResourcesContainRange(list,n,0x5000,4));           /* large range without size flag */
+}
+int main(void) { _set_error_mode(_OUT_TO_STDERR);_set_abort_behavior(0,_WRITE_ABORT_MSG|_CALL_REPORTFAULT);initTests();mmioTests();rangeTests();dispatchTests();puts("PASS: actual driver entry, unload assignment, MMIO width/map/unmap, device memory range check and dispatch; fake kernel only; PCI and write workers stubbed");return 0; }
 '@
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 $OutputDirectory = (Resolve-Path $OutputDirectory).Path

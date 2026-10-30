@@ -58,13 +58,18 @@ public static class DeviceTweakerImodRuntime
     private const uint ImodIoctlIndex = 0x810;
     private const uint MethodBuffered = 0;
     private const uint FileAnyAccess = 0;
+    private const uint FileWriteAccess = 2;
     private const int OpenRetryCount = 10;
     private const int OpenRetryDelayMs = 100;
     private const string ImodDriverDevicePath = "\\\\.\\DeviceTweakerImod2";
     private const string ImodDriverServiceName = "DeviceTweakerImod2";
     private static readonly IntPtr InvalidHandleValue = new IntPtr(-1);
     private static readonly uint IoctlImodReadPhysicalMemory = CtlCode(FileDeviceImod, ImodIoctlIndex + 2, MethodBuffered, FileAnyAccess);
-    private static readonly uint IoctlImodWritePhysicalMemory = CtlCode(FileDeviceImod, ImodIoctlIndex + 3, MethodBuffered, FileAnyAccess);
+    // DTIMOD writes only inside memory ranges Windows assigned to the named PCI devnode.
+    private static readonly uint IoctlImodWriteDevice = CtlCode(FileDeviceImod, ImodIoctlIndex + 5, MethodBuffered, FileWriteAccess);
+    private const uint ImodDeviceWriteVersion = 1;
+    private const int ImodDeviceWriteRequestSize = 1048;
+    private const int ImodDeviceWriteReplySize = 8 + 65536;
 
     [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr SetupDiGetClassDevsW(IntPtr classGuid, string enumerator, IntPtr hwndParent, uint flags);
@@ -107,6 +112,15 @@ public static class DeviceTweakerImodRuntime
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool DeviceIoControl(IntPtr deviceHandle, uint ioControlCode, ref PhysAccessStruct inBuffer, int inBufferSize, ref PhysAccessStruct outBuffer, int outBufferSize, out int bytesReturned, IntPtr overlapped);
+
+    [DllImport("kernel32.dll", SetLastError = true, EntryPoint = "DeviceIoControl")]
+    private static extern bool DeviceIoControlBytes(IntPtr deviceHandle, uint ioControlCode, byte[] inBuffer, int inBufferSize, byte[] outBuffer, int outBufferSize, out int bytesReturned, IntPtr overlapped);
+
+    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
+    private static extern int CM_Locate_DevNodeW(out uint devInst, string deviceId, uint flags);
+
+    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
+    private static extern int CM_Get_DevNode_PropertyW(uint devInst, ref DevPropKey key, out uint type, byte[] buffer, ref uint size, uint flags);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool CloseHandle(IntPtr handle);
@@ -528,8 +542,15 @@ public static class DeviceTweakerImodRuntime
         return true;
     }
 
-    public static string ApplyController(ulong capabilityAddress, ulong memoryLength, uint hcsparamsOffset, uint rtsoff, uint interval, uint[] intervals)
+    public static string ApplyController(string deviceId, ulong capabilityAddress, ulong memoryLength, uint hcsparamsOffset, uint rtsoff, uint interval, uint[] intervals)
     {
+        WriteTarget writeTarget;
+        string targetError;
+        if (!TryResolveWriteTarget(deviceId, out writeTarget, out targetError))
+        {
+            return "error: " + targetError;
+        }
+
         IntPtr handle;
         string openError;
         if (!TryOpenDriverDevice(OpenRetryCount, out handle, out openError))
@@ -557,7 +578,7 @@ public static class DeviceTweakerImodRuntime
             {
                 ulong interrupterAddress = runtimeAddress + 0x24 + (0x20 * i);
                 uint target = intervals != null && intervals.Length > 0 ? intervals[(int)i] : interval;
-                if (!TryWriteImodInterval(handle, interrupterAddress, target, out ioError))
+                if (!TryWriteImodInterval(handle, writeTarget, interrupterAddress, target, out ioError))
                 {
                     failures++;
                 }
@@ -688,7 +709,7 @@ public static class DeviceTweakerImodRuntime
         }
     }
 
-    public static string ApplyNicItr(ulong baseAddress, ulong memoryLength, uint baseOffset, uint stride, uint queues, uint width, ulong mask, ulong orBits, ulong[] values)
+    public static string ApplyNicItr(string deviceId, ulong baseAddress, ulong memoryLength, uint baseOffset, uint stride, uint queues, uint width, ulong mask, ulong orBits, ulong[] values)
     {
         if (queues == 0)
         {
@@ -707,6 +728,13 @@ public static class DeviceTweakerImodRuntime
         if (values == null || values.Length == 0)
         {
             return "error: no values";
+        }
+
+        WriteTarget target;
+        string targetError;
+        if (!TryResolveWriteTarget(deviceId, out target, out targetError))
+        {
+            return "error: " + targetError;
         }
 
         IntPtr handle;
@@ -732,7 +760,7 @@ public static class DeviceTweakerImodRuntime
                 }
                 applied.Append("Q").Append(q).Append("@0x").Append(address.ToString("X")).Append("=0x").Append(finalValue.ToString("X"));
                 string ioError;
-                if (!TryWritePhysicalMemory(handle, address, size, finalValue, out ioError))
+                if (!TryWritePhysicalMemory(handle, target, address, size, finalValue, out ioError))
                 {
                     failures++;
                     continue;
@@ -794,7 +822,7 @@ public static class DeviceTweakerImodRuntime
         return true;
     }
 
-    private static bool TryWriteImodInterval(IntPtr handle, ulong address, uint interval, out string error)
+    private static bool TryWriteImodInterval(IntPtr handle, WriteTarget target, ulong address, uint interval, out string error)
     {
         uint currentValue;
         if (!TryReadPhys32(handle, address, out currentValue, out error))
@@ -802,7 +830,7 @@ public static class DeviceTweakerImodRuntime
             return false;
         }
         uint mergedValue = (currentValue & 0xFFFF0000U) | (interval & 0xFFFFU);
-        if (!TryWritePhysicalMemory(handle, address, 4, mergedValue, out error))
+        if (!TryWritePhysicalMemory(handle, target, address, 4, mergedValue, out error))
         {
             return false;
         }
@@ -840,17 +868,71 @@ public static class DeviceTweakerImodRuntime
         return true;
     }
 
-    private static bool TryWritePhysicalMemory(IntPtr handle, ulong address, uint size, ulong value, out string error)
+    private sealed class WriteTarget
+    {
+        public string InstanceId;
+        public string PdoName;
+    }
+
+    private static bool TryResolveWriteTarget(string instanceId, out WriteTarget target, out string error)
+    {
+        target = null;
+        error = null;
+        uint devInst;
+        int cr = CM_Locate_DevNodeW(out devInst, instanceId, 0);
+        if (cr != CrSuccess)
+        {
+            error = "device not found: " + instanceId + " (CM 0x" + cr.ToString("X") + ")";
+            return false;
+        }
+
+        // DEVPKEY_Device_PDOName {a45c254e-df1c-4efd-8020-67d146a850e0}, 16.
+        DevPropKey key = new DevPropKey();
+        key.fmtid = new Guid("a45c254e-df1c-4efd-8020-67d146a850e0");
+        key.pid = 16;
+        byte[] buffer = new byte[512];
+        uint size = (uint)buffer.Length;
+        uint type;
+        cr = CM_Get_DevNode_PropertyW(devInst, ref key, out type, buffer, ref size, 0);
+        if (cr != CrSuccess || size < 4)
+        {
+            error = "PDO name not available for " + instanceId + " (CM 0x" + cr.ToString("X") + ")";
+            return false;
+        }
+
+        target = new WriteTarget();
+        target.InstanceId = instanceId;
+        target.PdoName = Encoding.Unicode.GetString(buffer, 0, (int)size - 2);
+        return true;
+    }
+
+    private static bool TryWritePhysicalMemory(IntPtr handle, WriteTarget target, ulong address, uint size, ulong value, out string error)
     {
         error = null;
-        PhysAccessStruct access = new PhysAccessStruct();
-        access.physAddress = address;
-        access.accessSizeInBytes = size;
-        access.value = value;
-        int bytesReturned;
-        if (!DeviceIoControl(handle, IoctlImodWritePhysicalMemory, ref access, Marshal.SizeOf(typeof(PhysAccessStruct)), ref access, Marshal.SizeOf(typeof(PhysAccessStruct)), out bytesReturned, IntPtr.Zero))
+        if (target.PdoName.Length >= 256 || target.InstanceId.Length >= 256)
         {
-            error = GetWin32ErrorMessage(Marshal.GetLastWin32Error());
+            error = "device name is too long for DTIMOD";
+            return false;
+        }
+
+        // struct ImodDeviceWrite in IMOD\Driver\imod_driver.h.
+        byte[] request = new byte[ImodDeviceWriteRequestSize];
+        BitConverter.GetBytes(ImodDeviceWriteVersion).CopyTo(request, 0);
+        BitConverter.GetBytes(size).CopyTo(request, 4);
+        BitConverter.GetBytes(address).CopyTo(request, 8);
+        BitConverter.GetBytes(value).CopyTo(request, 16);
+        Encoding.Unicode.GetBytes(target.PdoName).CopyTo(request, 24);
+        Encoding.Unicode.GetBytes(target.InstanceId).CopyTo(request, 536);
+        byte[] reply = new byte[ImodDeviceWriteReplySize];
+        int bytesReturned;
+        if (!DeviceIoControlBytes(handle, IoctlImodWriteDevice, request, request.Length, reply, reply.Length, out bytesReturned, IntPtr.Zero))
+        {
+            int code = Marshal.GetLastWin32Error();
+            error = code == 5
+                ? "DTIMOD refused the write: the address is outside the device's memory"
+                : code == 1
+                    ? "DTIMOD in memory is older than this profile; restart Windows"
+                    : GetWin32ErrorMessage(code);
             return false;
         }
         return true;
@@ -1674,6 +1756,13 @@ public static class DeviceTweakerImodRuntime
         public uint dwServiceSpecificExitCode;
         public uint dwCheckPoint;
         public uint dwWaitHint;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DevPropKey
+    {
+        public Guid fmtid;
+        public uint pid;
     }
 
     private struct PhysAccessStruct

@@ -38,7 +38,7 @@ public sealed class LegacyCompatibilityTests
     [Fact] public void BundledSysMatchesThePinnedPayload()
     {
         using Stream stream = typeof(MainForm).Assembly.GetManifestResourceStream("DeviceTweakerCS.IMOD.DTIMOD.sys")!;
-        Assert.Equal("DBBF0081B5D2E931B5347C16CA457BDBC3988740C07C0224119749B6D26CA3A8", Convert.ToHexString(SHA256.HashData(stream)));
+        Assert.Equal("CDD742346888938F9F5CD6EEC4719F09686AD061B74EFDF1EF6709EEE1F30830", Convert.ToHexString(SHA256.HashData(stream)));
     }
     [Fact] public void StartupAndApplicationAddressTheSameOldDevice()
     {

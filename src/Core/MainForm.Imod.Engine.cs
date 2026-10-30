@@ -79,8 +79,6 @@ public sealed partial class MainForm
     private const string ImodKduDisableEnv = "DEVICE_TWEAKER_DISABLE_KDU_FALLBACK";
     private static readonly uint IoctlImodReadPhysicalMemory =
         CtlCode(FileDeviceImod, ImodIoctlIndex + 2, MethodBuffered, FileAnyAccess);
-    private static readonly uint IoctlImodWritePhysicalMemory =
-        CtlCode(FileDeviceImod, ImodIoctlIndex + 3, MethodBuffered, FileAnyAccess);
 
     private sealed class ImodControllerInfo
     {
@@ -252,6 +250,17 @@ public sealed partial class MainForm
         IntPtr overlapped);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool DeviceIoControl(
+        IntPtr deviceHandle,
+        uint ioControlCode,
+        byte[] inBuffer,
+        int inBufferSize,
+        byte[] outBuffer,
+        int outBufferSize,
+        out int bytesReturned,
+        IntPtr overlapped);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool CloseHandle(IntPtr handle);
 
     private sealed class ImodApplyStats
@@ -330,6 +339,13 @@ public sealed partial class MainForm
                         {
                             WriteLog($"IMOD: {controller.DeviceId} base error: {controller.BaseError}");
                         }
+                        continue;
+                    }
+
+                    if (!imodDriver.TrySetWriteTarget(controller.DeviceId, out string? targetError))
+                    {
+                        stats.ControllersFailed++;
+                        WriteLog($"IMOD: {controller.DeviceId} skipped: {targetError}");
                         continue;
                     }
 
@@ -3578,6 +3594,7 @@ public sealed partial class MainForm
         return true;
     }
 
+    // DTIMOD writes only inside the memory ranges of the device set with TrySetWriteTarget.
     private static bool TryWritePhysicalMemory(
         ImodDriverContext ctx,
         ulong address,
@@ -3587,25 +3604,31 @@ public sealed partial class MainForm
     {
         QaRun.DemandWrite("PUBLISHED PHYSICAL ACCESS");
         error = null;
-        PhysAccessStruct access = new()
+        if (ctx.WriteInstanceId is not { } instanceId || ctx.WritePdoName is not { } pdoName)
         {
-            physAddress = address,
-            accessSizeInBytes = size,
-            value = value,
-        };
+            error = "no target device was selected for the DTIMOD write";
+            return false;
+        }
 
-        int bytesReturned = 0;
+        if (!ImodDeviceWrite.TryBuild(pdoName, instanceId, address, size, value, out byte[] request))
+        {
+            error = $"invalid DTIMOD write request for {instanceId}";
+            return false;
+        }
+
+        byte[] reply = new byte[ImodDeviceWrite.ReplySize];
         if (!DeviceIoControl(
                 ctx.DriverHandle,
-                IoctlImodWritePhysicalMemory,
-                ref access,
-                Marshal.SizeOf<PhysAccessStruct>(),
-                ref access,
-                Marshal.SizeOf<PhysAccessStruct>(),
-                out bytesReturned,
+                ImodDeviceWrite.IoctlCode,
+                request,
+                request.Length,
+                reply,
+                reply.Length,
+                out _,
                 IntPtr.Zero))
         {
-            error = $"failed to write physical memory via driver: {GetWin32ErrorMessage(Marshal.GetLastWin32Error())}";
+            int code = Marshal.GetLastWin32Error();
+            error = ImodDeviceWrite.DescribeFailure(code, $"failed to write physical memory via driver: {GetWin32ErrorMessage(code)}");
             return false;
         }
 
@@ -3936,7 +3959,26 @@ public sealed partial class MainForm
         public bool ServiceStartedByContext { get; private set; }
         public bool InitializedSuccessfully { get; private set; }
         public string DriverPath { get; }
+        // Device whose memory ranges DTIMOD accepts for writes.
+        public string? WriteInstanceId { get; private set; }
+        public string? WritePdoName { get; private set; }
         private readonly Action<string>? _log;
+
+        public bool TrySetWriteTarget(string instanceId, out string? error)
+        {
+            WriteInstanceId = null;
+            WritePdoName = null;
+            if (!NativeCfgMgr32.TryGetPciPdoName(instanceId, out string pdoName, out string lookupError))
+            {
+                error = $"PDO of {instanceId} was not found: {lookupError}";
+                return false;
+            }
+
+            WriteInstanceId = instanceId;
+            WritePdoName = pdoName;
+            error = null;
+            return true;
+        }
 
         private ImodDriverContext(string driverPath, Action<string>? log)
         {

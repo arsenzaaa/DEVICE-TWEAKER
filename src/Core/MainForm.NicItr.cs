@@ -594,6 +594,11 @@ public sealed partial class MainForm
             }
 
             using ImodDriverContext ctx = driverContext!;
+            if (!ctx.TrySetWriteTarget(instanceId, out error))
+            {
+                return false;
+            }
+
             if (!TryProgramNicItrRegisters(profile, baseAddress, values, new DriverNicItrRegisters(ctx), out error))
             {
                 return false;
