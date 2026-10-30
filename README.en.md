@@ -58,14 +58,14 @@ MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + IMOD
 <tr><th align="left" width="860"><strong>USB IMOD</strong></th></tr>
 <tr><td width="860">
 <p>Reads and displays IMOD on supported xHCI USB controllers. <strong>Devices</strong> sets a profile by USB role, <strong>XHCI</strong> uses one value for the controller, and <strong>Interrupters</strong> allows values by index.</p>
-<p>Uses the custom DTIMOD.sys driver for reads and writes, then reads the values again after writing. Supports saving custom values for the next Windows sign-in.</p>
+<p>Uses the custom DTIMOD.sys driver for reads and writes, then reads the values again after writing. Saves custom values for reapplication at sign-in, after resume from sleep, and when USB devices are attached; the startup script also works without the EXE.</p>
 </td></tr>
 </table>
 
 <table width="100%">
 <tr><th align="left" width="860"><strong>Network settings</strong></th></tr>
 <tr><td width="860">
-<p>Reads and displays NIC ITR on supported Intel / Realtek network adapters, including compatible Killer models. Queue and RX/TX information depends on the controller family. Change current values and save a profile for automatic reapplication at the next Windows sign-in.</p>
+<p>Reads and displays NIC ITR on supported Intel / Realtek network adapters, including compatible Killer models. Queue and RX/TX information depends on the controller family. Change current values and save a profile that is reapplied at sign-in, after resume from sleep, and when USB devices are attached.</p>
 <p>Supports RSS settings on wired NDIS network adapters: base CPU, queue count, and RSS/IRQ mode.</p>
 </td></tr>
 </table>
@@ -148,8 +148,8 @@ MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + IMOD
 <p>For manual configuration, choose the settings and click <strong>APPLY</strong>. This button applies interrupt, ReservedCpuSets, RSS, Mouse Throttle, power-saving, and USB IMOD settings.</p>
 <p>IMOD / NIC ITR also have separate buttons:</p>
 <ul>
-<li>IMOD: <strong>SET</strong> applies settings and saves values that differ from the defaults for the next Windows sign-in.</li>
-<li>NIC ITR: <strong>SET</strong> changes current values; <strong>SAVE</strong> stores a profile for the next Windows sign-in.</li>
+<li>IMOD: <strong>SET</strong> applies settings and saves values that differ from the defaults for reapplication at sign-in, after resume from sleep, and when USB devices are attached.</li>
+<li>NIC ITR: <strong>SET</strong> changes current values; <strong>SAVE</strong> stores a profile for reapplication at sign-in, after resume from sleep, and when USB devices are attached.</li>
 <li><strong>CHECK</strong> reads current IMOD / NIC ITR values.</li>
 <li>IMOD: <strong>DELETE</strong> removes the shared IMOD / NIC ITR startup entry and returns the IMOD fields to their default value. Restart the PC to finish resetting.</li>
 </ul>

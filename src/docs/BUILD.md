@@ -39,6 +39,10 @@ dotnet build .\DeviceTweakerCS.csproj -c Release -p:BuildImodDriver=false
 
 Готовый `IMOD/DTIMOD.sys` уже есть в репозитории, поэтому обычная сборка не требует WDK. Чтобы пересобрать драйвер, задайте `-p:BuildImodDriver=true`; для этого нужны Visual Studio с C++ Build Tools и WDK.
 
+После изменения `IMOD/Driver/imod_driver.c` или `.h` пересоберите и подпишите драйвер командой `.\publish-variants.ps1 -BuildDriverOnly`. Она обновляет `IMOD/DTIMOD.sys`, `DTIMOD.sys.sha256` и `DTIMOD.build.json` с хешами исходников; если в MSBuild нет задач WDK, используется прямой вызов `cl` / `link` из Visual Studio. QA останавливается, пока бинарник не совпадает с исходниками.
+
+`Startup/ApplyIMOD.ps1` и `Startup/DeviceTweakerImodRuntime.cs` встраиваются в EXE и при сохранении настроек IMOD / NIC ITR копируются в `%ProgramData%\DEVICE TWEAKER\Startup`. Runtime компилируется и программой, и скриптом в PowerShell 5.1, поэтому в нём допустим только синтаксис C# 5.
+
 Для публичного релиза используйте `build.ps1`, чтобы обе версии собирались одинаково.
 
 ## Сборка и подпись драйвера

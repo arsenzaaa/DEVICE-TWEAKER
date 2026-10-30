@@ -15,3 +15,10 @@ Publication and credit will be coordinated after a fix is available.
 ## Driver trust boundary
 
 `DTIMOD.sys` runs in kernel mode and the current artifact is test-signed, not publicly trusted. HVCI, Microsoft Vulnerable Driver Blocklist, endpoint security, or anti-cheat may block it. The application reports a loading failure and may offer a user-confirmed blocklist change.
+
+- The driver's device object is open only to SYSTEM and Administrators.
+- Reads cover physical memory and PCI configuration space.
+- A write names the target PCI device by instance ID and PDO. The driver checks that the device exists and that the address range lies inside memory Windows allocated to that device; anything else, including I/O ports, is refused. There is no general physical-memory write.
+- `%ProgramData%\DEVICE TWEAKER\Startup` (startup script, runtime, profile, loader) is writable only by SYSTEM and Administrators, and the script verifies the SHA-256 of the runtime, driver, and loader recorded in `profile.json` before loading anything.
+
+Reports about bypassing any of these checks are in scope.

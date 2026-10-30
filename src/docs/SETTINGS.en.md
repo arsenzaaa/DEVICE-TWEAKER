@@ -58,11 +58,13 @@ The AUTO profile sets mouse IMOD to 0 regardless of polling rate, disabling inte
 
 **Devices** builds a profile for detected mice, keyboards, gamepads, and USB audio, then attempts to map them to interrupters through the xHCI topology. If a reliable map is unavailable, it applies one controller-wide value. **XHCI** writes one value to all interrupters; **Interrupters** opens per-index control. The details show the controller's first 64 interrupters.
 
+The device map is read from the xHCI contexts in memory: for each attached device, the interrupter named in the TRBs of its transfer ring is used, or the Slot Context target if the ring cannot be read. The read time is shown next to the current value. After a device is attached or removed, the map is marked "devices changed"; **CHECK** reads it again.
+
 The buttons have different jobs:
 
-- **SET** writes the selected configuration and reads the registers back. The program saves custom values for reapplication at the next Windows sign-in.
+- **SET** writes the selected configuration and reads the registers back. The program saves custom values to the startup task (see below).
 - **CHECK** rereads the registers. **REFRESH** only updates the device list.
-- **DELETE** removes the shared startup configuration for IMOD and saved NIC ITR profiles. The UI switches to the default IMOD value (0xC8). With the driver loaded, the program can also reset IMOD registers. USB IMOD writes are skipped when only saved NIC ITR profiles remain in the configuration. Restart Windows to finish resetting.
+- **DELETE** removes the shared startup configuration for IMOD and saved NIC ITR profiles and restores the network driver's moderation that **SAVE** turned off. The UI switches to the default IMOD value (0xC8). With the driver loaded, the program can also reset IMOD registers. USB IMOD writes are skipped when only saved NIC ITR profiles remain in the configuration. Restart Windows to finish resetting.
 
 **DELETE** does not create a separate automatic backup.
 
@@ -70,11 +72,22 @@ The main **APPLY** button also applies USB IMOD along with the other device set
 
 The IMOD interval is not added to every USB report. An event after the interrupter has been idle and one arriving during an active countdown take different paths. Neither the register value nor mouse Polling Rate measures end-to-end input latency.
 
+### IMOD / NIC ITR at startup
+
+Register values last until a restart, sleep, or controller reset, so a separate open script applies the saved settings. It works without `DEVICE TWEAKER.exe`: the program can be removed and the startup task keeps working.
+
+- Folder `%ProgramData%\DEVICE TWEAKER\Startup`: `ApplyIMOD.ps1` (a readable PowerShell script), `DeviceTweakerImodRuntime.cs` (register code shared with the program, compiled at run time), `profile.json` (saved values and SHA-256 of every file), `Loader\` (KDU for loading DTIMOD.sys), and `logs\` (logs for 14 days). Only administrators and SYSTEM can modify the folder.
+- The Task Scheduler task `\DEVICE TWEAKER\IMOD` runs the script as SYSTEM at sign-in, after resume from sleep, and when a USB/HID device is attached. Before running, the script checks the runtime, driver, and loader hashes against `profile.json`; a mismatch stops it.
+- The script and the program share one DTIMOD load mutex, so they never load the driver at the same time.
+- The previous startup entry in `%AppData%` and the `Run` key is migrated automatically the first time the program starts, keeping the saved values.
+
 ## Network adapters
 
 ### RSS
 
 **[RSS](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-receive-side-scaling)** distributes incoming packet processing across CPUs using a hash and an indirection table. **RSS Queues** sets the requested receive-queue count; the base CPU is the starting point for processor selection. **NDIS Mode** applies RSS, Interrupt Affinity, or both.
+
+Queue choices are limited to the values the driver offers and to the number of MSI-X vectors: without MSI-X, all queues arrive on one interrupt. RSS processors are taken one per physical core, skipping SMT siblings; `*MaxRssProcessors` and `*RssMaxProcNumber` are written together with the base CPU.
 
 The written `*NumRssQueues` value is not the number of queues used by a particular workload. DEVICE TWEAKER displays saved parameters separately from the active `Get-NetAdapterRss` state and logs mismatches. [`NdisRssProfileBalanced`](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/standardized-inf-keywords-for-rss) does not allow manual base-CPU configuration. The adapter is not restarted automatically after an RSS write. RSS controls receive processing; Interrupt Affinity controls eligible CPUs for IRQs. Neither replaces the other.
 
@@ -82,7 +95,9 @@ The written `*NumRssQueues` value is not the number of queues used by a particul
 
 **NIC ITR** accesses hardware moderation registers on supported network controllers: Intel I210/I211, I219, I225/I226, I350, 82576/82580, Realtek RTL8111/8168, RTL8125/8126, and compatible Killer models. Hardware writes are disabled for unknown PCI IDs.
 
-**SET** writes the register now, **SAVE** stores a profile for application at the next Windows sign-in without changing the current register, and **CHECK** rereads the hardware. Register formats and interval units differ by controller family: an [Intel EITR](https://cdrdv2-public.intel.com/333016/333016%20-%20I210_Datasheet_v_3_7.pdf) value is not a ready-made Realtek profile. A shorter interval can increase both interrupt rate and CPU load.
+**SET** writes the register now, **SAVE** stores a profile in the startup task without changing the current register, and **CHECK** rereads the hardware.
+
+The driver's own adaptive moderation would overwrite the register, so **SAVE** turns it off in the registry (`*InterruptModeration`, and `ITR` on Intel). The change takes effect after a restart. The card's **Interrupt Moderation** line shows the current state; **DELETE** in the IMOD block restores the driver default. Register formats and interval units differ by controller family: an [Intel EITR](https://cdrdv2-public.intel.com/333016/333016%20-%20I210_Datasheet_v_3_7.pdf) value is not a ready-made Realtek profile. A shorter interval can increase both interrupt rate and CPU load.
 
 ## Additional settings
 

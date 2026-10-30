@@ -27,7 +27,13 @@
 <ul>
 <li><strong>CHECK</strong> in the IMOD block reveals the values and table. Viewing the result no longer requires enabling the IMOD apply checkbox.</li>
 <li>Background IMOD reads no longer stage or replace the driver file. They use an already loaded DTIMOD.sys.</li>
-<li>Restoring IMOD / NIC ITR profiles retains device values and updates the saved script code. Required loader files are prepared before restoration.</li>
+<li>IMOD / NIC ITR startup now uses Task Scheduler: the <code>\DEVICE TWEAKER\IMOD</code> task runs as SYSTEM and applies the settings at sign-in, after resume from sleep, and when a USB/HID device is attached. Previously, startup ran only at sign-in.</li>
+<li>Startup files live in <code>%ProgramData%\DEVICE TWEAKER\Startup</code> and only administrators and SYSTEM can modify them. <code>ApplyIMOD.ps1</code> stays an open script that works without the EXE; values are kept in <code>profile.json</code>, the runtime, driver and loader SHA-256 are verified before each run, and logs are kept for 14 days. The previous startup entry in AppData and the Run key is migrated automatically.</li>
+<li>The program and the startup script share one register-write and interrupter-map code path. Fixed a mismatch: the startup script took a device's interrupter from the Slot Context instead of the TRBs of its transfer ring, so after a restart it could assign roles differently from what the program showed.</li>
+<li>Current IMOD values show the read time; after a device is attached or removed, the map is marked "devices changed".</li>
+<li><strong>SAVE</strong> for NIC ITR turns off the driver's own adaptive moderation in the registry (<code>*InterruptModeration</code>, and <code>ITR</code> on Intel), which otherwise overwrote the register. <strong>DELETE</strong> restores the driver value. The Interrupt Moderation line shows the state.</li>
+<li>The program and the startup script no longer load DTIMOD.sys at the same time.</li>
+<li>Backups store the startup profile; backups with the old script are converted on restore without losing values.</li>
 </ul>
 
 </td></tr>
@@ -77,6 +83,8 @@
 <ul>
 <li>RSS diagnostics distinguish unsupported functions, missing data, read failures, apply failures and skipped settings. Saved and active parameters are marked as matching only after a confirmed read.</li>
 <li>Removed unwarranted warnings for Wi-Fi and adapters where Windows selects RSS CPUs. Wi-Fi settings remain skipped. Active RSS queries have a longer timeout.</li>
+<li>Fixed RSS CPU selection: processors are taken one per physical core, skipping SMT siblings, and <code>*MaxRssProcessors</code> and <code>*RssMaxProcNumber</code> are written together with the base CPU.</li>
+<li>RSS queue counts are limited to the values the driver offers and to the number of MSI-X vectors.</li>
 </ul>
 
 </td></tr>
@@ -93,6 +101,7 @@
 <li>Removed the white block flash during IRQ Mode reads. Fixed resource disposal order when closing the window.</li>
 <li>Updated RU/EN wording, backup-reason labels and the modified-settings indicator. Fixed language switching for dynamic strings and Power Saving.</li>
 <li>Updated device-category colours to make GPU and network easier to distinguish.</li>
+<li>Russian filter buttons no longer lose their spaces after switching language.</li>
 </ul>
 
 </td></tr>
@@ -106,6 +115,7 @@
 <li>Added an application build identifier while keeping version 0.0.4. Logs can distinguish different EXEs of the same version.</li>
 <li>Logs now include the IRQ Mode read source and time, RSS query duration and detailed read / apply statuses.</li>
 <li>Added a system check before USB IMOD tuning: Blocklist / HVCI / Microsoft Defender and FACEIT / Vanguard service states.</li>
+<li>Registry, WMI and USB topology read failures are logged as warnings instead of being skipped silently. Numbers, dates and register values in logs are formatted the same way under any Windows locale.</li>
 </ul>
 
 </td></tr>
@@ -120,6 +130,7 @@
 <li>Moved checks and the test panel to dev/qa. The panel is included only in a separate developer build, not the normal EXE.</li>
 <li>Expanded the development workbench with reproducible scenarios, GUI and transition captures, RU/EN, layout-scale models, test files and frame comparison. Autonomous runs use a hidden desktop without applying Windows settings.</li>
 <li>Added test-sensitivity checks using deliberate faults and SHA-256 verification of sources / built components. Updated build documentation, the program description and screenshots.</li>
+<li>DTIMOD.sys writes only to memory Windows allocated to the named PCI device; the former general physical-memory write was removed. The range check runs on the driver model together with a deliberate fault.</li>
 </ul>
 
 </td></tr>
