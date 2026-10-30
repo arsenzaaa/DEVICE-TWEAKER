@@ -622,14 +622,24 @@ for ($refreshFrame = 0; $refreshFrame -lt 8; $refreshFrame++) {
     }
     Start-Sleep -Milliseconds 100
 }
-$ruBusyEnglish = @(
-    $normalMain.FindAll(
-        [System.Windows.Automation.TreeScope]::Descendants,
-        [System.Windows.Automation.Condition]::TrueCondition) |
-        ForEach-Object { [string]$_.Current.Name } |
-        Where-Object { $_ -match '(?i)Scanning devices|Clearing device list|Enumerating devices|Building device list|Building reserved CPU sets|Laying out devices|Updating (IMOD|IRQ)' } |
-        Sort-Object -Unique
-)
+# Cards are being replaced while REFRESH runs; an element can vanish mid-walk, so the
+# enumeration itself is retried. A real untranslated label is seen on every attempt.
+$ruBusyEnglish = $null
+for ($attempt = 1; $null -eq $ruBusyEnglish; $attempt++) {
+    try {
+        $ruBusyEnglish = @(
+            $normalMain.FindAll(
+                [System.Windows.Automation.TreeScope]::Descendants,
+                [System.Windows.Automation.Condition]::TrueCondition) |
+                ForEach-Object { [string]$_.Current.Name } |
+                Where-Object { $_ -match '(?i)Scanning devices|Clearing device list|Enumerating devices|Building device list|Building reserved CPU sets|Laying out devices|Updating (IMOD|IRQ)' } |
+                Sort-Object -Unique
+        )
+    } catch {
+        if ($attempt -ge 5) { throw }
+        Start-Sleep -Milliseconds 100
+    }
+}
 if ($ruBusyEnglish.Count -gt 0) {
     $smokeFailed = $true
     Write-Report "FAIL: untranslated Russian progress text: $($ruBusyEnglish -join ' | ')"
