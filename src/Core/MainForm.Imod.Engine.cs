@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
@@ -682,7 +683,9 @@ public sealed partial class MainForm
                 continue;
             }
 
-            block.ImodCurrentLabel.Text = $"current: {FormatImodValueList(values)}";
+            block.ImodMapReadAt = DateTime.Now;
+            block.ImodMapStale = false;
+            block.ImodCurrentLabel.Text = $"current: {FormatImodValueList(values)} · {FormatImodReadTime(block.ImodMapReadAt.Value)}";
             block.ImodCurrentLabel.Tag = $"current raw: {FormatImodValueListForLog(values)}";
             block.ImodCurrentLabel.ForeColor = _statusActive;
             SetImodStatusTooltip(block.ImodCurrentLabel);
@@ -752,6 +755,28 @@ public sealed partial class MainForm
     private static int CountNonEmptyLines(string value)
         => value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
 
+
+    private const string ImodMapStaleSuffix = "devices changed";
+    private const string ImodMapStaleHint = "Devices were added or removed after this read. A USB device may now use another interrupter; press CHECK to read again.";
+
+    private static string FormatImodReadTime(DateTime readAt)
+        => readAt.ToString("HH:mm", CultureInfo.InvariantCulture);
+
+    // Called after Windows reports added or removed devices: a re-plugged USB
+    // device may now use another interrupter, so the shown map is outdated.
+    private void MarkImodMapsStale()
+    {
+        foreach (DeviceBlock block in _blocks.Where(block => block.ImodMapReadAt is not null && !block.ImodMapStale))
+        {
+            block.ImodMapStale = true;
+            string text = block.ImodCurrentLabel.Text ?? string.Empty;
+            block.ImodCurrentLabel.Text = $"{text} · {ImodMapStaleSuffix}";
+            block.ImodCurrentLabel.Tag = ImodMapStaleHint;
+            block.ImodCurrentLabel.ForeColor = _statusWarn;
+            SetImodStatusTooltip(block.ImodCurrentLabel);
+            WriteLog($"IMOD.MAP.STALE: {block.Device.InstanceId} readAt={FormatImodReadTime(block.ImodMapReadAt!.Value)}");
+        }
+    }
 
     private void SetImodStatusTooltip(Control label)
     {

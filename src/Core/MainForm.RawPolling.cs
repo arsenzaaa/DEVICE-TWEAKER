@@ -6,6 +6,8 @@ namespace DeviceTweakerCS;
 public sealed partial class MainForm
 {
     private const int WmNcActivate = 0x0086;
+    private const int WmDeviceChange = 0x0219;
+    private const int DbtDevNodesChanged = 0x0007;
     private const int RawPollingUpdateIntervalMs = 250;
     private const int RawPollingMinSamples = 32;
     private const int RawPollingLiveMinSamples = 12;
@@ -17,7 +19,22 @@ public sealed partial class MainForm
     private readonly Dictionary<string, string> _usbRoleOverrideByController = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _rawPollingUiSnapshotByController = new(StringComparer.OrdinalIgnoreCase);
     private System.Windows.Forms.Timer? _rawPollingTimer;
+    private System.Windows.Forms.Timer? _deviceChangeTimer;
     private bool _rawPollingInitialized;
+
+    private System.Windows.Forms.Timer CreateDeviceChangeTimer()
+    {
+        System.Windows.Forms.Timer timer = new() { Interval = 1000 };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            if (!IsDisposed)
+            {
+                MarkImodMapsStale();
+            }
+        };
+        return timer;
+    }
 
     protected override void WndProc(ref Message m)
     {
@@ -31,6 +48,15 @@ public sealed partial class MainForm
         if (m.Msg == WmNcActivate && m.WParam == IntPtr.Zero && WindowState != FormWindowState.Minimized)
         {
             m.WParam = new IntPtr(1);
+        }
+
+        // Top-level windows receive this without registration whenever a device
+        // is added or removed; a burst of them collapses into one update.
+        if (m.Msg == WmDeviceChange && m.WParam == DbtDevNodesChanged)
+        {
+            _deviceChangeTimer ??= CreateDeviceChangeTimer();
+            _deviceChangeTimer.Stop();
+            _deviceChangeTimer.Start();
         }
 
         if (m.Msg == RawInputInterop.WmInput)
@@ -78,6 +104,9 @@ public sealed partial class MainForm
         _rawPollingTimer?.Stop();
         _rawPollingTimer?.Dispose();
         _rawPollingTimer = null;
+        _deviceChangeTimer?.Stop();
+        _deviceChangeTimer?.Dispose();
+        _deviceChangeTimer = null;
     }
 
     private void HandleRawInputMessage(IntPtr lParam)

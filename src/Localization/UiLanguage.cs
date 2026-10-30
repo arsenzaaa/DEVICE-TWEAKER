@@ -1448,6 +1448,7 @@ internal static partial class UiLanguage
             ["backup failed"] = "ошибка бекапа",
             ["applying..."] = "применение...",
             ["saved for startup"] = "сохранено для автозапуска",
+            ["Devices were added or removed after this read. A USB device may now use another interrupter; press CHECK to read again."] = "После этого чтения устройства подключались или отключались. USB-устройство могло получить другой interrupter; нажмите ПРОВЕРИТЬ, чтобы прочитать заново.",
             ["saved; driver moderation unchanged"] = "сохранено; модерация драйвера не изменена",
             ["save failed"] = "ошибка сохранения",
             ["off"] = "выключено",
@@ -1627,6 +1628,7 @@ internal static partial class UiLanguage
 
     private static readonly (string English, string Russian)[] InlineReplacements =
     [
+        ("devices changed", "устройства изменились"),
         ("Power Saving=Enabled", "Power Saving=Включено"),
         ("Power Saving=Disabled", "Power Saving=Выключено"),
         ("Hybrid CPU", "Hybrid CPU"),

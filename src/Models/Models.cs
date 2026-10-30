@@ -228,6 +228,10 @@ internal sealed class DeviceBlock
     public Control? ImodMapLabel { get; init; }
     public Button? ImodDetailsButton { get; init; }
     public bool ImodDetailsExpanded { get; set; }
+    // When IMOD values and the device-to-interrupter map were read; a USB device
+    // plugged in or removed after that can receive another interrupter.
+    public DateTime? ImodMapReadAt { get; set; }
+    public bool ImodMapStale { get; set; }
     public bool ImodReadbackRequested { get; set; }
     public Panel? ImodReadbackPanel { get; init; }
     public CheckBox? RawMouseThrottleCheck { get; init; }

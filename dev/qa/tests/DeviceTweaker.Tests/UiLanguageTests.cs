@@ -45,6 +45,8 @@ public class UiLanguageTests
     [InlineData("Service stopped", "Остановлена")]
     [InlineData("No registry setting", "Нет параметра")]
     [InlineData("Simulated interrupt mode. No hardware was queried.", "Тестовый режим прерываний. Железо не опрашивалось.")]
+    [InlineData("current: 0x0 x8 · 14:02", "текущее: 0x0 x8 · 14:02")]
+    [InlineData("current: 0x0 x8 · 14:02 · devices changed", "текущее: 0x0 x8 · 14:02 · устройства изменились")]
     public void UserStatusesTranslateWhilePreservingNumbersAndDiagnosticText(string source, string required)
     {
         var method = typeof(UiLanguage).GetMethod("TranslateRussian", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;

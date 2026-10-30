@@ -55,7 +55,10 @@ public sealed partial class MainForm
 
         block.ImodDefaultLabel.Text = $"default: {FormatImodValue(fallback)}";
         block.ImodDefaultLabel.Tag = FormatImodValue(fallback);
-        block.ImodCurrentLabel.Text = $"current: {FormatImodValueList(values)}";
+        // Fixed time keeps workbench snapshots comparable between runs.
+        block.ImodMapReadAt = DateTime.Today.AddHours(12);
+        block.ImodMapStale = false;
+        block.ImodCurrentLabel.Text = $"current: {FormatImodValueList(values)} · {FormatImodReadTime(block.ImodMapReadAt.Value)}";
         block.ImodCurrentLabel.Tag = $"test preview raw: {FormatImodValueListForLog(values)}";
         block.ImodCurrentLabel.ForeColor = _statusActive;
         SetImodStatusTooltip(block.ImodCurrentLabel);
