@@ -182,6 +182,12 @@ public sealed class StartupTaskTests
     }
 
     [Fact]
+    public void ShippedStartupFilesSatisfyThePersistenceContract()
+    {
+        Assert.True(MainForm.ValidateImodStartupPersistenceContract(out string error), error);
+    }
+
+    [Fact]
     public void ScriptPathWithXmlCharactersStaysIntact()
     {
         const string script = @"C:\Data & Co\O'Brien <test>\ApplyIMOD.ps1";

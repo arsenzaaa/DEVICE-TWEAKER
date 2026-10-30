@@ -599,7 +599,7 @@ public sealed partial class MainForm
                 return false;
             }
 
-            if (!TryProgramNicItrRegisters(profile, baseAddress, values, new DriverNicItrRegisters(ctx), out error))
+            if (!TryProgramNicItrRegisters(profile, baseAddress, values, ctx.Registers, out error))
             {
                 return false;
             }
@@ -616,18 +616,10 @@ public sealed partial class MainForm
         }
     }
 
-    private sealed class DriverNicItrRegisters(ImodDriverContext ctx) : INicItrRegisters
-    {
-        public bool TryWrite(ulong address, int width, ulong value, out string? error)
-            => TryWriteNicRegister(ctx, address, width, value, out error);
-        public bool TryRead(ulong address, int width, out ulong value, out string? error)
-            => TryReadNicRegister(ctx, address, width, out value, out error);
-    }
-
     // The production write/readback sequence is shared with the in-memory QA bus.
     internal static bool TryProgramNicItrRegisters(
         NicItrProfile profile, ulong baseAddress, IReadOnlyList<ulong> values,
-        INicItrRegisters registers, out string? error)
+        IDeviceRegisters registers, out string? error)
         => NicItrService.TryProgramNicItrRegisters(profile, baseAddress, values, registers, out error);
 
     private bool ShouldPersistSharedImodDriver()
@@ -660,13 +652,6 @@ public sealed partial class MainForm
         return true;
     }
 
-    private static bool TryWriteNicRegister(ImodDriverContext ctx, ulong address, int width, ulong value, out string? error)
-    {
-        return width == 16
-            ? TryWritePhys16(ctx, address, (ushort)value, out error)
-            : TryWritePhys32(ctx, address, (uint)value, out error);
-    }
-
     private static bool TryReadPhys16(ImodDriverContext ctx, ulong address, out ushort value, out string? error)
     {
         value = 0;
@@ -678,11 +663,6 @@ public sealed partial class MainForm
 
         value = unchecked((ushort)raw);
         return true;
-    }
-
-    private static bool TryWritePhys16(ImodDriverContext ctx, ulong address, ushort value, out string? error)
-    {
-        return TryWritePhysicalMemory(ctx, address, 2, value, out error);
     }
 
     private static bool TryValidateNicItrMemoryRange(NicItrProfile profile, ulong memoryLength, out string? error)

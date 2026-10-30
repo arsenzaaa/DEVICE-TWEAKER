@@ -5,6 +5,7 @@ using Xunit;
 
 namespace DeviceTweaker.Tests;
 
+// IOCTL_IMOD_WRITE_DEVICE request built by the shared runtime must match IMOD\Driver\imod_driver.h.
 public sealed class ImodDeviceWriteTests
 {
     private const string Pdo = @"\Device\NTPNP_PCI0012";
@@ -13,8 +14,9 @@ public sealed class ImodDeviceWriteTests
     [Fact]
     public void RequestMatchesTheDriverStructLayout()
     {
-        Assert.True(ImodDeviceWrite.TryBuild(Pdo, Instance, 0xF7000024, 4, 0x80000028, out byte[] request));
+        byte[] request = DeviceTweakerImodRuntime.BuildDeviceWriteRequest(Pdo, Instance, 0xF7000024, 4, 0x80000028);
 
+        Assert.NotNull(request);
         Assert.Equal(1048, request.Length);
         Assert.Equal(1u, BinaryPrimitives.ReadUInt32LittleEndian(request.AsSpan(0)));
         Assert.Equal(4u, BinaryPrimitives.ReadUInt32LittleEndian(request.AsSpan(4)));
@@ -27,7 +29,7 @@ public sealed class ImodDeviceWriteTests
     [Fact]
     public void IoctlUsesIndexFiveWithWriteAccess()
     {
-        Assert.Equal((0x8010u << 16) | (2u << 14) | (0x815u << 2), ImodDeviceWrite.IoctlCode);
+        Assert.Equal((0x8010u << 16) | (2u << 14) | (0x815u << 2), DeviceTweakerImodRuntime.IoctlImodWriteDevice);
     }
 
     [Theory]
@@ -37,21 +39,21 @@ public sealed class ImodDeviceWriteTests
     [InlineData(Pdo, Instance, 8)]
     public void InvalidRequestsAreNotBuilt(string pdo, string instance, uint size)
     {
-        Assert.False(ImodDeviceWrite.TryBuild(pdo, instance, 0x1000, size, 0, out _));
+        Assert.Null(DeviceTweakerImodRuntime.BuildDeviceWriteRequest(pdo, instance, 0x1000, size, 0));
     }
 
     [Fact]
     public void NamesMustFitTheDriverBuffers()
     {
-        Assert.False(ImodDeviceWrite.TryBuild(@"\Device\" + new string('A', 248), Instance, 0x1000, 4, 0, out _));
-        Assert.True(ImodDeviceWrite.TryBuild(@"\Device\" + new string('A', 247), Instance, 0x1000, 4, 0, out _));
+        Assert.Null(DeviceTweakerImodRuntime.BuildDeviceWriteRequest(@"\Device\" + new string('A', 248), Instance, 0x1000, 4, 0));
+        Assert.NotNull(DeviceTweakerImodRuntime.BuildDeviceWriteRequest(@"\Device\" + new string('A', 247), Instance, 0x1000, 4, 0));
     }
 
     [Fact]
     public void DriverRefusalsAreExplained()
     {
-        Assert.Contains(@"0xF7000024 is outside the memory of PCI\X", ImodDeviceWrite.DescribeFailure(5, "other", 0xF7000024, @"PCI\X"));
-        Assert.Equal(DriverRuntime.RestartMessage, ImodDeviceWrite.DescribeFailure(1, "other"));
-        Assert.Equal("other", ImodDeviceWrite.DescribeFailure(87, "other"));
+        Assert.Contains(@"0xF7000024 is outside the memory of PCI\X", DeviceTweakerImodRuntime.DescribeWriteFailure(5, 0xF7000024, @"PCI\X"));
+        Assert.Equal(DriverRuntime.RestartMessage, DeviceTweakerImodRuntime.DescribeWriteFailure(1, 0, @"PCI\X"));
+        Assert.StartsWith("failed to write physical memory via driver: ", DeviceTweakerImodRuntime.DescribeWriteFailure(87, 0, @"PCI\X"));
     }
 }

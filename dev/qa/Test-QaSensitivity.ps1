@@ -18,10 +18,10 @@ $mutations = @(
     @{ name = 'shift-i225-register'; file = 'Core\NicItrService.cs'; filter = 'NicItrProgrammingTests';
         old = '"125D", "5503"], 0x1680, 0x4, 5, 32'; new = '"125D", "5503"], 0x1684, 0x4, 5, 32';
         expected = 'I225_WritesFiveExactAddressesAndVerifiesEachRegister' },
-    @{ name = 'ignore-readback-mismatch'; file = 'Core\NicItrService.cs'; filter = 'NicItrProgrammingTests'; old = 'if (actual != expected)';
+    @{ name = 'ignore-readback-mismatch'; file = 'Startup\DeviceTweakerImodRuntime.cs'; filter = 'NicItrProgrammingTests'; old = 'if (actual != expected)';
         new = 'if (actual == ulong.MaxValue && actual != expected)'; expected = 'Failure_StopsBeforeLaterQueues(failure: "mismatch"' },
-    @{ name = 'erase-imod-counter'; file = 'Core\ImodRegisterService.cs'; filter = 'ImodRegisterTests';
-        old = '(currentValue & 0xFFFF0000) | (interval & 0xFFFF)'; new = '(interval & 0xFFFF)';
+    @{ name = 'erase-imod-counter'; file = 'Startup\DeviceTweakerImodRuntime.cs'; filter = 'ImodRegisterTests';
+        old = '((uint)currentValue & 0xFFFF0000U) | (interval & 0xFFFFU)'; new = '(interval & 0xFFFFU)';
         expected = 'IntervalWritePreservesCounterAndVerifiesLowBits' },
     @{ name = 'ignore-backup-readback'; file = 'Core\BackupRestoreService.cs'; filter = 'BackupRestoreTests';
         old = 'Verify(targets[i], captureValue(targets[i]));'; new = '// readback deliberately removed';

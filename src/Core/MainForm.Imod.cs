@@ -99,7 +99,7 @@ public sealed partial class MainForm
         }
     }
 
-    private bool ValidateImodStartupPersistenceContract(out string error)
+    internal static bool ValidateImodStartupPersistenceContract(out string error)
     {
         string root = GetStartupRoot();
         string programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
@@ -120,7 +120,7 @@ public sealed partial class MainForm
 
         string script = ReadStartupResource(StartupScriptResource);
         string runtime = ReadStartupResource(StartupRuntimeResource);
-        string[] scriptRequirements = ["Import-ImodProfile", "Test-ImodFileHash -name 'DeviceTweakerImodRuntime.cs'", "-role 'Audio'", "IMOD readback mismatch"];
+        string[] scriptRequirements = ["Import-ImodProfile", "Test-ImodFileHash -name 'DeviceTweakerImodRuntime.cs'", "-role 'Audio'"];
         string? missingScript = scriptRequirements.FirstOrDefault(token => !script.Contains(token, StringComparison.Ordinal));
         if (missingScript is not null)
         {
@@ -128,7 +128,8 @@ public sealed partial class MainForm
             return false;
         }
 
-        if (!runtime.Contains("TryReadPhys32(handle, address, out readBack", StringComparison.Ordinal))
+        if (!runtime.Contains("registers.TryRead(address, 4, out readBack", StringComparison.Ordinal)
+            || !runtime.Contains("IMOD readback mismatch", StringComparison.Ordinal))
         {
             error = "startup runtime does not read IMOD back after writing";
             return false;

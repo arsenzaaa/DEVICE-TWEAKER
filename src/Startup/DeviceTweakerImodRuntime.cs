@@ -12,6 +12,14 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 
+// Register access for the IMOD / NIC ITR sequences: DTIMOD in the app and the logon
+// script, an in-memory bus in tests. Sizes are in bytes (1, 2 or 4).
+public interface IDeviceRegisters
+{
+    bool TryRead(ulong address, uint size, out ulong value, out string error);
+    bool TryWrite(ulong address, uint size, ulong value, out string error);
+}
+
 public sealed class DeviceTweakerImodController
 {
     public string DeviceId;
@@ -73,7 +81,7 @@ public static class DeviceTweakerImodRuntime
     private static readonly IntPtr InvalidHandleValue = new IntPtr(-1);
     private static readonly uint IoctlImodReadPhysicalMemory = CtlCode(FileDeviceImod, ImodIoctlIndex + 2, MethodBuffered, FileAnyAccess);
     // DTIMOD writes only inside memory ranges Windows assigned to the named PCI devnode.
-    private static readonly uint IoctlImodWriteDevice = CtlCode(FileDeviceImod, ImodIoctlIndex + 5, MethodBuffered, FileWriteAccess);
+    internal static readonly uint IoctlImodWriteDevice = CtlCode(FileDeviceImod, ImodIoctlIndex + 5, MethodBuffered, FileWriteAccess);
     private const uint ImodDeviceWriteVersion = 1;
     private const int ImodDeviceWriteRequestSize = 1048;
     private const int ImodDeviceWriteReplySize = 8 + 65536;
@@ -488,7 +496,7 @@ public static class DeviceTweakerImodRuntime
         return value <= memoryLength && size <= memoryLength - value;
     }
 
-    private static bool TryResolveXhciRuntimeLayout(
+    internal static bool TryResolveXhciRuntimeLayout(
         IntPtr handle,
         ulong capabilityAddress,
         ulong memoryLength,
@@ -567,9 +575,9 @@ public static class DeviceTweakerImodRuntime
 
     public static string ApplyController(string deviceId, ulong capabilityAddress, ulong memoryLength, uint hcsparamsOffset, uint rtsoff, uint interval, uint[] intervals)
     {
-        WriteTarget writeTarget;
+        DeviceWriteTarget writeTarget;
         string targetError;
-        if (!TryResolveWriteTarget(deviceId, out writeTarget, out targetError))
+        if (!DeviceWriteTarget.TryResolve(deviceId, out writeTarget, out targetError))
         {
             return "error: " + targetError;
         }
@@ -601,7 +609,7 @@ public static class DeviceTweakerImodRuntime
             {
                 ulong interrupterAddress = runtimeAddress + 0x24 + (0x20 * i);
                 uint target = intervals != null && intervals.Length > 0 ? intervals[(int)i] : interval;
-                if (!TryWriteImodInterval(handle, writeTarget, interrupterAddress, target, out ioError))
+                if (!TryWriteImodInterval(new DtimodRegisters(handle, writeTarget), interrupterAddress, target, out ioError))
                 {
                     failures++;
                 }
@@ -753,9 +761,9 @@ public static class DeviceTweakerImodRuntime
             return "error: no values";
         }
 
-        WriteTarget target;
+        DeviceWriteTarget target;
         string targetError;
-        if (!TryResolveWriteTarget(deviceId, out target, out targetError))
+        if (!DeviceWriteTarget.TryResolve(deviceId, out target, out targetError))
         {
             return "error: " + targetError;
         }
@@ -770,34 +778,25 @@ public static class DeviceTweakerImodRuntime
         try
         {
             uint size = width == 16 ? 2U : 4U;
-            uint failures = 0;
             StringBuilder applied = new StringBuilder();
             for (uint q = 0; q < queues; q++)
             {
                 ulong selected = q < values.Length ? values[q] : values[0];
-                ulong finalValue = (selected & mask) | orBits;
                 ulong address = baseAddress + baseOffset + (stride * q);
                 if (applied.Length > 0)
                 {
                     applied.Append(", ");
                 }
-                applied.Append("Q").Append(q).Append("@0x").Append(address.ToString("X")).Append("=0x").Append(finalValue.ToString("X"));
-                string ioError;
-                if (!TryWritePhysicalMemory(handle, target, address, size, finalValue, out ioError))
-                {
-                    failures++;
-                    continue;
-                }
-
-                ulong readback;
-                if (!TryReadPhysicalMemory(handle, address, size, out readback, out ioError)
-                    || (readback & mask) != (selected & mask))
-                {
-                    failures++;
-                }
+                applied.Append("Q").Append(q).Append("@0x").Append(address.ToString("X")).Append("=0x").Append(((selected & mask) | orBits).ToString("X"));
             }
 
-            return "writes=" + queues + " width=" + width + " values=[" + applied.ToString() + "] failures=" + failures;
+            string ioError;
+            if (!TryProgramNicItr(new DtimodRegisters(handle, target), baseAddress, baseOffset, stride, queues, size, mask, orBits, values, null, out ioError))
+            {
+                return "error: " + ioError + " values=[" + applied.ToString() + "]";
+            }
+
+            return "writes=" + queues + " width=" + width + " values=[" + applied.ToString() + "] verified";
         }
         finally
         {
@@ -833,7 +832,7 @@ public static class DeviceTweakerImodRuntime
         return false;
     }
 
-    private static bool TryReadPhys32(IntPtr handle, ulong address, out uint value, out string error)
+    internal static bool TryReadPhys32(IntPtr handle, ulong address, out uint value, out string error)
     {
         value = 0;
         ulong raw;
@@ -845,36 +844,77 @@ public static class DeviceTweakerImodRuntime
         return true;
     }
 
-    private static bool TryWriteImodInterval(IntPtr handle, WriteTarget target, ulong address, uint interval, out string error)
+    // Writes the IMOD interval (low 16 bits) and keeps the counter (high 16 bits);
+    // the interval is read back. Used by the app, the logon script and tests.
+    public static bool TryWriteImodInterval(IDeviceRegisters registers, ulong address, uint interval, out string error)
     {
-        uint currentValue;
-        if (!TryReadPhys32(handle, address, out currentValue, out error))
+        ulong currentValue;
+        if (!registers.TryRead(address, 4, out currentValue, out error))
         {
             return false;
         }
-        uint mergedValue = (currentValue & 0xFFFF0000U) | (interval & 0xFFFFU);
-        if (!TryWritePhysicalMemory(handle, target, address, 4, mergedValue, out error))
+        uint mergedValue = ((uint)currentValue & 0xFFFF0000U) | (interval & 0xFFFFU);
+        if (!registers.TryWrite(address, 4, mergedValue, out error))
         {
             return false;
         }
-        uint readBack;
+        ulong readBack;
         string readError;
-        if (!TryReadPhys32(handle, address, out readBack, out readError))
+        if (!registers.TryRead(address, 4, out readBack, out readError))
         {
             error = "IMOD write completed, but readback failed: " + readError;
             return false;
         }
         uint expectedInterval = interval & 0xFFFFU;
-        uint actualInterval = readBack & 0xFFFFU;
+        uint actualInterval = (uint)readBack & 0xFFFFU;
         if (actualInterval != expectedInterval)
         {
             error = string.Format("IMOD readback mismatch at 0x{0:X}: expected interval 0x{1:X}, read 0x{2:X}", address, expectedInterval, actualInterval);
             return false;
         }
+        error = null;
         return true;
     }
 
-    private static bool TryReadPhysicalMemory(IntPtr handle, ulong address, uint size, out ulong value, out string error)
+    // Programs one ITR register per queue and reads each back; the first failure stops
+    // the remaining queues. labels name the queues in errors (Q0, IRQ0, ...).
+    public static bool TryProgramNicItr(IDeviceRegisters registers, ulong baseAddress, uint baseOffset, uint stride,
+        uint queues, uint size, ulong mask, ulong orBits, ulong[] values, string[] labels, out string error)
+    {
+        error = null;
+        if (values == null || values.Length == 0)
+        {
+            error = "no values";
+            return false;
+        }
+        for (uint q = 0; q < queues; q++)
+        {
+            string label = labels != null && q < labels.Length ? labels[q] : "Q" + q;
+            ulong selected = q < values.Length ? values[q] : values[0];
+            ulong finalValue = (selected & mask) | orBits;
+            ulong address = baseAddress + baseOffset + (stride * q);
+            if (!registers.TryWrite(address, size, finalValue, out error))
+            {
+                return false;
+            }
+            ulong readback;
+            if (!registers.TryRead(address, size, out readback, out error))
+            {
+                error = "write completed but readback failed at " + label + ": " + error;
+                return false;
+            }
+            ulong expected = selected & mask;
+            ulong actual = readback & mask;
+            if (actual != expected)
+            {
+                error = string.Format("write verification failed at {0}: expected 0x{1:X}, read 0x{2:X}", label, expected, actual);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    internal static bool TryReadPhysicalMemory(IntPtr handle, ulong address, uint size, out ulong value, out string error)
     {
         value = 0;
         error = null;
@@ -887,75 +927,136 @@ public static class DeviceTweakerImodRuntime
             error = GetWin32ErrorMessage(Marshal.GetLastWin32Error());
             return false;
         }
+        if (bytesReturned < Marshal.SizeOf(typeof(PhysAccessStruct)))
+        {
+            error = "incomplete DTIMOD read reply";
+            return false;
+        }
         value = access.value;
         return true;
     }
 
-    private sealed class WriteTarget
+    // Exact PCI devnode DTIMOD accepts writes for: its PDO name and instance ID.
+    public sealed class DeviceWriteTarget
     {
-        public string InstanceId;
-        public string PdoName;
+        public readonly string InstanceId;
+        public readonly string PdoName;
+
+        public DeviceWriteTarget(string instanceId, string pdoName)
+        {
+            InstanceId = instanceId;
+            PdoName = pdoName;
+        }
+
+        public static bool TryResolve(string instanceId, out DeviceWriteTarget target, out string error)
+        {
+            target = null;
+            error = null;
+            uint devInst;
+            int cr = CM_Locate_DevNodeW(out devInst, instanceId, 0);
+            if (cr != CrSuccess)
+            {
+                error = "device not found: " + instanceId + " (CM 0x" + cr.ToString("X") + ")";
+                return false;
+            }
+
+            // DEVPKEY_Device_PDOName {a45c254e-df1c-4efd-8020-67d146a850e0}, 16.
+            DevPropKey key = new DevPropKey();
+            key.fmtid = new Guid("a45c254e-df1c-4efd-8020-67d146a850e0");
+            key.pid = 16;
+            byte[] buffer = new byte[512];
+            uint size = (uint)buffer.Length;
+            uint type;
+            cr = CM_Get_DevNode_PropertyW(devInst, ref key, out type, buffer, ref size, 0);
+            if (cr != CrSuccess || size < 4)
+            {
+                error = "PDO name not available for " + instanceId + " (CM 0x" + cr.ToString("X") + ")";
+                return false;
+            }
+
+            target = new DeviceWriteTarget(instanceId, Encoding.Unicode.GetString(buffer, 0, (int)size - 2));
+            return true;
+        }
     }
 
-    private static bool TryResolveWriteTarget(string instanceId, out WriteTarget target, out string error)
+    // DTIMOD access for one device: reads anywhere, writes only inside its memory.
+    public sealed class DtimodRegisters : IDeviceRegisters
     {
-        target = null;
-        error = null;
-        uint devInst;
-        int cr = CM_Locate_DevNodeW(out devInst, instanceId, 0);
-        if (cr != CrSuccess)
+        private readonly IntPtr handle;
+        private readonly DeviceWriteTarget target;
+
+        public DtimodRegisters(IntPtr handle, DeviceWriteTarget target)
         {
-            error = "device not found: " + instanceId + " (CM 0x" + cr.ToString("X") + ")";
-            return false;
+            this.handle = handle;
+            this.target = target;
         }
 
-        // DEVPKEY_Device_PDOName {a45c254e-df1c-4efd-8020-67d146a850e0}, 16.
-        DevPropKey key = new DevPropKey();
-        key.fmtid = new Guid("a45c254e-df1c-4efd-8020-67d146a850e0");
-        key.pid = 16;
-        byte[] buffer = new byte[512];
-        uint size = (uint)buffer.Length;
-        uint type;
-        cr = CM_Get_DevNode_PropertyW(devInst, ref key, out type, buffer, ref size, 0);
-        if (cr != CrSuccess || size < 4)
+        public bool TryRead(ulong address, uint size, out ulong value, out string error)
         {
-            error = "PDO name not available for " + instanceId + " (CM 0x" + cr.ToString("X") + ")";
-            return false;
+            return TryReadPhysicalMemory(handle, address, size, out value, out error);
         }
 
-        target = new WriteTarget();
-        target.InstanceId = instanceId;
-        target.PdoName = Encoding.Unicode.GetString(buffer, 0, (int)size - 2);
-        return true;
+        public bool TryWrite(ulong address, uint size, ulong value, out string error)
+        {
+            if (target == null)
+            {
+                error = "no target device was selected for the DTIMOD write";
+                return false;
+            }
+            return TryWritePhysicalMemory(handle, target, address, size, value, out error);
+        }
     }
 
-    private static bool TryWritePhysicalMemory(IntPtr handle, WriteTarget target, ulong address, uint size, ulong value, out string error)
+    // struct ImodDeviceWrite in IMOD\Driver\imod_driver.h; null when the request is invalid.
+    internal static byte[] BuildDeviceWriteRequest(string pdoName, string instanceId, ulong address, uint size, ulong value)
     {
-        error = null;
-        if (target.PdoName.Length >= 256 || target.InstanceId.Length >= 256)
+        if (pdoName == null || instanceId == null
+            || !pdoName.StartsWith("\\Device\\", StringComparison.OrdinalIgnoreCase)
+            || !instanceId.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase)
+            || pdoName.Length >= 256 || instanceId.Length >= 256
+            || pdoName.IndexOf('\0') >= 0 || instanceId.IndexOf('\0') >= 0
+            || (size != 1 && size != 2 && size != 4))
         {
-            error = "device name is too long for DTIMOD";
-            return false;
+            return null;
         }
 
-        // struct ImodDeviceWrite in IMOD\Driver\imod_driver.h.
         byte[] request = new byte[ImodDeviceWriteRequestSize];
         BitConverter.GetBytes(ImodDeviceWriteVersion).CopyTo(request, 0);
         BitConverter.GetBytes(size).CopyTo(request, 4);
         BitConverter.GetBytes(address).CopyTo(request, 8);
         BitConverter.GetBytes(value).CopyTo(request, 16);
-        Encoding.Unicode.GetBytes(target.PdoName).CopyTo(request, 24);
-        Encoding.Unicode.GetBytes(target.InstanceId).CopyTo(request, 536);
+        Encoding.Unicode.GetBytes(pdoName).CopyTo(request, 24);
+        Encoding.Unicode.GetBytes(instanceId).CopyTo(request, 536);
+        return request;
+    }
+
+    internal static string DescribeWriteFailure(int win32Error, ulong address, string instanceId)
+    {
+        if (win32Error == 5)
+        {
+            return "DTIMOD refused the write: 0x" + address.ToString("X") + " is outside the memory of " + instanceId;
+        }
+        if (win32Error == 1)
+        {
+            return "DTIMOD is unavailable.\nRestart Windows, then press CHECK.";
+        }
+        return "failed to write physical memory via driver: " + GetWin32ErrorMessage(win32Error);
+    }
+
+    private static bool TryWritePhysicalMemory(IntPtr handle, DeviceWriteTarget target, ulong address, uint size, ulong value, out string error)
+    {
+        error = null;
+        byte[] request = BuildDeviceWriteRequest(target.PdoName, target.InstanceId, address, size, value);
+        if (request == null)
+        {
+            error = "invalid DTIMOD write request for " + target.InstanceId;
+            return false;
+        }
         byte[] reply = new byte[ImodDeviceWriteReplySize];
         int bytesReturned;
         if (!DeviceIoControlBytes(handle, IoctlImodWriteDevice, request, request.Length, reply, reply.Length, out bytesReturned, IntPtr.Zero))
         {
-            int code = Marshal.GetLastWin32Error();
-            error = code == 5
-                ? "DTIMOD refused the write: 0x" + address.ToString("X") + " is outside the memory of " + target.InstanceId
-                : code == 1
-                    ? "DTIMOD in memory is older than this profile; restart Windows"
-                    : GetWin32ErrorMessage(code);
+            error = DescribeWriteFailure(Marshal.GetLastWin32Error(), address, target.InstanceId);
             return false;
         }
         return true;

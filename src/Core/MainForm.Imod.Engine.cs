@@ -47,11 +47,6 @@ public sealed partial class MainForm
     private const uint OpenExisting = 3;
     private const uint FileAttributeNormal = 0x00000080;
 
-    private const uint FileDeviceImod = 0x00008010;
-    private const uint ImodIoctlIndex = 0x810;
-    private const uint MethodBuffered = 0;
-    private const uint FileAnyAccess = 0;
-
     private const string ImodDriverDevicePath = DriverRename.DevicePath;
     private const string ImodDriverServiceName = DriverRename.ServiceName;
     private const int ImodDriverOpenRetryCount = 10;
@@ -60,8 +55,6 @@ public sealed partial class MainForm
     private const string ImodKduFileName = "kdu.exe";
     private const string ImodKduDatabaseFileName = "drv64.dll";
     private const string ImodKduDisableEnv = "DEVICE_TWEAKER_DISABLE_KDU_FALLBACK";
-    private static readonly uint IoctlImodReadPhysicalMemory =
-        CtlCode(FileDeviceImod, ImodIoctlIndex + 2, MethodBuffered, FileAnyAccess);
 
     private sealed class ImodControllerInfo
     {
@@ -155,39 +148,6 @@ public sealed partial class MainForm
         uint creationDisposition,
         uint flagsAndAttributes,
         IntPtr templateFile);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool DeviceIoControl(
-        IntPtr deviceHandle,
-        uint ioControlCode,
-        ref PhysAccessStruct inBuffer,
-        int inBufferSize,
-        ref PhysAccessStruct outBuffer,
-        int outBufferSize,
-        out int bytesReturned,
-        IntPtr overlapped);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool DeviceIoControl(
-        IntPtr deviceHandle,
-        uint ioControlCode,
-        IntPtr inBuffer,
-        int inBufferSize,
-        IntPtr outBuffer,
-        int outBufferSize,
-        out int bytesReturned,
-        IntPtr overlapped);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool DeviceIoControl(
-        IntPtr deviceHandle,
-        uint ioControlCode,
-        byte[] inBuffer,
-        int inBufferSize,
-        byte[] outBuffer,
-        int outBufferSize,
-        out int bytesReturned,
-        IntPtr overlapped);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool CloseHandle(IntPtr handle);
@@ -1889,40 +1849,6 @@ public sealed partial class MainForm
         }
     }
 
-    private static Dictionary<uint, HashSet<string>> BuildAdaptiveRootPortRoles(string controllerDeviceId)
-    {
-        Dictionary<uint, HashSet<string>> rolesByRootPort = [];
-        List<UsbEndpointInfo> endpoints;
-        try
-        {
-            endpoints = UsbTopologyInterop.EnumerateEndpoints();
-        }
-        catch
-        {
-            return rolesByRootPort;
-        }
-
-        foreach (UsbEndpointInfo endpoint in endpoints)
-        {
-            if (!HostControllerPathMatchesDeviceId(endpoint.HostControllerPath, controllerDeviceId)
-                || !TryGetUsbRootPort(endpoint.TopologyPath, out uint rootPort)
-                || !TryClassifyAdaptiveUsbRole(endpoint, out string role))
-            {
-                continue;
-            }
-
-            if (!rolesByRootPort.TryGetValue(rootPort, out HashSet<string>? roles))
-            {
-                roles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                rolesByRootPort[rootPort] = roles;
-            }
-
-            roles.Add(role);
-        }
-
-        return rolesByRootPort;
-    }
-
     private HashSet<string> BuildAdaptiveControllerRoleFallback(string controllerDeviceId)
     {
         HashSet<string> roles = new(StringComparer.OrdinalIgnoreCase);
@@ -2636,104 +2562,6 @@ public sealed partial class MainForm
         }
     }
 
-    private bool EnsureImodDriverOnDiskCore(bool persistDriver, out string driverPath, out string? error)
-    {
-        error = null;
-        driverPath = GetImodDriverSystemPath();
-        if (QaRun.TryBlock("IMOD DRIVER STAGING"))
-        {
-            error = "QA read-only session: driver access skipped";
-            driverPath = string.Empty;
-            return false;
-        }
-
-        try
-        {
-            DriverRename.Prepare(DriverRename.Native(driverPath), QaRun.IsReadOnly);
-            using Stream? resource = OpenImodDriverResourceStream();
-            if (resource is null)
-            {
-                error = "embedded DTIMOD.sys not found";
-                return false;
-            }
-
-            using MemoryStream buffer = new();
-            resource.CopyTo(buffer);
-            byte[] driverBytes = buffer.ToArray();
-            string embeddedHash = ComputeSha256(driverBytes);
-            string? expectedHash = ReadEmbeddedImodDriverHash();
-
-            if (!string.IsNullOrWhiteSpace(expectedHash)
-                && !HashEquals(embeddedHash, expectedHash))
-            {
-                error = $"embedded DTIMOD.sys hash mismatch: actual={embeddedHash}, expected={expectedHash}";
-                return false;
-            }
-
-            string? driverDir = Path.GetDirectoryName(driverPath);
-            if (string.IsNullOrWhiteSpace(driverDir))
-            {
-                error = "failed to resolve IMOD driver directory";
-                return false;
-            }
-
-            if (File.Exists(driverPath))
-            {
-                string existingHash = ComputeFileSha256(driverPath);
-                if (HashEquals(existingHash, expectedHash ?? embeddedHash))
-                {
-                    WriteLog($"IMOD.DRIVER: using existing staged {driverPath} sha256={existingHash}");
-                    // This isolated compatibility build does not migrate existing startup settings.
-                    return true;
-                }
-                WriteLog($"IMOD.DRIVER: replacing staged {driverPath} sha256={existingHash} -> {embeddedHash}");
-            }
-
-            if (!IsImodDriverSystemPath(driverPath))
-            {
-                string? driverRoot = Path.GetDirectoryName(driverDir);
-                if (string.IsNullOrWhiteSpace(driverRoot))
-                {
-                    error = "failed to resolve IMOD driver root directory";
-                    return false;
-                }
-
-                if (!TrySecureImodDriverDirectory(driverRoot, out error))
-                {
-                    return false;
-                }
-
-                if (!TrySecureImodDriverDirectory(driverDir, out error))
-                {
-                    return false;
-                }
-            }
-            else if (!Directory.Exists(driverDir))
-            {
-                error = "Windows directory for IMOD driver not found";
-                return false;
-            }
-
-            WriteAllBytesAtomic(driverPath, driverBytes);
-
-            string writtenHash = ComputeFileSha256(driverPath);
-            if (!HashEquals(writtenHash, expectedHash ?? embeddedHash))
-            {
-                error = $"written DTIMOD.sys hash mismatch: actual={writtenHash}, expected={expectedHash ?? embeddedHash}";
-                return false;
-            }
-
-            WriteLog($"IMOD.DRIVER: staged {driverPath} sha256={writtenHash}");
-            // This isolated compatibility build does not migrate existing startup settings.
-            return true;
-        }
-        catch (Exception ex)
-        {
-            error = ex.Message == DriverRename.RestartMessage ? ex.Message : $"failed to stage DTIMOD.sys: {ex.Message}";
-            return false;
-        }
-    }
-
     private static bool TrySecureImodDriverDirectory(string directoryPath, out string? error)
     {
         QaRun.DemandWrite("TrySecureImodDriverDirectory");
@@ -3070,48 +2898,10 @@ public sealed partial class MainForm
         return true;
     }
 
-    private static bool TryWritePhys32(ImodDriverContext ctx, ulong address, uint value, out string? error)
-    {
-        return TryWritePhysicalMemory(ctx, address, 4, value, out error);
-    }
-
-    private sealed class DriverImodRegisters(ImodDriverContext context) : IImodRegisters
-    {
-        public bool TryRead(ulong address, out uint value, out string? error)
-            => TryReadPhys32(context, address, out value, out error);
-        public bool TryWrite(ulong address, uint value, out string? error)
-            => TryWritePhys32(context, address, value, out error);
-    }
-
     private static bool TryWriteImodInterval(ImodDriverContext ctx, ulong address, uint interval, out string? error)
     {
         QaRun.DemandWrite("PUBLISHED PHYSICAL ACCESS");
-        if (!TryReadPhys32(ctx, address, out uint currentValue, out error))
-        {
-            return false;
-        }
-
-        uint mergedValue = (currentValue & 0xFFFF0000) | (interval & 0xFFFF);
-        if (!TryWritePhys32(ctx, address, mergedValue, out error))
-        {
-            return false;
-        }
-
-        if (!TryReadPhys32(ctx, address, out uint readBack, out string? readError))
-        {
-            error = $"IMOD write completed, but readback failed: {readError}";
-            return false;
-        }
-
-        uint expectedInterval = interval & 0xFFFF;
-        uint actualInterval = readBack & 0xFFFF;
-        if (actualInterval != expectedInterval)
-        {
-            error = $"IMOD readback mismatch at 0x{address:X}: expected interval 0x{expectedInterval:X}, read 0x{actualInterval:X}";
-            return false;
-        }
-
-        return true;
+        return DeviceTweakerImodRuntime.TryWriteImodInterval(ctx.Registers, address, interval, out error);
     }
 
     private static bool TryReadPhysicalMemory(
@@ -3122,36 +2912,13 @@ public sealed partial class MainForm
         out string? error)
     {
         QaRun.DemandWrite("PUBLISHED PHYSICAL ACCESS");
-        value = 0;
+        if (!ctx.Registers.TryRead(address, size, out value, out string runtimeError))
+        {
+            error = $"failed to read physical memory via driver: {runtimeError}";
+            return false;
+        }
+
         error = null;
-        PhysAccessStruct access = new()
-        {
-            physAddress = address,
-            accessSizeInBytes = size,
-        };
-
-        int bytesReturned = 0;
-        if (!DeviceIoControl(
-                ctx.DriverHandle,
-                IoctlImodReadPhysicalMemory,
-                ref access,
-                Marshal.SizeOf<PhysAccessStruct>(),
-                ref access,
-                Marshal.SizeOf<PhysAccessStruct>(),
-                out bytesReturned,
-                IntPtr.Zero))
-        {
-            error = $"failed to read physical memory via driver: {GetWin32ErrorMessage(Marshal.GetLastWin32Error())}";
-            return false;
-        }
-
-        if (bytesReturned < Marshal.SizeOf<PhysAccessStruct>())
-        {
-            error = "failed to read physical memory via driver: incomplete ioctl response";
-            return false;
-        }
-
-        value = access.value;
         return true;
     }
 
@@ -3164,36 +2931,7 @@ public sealed partial class MainForm
         out string? error)
     {
         QaRun.DemandWrite("PUBLISHED PHYSICAL ACCESS");
-        error = null;
-        if (ctx.WriteInstanceId is not { } instanceId || ctx.WritePdoName is not { } pdoName)
-        {
-            error = "no target device was selected for the DTIMOD write";
-            return false;
-        }
-
-        if (!ImodDeviceWrite.TryBuild(pdoName, instanceId, address, size, value, out byte[] request))
-        {
-            error = $"invalid DTIMOD write request for {instanceId}";
-            return false;
-        }
-
-        byte[] reply = new byte[ImodDeviceWrite.ReplySize];
-        if (!DeviceIoControl(
-                ctx.DriverHandle,
-                ImodDeviceWrite.IoctlCode,
-                request,
-                request.Length,
-                reply,
-                reply.Length,
-                out _,
-                IntPtr.Zero))
-        {
-            int code = Marshal.GetLastWin32Error();
-            error = ImodDeviceWrite.DescribeFailure(code, $"failed to write physical memory via driver: {GetWin32ErrorMessage(code)}", address, instanceId);
-            return false;
-        }
-
-        return true;
+        return ctx.Registers.TryWrite(address, size, value, out error);
     }
 
     private static bool TryLoadImodDriverWithKduFallback(string driverPath, Action<string>? log, out string? error)
@@ -3521,23 +3259,20 @@ public sealed partial class MainForm
         public bool InitializedSuccessfully { get; private set; }
         public string DriverPath { get; }
         // Device whose memory ranges DTIMOD accepts for writes.
-        public string? WriteInstanceId { get; private set; }
-        public string? WritePdoName { get; private set; }
+        public DeviceTweakerImodRuntime.DeviceWriteTarget? WriteTarget { get; private set; }
+        // Without a target the shared runtime refuses writes; reads need none.
+        public IDeviceRegisters Registers => new DeviceTweakerImodRuntime.DtimodRegisters(DriverHandle, WriteTarget!);
         private readonly Action<string>? _log;
 
         public bool TrySetWriteTarget(string instanceId, out string? error)
         {
-            WriteInstanceId = null;
-            WritePdoName = null;
-            if (!NativeCfgMgr32.TryGetPciPdoName(instanceId, out string pdoName, out string lookupError))
+            WriteTarget = null;
+            if (!DeviceTweakerImodRuntime.DeviceWriteTarget.TryResolve(instanceId, out DeviceTweakerImodRuntime.DeviceWriteTarget target, out error))
             {
-                error = $"PDO of {instanceId} was not found: {lookupError}";
                 return false;
             }
 
-            WriteInstanceId = instanceId;
-            WritePdoName = pdoName;
-            error = null;
+            WriteTarget = target;
             return true;
         }
 
@@ -3922,21 +3657,7 @@ public sealed partial class MainForm
         return new Win32Exception(error).Message;
     }
 
-    private static uint CtlCode(uint deviceType, uint function, uint method, uint access)
-    {
-        return (deviceType << 16) | (access << 14) | (function << 2) | method;
-    }
-
     private static readonly IntPtr InvalidHandleValue = new(-1);
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    private struct PhysAccessStruct
-    {
-        public ulong physAddress;
-        public uint accessSizeInBytes;
-        public uint reserved;
-        public ulong value;
-    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct SERVICE_STATUS_PROCESS

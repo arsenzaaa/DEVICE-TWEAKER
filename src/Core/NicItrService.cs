@@ -26,12 +26,6 @@ internal sealed record NicItrProfile(
     string[]? VectorLabels = null,
     uint IntelEitrUnitUs = 2);
 
-internal interface INicItrRegisters
-{
-    bool TryWrite(ulong address, int width, ulong value, out string? error);
-    bool TryRead(ulong address, int width, out ulong value, out string? error);
-}
-
 internal static class NicItrService
 {
     internal static readonly NicItrProfile[] NicItrProfiles =
@@ -68,43 +62,18 @@ internal static class NicItrService
         return null;
     }
 
+    // The write / readback sequence itself lives in Startup\DeviceTweakerImodRuntime.cs
+    // and is shared with the logon script.
     internal static bool TryProgramNicItrRegisters(
         NicItrProfile profile, ulong baseAddress, IReadOnlyList<ulong> values,
-        INicItrRegisters registers, out string? error)
+        IDeviceRegisters registers, out string? error)
     {
-        error = null;
-        if (values.Count == 0)
-        {
-            error = "no values";
-            return false;
-        }
-        for (int q = 0; q < profile.MaxQueues; q++)
-        {
-            ulong selected = q < values.Count ? values[q] : values[0];
-            ulong finalValue = (selected & profile.ReadMask) | profile.WriteOrBits;
-            ulong address = baseAddress + profile.BaseOffset + (profile.Stride * (uint)q);
-            if (!registers.TryWrite(address, profile.ReadWidth, finalValue, out error))
-            {
-                return false;
-            }
-
-            if (!registers.TryRead(address, profile.ReadWidth, out ulong readback, out error))
-            {
-                error = $"write completed but readback failed at {GetNicItrVectorLabel(profile, q)}: {error}";
-                return false;
-            }
-
-            ulong expected = selected & profile.ReadMask;
-            ulong actual = readback & profile.ReadMask;
-            if (actual != expected)
-            {
-                error = $"write verification failed at {GetNicItrVectorLabel(profile, q)}: expected {FormatNicItrValue(expected, profile)}, read {FormatNicItrValue(actual, profile)}";
-                return false;
-            }
-        }
-
-        return true;
+        string[] labels = Enumerable.Range(0, profile.MaxQueues).Select(q => GetNicItrVectorLabel(profile, q)).ToArray();
+        return DeviceTweakerImodRuntime.TryProgramNicItr(
+            registers, baseAddress, profile.BaseOffset, profile.Stride, (uint)profile.MaxQueues,
+            (uint)(profile.ReadWidth / 8), profile.ReadMask, profile.WriteOrBits, [.. values], labels, out error);
     }
+
     internal static bool TryValidateNicItrMemoryRange(NicItrProfile profile, ulong memoryLength, out string? error)
     {
         ulong registerWidth = (ulong)(profile.ReadWidth / 8);
