@@ -1,2 +1,5 @@
 # Source and payload manifests verify exact file bytes.
 * -text
+
+# Pinned upstream KDU sources: kept for reproducible builds, not project code.
+src/IMOD/KDU/** linguist-vendored
