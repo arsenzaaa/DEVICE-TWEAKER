@@ -67,9 +67,45 @@ Write-Host "Driver cert:   $ImodDriverCertSubject"
 Write-Host "Thumbprint:    $ImodDriverCertThumbprint"
 Write-Host ""
 
-& powershell.exe @argsList
-if ($LASTEXITCODE -ne 0) {
-    throw "publish-variants.ps1 failed with exit code $LASTEXITCODE"
+# A clean publish deletes the output folders. Backups and logs written next to the EXE
+# are the user's restore points and history, so they are moved aside and put back.
+$keptUserData = @()
+$keepRoot = Join-Path $root ("bin\.kept-user-data-" + [Guid]::NewGuid().ToString("N"))
+if (-not $NoClean) {
+    foreach ($exe in @($withNetExe, $withoutNetExe)) {
+        foreach ($name in @("Backups", "logs")) {
+            $source = Join-Path (Split-Path -Parent $exe) $name
+            if (Test-Path -LiteralPath $source -PathType Container) {
+                $kept = Join-Path $keepRoot ((Split-Path -Leaf (Split-Path -Parent $exe)) + "\" + $name)
+                New-Item -ItemType Directory -Path (Split-Path -Parent $kept) -Force | Out-Null
+                Move-Item -LiteralPath $source -Destination $kept
+                $keptUserData += [pscustomobject]@{ Source = $source; Kept = $kept }
+            }
+        }
+    }
+}
+
+try {
+    & powershell.exe @argsList
+    $publishExitCode = $LASTEXITCODE
+} finally {
+    foreach ($item in $keptUserData) {
+        New-Item -ItemType Directory -Path (Split-Path -Parent $item.Source) -Force | Out-Null
+        if (Test-Path -LiteralPath $item.Source) {
+            # The new build created the folder; merge the kept files into it.
+            Get-ChildItem -LiteralPath $item.Kept -Force | Move-Item -Destination $item.Source -Force
+            Remove-Item -LiteralPath $item.Kept -Recurse -Force
+        } else {
+            Move-Item -LiteralPath $item.Kept -Destination $item.Source
+        }
+        Write-Host "Kept: $($item.Source)"
+    }
+    if (Test-Path -LiteralPath $keepRoot) {
+        Remove-Item -LiteralPath $keepRoot -Recurse -Force
+    }
+}
+if ($publishExitCode -ne 0) {
+    throw "publish-variants.ps1 failed with exit code $publishExitCode"
 }
 
 $artifacts = @()
