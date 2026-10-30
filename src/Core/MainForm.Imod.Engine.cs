@@ -67,16 +67,6 @@ public sealed partial class MainForm
         public string BaseError { get; init; } = string.Empty;
     }
 
-    private sealed class XhciInterrupterTopology
-    {
-        public Dictionary<uint, List<uint>> ByRootPort { get; } = [];
-        public Dictionary<uint, List<uint>> ByDeviceAddress { get; } = [];
-        public int EndpointTargetCount { get; set; }
-        public int SlotTargetCount { get; set; }
-        public uint MaxSlots { get; set; }
-        public uint ContextSize { get; set; }
-    }
-
     [DllImport("setupapi.dll", SetLastError = true)]
     private static extern bool SetupDiDestroyDeviceInfoList(IntPtr deviceInfoSet);
 
@@ -291,13 +281,16 @@ public sealed partial class MainForm
                         continue;
                     }
 
-                    if (!TryResolveXhciRuntimeLayout(
-                            controller,
-                            imodDriver,
+                    if (!DeviceTweakerImodRuntime.TryResolveXhciRuntimeLayout(
+                            imodDriver.Registers,
+                            controller.BaseAddress,
+                            controller.MemoryLength,
                             hcsparamsOffset,
                             rtsoff,
                             out uint maxIntrs,
                             out ulong runtimeAddress,
+                            out _,
+                            out _,
                             out string? ioError))
                     {
                         stats.ReadFailures++;
@@ -955,13 +948,16 @@ public sealed partial class MainForm
                     }
                 }
 
-                if (!TryResolveXhciRuntimeLayout(
-                        controller,
-                        imodDriver,
+                if (!DeviceTweakerImodRuntime.TryResolveXhciRuntimeLayout(
+                        imodDriver.Registers,
+                        controller.BaseAddress,
+                        controller.MemoryLength,
                         hcsparamsOffset,
                         rtsoff,
                         out uint maxIntrs,
                         out ulong runtimeAddress,
+                        out _,
+                        out _,
                         out string? ioError))
                 {
                     WriteLog($"IMOD.READBACK: unsafe or invalid xHCI MMIO layout {controller.DeviceId}: {ioError}");
@@ -974,7 +970,7 @@ public sealed partial class MainForm
                 for (uint i = 0; i < readCount; i++)
                 {
                     ulong interrupterAddress = runtimeAddress + 0x24 + (0x20 * i);
-                    if (!TryReadPhys32(imodDriver, interrupterAddress, out uint registerValue, out ioError))
+                    if (!DeviceTweakerImodRuntime.TryRead32(imodDriver.Registers, interrupterAddress, out uint registerValue, out ioError))
                     {
                         WriteLog($"IMOD.READBACK: read failed {controller.DeviceId} @ {ToHex(interrupterAddress)}: {ioError}");
                         continue;
@@ -1152,7 +1148,7 @@ public sealed partial class MainForm
         {
             uint target = fallback;
             if (rolesByInterrupter.TryGetValue((uint)i, out HashSet<string>? roles)
-                && TrySelectAdaptiveRoleInterval(roles, roleIntervals, out _, out uint roleValue))
+                && DeviceTweakerImodRuntime.TrySelectAdaptiveRoleInterval(roles, roleIntervals, out _, out uint roleValue))
             {
                 target = roleValue;
             }
@@ -1164,7 +1160,7 @@ public sealed partial class MainForm
         List<string> shared = [];
         foreach (KeyValuePair<uint, HashSet<string>> pair in rolesByInterrupter.OrderBy(kvp => kvp.Key))
         {
-            bool hasSelectedRole = TrySelectAdaptiveRoleInterval(pair.Value, roleIntervals, out string selectedRole, out uint selectedValue);
+            bool hasSelectedRole = DeviceTweakerImodRuntime.TrySelectAdaptiveRoleInterval(pair.Value, roleIntervals, out string selectedRole, out uint selectedValue);
             if (!hasSelectedRole)
             {
                 selectedRole = string.Join("+", pair.Value.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
@@ -1763,7 +1759,7 @@ public sealed partial class MainForm
         interruptersByRootPort = [];
         detail = "no exact USB role/interrupter map";
 
-        if (!TryReadXhciInterrupterTopology(controller, imodDriver, maxIntrs, out XhciInterrupterTopology topology, out string topologyDetail))
+        if (!TryReadXhciTopology(controller, imodDriver, out DeviceTweakerImodRuntime.XhciInterrupterTopology topology, out string topologyDetail))
         {
             detail = topologyDetail;
             return false;
@@ -1961,6 +1957,17 @@ public sealed partial class MainForm
         }
     }
 
+    private static bool TryReadXhciTopology(
+        ImodControllerInfo controller,
+        ImodDriverContext imodDriver,
+        out DeviceTweakerImodRuntime.XhciInterrupterTopology topology,
+        out string detail)
+    {
+        return DeviceTweakerImodRuntime.TryReadXhciInterrupterTopology(
+            imodDriver.Registers, controller.BaseAddress, controller.MemoryLength, ImodDefaultHcsparamsOffset,
+            out _, out topology, out detail);
+    }
+
     private static bool TryReadXhciRootPortInterrupters(
         ImodControllerInfo controller,
         ImodDriverContext imodDriver,
@@ -1969,7 +1976,7 @@ public sealed partial class MainForm
         out string detail)
     {
         interruptersByRootPort = [];
-        if (!TryReadXhciInterrupterTopology(controller, imodDriver, maxIntrs, out XhciInterrupterTopology topology, out detail))
+        if (!TryReadXhciTopology(controller, imodDriver, out DeviceTweakerImodRuntime.XhciInterrupterTopology topology, out detail))
         {
             return false;
         }
@@ -1985,291 +1992,7 @@ public sealed partial class MainForm
         return true;
     }
 
-    private static bool TryReadXhciInterrupterTopology(
-        ImodControllerInfo controller,
-        ImodDriverContext imodDriver,
-        uint maxIntrs,
-        out XhciInterrupterTopology topology,
-        out string detail)
-    {
-        topology = new XhciInterrupterTopology();
-        ulong capabilityAddress = controller.BaseAddress;
-
-        if (!TryReadPhys32(imodDriver, capabilityAddress, out uint capReg, out string? ioError))
-        {
-            detail = $"failed to read xHCI CAPLENGTH: {ioError}";
-            return false;
-        }
-
-        uint capLength = capReg & 0xFF;
-        if (capLength == 0)
-        {
-            detail = "xHCI CAPLENGTH is zero";
-            return false;
-        }
-
-        if (!TryReadPhys32(imodDriver, capabilityAddress + ImodDefaultHcsparamsOffset, out uint hcsparamsValue, out ioError))
-        {
-            detail = $"failed to read xHCI HCSPARAMS1: {ioError}";
-            return false;
-        }
-
-        uint maxSlots = hcsparamsValue & 0xFF;
-        if (maxSlots == 0)
-        {
-            detail = "xHCI MaxSlots is zero";
-            return false;
-        }
-
-        if (!TryReadPhys32(imodDriver, capabilityAddress + 0x10, out uint hccparamsValue, out ioError))
-        {
-            detail = $"failed to read xHCI HCCPARAMS1: {ioError}";
-            return false;
-        }
-
-        uint contextSize = ((hccparamsValue >> 2) & 0x1) != 0 ? 64u : 32u;
-        ulong operationalAddress = capabilityAddress + capLength;
-        if (!TryReadPhys64ForAdaptive(imodDriver, operationalAddress + 0x30, out ulong dcbaap, out ioError))
-        {
-            detail = $"failed to read xHCI DCBAAP: {ioError}";
-            return false;
-        }
-
-        dcbaap &= 0xFFFFFFFFFFFFFFC0UL;
-        if (dcbaap == 0)
-        {
-            detail = "xHCI DCBAAP is zero";
-            return false;
-        }
-
-        topology.MaxSlots = maxSlots;
-        topology.ContextSize = contextSize;
-
-        for (uint slot = 1; slot <= maxSlots; slot++)
-        {
-            if (!TryReadPhys64ForAdaptive(imodDriver, dcbaap + ((ulong)slot * 8), out ulong deviceContext, out _))
-            {
-                continue;
-            }
-
-            deviceContext &= 0xFFFFFFFFFFFFFFC0UL;
-            if (deviceContext == 0)
-            {
-                continue;
-            }
-
-            if (!TryReadPhys32(imodDriver, deviceContext, out uint slotDword0, out _)
-                || !TryReadPhys32(imodDriver, deviceContext + 0x04, out uint slotDword1, out _)
-                || !TryReadPhys32(imodDriver, deviceContext + 0x08, out uint slotDword2, out _)
-                || !TryReadPhys32(imodDriver, deviceContext + 0x0C, out uint slotDword3, out _))
-            {
-                continue;
-            }
-
-            bool isHub = ((slotDword0 >> 26) & 0x1) != 0;
-            uint contextEntries = (slotDword0 >> 27) & 0x1F;
-            uint slotState = (slotDword3 >> 27) & 0x1F;
-            uint rootPort = (slotDword1 >> 16) & 0xFF;
-            uint deviceAddress = slotDword3 & 0xFF;
-            uint interrupter = (slotDword2 >> 22) & 0x3FF;
-
-            if (slotState < 2 || isHub || rootPort == 0)
-            {
-                continue;
-            }
-
-            if (TryReadEndpointInterrupterTarget(
-                    imodDriver,
-                    deviceContext,
-                    contextSize,
-                    contextEntries,
-                    maxIntrs,
-                    out uint endpointInterrupter))
-            {
-                interrupter = endpointInterrupter;
-                topology.EndpointTargetCount++;
-            }
-            else
-            {
-                topology.SlotTargetCount++;
-            }
-
-            if (interrupter >= maxIntrs)
-            {
-                continue;
-            }
-
-            AddUniqueInterrupter(topology.ByRootPort, rootPort, interrupter);
-            if (deviceAddress > 0)
-            {
-                AddUniqueInterrupter(topology.ByDeviceAddress, deviceAddress, interrupter);
-            }
-        }
-
-        if (topology.ByRootPort.Count == 0 && topology.ByDeviceAddress.Count == 0)
-        {
-            detail = "no active xHCI device/interrupter topology was found";
-            return false;
-        }
-
-        detail =
-            $"slots={maxSlots}, ctx={contextSize}, byAddress={topology.ByDeviceAddress.Count}, byRootPort={topology.ByRootPort.Count}, endpointTargets={topology.EndpointTargetCount}, slotTargets={topology.SlotTargetCount}, "
-            + FormatXhciTopologyMap("addr", topology.ByDeviceAddress)
-            + ", "
-            + FormatXhciTopologyMap("rootPort", topology.ByRootPort);
-        return true;
-    }
-
-    private static string FormatXhciTopologyMap(string name, IReadOnlyDictionary<uint, List<uint>> map)
-    {
-        if (map.Count == 0)
-        {
-            return $"{name}Map=-";
-        }
-
-        const int maxShown = 16;
-        List<string> parts = [];
-        foreach (KeyValuePair<uint, List<uint>> pair in map.OrderBy(static kvp => kvp.Key))
-        {
-            string intrs = pair.Value.Count == 0
-                ? "-"
-                : string.Join("/", pair.Value.OrderBy(static intr => intr).Select(static intr => $"I{intr}"));
-            parts.Add($"{pair.Key}:{intrs}");
-            if (parts.Count >= maxShown)
-            {
-                break;
-            }
-        }
-
-        string suffix = map.Count > maxShown ? $", +{map.Count - maxShown} more" : string.Empty;
-        return $"{name}Map=[{string.Join(", ", parts)}{suffix}]";
-    }
-
-    private static bool TryReadEndpointInterrupterTarget(
-        ImodDriverContext imodDriver,
-        ulong deviceContext,
-        uint contextSize,
-        uint contextEntries,
-        uint maxIntrs,
-        out uint interrupter)
-    {
-        interrupter = 0;
-        if (contextSize == 0 || contextEntries < 2)
-        {
-            return false;
-        }
-
-        for (uint contextIndex = 2; contextIndex <= contextEntries; contextIndex++)
-        {
-            ulong endpointContext = deviceContext + ((ulong)contextIndex * contextSize);
-            if (!TryReadPhys32(imodDriver, endpointContext, out uint epDword0, out _)
-                || !TryReadPhys32(imodDriver, endpointContext + 0x04, out uint epDword1, out _))
-            {
-                continue;
-            }
-
-            uint endpointState = epDword0 & 0x7;
-            uint endpointType = (epDword1 >> 3) & 0x7;
-            if (endpointState == 0 || endpointType is not (3 or 5 or 7))
-            {
-                continue;
-            }
-
-            if (!TryReadPhys64ForAdaptive(imodDriver, endpointContext + 0x08, out ulong transferRing, out _))
-            {
-                continue;
-            }
-
-            transferRing &= 0xFFFFFFFFFFFFFFF0UL;
-            if (transferRing == 0)
-            {
-                continue;
-            }
-
-            if (!TryReadPhys32(imodDriver, transferRing + 0x08, out uint trbDword2, out _)
-                || !TryReadPhys32(imodDriver, transferRing + 0x0C, out uint trbDword3, out _))
-            {
-                continue;
-            }
-
-            uint trbType = (trbDword3 >> 10) & 0x3F;
-            if (trbType is not (1 or 3 or 5))
-            {
-                continue;
-            }
-
-            uint target = (trbDword2 >> 22) & 0x3FF;
-            if (target < maxIntrs)
-            {
-                interrupter = target;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static void AddUniqueInterrupter(Dictionary<uint, List<uint>> map, uint key, uint interrupter)
-    {
-        if (!map.TryGetValue(key, out List<uint>? intrs))
-        {
-            intrs = [];
-            map[key] = intrs;
-        }
-
-        if (!intrs.Contains(interrupter))
-        {
-            intrs.Add(interrupter);
-        }
-    }
-
-    private static bool TryReadPhys64ForAdaptive(ImodDriverContext imodDriver, ulong address, out ulong value, out string? error)
-    {
-        value = 0;
-        if (!TryReadPhys32(imodDriver, address, out uint low, out error))
-        {
-            return false;
-        }
-
-        if (!TryReadPhys32(imodDriver, address + 4, out uint high, out error))
-        {
-            return false;
-        }
-
-        value = low | ((ulong)high << 32);
-        return true;
-    }
-
-    private static bool TrySelectAdaptiveRoleInterval(
-        HashSet<string> roles,
-        IReadOnlyDictionary<string, uint> roleIntervals,
-        out string selectedRole,
-        out uint selectedValue)
-    {
-        selectedRole = string.Empty;
-        selectedValue = 0;
-        foreach (string role in AdaptiveRolePriority)
-        {
-            if (roles.Contains(role) && roleIntervals.TryGetValue(role, out selectedValue))
-            {
-                selectedRole = role;
-                return true;
-            }
-        }
-
-        foreach (string role in roles.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
-        {
-            if (roleIntervals.TryGetValue(role, out selectedValue))
-            {
-                selectedRole = role;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static readonly string[] AdaptiveRolePriority = ["Mouse", "Keyboard", "Audio", "Gamepad", "Webcam"];
+    private static readonly string[] AdaptiveRolePriority = DeviceTweakerImodRuntime.AdaptiveRolePriority;
 
     private static bool HostControllerPathMatchesDeviceId(string hostControllerPath, string controllerDeviceId)
     {
@@ -2791,147 +2514,10 @@ public sealed partial class MainForm
         return true;
     }
 
-    private static bool TryResolveXhciRuntimeLayout(
-        ImodControllerInfo controller,
-        ImodDriverContext driver,
-        uint hcsparamsOffset,
-        uint rtsoffOffset,
-        out uint maxInterrupters,
-        out ulong runtimeAddress,
-        out string? error)
-    {
-        maxInterrupters = 0;
-        runtimeAddress = 0;
-        error = null;
-
-        if (!controller.HasBase || controller.BaseAddress == 0 || controller.MemoryLength < 0x20)
-        {
-            error = $"missing or undersized PCI memory resource (length=0x{controller.MemoryLength:X})";
-            return false;
-        }
-
-        bool Contains(uint offset, ulong size)
-        {
-            ulong value = offset;
-            return value <= controller.MemoryLength && size <= controller.MemoryLength - value;
-        }
-
-        if (!Contains(0, sizeof(uint))
-            || !Contains(hcsparamsOffset, sizeof(uint))
-            || !Contains(rtsoffOffset, sizeof(uint)))
-        {
-            error = $"capability offsets exceed PCI memory resource (HCS=0x{hcsparamsOffset:X}, RTS=0x{rtsoffOffset:X}, length=0x{controller.MemoryLength:X})";
-            return false;
-        }
-
-        if (!TryReadPhys32(driver, controller.BaseAddress, out uint capabilityHeader, out error))
-        {
-            error = $"failed to read xHCI capability header: {error}";
-            return false;
-        }
-
-        uint capabilityLength = capabilityHeader & 0xFF;
-        uint hciVersion = capabilityHeader >> 16;
-        if (capabilityLength < 0x20 || capabilityLength > controller.MemoryLength)
-        {
-            error = $"invalid xHCI CAPLENGTH 0x{capabilityLength:X} for BAR length 0x{controller.MemoryLength:X}";
-            return false;
-        }
-
-        if (hciVersion < 0x0090 || hciVersion > 0x0120)
-        {
-            error = $"unexpected xHCI version 0x{hciVersion:X4}";
-            return false;
-        }
-
-        if (!TryReadPhys32(driver, controller.BaseAddress + hcsparamsOffset, out uint hcsparamsValue, out error))
-        {
-            error = $"failed to read HCSPARAMS: {error}";
-            return false;
-        }
-
-        maxInterrupters = (hcsparamsValue >> 8) & 0x7FF;
-        if (maxInterrupters == 0 || maxInterrupters > 2047)
-        {
-            error = $"invalid MaxIntrs value {maxInterrupters}";
-            return false;
-        }
-
-        if (!TryReadPhys32(driver, controller.BaseAddress + rtsoffOffset, out uint rtsoffValue, out error))
-        {
-            error = $"failed to read RTSOFF: {error}";
-            return false;
-        }
-
-        ulong runtimeOffset = rtsoffValue & 0xFFFFFFE0u;
-        ulong finalRegisterEnd;
-        try
-        {
-            finalRegisterEnd = checked(runtimeOffset + 0x24UL + (0x20UL * (maxInterrupters - 1UL)) + sizeof(uint));
-        }
-        catch (OverflowException)
-        {
-            error = "xHCI runtime register range overflowed";
-            return false;
-        }
-
-        if (runtimeOffset == 0 || finalRegisterEnd > controller.MemoryLength)
-        {
-            error = $"xHCI runtime registers exceed PCI memory resource (RTSOFF=0x{runtimeOffset:X}, end=0x{finalRegisterEnd:X}, length=0x{controller.MemoryLength:X})";
-            return false;
-        }
-
-        runtimeAddress = controller.BaseAddress + runtimeOffset;
-        return true;
-    }
-
-    private static bool TryReadPhys32(ImodDriverContext ctx, ulong address, out uint value, out string? error)
-    {
-        value = 0;
-
-        if (!TryReadPhysicalMemory(ctx, address, 4, out ulong raw, out error))
-        {
-            return false;
-        }
-
-        value = unchecked((uint)raw);
-        return true;
-    }
-
     private static bool TryWriteImodInterval(ImodDriverContext ctx, ulong address, uint interval, out string? error)
     {
         QaRun.DemandWrite("PUBLISHED PHYSICAL ACCESS");
         return DeviceTweakerImodRuntime.TryWriteImodInterval(ctx.Registers, address, interval, out error);
-    }
-
-    private static bool TryReadPhysicalMemory(
-        ImodDriverContext ctx,
-        ulong address,
-        uint size,
-        out ulong value,
-        out string? error)
-    {
-        QaRun.DemandWrite("PUBLISHED PHYSICAL ACCESS");
-        if (!ctx.Registers.TryRead(address, size, out value, out string runtimeError))
-        {
-            error = $"failed to read physical memory via driver: {runtimeError}";
-            return false;
-        }
-
-        error = null;
-        return true;
-    }
-
-    // DTIMOD writes only inside the memory ranges of the device set with TrySetWriteTarget.
-    private static bool TryWritePhysicalMemory(
-        ImodDriverContext ctx,
-        ulong address,
-        uint size,
-        ulong value,
-        out string? error)
-    {
-        QaRun.DemandWrite("PUBLISHED PHYSICAL ACCESS");
-        return ctx.Registers.TryWrite(address, size, value, out error);
     }
 
     private static bool TryLoadImodDriverWithKduFallback(string driverPath, Action<string>? log, out string? error)
@@ -3260,8 +2846,16 @@ public sealed partial class MainForm
         public string DriverPath { get; }
         // Device whose memory ranges DTIMOD accepts for writes.
         public DeviceTweakerImodRuntime.DeviceWriteTarget? WriteTarget { get; private set; }
-        // Without a target the shared runtime refuses writes; reads need none.
-        public IDeviceRegisters Registers => new DeviceTweakerImodRuntime.DtimodRegisters(DriverHandle, WriteTarget!);
+        // Every DTIMOD read and write goes through here, so a read-only QA process stops
+        // before the driver. Without a target the shared runtime refuses writes; reads need none.
+        public IDeviceRegisters Registers
+        {
+            get
+            {
+                QaRun.DemandWrite("PUBLISHED PHYSICAL ACCESS");
+                return new DeviceTweakerImodRuntime.DtimodRegisters(DriverHandle, WriteTarget!);
+            }
+        }
         private readonly Action<string>? _log;
 
         public bool TrySetWriteTarget(string instanceId, out string? error)

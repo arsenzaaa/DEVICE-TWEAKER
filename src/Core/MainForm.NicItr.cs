@@ -546,7 +546,7 @@ public sealed partial class MainForm
             for (int q = 0; q < profile.MaxQueues; q++)
             {
                 ulong address = baseAddress + profile.BaseOffset + (profile.Stride * (uint)q);
-                if (!TryReadNicRegister(ctx, address, profile.ReadWidth, out ulong raw, out error))
+                if (!ctx.Registers.TryRead(address, (uint)(profile.ReadWidth / 8), out ulong raw, out error))
                 {
                     return false;
                 }
@@ -627,42 +627,6 @@ public sealed partial class MainForm
         EnsureImodConfigLoaded();
         return _imodConfigCache is not null
             && (_imodConfigCache.HasScript || HasCustomImod(_imodConfigCache));
-    }
-
-    private static bool TryReadNicRegister(ImodDriverContext ctx, ulong address, int width, out ulong value, out string? error)
-    {
-        value = 0;
-        if (width == 16)
-        {
-            if (!TryReadPhys16(ctx, address, out ushort word, out error))
-            {
-                return false;
-            }
-
-            value = word;
-            return true;
-        }
-
-        if (!TryReadPhys32(ctx, address, out uint dword, out error))
-        {
-            return false;
-        }
-
-        value = dword;
-        return true;
-    }
-
-    private static bool TryReadPhys16(ImodDriverContext ctx, ulong address, out ushort value, out string? error)
-    {
-        value = 0;
-
-        if (!TryReadPhysicalMemory(ctx, address, 2, out ulong raw, out error))
-        {
-            return false;
-        }
-
-        value = unchecked((ushort)raw);
-        return true;
     }
 
     private static bool TryValidateNicItrMemoryRange(NicItrProfile profile, ulong memoryLength, out string? error)

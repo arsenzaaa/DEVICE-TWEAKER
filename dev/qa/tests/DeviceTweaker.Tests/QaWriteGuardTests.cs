@@ -118,8 +118,9 @@ public sealed class QaWriteGuardTests
         Assert.Equal(false, ctx.GetMethod("TryInitialize")!.Invoke(null, initializeArgs));
         Assert.Null(initializeArgs[2]);
         Assert.Contains("QA read-only", (string)initializeArgs[3]!);
-        AssertBlocked("TryReadPhysicalMemory", null, 0UL, 4U, null, null);
-        AssertBlocked("TryWritePhysicalMemory", null, 0UL, 4U, 0UL, null);
+        object context = RuntimeHelpers.GetUninitializedObject(ctx);
+        var registers = Assert.Throws<TargetInvocationException>(() => ctx.GetProperty("Registers")!.GetValue(context));
+        Assert.IsType<QaWriteBlockedException>(registers.InnerException);
         AssertBlocked("RunImodKduMap", "", "", null, null);
     }
 

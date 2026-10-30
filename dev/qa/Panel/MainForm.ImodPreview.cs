@@ -123,7 +123,7 @@ public sealed partial class MainForm
                     continue;
                 }
 
-                if (TrySelectAdaptiveRoleInterval(new HashSet<string>(StringComparer.OrdinalIgnoreCase) { role }, roleIntervals, out _, out uint selectedValue))
+                if (DeviceTweakerImodRuntime.TrySelectAdaptiveRoleInterval(new HashSet<string>(StringComparer.OrdinalIgnoreCase) { role }, roleIntervals, out _, out uint selectedValue))
                 {
                     if (currentIntr < previewInterrupters)
                     {

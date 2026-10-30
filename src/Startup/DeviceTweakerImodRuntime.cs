@@ -497,7 +497,7 @@ public static class DeviceTweakerImodRuntime
     }
 
     internal static bool TryResolveXhciRuntimeLayout(
-        IntPtr handle,
+        IDeviceRegisters registers,
         ulong capabilityAddress,
         ulong memoryLength,
         uint hcsparamsOffset,
@@ -516,26 +516,27 @@ public static class DeviceTweakerImodRuntime
 
         if (capabilityAddress == 0 || memoryLength < 0x20UL)
         {
-            error = "missing or undersized PCI memory resource";
+            error = "missing or undersized PCI memory resource (length=0x" + memoryLength.ToString("X") + ")";
             return false;
         }
         if (!RangeContains(memoryLength, 0, 4) || !RangeContains(memoryLength, hcsparamsOffset, 4) || !RangeContains(memoryLength, rtsoffOffset, 4))
         {
-            error = "capability offsets exceed PCI memory resource";
+            error = "capability offsets exceed PCI memory resource (HCS=0x" + hcsparamsOffset.ToString("X")
+                + ", RTS=0x" + rtsoffOffset.ToString("X") + ", length=0x" + memoryLength.ToString("X") + ")";
             return false;
         }
 
         uint capabilityHeader;
-        if (!TryReadPhys32(handle, capabilityAddress, out capabilityHeader, out error))
+        if (!TryRead32(registers, capabilityAddress, out capabilityHeader, out error))
         {
-            error = "failed to read capability header: " + error;
+            error = "failed to read xHCI capability header: " + error;
             return false;
         }
         uint capabilityLength = capabilityHeader & 0xFFU;
         uint hciVersion = capabilityHeader >> 16;
         if (capabilityLength < 0x20U || capabilityLength > memoryLength)
         {
-            error = "invalid xHCI CAPLENGTH 0x" + capabilityLength.ToString("X");
+            error = "invalid xHCI CAPLENGTH 0x" + capabilityLength.ToString("X") + " for BAR length 0x" + memoryLength.ToString("X");
             return false;
         }
         if (hciVersion < 0x0090U || hciVersion > 0x0120U)
@@ -544,28 +545,30 @@ public static class DeviceTweakerImodRuntime
             return false;
         }
 
-        if (!TryReadPhys32(handle, capabilityAddress + hcsparamsOffset, out hcsparamsValue, out error))
+        if (!TryRead32(registers, capabilityAddress + hcsparamsOffset, out hcsparamsValue, out error))
         {
             error = "failed to read HCSPARAMS: " + error;
             return false;
         }
         maxIntrs = (hcsparamsValue >> 8) & 0x7FFU;
-        if (maxIntrs == 0 || maxIntrs > 2047)
+        if (maxIntrs == 0)
         {
-            error = "invalid MaxIntrs value " + maxIntrs;
+            error = "invalid MaxIntrs value 0";
             return false;
         }
 
-        if (!TryReadPhys32(handle, capabilityAddress + rtsoffOffset, out rtsoffValue, out error))
+        if (!TryRead32(registers, capabilityAddress + rtsoffOffset, out rtsoffValue, out error))
         {
             error = "failed to read RTSOFF: " + error;
             return false;
         }
+        // RTSOFF is 32-bit and MaxIntrs at most 2047, so the end cannot overflow.
         ulong runtimeOffset = ((ulong)rtsoffValue) & 0xFFFFFFE0UL;
         ulong finalRegisterEnd = runtimeOffset + 0x24UL + (0x20UL * ((ulong)maxIntrs - 1UL)) + 4UL;
-        if (runtimeOffset == 0 || finalRegisterEnd < runtimeOffset || finalRegisterEnd > memoryLength)
+        if (runtimeOffset == 0 || finalRegisterEnd > memoryLength)
         {
-            error = "xHCI runtime registers exceed PCI memory resource";
+            error = "xHCI runtime registers exceed PCI memory resource (RTSOFF=0x" + runtimeOffset.ToString("X")
+                + ", end=0x" + finalRegisterEnd.ToString("X") + ", length=0x" + memoryLength.ToString("X") + ")";
             return false;
         }
 
@@ -591,12 +594,13 @@ public static class DeviceTweakerImodRuntime
 
         try
         {
+            DtimodRegisters registers = new DtimodRegisters(handle, writeTarget);
             string ioError;
             uint maxIntrs;
             ulong runtimeAddress;
             uint hcsparamsValue;
             uint rtsoffValue;
-            if (!TryResolveXhciRuntimeLayout(handle, capabilityAddress, memoryLength, hcsparamsOffset, rtsoff, out maxIntrs, out runtimeAddress, out hcsparamsValue, out rtsoffValue, out ioError))
+            if (!TryResolveXhciRuntimeLayout(registers, capabilityAddress, memoryLength, hcsparamsOffset, rtsoff, out maxIntrs, out runtimeAddress, out hcsparamsValue, out rtsoffValue, out ioError))
             {
                 return "error: unsafe or invalid xHCI MMIO layout: " + ioError;
             }
@@ -609,7 +613,7 @@ public static class DeviceTweakerImodRuntime
             {
                 ulong interrupterAddress = runtimeAddress + 0x24 + (0x20 * i);
                 uint target = intervals != null && intervals.Length > 0 ? intervals[(int)i] : interval;
-                if (!TryWriteImodInterval(new DtimodRegisters(handle, writeTarget), interrupterAddress, target, out ioError))
+                if (!TryWriteImodInterval(registers, interrupterAddress, target, out ioError))
                 {
                     failures++;
                 }
@@ -666,7 +670,7 @@ public static class DeviceTweakerImodRuntime
             uint maxIntrs;
             XhciInterrupterTopology topology;
             string topologyDetail;
-            if (!TryReadXhciInterrupterTopology(handle, capabilityAddress, memoryLength, hcsparamsOffset, out maxIntrs, out topology, out topologyDetail))
+            if (!TryReadXhciInterrupterTopology(new DtimodRegisters(handle, null), capabilityAddress, memoryLength, hcsparamsOffset, out maxIntrs, out topology, out topologyDetail))
             {
                 return "error: " + topologyDetail;
             }
@@ -832,15 +836,28 @@ public static class DeviceTweakerImodRuntime
         return false;
     }
 
-    internal static bool TryReadPhys32(IntPtr handle, ulong address, out uint value, out string error)
+    internal static bool TryRead32(IDeviceRegisters registers, ulong address, out uint value, out string error)
     {
         value = 0;
         ulong raw;
-        if (!TryReadPhysicalMemory(handle, address, 4, out raw, out error))
+        if (!registers.TryRead(address, 4, out raw, out error))
         {
             return false;
         }
         value = unchecked((uint)raw);
+        return true;
+    }
+
+    internal static bool TryRead64(IDeviceRegisters registers, ulong address, out ulong value, out string error)
+    {
+        value = 0;
+        uint low;
+        uint high;
+        if (!TryRead32(registers, address, out low, out error) || !TryRead32(registers, address + 4, out high, out error))
+        {
+            return false;
+        }
+        value = (ulong)low | ((ulong)high << 32);
         return true;
     }
 
@@ -1215,9 +1232,10 @@ public static class DeviceTweakerImodRuntime
         return uint.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
     }
 
-    private static bool TrySelectAdaptiveRoleInterval(
+    // Highest-priority role first (Mouse, Keyboard, ...), then any other role by name.
+    internal static bool TrySelectAdaptiveRoleInterval(
         HashSet<string> roles,
-        Dictionary<string, uint> roleIntervals,
+        IReadOnlyDictionary<string, uint> roleIntervals,
         out string selectedRole,
         out uint selectedValue)
     {
@@ -1233,7 +1251,9 @@ public static class DeviceTweakerImodRuntime
             }
         }
 
-        foreach (string role in roles)
+        List<string> others = new List<string>(roles);
+        others.Sort(StringComparer.OrdinalIgnoreCase);
+        foreach (string role in others)
         {
             if (roleIntervals.TryGetValue(role, out selectedValue))
             {
@@ -1245,8 +1265,11 @@ public static class DeviceTweakerImodRuntime
         return false;
     }
 
-    private static bool TryReadXhciInterrupterTopology(
-        IntPtr handle,
+    // Interrupter of every active non-hub device, keyed by root port and by device address.
+    // Transfer events go to the Interrupter Target of the endpoint's TRBs, so that one wins;
+    // the slot context target is used when no endpoint ring can be read.
+    internal static bool TryReadXhciInterrupterTopology(
+        IDeviceRegisters registers,
         ulong capabilityAddress,
         ulong memoryLength,
         uint hcsparamsOffset,
@@ -1268,7 +1291,7 @@ public static class DeviceTweakerImodRuntime
 
         uint capReg;
         string ioError;
-        if (!TryReadPhys32(handle, capabilityAddress, out capReg, out ioError))
+        if (!TryRead32(registers, capabilityAddress, out capReg, out ioError))
         {
             detail = "failed to read xHCI CAPLENGTH: " + ioError;
             return false;
@@ -1278,7 +1301,7 @@ public static class DeviceTweakerImodRuntime
         uint hciVersion = capReg >> 16;
         if (capLength < 0x20U || capLength > memoryLength)
         {
-            detail = "invalid xHCI CAPLENGTH";
+            detail = "invalid xHCI CAPLENGTH 0x" + capLength.ToString("X");
             return false;
         }
         if (hciVersion < 0x0090U || hciVersion > 0x0120U)
@@ -1288,7 +1311,7 @@ public static class DeviceTweakerImodRuntime
         }
 
         uint hcsparamsValue;
-        if (!TryReadPhys32(handle, capabilityAddress + hcsparamsOffset, out hcsparamsValue, out ioError))
+        if (!TryRead32(registers, capabilityAddress + hcsparamsOffset, out hcsparamsValue, out ioError))
         {
             detail = "failed to read xHCI HCSPARAMS1: " + ioError;
             return false;
@@ -1303,7 +1326,7 @@ public static class DeviceTweakerImodRuntime
         }
 
         uint hccparamsValue;
-        if (!TryReadPhys32(handle, capabilityAddress + 0x10, out hccparamsValue, out ioError))
+        if (!TryRead32(registers, capabilityAddress + 0x10, out hccparamsValue, out ioError))
         {
             detail = "failed to read xHCI HCCPARAMS1: " + ioError;
             return false;
@@ -1317,7 +1340,7 @@ public static class DeviceTweakerImodRuntime
         }
         ulong operationalAddress = capabilityAddress + capLength;
         ulong dcbaap;
-        if (!TryReadPhys64(handle, operationalAddress + 0x30, out dcbaap, out ioError))
+        if (!TryRead64(registers, operationalAddress + 0x30, out dcbaap, out ioError))
         {
             detail = "failed to read xHCI DCBAAP: " + ioError;
             return false;
@@ -1330,10 +1353,12 @@ public static class DeviceTweakerImodRuntime
             return false;
         }
 
+        topology.MaxSlots = maxSlots;
+        topology.ContextSize = contextSize;
         for (uint slot = 1; slot <= maxSlots; slot++)
         {
             ulong deviceContext;
-            if (!TryReadPhys64(handle, dcbaap + ((ulong)slot * 8UL), out deviceContext, out ioError))
+            if (!TryRead64(registers, dcbaap + ((ulong)slot * 8UL), out deviceContext, out ioError))
             {
                 continue;
             }
@@ -1348,10 +1373,10 @@ public static class DeviceTweakerImodRuntime
             uint slotDword1;
             uint slotDword2;
             uint slotDword3;
-            if (!TryReadPhys32(handle, deviceContext, out slotDword0, out ioError)
-                || !TryReadPhys32(handle, deviceContext + 0x04, out slotDword1, out ioError)
-                || !TryReadPhys32(handle, deviceContext + 0x08, out slotDword2, out ioError)
-                || !TryReadPhys32(handle, deviceContext + 0x0C, out slotDword3, out ioError))
+            if (!TryRead32(registers, deviceContext, out slotDword0, out ioError)
+                || !TryRead32(registers, deviceContext + 0x04, out slotDword1, out ioError)
+                || !TryRead32(registers, deviceContext + 0x08, out slotDword2, out ioError)
+                || !TryRead32(registers, deviceContext + 0x0C, out slotDword3, out ioError))
             {
                 continue;
             }
@@ -1368,7 +1393,16 @@ public static class DeviceTweakerImodRuntime
                 continue;
             }
 
-            topology.SlotTargetCount++;
+            uint endpointInterrupter;
+            if (TryReadEndpointInterrupterTarget(registers, deviceContext, contextSize, contextEntries, maxIntrs, out endpointInterrupter))
+            {
+                interrupter = endpointInterrupter;
+                topology.EndpointTargetCount++;
+            }
+            else
+            {
+                topology.SlotTargetCount++;
+            }
 
             if (interrupter >= maxIntrs)
             {
@@ -1389,16 +1423,19 @@ public static class DeviceTweakerImodRuntime
         }
 
         detail = "slots=" + maxSlots
-            + " intrs=" + maxIntrs
-            + " ctx=" + contextSize
-            + " endpointTargets=" + topology.EndpointTargetCount
-            + " slotTargets=" + topology.SlotTargetCount
-            + " rootPortMap=[" + FormatInterrupterMap(topology.ByRootPort) + "]";
+            + ", intrs=" + maxIntrs
+            + ", ctx=" + contextSize
+            + ", byAddress=" + topology.ByDeviceAddress.Count
+            + ", byRootPort=" + topology.ByRootPort.Count
+            + ", endpointTargets=" + topology.EndpointTargetCount
+            + ", slotTargets=" + topology.SlotTargetCount
+            + ", " + FormatInterrupterMap("addr", topology.ByDeviceAddress)
+            + ", " + FormatInterrupterMap("rootPort", topology.ByRootPort);
         return true;
     }
 
     private static bool TryReadEndpointInterrupterTarget(
-        IntPtr handle,
+        IDeviceRegisters registers,
         ulong deviceContext,
         uint contextSize,
         uint contextEntries,
@@ -1417,8 +1454,8 @@ public static class DeviceTweakerImodRuntime
             uint epDword0;
             uint epDword1;
             string ioError;
-            if (!TryReadPhys32(handle, endpointContext, out epDword0, out ioError)
-                || !TryReadPhys32(handle, endpointContext + 0x04, out epDword1, out ioError))
+            if (!TryRead32(registers, endpointContext, out epDword0, out ioError)
+                || !TryRead32(registers, endpointContext + 0x04, out epDword1, out ioError))
             {
                 continue;
             }
@@ -1431,7 +1468,7 @@ public static class DeviceTweakerImodRuntime
             }
 
             ulong transferRing;
-            if (!TryReadPhys64(handle, endpointContext + 0x08, out transferRing, out ioError))
+            if (!TryRead64(registers, endpointContext + 0x08, out transferRing, out ioError))
             {
                 continue;
             }
@@ -1444,8 +1481,8 @@ public static class DeviceTweakerImodRuntime
 
             uint trbDword2;
             uint trbDword3;
-            if (!TryReadPhys32(handle, transferRing + 0x08, out trbDword2, out ioError)
-                || !TryReadPhys32(handle, transferRing + 0x0C, out trbDword3, out ioError))
+            if (!TryRead32(registers, transferRing + 0x08, out trbDword2, out ioError)
+                || !TryRead32(registers, transferRing + 0x0C, out trbDword3, out ioError))
             {
                 continue;
             }
@@ -1467,25 +1504,6 @@ public static class DeviceTweakerImodRuntime
         return false;
     }
 
-    private static bool TryReadPhys64(IntPtr handle, ulong address, out ulong value, out string error)
-    {
-        value = 0;
-        uint low;
-        if (!TryReadPhys32(handle, address, out low, out error))
-        {
-            return false;
-        }
-
-        uint high;
-        if (!TryReadPhys32(handle, address + 4, out high, out error))
-        {
-            return false;
-        }
-
-        value = (ulong)low | ((ulong)high << 32);
-        return true;
-    }
-
     private static void AddUniqueInterrupter(Dictionary<uint, List<uint>> map, uint key, uint interrupter)
     {
         List<uint> interrupters;
@@ -1501,48 +1519,50 @@ public static class DeviceTweakerImodRuntime
         }
     }
 
-    private static string FormatInterrupterMap(Dictionary<uint, List<uint>> map)
+    internal static string FormatInterrupterMap(string name, Dictionary<uint, List<uint>> map)
     {
-        List<string> parts = new List<string>();
-        foreach (KeyValuePair<uint, List<uint>> pair in map)
+        if (map.Count == 0)
         {
-            if (parts.Count >= 16)
+            return name + "Map=-";
+        }
+
+        const int maxShown = 16;
+        List<uint> keys = new List<uint>(map.Keys);
+        keys.Sort();
+        List<string> parts = new List<string>();
+        foreach (uint key in keys)
+        {
+            if (parts.Count >= maxShown)
             {
                 break;
             }
 
-            List<string> intrs = new List<string>();
-            foreach (uint intr in pair.Value)
+            List<uint> interrupters = new List<uint>(map[key]);
+            interrupters.Sort();
+            List<string> shown = new List<string>();
+            foreach (uint interrupter in interrupters)
             {
-                intrs.Add("I" + intr);
+                shown.Add("I" + interrupter);
             }
 
-            parts.Add(pair.Key + ":" + string.Join("/", intrs.ToArray()));
+            parts.Add(key + ":" + (shown.Count == 0 ? "-" : string.Join("/", shown.ToArray())));
         }
 
-        if (map.Count > parts.Count)
-        {
-            parts.Add("+" + (map.Count - parts.Count) + " more");
-        }
-
-        return string.Join(", ", parts.ToArray());
+        string suffix = map.Count > maxShown ? ", +" + (map.Count - maxShown) + " more" : string.Empty;
+        return name + "Map=[" + string.Join(", ", parts.ToArray()) + suffix + "]";
     }
 
-    private sealed class XhciInterrupterTopology
+    internal sealed class XhciInterrupterTopology
     {
         public readonly Dictionary<uint, List<uint>> ByRootPort = new Dictionary<uint, List<uint>>();
         public readonly Dictionary<uint, List<uint>> ByDeviceAddress = new Dictionary<uint, List<uint>>();
-        public uint EndpointTargetCount;
-        public uint SlotTargetCount;
-
-        public XhciInterrupterTopology()
-        {
-            EndpointTargetCount = 0;
-            SlotTargetCount = 0;
-        }
+        public int EndpointTargetCount;
+        public int SlotTargetCount;
+        public uint MaxSlots;
+        public uint ContextSize;
     }
 
-    private static readonly string[] AdaptiveRolePriority = new[] { "Mouse", "Keyboard", "Audio", "Gamepad", "Webcam" };
+    internal static readonly string[] AdaptiveRolePriority = new[] { "Mouse", "Keyboard", "Audio", "Gamepad", "Webcam" };
 
     private static bool IsXhciDevice(IntPtr devInfoSet, ref SP_DEVINFO_DATA devInfo)
     {

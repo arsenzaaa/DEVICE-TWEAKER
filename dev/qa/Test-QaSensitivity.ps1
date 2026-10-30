@@ -70,7 +70,10 @@ $mutations = @(
         old = 'protocol != ProtocolVersion'; new = 'protocol == 0'; expected = 'MalformedOrIncompatibleReplyIsRejected(offset: 4' },
     @{ name = 'drop-nic-values-from-startup-profile'; file = 'Core\MainForm.Startup.cs'; filter = 'StartupScriptTests';
         old = 'Values = entry.Values.Select(StartupProfile.Hex).ToList(),'; new = 'Values = [],';
-        expected = 'ImportImodProfileGivesTheScriptTheSavedValues' }
+        expected = 'ImportImodProfileGivesTheScriptTheSavedValues' },
+    @{ name = 'route-by-slot-interrupter'; file = 'Startup\DeviceTweakerImodRuntime.cs'; filter = 'XhciTopologyTests';
+        old = 'interrupter = endpointInterrupter;'; new = 'endpointInterrupter = interrupter;';
+        expected = 'EndpointTargetWinsOverSlotTargetAndHubsAreSkipped' }
 )
 
 foreach ($mutation in $mutations) {
