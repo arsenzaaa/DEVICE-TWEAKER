@@ -50,7 +50,7 @@ Assembly assembly = Assembly.LoadFrom(Path.GetFullPath(args[1]));
 Type language = assembly.GetType("DeviceTweakerCS.UiLanguage", throwOnError: true)!;
 MethodInfo translate = language.GetMethod("Text", [typeof(string)])!;
 string Russian(string source) => (string)translate.Invoke(null, [source])!;
-string[] folders = ["Affinity", "Core", "Devices", "GUI", "Interop", "Localization", "Models", "Tweaks"];
+string[] folders = ["Affinity", "Core", "Devices", "GUI", "Interop", "Localization", "Models", "Startup", "Tweaks"];
 List<object> files = [], literals = [], candidates = [];
 string[] properties = ["Text", "PlaceholderText", "AccessibleName", "AccessibleDescription"];
 string[] calls = ["Text", "SetToolTip", "ShowThemedInfo", "ShowThemedError", "ShowThemedWarning", "ShowThemedConfirm", "ShowOperationResult", "SetProgress", "NewDialogButton", "NewTopButton", "AddError", "AddWarning", "AddSkipped", "AddSuccess", "SetDevicesBusyStage", "BeginDevicesBusy"];
@@ -63,7 +63,7 @@ string? ConstantString(ExpressionSyntax expression) => expression switch
     _ => null
 };
 foreach (string folder in folders)
-foreach (string path in Directory.GetFiles(Path.Combine(workspace, "DEVICE TWEAKER", folder), "*.cs"))
+foreach (string path in Directory.GetFiles(Path.Combine(workspace, "src", folder), "*.cs"))
 {
     string source = File.ReadAllText(path);
     var syntax = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
