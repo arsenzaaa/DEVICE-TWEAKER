@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Win32;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -109,7 +110,7 @@ public sealed partial class MainForm
 
     private static string FormatNdisRuntimeValue(int? value)
     {
-        return value.HasValue ? value.Value.ToString() : "-";
+        return value.HasValue ? value.Value.ToString(CultureInfo.InvariantCulture) : "-";
     }
 
     private static string FormatNdisRuntimeBool(bool? value)
@@ -151,7 +152,7 @@ public sealed partial class MainForm
     {
         NdisRssDiagnostics.Comparison result = NdisRssDiagnostics.Compare(state, registryBase, registryQueues, registryMaxProcessors, wifiPreserved);
         string eventName = result.Status == "different" ? "CONFLICT" : result.Status == "failed" ? "ERROR" : "CHECK";
-        WriteLog($"{prefix}.RSS.{eventName}: {instanceId} registryBase={(registryBase?.ToString() ?? "-")} registryQueues={(registryQueues?.ToString() ?? "-")} registryMaxProcessors={(registryMaxProcessors?.ToString() ?? "-")} activeStatus={result.Status} detail=\"{SanitizeLogValue(result.Detail)}\"");
+        WriteLog($"{prefix}.RSS.{eventName}: {instanceId} registryBase={(registryBase?.ToString(CultureInfo.InvariantCulture) ?? "-")} registryQueues={(registryQueues?.ToString(CultureInfo.InvariantCulture) ?? "-")} registryMaxProcessors={(registryMaxProcessors?.ToString(CultureInfo.InvariantCulture) ?? "-")} activeStatus={result.Status} detail=\"{SanitizeLogValue(result.Detail)}\"");
     }
 
     private NdisAffinityMode ChooseSmartNdisAffinityMode(DeviceBlock block, int plannedQueues, out string reason)
@@ -478,7 +479,7 @@ public sealed partial class MainForm
         }
 
         block.MsiCombo.SelectedItem = msiSupported == 1 ? "Enabled" : "Disabled";
-        block.LimitBox.Text = limitPresent && limit > 0 ? limit.ToString() : "Unlimited";
+        block.LimitBox.Text = limitPresent && limit > 0 ? limit.ToString(CultureInfo.InvariantCulture) : "Unlimited";
 
         if (block.PowerSavingCheck is not null)
         {
@@ -661,7 +662,7 @@ public sealed partial class MainForm
             string loadPrefix = isTestDevice ? "LOAD.TEST" : "LOAD";
             WriteLog($"{loadPrefix}.RSS.ACTIVE: {block.Device.InstanceId} {FormatNdisRssRuntimeState(block.NdisRssRuntime)}");
             LogNdisRssComparison(loadPrefix, block.Device.InstanceId, block.NdisRssRuntime, baseCore, registryQueues, null, block.Device.Wifi);
-            WriteLog($"{loadPrefix}: NET_NDIS {block.Device.InstanceId} MSI={(msiSupported == 1 ? "Enabled" : "Disabled")} Limit={(limitPresent ? limit.ToString() : "Unlimited")} PrioVal={prioValue} Mode={FormatNdisAffinityMode(ndisMode)} BaseCore={(baseCore ?? -1)} Queues={queues} IrqPolicy={irqPolicy} IrqMask=0x{irqMask:X} Mask=0x{block.AffinityMask:X}");
+            WriteLog($"{loadPrefix}: NET_NDIS {block.Device.InstanceId} MSI={(msiSupported == 1 ? "Enabled" : "Disabled")} Limit={(limitPresent ? limit.ToString(CultureInfo.InvariantCulture) : "Unlimited")} PrioVal={prioValue} Mode={FormatNdisAffinityMode(ndisMode)} BaseCore={(baseCore ?? -1)} Queues={queues} IrqPolicy={irqPolicy} IrqMask=0x{irqMask:X} Mask=0x{block.AffinityMask:X}");
         }
         else
         {
@@ -716,7 +717,7 @@ public sealed partial class MainForm
             }
 
             string loadPrefix = isTestDevice ? "LOAD.TEST" : "LOAD";
-            WriteLog($"{loadPrefix}: {block.Device.InstanceId} Kind={block.Kind} MSI={(msiSupported == 1 ? "Enabled" : "Disabled")} Limit={(limitPresent ? limit.ToString() : "Unlimited")} PrioVal={prioValue} PolicyVal={policyVal} Mask=0x{block.AffinityMask:X}");
+            WriteLog($"{loadPrefix}: {block.Device.InstanceId} Kind={block.Kind} MSI={(msiSupported == 1 ? "Enabled" : "Disabled")} Limit={(limitPresent ? limit.ToString(CultureInfo.InvariantCulture) : "Unlimited")} PrioVal={prioValue} PolicyVal={policyVal} Mask=0x{block.AffinityMask:X}");
         }
 
         RecalcAffinityMask(block);
@@ -801,12 +802,12 @@ public sealed partial class MainForm
         }
 
         info.AppendLine();
-        info.Append($"NIC ITR: {nicProfile.FamilyName}");
+        info.Append(CultureInfo.InvariantCulture, $"NIC ITR: {nicProfile.FamilyName}");
         if (!block.Device.IsTestDevice
             && NicDriverModeration.Describe(ReadNicDriverModeration(block.Device.InstanceId)) is string moderation)
         {
             info.AppendLine();
-            info.Append($"Interrupt Moderation: {moderation}");
+            info.Append(CultureInfo.InvariantCulture, $"Interrupt Moderation: {moderation}");
         }
     }
 
@@ -849,9 +850,9 @@ public sealed partial class MainForm
         {
             info.AppendLine("TEST DEVICE (no registry writes)");
         }
-        info.AppendLine($"PNP ID: {shortPnp}");
-        info.AppendLine($"Class: {block.Device.Class}");
-        info.Append($"Registry: {displayReg}");
+        info.AppendLine(CultureInfo.InvariantCulture, $"PNP ID: {shortPnp}");
+        info.AppendLine(CultureInfo.InvariantCulture, $"Class: {block.Device.Class}");
+        info.Append(CultureInfo.InvariantCulture, $"Registry: {displayReg}");
 
         if (block.Device.Wifi)
         {
@@ -862,16 +863,16 @@ public sealed partial class MainForm
         if (block.Device.Kind == DeviceKind.USB && !string.IsNullOrWhiteSpace(usbRoles))
         {
             info.AppendLine();
-            info.Append($"HID: {usbRoles}");
+            info.Append(CultureInfo.InvariantCulture, $"HID: {usbRoles}");
             if (!string.IsNullOrWhiteSpace(usbPolling))
             {
                 info.AppendLine();
-                info.Append($"Polling: {usbPolling}");
+                info.Append(CultureInfo.InvariantCulture, $"Polling: {usbPolling}");
             }
             if (!string.IsNullOrWhiteSpace(usbLivePolling))
             {
                 info.AppendLine();
-                info.Append($"Polling live: {usbLivePolling}");
+                info.Append(CultureInfo.InvariantCulture, $"Polling live: {usbLivePolling}");
             }
             if (Regex.IsMatch($"{usbRoles} {usbPolling} {usbLivePolling}", @"(?i)(?:[4-9](?:\.\d+)?\s*k(?:hz)?|(?:4000|8000)\s*hz)"))
             {
@@ -888,7 +889,7 @@ public sealed partial class MainForm
             if (!string.IsNullOrWhiteSpace(block.Device.UsbSelectiveSuspend))
             {
                 info.AppendLine();
-                info.Append($"Power Saving: {FormatPowerSavingDisplay(block.Device.UsbSelectiveSuspend)}");
+                info.Append(CultureInfo.InvariantCulture, $"Power Saving: {FormatPowerSavingDisplay(block.Device.UsbSelectiveSuspend)}");
             }
         }
         else if (block.Device.Kind == DeviceKind.USB)
@@ -902,25 +903,25 @@ public sealed partial class MainForm
             if (!string.IsNullOrWhiteSpace(block.Device.UsbSelectiveSuspend))
             {
                 info.AppendLine();
-                info.Append($"Power Saving: {FormatPowerSavingDisplay(block.Device.UsbSelectiveSuspend)}");
+                info.Append(CultureInfo.InvariantCulture, $"Power Saving: {FormatPowerSavingDisplay(block.Device.UsbSelectiveSuspend)}");
             }
         }
         else if (block.Device.Kind == DeviceKind.NET_NDIS)
         {
             info.AppendLine();
             string ndisMode = FormatNdisAffinityMode(GetSelectedNdisAffinityMode(block));
-            info.Append($"Net type: NDIS ({ndisMode})");
+            info.Append(CultureInfo.InvariantCulture, $"Net type: NDIS ({ndisMode})");
             if (block.NdisRssRuntime is NdisRssRuntimeState runtime && runtime.RssFound)
             {
                 info.AppendLine();
-                info.Append($"RSS: {FormatNdisRuntimeBool(runtime.Enabled)} base {FormatNdisRuntimeValue(runtime.BaseProcessorNumber)} queues {FormatNdisRuntimeValue(runtime.NumberOfReceiveQueues)}");
+                info.Append(CultureInfo.InvariantCulture, $"RSS: {FormatNdisRuntimeBool(runtime.Enabled)} base {FormatNdisRuntimeValue(runtime.BaseProcessorNumber)} queues {FormatNdisRuntimeValue(runtime.NumberOfReceiveQueues)}");
             }
             AppendNicItrInfo(info, block);
 
             if (!block.Device.Wifi && !string.IsNullOrWhiteSpace(block.Device.NicPowerSaving))
             {
                 info.AppendLine();
-                info.Append($"Power Saving: {FormatPowerSavingDisplay(block.Device.NicPowerSaving)}");
+                info.Append(CultureInfo.InvariantCulture, $"Power Saving: {FormatPowerSavingDisplay(block.Device.NicPowerSaving)}");
             }
         }
         else if (block.Device.Kind == DeviceKind.NET_CX)
@@ -932,7 +933,7 @@ public sealed partial class MainForm
             if (!block.Device.Wifi && !string.IsNullOrWhiteSpace(block.Device.NicPowerSaving))
             {
                 info.AppendLine();
-                info.Append($"Power Saving: {FormatPowerSavingDisplay(block.Device.NicPowerSaving)}");
+                info.Append(CultureInfo.InvariantCulture, $"Power Saving: {FormatPowerSavingDisplay(block.Device.NicPowerSaving)}");
             }
         }
         else if (block.Device.Kind == DeviceKind.STOR)
@@ -957,7 +958,7 @@ public sealed partial class MainForm
         else if (block.Device.Kind == DeviceKind.AUDIO && !string.IsNullOrWhiteSpace(block.Device.AudioEndpoints))
         {
             info.AppendLine();
-            info.Append($"Audio endpoints: {block.Device.AudioEndpoints}");
+            info.Append(CultureInfo.InvariantCulture, $"Audio endpoints: {block.Device.AudioEndpoints}");
         }
 
         string infoText = info.ToString();
@@ -1084,8 +1085,8 @@ public sealed partial class MainForm
                 else
                 {
                     DeviceSettingsWriter.SetMsiLimit(new WindowsRegistryValues(msiKey), limitValue);
-                    block.LimitBox.Text = limitValue.ToString();
-                    limitText = limitValue.ToString();
+                    block.LimitBox.Text = limitValue.ToString(CultureInfo.InvariantCulture);
+                    limitText = limitValue.ToString(CultureInfo.InvariantCulture);
                 }
             }
             catch (Exception ex)

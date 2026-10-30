@@ -690,15 +690,15 @@ public sealed partial class MainForm : Form
         {
             string s => s,
             string[] arr => string.Join(";", arr),
-            byte[] bytes => string.Join(" ", bytes.Select(b => b.ToString("X2"))),
-            int i => i.ToString(),
-            uint ui => ui.ToString(),
-            long l => l.ToString(),
-            ulong ul => ul.ToString(),
-            short s16 => s16.ToString(),
-            ushort u16 => u16.ToString(),
-            byte b => b.ToString(),
-            sbyte sb => sb.ToString(),
+            byte[] bytes => string.Join(" ", bytes.Select(b => b.ToString("X2", CultureInfo.InvariantCulture))),
+            int i => i.ToString(CultureInfo.InvariantCulture),
+            uint ui => ui.ToString(CultureInfo.InvariantCulture),
+            long l => l.ToString(CultureInfo.InvariantCulture),
+            ulong ul => ul.ToString(CultureInfo.InvariantCulture),
+            short s16 => s16.ToString(CultureInfo.InvariantCulture),
+            ushort u16 => u16.ToString(CultureInfo.InvariantCulture),
+            byte b => b.ToString(CultureInfo.InvariantCulture),
+            sbyte sb => sb.ToString(CultureInfo.InvariantCulture),
             _ => value.ToString() ?? string.Empty,
         };
     }
@@ -832,7 +832,7 @@ public sealed partial class MainForm : Form
     {
         if (value is byte[] bytes)
         {
-            string hex = string.Join(" ", bytes.Select(b => b.ToString("X2")));
+            string hex = string.Join(" ", bytes.Select(b => b.ToString("X2", CultureInfo.InvariantCulture)));
             if (bytes.Length >= 8)
             {
                 ulong mask = BitConverter.ToUInt64(bytes, 0);
@@ -908,7 +908,7 @@ public sealed partial class MainForm : Form
             text = text.Substring(@"\??\".Length);
         }
 
-        if (text.StartsWith(@"\\?\"))
+        if (text.StartsWith(@"\\?\", StringComparison.OrdinalIgnoreCase))
         {
             text = text.Substring(@"\\?\".Length);
         }
@@ -994,7 +994,7 @@ public sealed partial class MainForm : Form
         try
         {
             DateTime dt = ManagementDateTimeConverter.ToDateTime(value);
-            return dt.ToString("yyyy-MM-dd");
+            return dt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         }
         catch
         {
@@ -1270,7 +1270,7 @@ public sealed partial class MainForm : Form
                 .ToList();
             string valueText = GetSourceControlText(tag.ValueLabel);
             byte[] bytes = BuildReservedCpuSetBytes(reserved);
-            string bytesText = bytes.Length == 0 ? "none" : string.Join(" ", bytes.Select(b => b.ToString("X2")));
+            string bytesText = bytes.Length == 0 ? "none" : string.Join(" ", bytes.Select(b => b.ToString("X2", CultureInfo.InvariantCulture)));
             WriteLog($"GUI.RESERVED: count={tag.Meta.Count} set=[{FormatIndexList(reserved)}] bytes=[{bytesText}] value=\"{SanitizeLogValue(valueText)}\"");
         }
         else
@@ -1790,9 +1790,9 @@ public sealed partial class MainForm : Form
             if (block.Kind == DeviceKind.NET_NDIS)
             {
                 int? rssBase = GetNdisBaseCore(instanceId);
-                string rssText = rssBase.HasValue ? rssBase.Value.ToString() : string.Empty;
+                string rssText = rssBase.HasValue ? rssBase.Value.ToString(CultureInfo.InvariantCulture) : string.Empty;
                 int? rssQueues = GetNdisRssQueues(instanceId);
-                string rssQueueText = rssQueues.HasValue ? rssQueues.Value.ToString() : string.Empty;
+                string rssQueueText = rssQueues.HasValue ? rssQueues.Value.ToString(CultureInfo.InvariantCulture) : string.Empty;
                 string rssBaseGroupRaw = ReadRegNumeric(classKey, "*RssBaseProcGroup");
                 string rssMaxProcessorsRaw = ReadRegNumeric(classKey, "*MaxRssProcessors");
                 string rssMaxGroupRaw = ReadRegNumeric(classKey, "*RSSMaxProcGroup");

@@ -1,4 +1,5 @@
 
+using System.Globalization;
 using Microsoft.Win32;
 
 namespace DeviceTweakerCS;
@@ -23,7 +24,7 @@ public sealed partial class MainForm
             using RegistryKey? key = Registry.LocalMachine.OpenSubKey(keyPath);
             if (key?.GetValue(valueName) is byte[] bytes)
             {
-                rawHex = string.Join(" ", bytes.Select(b => b.ToString("X2")));
+                rawHex = string.Join(" ", bytes.Select(b => b.ToString("X2", CultureInfo.InvariantCulture)));
                 rawIds = DecodeReservedCpuSetsRawIds(bytes);
             }
         }
@@ -112,7 +113,7 @@ public sealed partial class MainForm
             else
             {
                 key.SetValue(valueName, bytes, RegistryValueKind.Binary);
-                string hexStr = string.Join(" ", bytes.Select(b => b.ToString("X2")));
+                string hexStr = string.Join(" ", bytes.Select(b => b.ToString("X2", CultureInfo.InvariantCulture)));
                 WriteLog($"RESERVED.WRITE: path=HKLM\\{keyPath}\\{valueName} set=[{string.Join(',', setBits)}] bytes=[{hexStr}]");
             }
 
@@ -348,7 +349,7 @@ public sealed partial class MainForm
         }
 
         byte[] bytes = BuildReservedCpuSetBytes(setBits);
-        string hex = bytes.Length == 0 ? "empty" : string.Join(" ", bytes.Select(b => b.ToString("X2")));
+        string hex = bytes.Length == 0 ? "empty" : string.Join(" ", bytes.Select(b => b.ToString("X2", CultureInfo.InvariantCulture)));
         tag.ValueLabel.Text = $"{prefix}ReservedCpuSets = [{hex}] | CPUs: {string.Join(", ", setBits)}";
         tag.ValueLabel.Tag = tag.ValueLabel.Text;
     }

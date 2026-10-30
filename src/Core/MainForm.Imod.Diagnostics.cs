@@ -33,8 +33,8 @@ public sealed partial class MainForm
         bool? hvciRunning = TryQueryImodCodeIntegrityOptions(out uint options)
             ? (options & ImodCiOptionHvciEnabled) != 0 : null;
         DriverEnvironmentSnapshot snapshot = DriverEnvironment.Capture(hvciRunning);
-        WriteLog($"DRIVER.PREFLIGHT: blocklist={snapshot.Blocklist.Value?.ToString() ?? snapshot.Blocklist.Evidence} "
-            + $"hvciRegistry={snapshot.HvciConfigured.Value?.ToString() ?? snapshot.HvciConfigured.Evidence} hvciRuntime={snapshot.HvciRunning} "
+        WriteLog($"DRIVER.PREFLIGHT: blocklist={snapshot.Blocklist.Value?.ToString(CultureInfo.InvariantCulture) ?? snapshot.Blocklist.Evidence} "
+            + $"hvciRegistry={snapshot.HvciConfigured.Value?.ToString(CultureInfo.InvariantCulture) ?? snapshot.HvciConfigured.Evidence} hvciRuntime={snapshot.HvciRunning} "
             + $"defender={snapshot.Defender} faceit={snapshot.Faceit} vgk={snapshot.VanguardDriver} vgc={snapshot.VanguardService} "
             + "driverLoad=not-tested compatibility=not-validated");
         details = snapshot;

@@ -85,11 +85,11 @@ namespace DeviceTweakerCS
                         {
                             if (key != null)
                             {
-                                string image = System.Environment.ExpandEnvironmentVariables(System.Convert.ToString(key.GetValue("ImagePath")) ?? "").Trim('"');
+                                string image = System.Environment.ExpandEnvironmentVariables(System.Convert.ToString(key.GetValue("ImagePath"), System.Globalization.CultureInfo.InvariantCulture) ?? "").Trim('"');
                                 if (image.StartsWith(@"\??\", System.StringComparison.Ordinal)) image = image.Substring(4);
                                 if (image.StartsWith(@"\SystemRoot\", System.StringComparison.OrdinalIgnoreCase))
                                     image = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Windows), image.Substring(12));
-                                owned = System.Convert.ToInt32(key.GetValue("Type", 0)) == 1
+                                owned = System.Convert.ToInt32(key.GetValue("Type", 0), System.Globalization.CultureInfo.InvariantCulture) == 1
                                     && System.String.Equals(System.IO.Path.GetFullPath(image), expectedPath, System.StringComparison.OrdinalIgnoreCase);
                             }
                         }

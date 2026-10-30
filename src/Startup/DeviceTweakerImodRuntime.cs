@@ -483,7 +483,7 @@ public static class DeviceTweakerImodRuntime
         int cr = CM_Locate_DevNodeW(out devInst, instanceId, 0);
         if (cr != CrSuccess)
         {
-            error = "PCI device not found: " + instanceId + " (CM 0x" + cr.ToString("X") + ")";
+            error = "PCI device not found: " + instanceId + " (CM 0x" + cr.ToString("X", CultureInfo.InvariantCulture) + ")";
             return false;
         }
 
@@ -516,13 +516,13 @@ public static class DeviceTweakerImodRuntime
 
         if (capabilityAddress == 0 || memoryLength < 0x20UL)
         {
-            error = "missing or undersized PCI memory resource (length=0x" + memoryLength.ToString("X") + ")";
+            error = "missing or undersized PCI memory resource (length=0x" + memoryLength.ToString("X", CultureInfo.InvariantCulture) + ")";
             return false;
         }
         if (!RangeContains(memoryLength, 0, 4) || !RangeContains(memoryLength, hcsparamsOffset, 4) || !RangeContains(memoryLength, rtsoffOffset, 4))
         {
-            error = "capability offsets exceed PCI memory resource (HCS=0x" + hcsparamsOffset.ToString("X")
-                + ", RTS=0x" + rtsoffOffset.ToString("X") + ", length=0x" + memoryLength.ToString("X") + ")";
+            error = "capability offsets exceed PCI memory resource (HCS=0x" + hcsparamsOffset.ToString("X", CultureInfo.InvariantCulture)
+                + ", RTS=0x" + rtsoffOffset.ToString("X", CultureInfo.InvariantCulture) + ", length=0x" + memoryLength.ToString("X", CultureInfo.InvariantCulture) + ")";
             return false;
         }
 
@@ -536,12 +536,12 @@ public static class DeviceTweakerImodRuntime
         uint hciVersion = capabilityHeader >> 16;
         if (capabilityLength < 0x20U || capabilityLength > memoryLength)
         {
-            error = "invalid xHCI CAPLENGTH 0x" + capabilityLength.ToString("X") + " for BAR length 0x" + memoryLength.ToString("X");
+            error = "invalid xHCI CAPLENGTH 0x" + capabilityLength.ToString("X", CultureInfo.InvariantCulture) + " for BAR length 0x" + memoryLength.ToString("X", CultureInfo.InvariantCulture);
             return false;
         }
         if (hciVersion < 0x0090U || hciVersion > 0x0120U)
         {
-            error = "unexpected xHCI version 0x" + hciVersion.ToString("X4");
+            error = "unexpected xHCI version 0x" + hciVersion.ToString("X4", CultureInfo.InvariantCulture);
             return false;
         }
 
@@ -567,8 +567,8 @@ public static class DeviceTweakerImodRuntime
         ulong finalRegisterEnd = runtimeOffset + 0x24UL + (0x20UL * ((ulong)maxIntrs - 1UL)) + 4UL;
         if (runtimeOffset == 0 || finalRegisterEnd > memoryLength)
         {
-            error = "xHCI runtime registers exceed PCI memory resource (RTSOFF=0x" + runtimeOffset.ToString("X")
-                + ", end=0x" + finalRegisterEnd.ToString("X") + ", length=0x" + memoryLength.ToString("X") + ")";
+            error = "xHCI runtime registers exceed PCI memory resource (RTSOFF=0x" + runtimeOffset.ToString("X", CultureInfo.InvariantCulture)
+                + ", end=0x" + finalRegisterEnd.ToString("X", CultureInfo.InvariantCulture) + ", length=0x" + memoryLength.ToString("X", CultureInfo.InvariantCulture) + ")";
             return false;
         }
 
@@ -619,11 +619,11 @@ public static class DeviceTweakerImodRuntime
                 }
             }
 
-            string mode = intervals != null && intervals.Length > 0 ? "vector=" + intervals.Length : "interval=0x" + interval.ToString("X");
+            string mode = intervals != null && intervals.Length > 0 ? "vector=" + intervals.Length : "interval=0x" + interval.ToString("X", CultureInfo.InvariantCulture);
             return "writes=" + writeCount + "/" + maxIntrs
-                + " hcsparams=0x" + hcsparamsValue.ToString("X")
-                + " rtsoff=0x" + rtsoffValue.ToString("X")
-                + " runtime=0x" + runtimeAddress.ToString("X")
+                + " hcsparams=0x" + hcsparamsValue.ToString("X", CultureInfo.InvariantCulture)
+                + " rtsoff=0x" + rtsoffValue.ToString("X", CultureInfo.InvariantCulture)
+                + " runtime=0x" + runtimeAddress.ToString("X", CultureInfo.InvariantCulture)
                 + " " + mode
                 + " failures=" + failures;
         }
@@ -720,7 +720,7 @@ public static class DeviceTweakerImodRuntime
                     assignedIntrs++;
                     if (shown.Count < 8)
                     {
-                        shown.Add("port" + pair.Key + "->I" + intr + "=" + selectedRole + ":0x" + selectedValue.ToString("X"));
+                        shown.Add("port" + pair.Key + "->I" + intr + "=" + selectedRole + ":0x" + selectedValue.ToString("X", CultureInfo.InvariantCulture));
                     }
                 }
             }
@@ -791,7 +791,7 @@ public static class DeviceTweakerImodRuntime
                 {
                     applied.Append(", ");
                 }
-                applied.Append("Q").Append(q).Append("@0x").Append(address.ToString("X")).Append("=0x").Append(((selected & mask) | orBits).ToString("X"));
+                applied.Append("Q").Append(q).Append("@0x").Append(address.ToString("X", CultureInfo.InvariantCulture)).Append("=0x").Append(((selected & mask) | orBits).ToString("X", CultureInfo.InvariantCulture));
             }
 
             string ioError;
@@ -886,7 +886,7 @@ public static class DeviceTweakerImodRuntime
         uint actualInterval = (uint)readBack & 0xFFFFU;
         if (actualInterval != expectedInterval)
         {
-            error = string.Format("IMOD readback mismatch at 0x{0:X}: expected interval 0x{1:X}, read 0x{2:X}", address, expectedInterval, actualInterval);
+            error = string.Format(CultureInfo.InvariantCulture, "IMOD readback mismatch at 0x{0:X}: expected interval 0x{1:X}, read 0x{2:X}", address, expectedInterval, actualInterval);
             return false;
         }
         error = null;
@@ -924,7 +924,7 @@ public static class DeviceTweakerImodRuntime
             ulong actual = readback & mask;
             if (actual != expected)
             {
-                error = string.Format("write verification failed at {0}: expected 0x{1:X}, read 0x{2:X}", label, expected, actual);
+                error = string.Format(CultureInfo.InvariantCulture, "write verification failed at {0}: expected 0x{1:X}, read 0x{2:X}", label, expected, actual);
                 return false;
             }
         }
@@ -973,7 +973,7 @@ public static class DeviceTweakerImodRuntime
             int cr = CM_Locate_DevNodeW(out devInst, instanceId, 0);
             if (cr != CrSuccess)
             {
-                error = "device not found: " + instanceId + " (CM 0x" + cr.ToString("X") + ")";
+                error = "device not found: " + instanceId + " (CM 0x" + cr.ToString("X", CultureInfo.InvariantCulture) + ")";
                 return false;
             }
 
@@ -987,7 +987,7 @@ public static class DeviceTweakerImodRuntime
             cr = CM_Get_DevNode_PropertyW(devInst, ref key, out type, buffer, ref size, 0);
             if (cr != CrSuccess || size < 4)
             {
-                error = "PDO name not available for " + instanceId + " (CM 0x" + cr.ToString("X") + ")";
+                error = "PDO name not available for " + instanceId + " (CM 0x" + cr.ToString("X", CultureInfo.InvariantCulture) + ")";
                 return false;
             }
 
@@ -1051,7 +1051,7 @@ public static class DeviceTweakerImodRuntime
     {
         if (win32Error == 5)
         {
-            return "DTIMOD refused the write: 0x" + address.ToString("X") + " is outside the memory of " + instanceId;
+            return "DTIMOD refused the write: 0x" + address.ToString("X", CultureInfo.InvariantCulture) + " is outside the memory of " + instanceId;
         }
         if (win32Error == 1)
         {
@@ -1301,12 +1301,12 @@ public static class DeviceTweakerImodRuntime
         uint hciVersion = capReg >> 16;
         if (capLength < 0x20U || capLength > memoryLength)
         {
-            detail = "invalid xHCI CAPLENGTH 0x" + capLength.ToString("X");
+            detail = "invalid xHCI CAPLENGTH 0x" + capLength.ToString("X", CultureInfo.InvariantCulture);
             return false;
         }
         if (hciVersion < 0x0090U || hciVersion > 0x0120U)
         {
-            detail = "unexpected xHCI version 0x" + hciVersion.ToString("X4");
+            detail = "unexpected xHCI version 0x" + hciVersion.ToString("X4", CultureInfo.InvariantCulture);
             return false;
         }
 

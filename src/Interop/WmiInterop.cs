@@ -179,7 +179,7 @@ internal static class WmiInterop
 
         try
         {
-            return Convert.ToUInt16(value);
+            return Convert.ToUInt16(value, CultureInfo.InvariantCulture);
         }
         catch
         {

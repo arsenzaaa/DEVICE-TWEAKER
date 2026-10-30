@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
@@ -267,8 +268,8 @@ internal static class UsbTopologyInterop
             byte[] deviceDescriptor = new byte[18];
             Buffer.BlockCopy(connection, 4, deviceDescriptor, 0, deviceDescriptor.Length);
 
-            string vendorId = ToUInt16(deviceDescriptor, 8).ToString("X4");
-            string productId = ToUInt16(deviceDescriptor, 10).ToString("X4");
+            string vendorId = ToUInt16(deviceDescriptor, 8).ToString("X4", CultureInfo.InvariantCulture);
+            string productId = ToUInt16(deviceDescriptor, 10).ToString("X4", CultureInfo.InvariantCulture);
             int configurationCount = deviceDescriptor[17];
 
             if (configurationCount > 0)
@@ -357,9 +358,9 @@ internal static class UsbTopologyInterop
             {
                 interfaceNumber = config[offset + 2];
                 alternateSetting = config[offset + 3];
-                interfaceClass = "0x" + config[offset + 5].ToString("X2");
-                interfaceSubClass = "0x" + config[offset + 6].ToString("X2");
-                interfaceProtocol = "0x" + config[offset + 7].ToString("X2");
+                interfaceClass = "0x" + config[offset + 5].ToString("X2", CultureInfo.InvariantCulture);
+                interfaceSubClass = "0x" + config[offset + 6].ToString("X2", CultureInfo.InvariantCulture);
+                interfaceProtocol = "0x" + config[offset + 7].ToString("X2", CultureInfo.InvariantCulture);
             }
             else if (descriptorType == UsbEndpointDescriptorType && length >= 7)
             {

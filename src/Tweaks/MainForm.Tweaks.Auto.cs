@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace DeviceTweakerCS;
@@ -200,7 +201,7 @@ public sealed partial class MainForm
                     return $"{lp}:R{rating}/#{rank}";
                 }
 
-                return lp.ToString();
+                return lp.ToString(CultureInfo.InvariantCulture);
             }));
     }
 
@@ -550,7 +551,7 @@ public sealed partial class MainForm
             if (block.Kind == DeviceKind.NET_NDIS)
             {
                 string mode = FormatAutoResultPicker(block.NdisModeCombo);
-                string queues = block.RssQueueBox?.Value.ToString() ?? "n/a";
+                string queues = block.RssQueueBox?.Value.ToString(CultureInfo.InvariantCulture) ?? "n/a";
                 extra = $" ndisMode=\"{SanitizeLogValue(mode)}\" rssQueues={queues}";
             }
             else if (block.Kind == DeviceKind.USB && IsUsbImodTarget(block.Device))

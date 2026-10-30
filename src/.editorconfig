@@ -1,0 +1,6 @@
+# Formatting and comparisons must not depend on the Windows locale: log lines,
+# registry values and hex registers read the same on every system.
+[*.cs]
+dotnet_diagnostic.CA1304.severity = warning
+dotnet_diagnostic.CA1305.severity = warning
+dotnet_diagnostic.CA1310.severity = warning

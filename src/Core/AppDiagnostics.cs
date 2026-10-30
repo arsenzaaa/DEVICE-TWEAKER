@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -61,7 +62,7 @@ internal static partial class AppDiagnostics
                 {
                     Directory.CreateDirectory(LogDirectory);
                     PruneLogsUnsafe();
-                    string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+                    string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture);
                     string candidate = Path.Combine(LogDirectory, $"DeviceTweaker_{stamp}.log");
 
                     FileStream stream = new(
@@ -213,19 +214,19 @@ internal static partial class AppDiagnostics
             {
                 Directory.CreateDirectory(LogDirectory);
                 PruneCrashReportsUnsafe();
-                string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+                string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture);
                 string crashPath = Path.Combine(LogDirectory, $"crash_{stamp}_PID{Environment.ProcessId}.txt");
                 string latestPath = Path.Combine(LogDirectory, "last-crash.txt");
 
                 StringBuilder report = new();
                 report.AppendLine(DateTime.Now.ToString("O"));
-                report.AppendLine($"source={source}");
-                report.AppendLine($"version={GetAppVersion()}");
-                report.AppendLine($"pid={Environment.ProcessId}");
-                report.AppendLine($"processArchitecture={RuntimeInformation.ProcessArchitecture}");
-                report.AppendLine($"osArchitecture={RuntimeInformation.OSArchitecture}");
-                report.AppendLine($"dotnet={Environment.Version}");
-                report.AppendLine($"sessionLog={_sessionLogPath ?? "unavailable"}");
+                report.AppendLine(CultureInfo.InvariantCulture, $"source={source}");
+                report.AppendLine(CultureInfo.InvariantCulture, $"version={GetAppVersion()}");
+                report.AppendLine(CultureInfo.InvariantCulture, $"pid={Environment.ProcessId}");
+                report.AppendLine(CultureInfo.InvariantCulture, $"processArchitecture={RuntimeInformation.ProcessArchitecture}");
+                report.AppendLine(CultureInfo.InvariantCulture, $"osArchitecture={RuntimeInformation.OSArchitecture}");
+                report.AppendLine(CultureInfo.InvariantCulture, $"dotnet={Environment.Version}");
+                report.AppendLine(CultureInfo.InvariantCulture, $"sessionLog={_sessionLogPath ?? "unavailable"}");
                 report.AppendLine();
                 report.AppendLine(ex.ToString());
 

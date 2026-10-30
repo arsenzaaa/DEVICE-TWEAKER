@@ -203,7 +203,7 @@ public sealed partial class MainForm
                     _pendingRawMouseThrottleEnabled,
                     _pendingRawMouseThrottleEnabled,
                     _pendingRawMouseThrottleDuration,
-                    _pendingRawMouseThrottleEnabled ? _pendingRawMouseThrottleDuration.ToString() : "pending off")
+                    _pendingRawMouseThrottleEnabled ? _pendingRawMouseThrottleDuration.ToString(CultureInfo.InvariantCulture) : "pending off")
                 : ReadRawMouseThrottleState();
             selected = GetRawMouseThrottlePreset(
                 state.IsValid ? state.Duration : DefaultRawMouseThrottleDuration);

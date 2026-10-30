@@ -1,3 +1,4 @@
+using System.Globalization;
 
 namespace DeviceTweakerCS;
 
@@ -1064,7 +1065,7 @@ public sealed partial class MainForm
 
                 // Column 1: Date & Time
                 DateTime stamp = info.CreatedAt ?? info.LastWriteUtc.ToLocalTime();
-                string dateStr = stamp.ToString("yyyy-MM-dd  HH:mm:ss");
+                string dateStr = stamp.ToString("yyyy-MM-dd  HH:mm:ss", CultureInfo.InvariantCulture);
                 Color dateColor = selected ? Color.FromArgb(248, 250, 255) : Color.FromArgb(175, 182, 196);
                 TextRenderer.DrawText(e.Graphics, dateStr, _dialogFont, new Point(x, textY), dateColor, TextFormatFlags.NoPadding);
                 x += UiScale(205);
