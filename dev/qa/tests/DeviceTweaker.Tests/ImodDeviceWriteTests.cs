@@ -50,7 +50,7 @@ public sealed class ImodDeviceWriteTests
     [Fact]
     public void DriverRefusalsAreExplained()
     {
-        Assert.Contains("outside the device", ImodDeviceWrite.DescribeFailure(5, "other"));
+        Assert.Contains(@"0xF7000024 is outside the memory of PCI\X", ImodDeviceWrite.DescribeFailure(5, "other", 0xF7000024, @"PCI\X"));
         Assert.Equal(DriverRuntime.RestartMessage, ImodDeviceWrite.DescribeFailure(1, "other"));
         Assert.Equal("other", ImodDeviceWrite.DescribeFailure(87, "other"));
     }

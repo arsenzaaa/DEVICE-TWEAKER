@@ -42,9 +42,9 @@ internal static class ImodDeviceWrite
         return true;
     }
 
-    internal static string DescribeFailure(int win32Error, string fallback) => win32Error switch
+    internal static string DescribeFailure(int win32Error, string fallback, ulong address = 0, string? instanceId = null) => win32Error switch
     {
-        ErrorAccessDenied => "DTIMOD refused the write: the address is outside the device's memory",
+        ErrorAccessDenied => $"DTIMOD refused the write: 0x{address:X} is outside the memory of {instanceId ?? "the device"}",
         ErrorInvalidFunction => DriverRuntime.RestartMessage,
         _ => fallback,
     };

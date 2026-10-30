@@ -929,7 +929,7 @@ public static class DeviceTweakerImodRuntime
         {
             int code = Marshal.GetLastWin32Error();
             error = code == 5
-                ? "DTIMOD refused the write: the address is outside the device's memory"
+                ? "DTIMOD refused the write: 0x" + address.ToString("X") + " is outside the memory of " + target.InstanceId
                 : code == 1
                     ? "DTIMOD in memory is older than this profile; restart Windows"
                     : GetWin32ErrorMessage(code);

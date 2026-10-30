@@ -3628,7 +3628,7 @@ public sealed partial class MainForm
                 IntPtr.Zero))
         {
             int code = Marshal.GetLastWin32Error();
-            error = ImodDeviceWrite.DescribeFailure(code, $"failed to write physical memory via driver: {GetWin32ErrorMessage(code)}");
+            error = ImodDeviceWrite.DescribeFailure(code, $"failed to write physical memory via driver: {GetWin32ErrorMessage(code)}", address, instanceId);
             return false;
         }
 
