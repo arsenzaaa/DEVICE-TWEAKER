@@ -322,7 +322,9 @@ public sealed partial class MainForm
 
     private void UpdateRssQueueOptions(DeviceBlock block)
     {
-        if (block.Kind != DeviceKind.NET_NDIS)
+        // Wi-Fi is never written, so its card shows the stored queue count as is
+        // instead of snapping it to a value APPLY would use.
+        if (block.Kind != DeviceKind.NET_NDIS || block.Device.Wifi)
         {
             return;
         }
