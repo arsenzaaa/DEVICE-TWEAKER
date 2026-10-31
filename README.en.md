@@ -77,7 +77,7 @@
   <tr>
     <td width="50%" valign="top">
       <h3>Rollback</h3>
-      A verified backup before every write; restore the original state or any backup, or reset to Windows defaults.
+      A verified backup before settings are applied; restore the original state or any backup, or reset to Windows defaults.
     </td>
     <td width="50%" valign="top">
       <h3>Transparency</h3>

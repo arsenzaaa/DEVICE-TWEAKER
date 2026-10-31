@@ -47,7 +47,7 @@ TEXT = {
         "steps": [
             ("Скан", ["Устройства, роли USB,", "топология CPU"]),
             ("План", ["Ядра под GPU, ввод,", "сеть и аудио"]),
-            ("Бекап", ["Снимок реестра", "до любой записи"]),
+            ("Бекап", ["Снимок реестра", "перед применением"]),
             ("Запись", ["MSI, affinity, IMOD,", "NIC ITR, RSS"]),
             ("Проверка", ["Повторное чтение", "каждого значения"]),
             ("Автозапуск", ["Вход, выход из сна,", "подключение USB"]),
@@ -60,7 +60,7 @@ TEXT = {
         "steps": [
             ("Scan", ["Devices, USB roles,", "CPU topology"]),
             ("Plan", ["Cores for GPU, input,", "network and audio"]),
-            ("Backup", ["Registry snapshot", "before any write"]),
+            ("Backup", ["Registry snapshot", "before applying"]),
             ("Write", ["MSI, affinity, IMOD,", "NIC ITR, RSS"]),
             ("Verify", ["Every value is", "read back"]),
             ("Startup", ["Sign-in, resume,", "USB attach"]),

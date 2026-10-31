@@ -7,6 +7,21 @@
 [Download 0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4). Changes since 0.0.3.
 
 <table width="100%">
+<tr><th align="left" width="860"><strong>Highlights</strong></th></tr>
+<tr><td width="860">
+
+<ul>
+<li>IMOD / NIC&nbsp;ITR startup via Task Scheduler: applied at sign-in, after resume from sleep and when USB devices are attached. The open script works without the EXE.</li>
+<li>DTIMOD.sys writes only to memory Windows allocated to the selected device.</li>
+<li>RSS is spread across physical cores; NIC&nbsp;ITR turns off the driver's own moderation.</li>
+<li>The program and the startup script share one register-write path and one interrupter map.</li>
+<li>New IRQ&nbsp;Mode, the READ IRQ MODE button, and a verified backup before settings are applied.</li>
+</ul>
+
+</td></tr>
+</table>
+
+<table width="100%">
 <tr><th align="left" width="860"><strong>Interrupt modes</strong></th></tr>
 <tr><td width="860">
 
