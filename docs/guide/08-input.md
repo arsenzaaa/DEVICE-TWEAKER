@@ -1,14 +1,12 @@
-<!-- tag: I/O | summary: Путь ввода мыши, клавиатуры и контроллера в Windows 10 и 11, ограничение фоновых окон и RawMouseThrottleDuration, Raw Input Buffer и выделенный поток ввода, что на самом деле измеряет замер Polling Rate. -->
-
 # Ввод: Polling Rate, Raw Input и Mouse Throttle
 
 ## Путь ввода
 
 ```text
-Мышь, Windows 10        WDF01000 ISR -> DPC -> CSRSS (Win32k Raw Input Thread)    -> поток игры
-Мышь, Windows 11        WDF01000 ISR -> DPC -> DWM KERNEL SENSOR THREAD           -> поток игры
-Клавиатура, 10 / 11     WDF01000 ISR -> DPC -> CSRSS (winsrvext.dll)              -> поток игры
-Контроллер, Windows 11  WDF01000 ISR -> DPC -> DWM MASTER INPUT THREAD            -> поток игры
+Мышь, Windows 10        WDF01000 ISR → DPC → CSRSS (Win32k Raw Input Thread)    → поток игры
+Мышь, Windows 11        WDF01000 ISR → DPC → DWM KERNEL SENSOR THREAD           → поток игры
+Клавиатура, 10 / 11     WDF01000 ISR → DPC → CSRSS (winsrvext.dll)              → поток игры
+Контроллер, Windows 11  WDF01000 ISR → DPC → DWM MASTER INPUT THREAD            → поток игры
 ```
 
 У Windows 11 нет преимущества перед Windows 10: в CSRSS за мышь и клавиатуру и так отвечают разные потоки. Иногда ввод мыши проходит через два потока DWM, ввод контроллера может идти через поток DWM `WINDOWS.GAMING.INPUT` или сразу из DPC в игру.
@@ -43,7 +41,7 @@ HKCU\Control Panel\Mouse
   RawMouseThrottleDuration   REG_DWORD   интервал в мс, частота = 1000 / значение
 ```
 
-`20` -> 50 Гц, минимальная частота; `8` -> 125 Гц, значение по умолчанию. Остальные параметры (`RawMouseThrottleEnabled`, `Leeway`, `Forced`) практического применения не имеют. Настройка не меняет polling rate мыши и не касается активного окна.
+`20` → 50 Гц, минимальная частота; `8` → 125 Гц, значение по умолчанию. Остальные параметры (`RawMouseThrottleEnabled`, `Leeway`, `Forced`) практического применения не имеют. Настройка не меняет polling rate мыши и не касается активного окна.
 
 Контроллер этим ограничением не охвачен: его данные не проходят через KERNEL SENSOR THREAD и приходят на полной частоте в DWM MASTER INPUT THREAD, `WINDOWS.GAMING.INPUT` и службу GameInputSvc. Чем больше фоновых потоков их получают, тем дольше DPC и главный поток ввода.
 
@@ -61,3 +59,7 @@ DEVICE TWEAKER показывает Polling Rate мыши и клавиату�
 - Для каждого USB-контроллера показаны найденные на нём устройства ввода и их частота.
 
 **Вывод:** фоновый ввод — на минимум, высокий опрос — только если игра умеет RIB или DIT, потоки ввода DWM / CSRSS — на ядра без драйверов.
+
+---
+
+[← Глава 07](./07-cpu-topology.md) · [Оглавление](./README.md) · [Глава 09 →](./09-power.md)

@@ -1,5 +1,3 @@
-<!-- tag: PWR | summary: USB selective suspend, letting Windows turn a device off, and the Device Parameters values: what actually works, where it is stored, and how the program verifies the write. -->
-
 # Device power saving
 
 ## Why turn it off
@@ -30,3 +28,7 @@ The **Device Parameters** of USB controllers and hubs (`SelectiveSuspendEnabled`
 - USB selective suspend is restored from a backup through the Windows Power API, separately for AC and battery, and verified by reading it back; the active power plan is not switched.
 
 **Conclusion:** power saving is off for input devices, audio and network, and the result is confirmed by reading it back, not by a checkbox in the interface.
+
+---
+
+[← Chapter 08](./08-input.en.md) · [Contents](./README.en.md) · [Chapter 10 →](./10-verification.en.md)

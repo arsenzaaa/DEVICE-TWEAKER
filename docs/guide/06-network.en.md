@@ -1,5 +1,3 @@
-<!-- tag: NET | summary: NDIS versus NetAdapterCx, why a mask does not work on NDIS and RSS is needed instead, how many queues a game really uses, the NDIS thread and MMCSS, NIC ITR and the driver's own moderation. -->
-
 # Network: RSS, NDIS and NIC ITR
 
 ## Two kinds of drivers
@@ -51,7 +49,7 @@ Realtek RTL8111 / 8168, RTL8125 / 8126                IntrMit
 
 Compatible Killer adapters behave like their base chips. An Intel EITR value is not a ready Realtek profile: the units differ.
 
-There is no single rule here. One approach turns moderation off: the network produces frequent short interrupts, and for latency they are better not batched. The other uses Medium / Adaptive: too many interrupts under load hurt input. A shorter interval -> more interrupts and more CPU load. That is why DEVICE TWEAKER configures NIC ITR **manually only**.
+There is no single rule here. One approach turns moderation off: the network produces frequent short interrupts, and for latency they are better not batched. The other uses Medium / Adaptive: too many interrupts under load hurt input. A shorter interval → more interrupts and more CPU load. That is why DEVICE TWEAKER configures NIC ITR **manually only**.
 
 ## The driver's moderation
 
@@ -65,3 +63,7 @@ The adapter driver has its own adaptive moderation (`*InterruptModeration`, on I
 - Wi-Fi is left untouched.
 
 **Conclusion:** on NDIS use RSS instead of a mask, one or two queues on separate physical cores, MSI-X required. NIC ITR is a deliberate trade between latency and load, and only after the driver's moderation is off.
+
+---
+
+[← Chapter 05](./05-usb-imod.en.md) · [Contents](./README.en.md) · [Chapter 07 →](./07-cpu-topology.en.md)

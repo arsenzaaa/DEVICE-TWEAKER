@@ -1,5 +1,3 @@
-<!-- tag: CPU | summary: Interrupt Affinity policies, the AssignmentSetOverride mask, what IRQ Priority really does, Interrupt Steering, and the alternative "all cores except 0" method. -->
-
 # Affinity, policies and interrupt priority
 
 ## Affinity
@@ -87,3 +85,7 @@ DEVICE TWEAKER uses the main method: fixed physical cores.
 Core 0 receives more clock interrupts (it updates the system time), always runs the TIMER DPCs of NDIS, DXGMMS2, CLASSPNP and KBDHID, and SYMCRYPTK DPCs scale with the number of interrupts. AUTO-OPTIMIZATION keeps drivers off it when it can; with too few physical cores, core 0 is used last.
 
 **Conclusion:** the `SpecCPU` policy with a mask on a specific physical core, High priority, NVMe left alone, result checked with a trace.
+
+---
+
+[← Chapter 02](./02-msi.en.md) · [Contents](./README.en.md) · [Chapter 04 →](./04-gpu.en.md)

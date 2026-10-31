@@ -1,5 +1,3 @@
-<!-- tag: CPU | summary: SMT-SETs, P- and E-cores, CCDs and CPPC ranks: how to read the CPU list in the program. ReservedCpuSets, the mask format and two strategies for CPUs with two CCDs or E-cores. -->
-
 # CPU topology and ReservedCpuSets
 
 ## Reading the CPU list
@@ -33,7 +31,7 @@ HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\kernel
   ReservedCpuSets   REG_BINARY   CPU mask, least significant byte first
 ```
 
-Example: 12 logical processors, reserving CPUs 1–11 -> `1111 1111 1110` = `0xFFE` -> in REG_BINARY the least significant byte first: `FE 0F`.
+Example: 12 logical processors, reserving CPUs 1–11 → `1111 1111 1110` = `0xFFE` → in REG_BINARY the least significant byte first: `FE 0F`.
 
 Know whom the reservation protects. If you reserve a core where a masked driver runs, the driver keeps running there: **threads are protected from that driver, not the other way round**. Reservation is not hard isolation and not a substitute for device Interrupt Affinity. Never give a process an affinity that spans both reserved and unreserved CPUs: the behaviour is unpredictable.
 
@@ -57,3 +55,7 @@ Option 1 leaves storage interrupts and DPCs such as KBDHID on the slow cores, an
 - ReservedCpuSets is set in its own block; the mask is built from the checked processors.
 
 **Conclusion:** count physical cores, not logical ones. Drivers do not share SMT-SETs, threads do not hop between CCDs, and reservation is a tool for two CCDs and E-cores, not a way to "isolate a driver".
+
+---
+
+[← Chapter 06](./06-network.en.md) · [Contents](./README.en.md) · [Chapter 08 →](./08-input.en.md)

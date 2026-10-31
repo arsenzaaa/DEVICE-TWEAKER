@@ -1,5 +1,3 @@
-<!-- tag: SYS | summary: Why the program has its own driver, where it may write, why KDU loads it and what antivirus software, HVCI and anti-cheats think about that. How IMOD / NIC ITR startup works without the EXE. -->
-
 # DTIMOD.sys, KDU and startup
 
 ## Why a driver
@@ -53,3 +51,7 @@ Select-String -Path .\SHA256SUMS.txt -Pattern 'DEVICE.TWEAKER.SelfContained.exe'
 ```
 
 **Conclusion:** the driver is only needed for IMOD, NIC ITR and **READ IRQ MODE**, writes only to the selected device's memory, and its sources are open. If HVCI, the Blocklist or an anti-cheat matters more, everything else works without it.
+
+---
+
+[← Chapter 10](./10-verification.en.md) · [Contents](./README.en.md)

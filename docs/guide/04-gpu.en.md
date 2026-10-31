@@ -1,5 +1,3 @@
-<!-- tag: GPU | summary: Why a graphics card needs two different physical cores, how the NVIDIA driver differs from AMD, and what to do when ISRs / DPCs still pile up on one core. -->
-
 # Graphics card
 
 ## Which drivers run
@@ -21,7 +19,7 @@ On a single core, the graphics driver's ISR interrupts its own DPC:
 core N   DPC NVLDDMKM ... [ ISR NVLDDMKM ] ... DPC continues
 ```
 
-The DPC cannot move to another core and waits for the ISR -> latency spikes at random moments and broken parallelism. The "one core for cache" gain is measured in microseconds and is not worth those spikes. So the card goes on **two different physical cores**: two logical processors of one SMT-SET share cache and EXECUTION-UNITS and do not count as two cores.
+The DPC cannot move to another core and waits for the ISR → latency spikes at random moments and broken parallelism. The "one core for cache" gain is measured in microseconds and is not worth those spikes. So the card goes on **two different physical cores**: two logical processors of one SMT-SET share cache and EXECUTION-UNITS and do not count as two cores.
 
 Tests on an unstable benchmark easily "prove" that one core is better: under PBO a CPU has good and bad cores, and that difference gets mistaken for one core versus two. Check with a trace, not with the FPS of a single run.
 
@@ -48,3 +46,7 @@ The program only configures interrupts. A few related things worth knowing:
 - The card's block shows IRQ Mode (usually MSI-X), HW and the mask; cores can be checked manually in the CPU Affinity list.
 
 **Conclusion:** a discrete graphics card gets two physical cores with no other drivers and not core 0, verified with a trace, with Round Robin in BIOS if needed.
+
+---
+
+[← Chapter 03](./03-affinity.en.md) · [Contents](./README.en.md) · [Chapter 05 →](./05-usb-imod.en.md)

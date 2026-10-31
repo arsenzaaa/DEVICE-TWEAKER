@@ -1,14 +1,12 @@
-<!-- tag: I/O | summary: The input path of a mouse, keyboard and controller on Windows 10 and 11, background-window throttling and RawMouseThrottleDuration, Raw Input Buffer and dedicated input threads, and what the Polling Rate measurement really measures. -->
-
 # Input: Polling Rate, Raw Input and Mouse Throttle
 
 ## The input path
 
 ```text
-Mouse, Windows 10       WDF01000 ISR -> DPC -> CSRSS (Win32k Raw Input Thread)    -> game thread
-Mouse, Windows 11       WDF01000 ISR -> DPC -> DWM KERNEL SENSOR THREAD           -> game thread
-Keyboard, 10 / 11       WDF01000 ISR -> DPC -> CSRSS (winsrvext.dll)              -> game thread
-Controller, Windows 11  WDF01000 ISR -> DPC -> DWM MASTER INPUT THREAD            -> game thread
+Mouse, Windows 10       WDF01000 ISR → DPC → CSRSS (Win32k Raw Input Thread)    → game thread
+Mouse, Windows 11       WDF01000 ISR → DPC → DWM KERNEL SENSOR THREAD           → game thread
+Keyboard, 10 / 11       WDF01000 ISR → DPC → CSRSS (winsrvext.dll)              → game thread
+Controller, Windows 11  WDF01000 ISR → DPC → DWM MASTER INPUT THREAD            → game thread
 ```
 
 Windows 11 has no advantage over Windows 10 here: CSRSS already uses separate threads for the mouse and keyboard. Mouse input sometimes passes through two DWM threads; controller input may go through the DWM `WINDOWS.GAMING.INPUT` thread or straight from the DPC to the game.
@@ -43,7 +41,7 @@ HKCU\Control Panel\Mouse
   RawMouseThrottleDuration   REG_DWORD   interval in ms, rate = 1000 / value
 ```
 
-`20` -> 50 Hz, the lowest rate; `8` -> 125 Hz, the default. The other values (`RawMouseThrottleEnabled`, `Leeway`, `Forced`) have no practical use. The setting does not change the mouse polling rate and does not affect the active window.
+`20` → 50 Hz, the lowest rate; `8` → 125 Hz, the default. The other values (`RawMouseThrottleEnabled`, `Leeway`, `Forced`) have no practical use. The setting does not change the mouse polling rate and does not affect the active window.
 
 Controllers are not covered by this limit: their data does not pass through the KERNEL SENSOR THREAD and arrives at full rate in the DWM MASTER INPUT THREAD, `WINDOWS.GAMING.INPUT` and the GameInputSvc service. The more background threads receive it, the longer the DPC and the main input thread run.
 
@@ -61,3 +59,7 @@ DEVICE TWEAKER shows the mouse and keyboard Polling Rate from USB data and can *
 - Every USB controller lists the input devices found on it and their rate.
 
 **Conclusion:** background input at the minimum, high polling only if the game has RIB or DIT, and the DWM / CSRSS input threads on cores without drivers.
+
+---
+
+[← Chapter 07](./07-cpu-topology.en.md) · [Contents](./README.en.md) · [Chapter 09 →](./09-power.en.md)

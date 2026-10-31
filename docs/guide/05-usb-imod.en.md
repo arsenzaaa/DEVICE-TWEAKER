@@ -1,5 +1,3 @@
-<!-- tag: USB | summary: How an xHCI controller works: interrupters, Event Rings and the IMOD register. Why a mouse gets a different interrupter on every connection, what IMOD to give audio, and how to spread devices across controllers. -->
-
 # USB controllers and IMOD
 
 ## How xHCI is built
@@ -7,7 +5,7 @@
 A mouse, keyboard or headset does not raise interrupts itself: the **xHCI controller** it is attached to does. The path of an event:
 
 ```text
-device -> endpoint -> Transfer Event -> interrupter -> Event Ring -> IMOD -> MSI / MSI-X vector -> CPU
+device → endpoint → Transfer Event → interrupter → Event Ring → IMOD → MSI / MSI-X vector → CPU
 ```
 
 - An **interrupter** is a part of the controller with its own Event Ring, its own IMOD register and its own interrupt vector. There can be up to 1024, usually 8 (as many as MSI vectors). The count is stored in bits 18..8 of `HCSPARAMS1`.
@@ -32,7 +30,7 @@ Data is not lost under moderation; it **stacks up**. With 1000 Hz polling (an ev
 
 The system assigns an interrupter to a device **on every connection**, and after a restart it may be a different one (any match is luck). So you cannot write "mouse = interrupter 2" once: per-device settings must be recalculated every time.
 
-DEVICE TWEAKER reads the device -> interrupter map from the xHCI contexts in memory on every apply: the interrupter from the TRB of the device's transfer ring, or from the Slot Context if the ring cannot be read. The read time is shown next to the values; after a device connects or disconnects the map is marked "devices changed", and **CHECK** reads it again.
+DEVICE TWEAKER reads the device → interrupter map from the xHCI contexts in memory on every apply: the interrupter from the TRB of the device's transfer ring, or from the Slot Context if the ring cannot be read. The read time is shown next to the values; after a device connects or disconnects the map is marked "devices changed", and **CHECK** reads it again.
 
 ## Which value to use
 
@@ -68,3 +66,7 @@ The IMOD register lasts until a restart, sleep or controller reset. A saved prof
 - Before enabling USB IMOD the program shows the state of HVCI, the Blocklist, Defender and the FACEIT / Vanguard services (**SYSTEM CHECK**).
 
 **Conclusion:** IMOD is an interrupter setting, not a device setting. High IMOD for audio, no moderation for the mouse, devices spread across controllers, and the interrupter map re-read on every apply.
+
+---
+
+[← Chapter 04](./04-gpu.en.md) · [Contents](./README.en.md) · [Chapter 06 →](./06-network.en.md)

@@ -16,7 +16,7 @@
 
 ## Если правите гайд
 
-Главы гайда лежат в `docs/guide`: русская и английская версия рядом, первая строка каждой главы — HTML-комментарий с меткой и кратким описанием. Утверждения о Windows должны проверяться трейсом или документацией, утверждения о программе — её кодом.
+Главы гайда лежат в `docs/guide`, русская и английская версии лежат рядом. Утверждения о Windows должны проверяться трейсом или документацией, утверждения о программе — её кодом.
 
 Код проекта распространяется по [GPL-3.0](../LICENSE).
 
@@ -30,6 +30,6 @@ For a bug, include the DEVICE TWEAKER version, Windows build, CPU, motherboard, 
 
 Keep each PR focused. Explain which hardware or Windows build you tested and how to repeat the check. Claims about lower latency need a repeatable method and raw results. Run the build and tests from the [development guide](../docs/DEVELOPMENT.en.md) before submitting. Check read/write failures for changes to registers, IMOD/ITR, and restore; check RU/EN and 100%, 125%, and 150% scaling for UI changes.
 
-Guide chapters live in `docs/guide` (Russian and English side by side; the first line of each chapter is an HTML comment with its tag and summary). Claims about Windows need a trace or documentation behind them, claims about the program need its code.
+Guide chapters live in `docs/guide`, Russian and English side by side. Claims about Windows need a trace or documentation behind them, claims about the program need its code.
 
 Contributions are distributed under [GPL-3.0](../LICENSE).

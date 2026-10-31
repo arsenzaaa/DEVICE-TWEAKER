@@ -1,5 +1,3 @@
-<!-- tag: LOG | summary: How to check the result by facts rather than the FPS of one run: an xperf / WPR trace, where to look at ISRs and DPCs in WPA and MXA, what to send in a hardware report and how to read the program log. -->
-
 # Verification: traces and logs
 
 ## Why not FPS
@@ -55,3 +53,7 @@ Auto-optimization has been verified on specific systems, and every new configura
 Attach before / after traces if you recorded them: they are the most valuable part.
 
 **Conclusion:** the result is verified with a trace — where ISRs / DPCs run and how long they take — not with a single benchmark run.
+
+---
+
+[← Chapter 09](./09-power.en.md) · [Contents](./README.en.md) · [Chapter 11 →](./11-driver.en.md)

@@ -1,5 +1,3 @@
-<!-- tag: MSI | summary: Line versus message: why disabling MSI MODE adds extra and longer ISRs, why MessageNumberLimit should be removed, and how the program reads a device's real mode. -->
-
 # MSI and MSI-X
 
 ## Line and message
@@ -26,7 +24,7 @@ Without MSI you get extra ISRs, and each one is longer. That is a widespread and
 
 ## Message limit
 
-`MessageNumberLimit` caps the number of messages. **Do not set a limit**: without one the device uses the number of vectors it needs (the maximum). In DEVICE TWEAKER that is **MSI Limit: Unlimited**, which deletes the value from the registry. The real vector count is visible in `msinfo32` -> Hardware Resources -> IRQs: count your device's IRQs (MSI ones are negative).
+`MessageNumberLimit` caps the number of messages. **Do not set a limit**: without one the device uses the number of vectors it needs (the maximum). In DEVICE TWEAKER that is **MSI Limit: Unlimited**, which deletes the value from the registry. The real vector count is visible in `msinfo32` → Hardware Resources → IRQs: count your device's IRQs (MSI ones are negative).
 
 ## Where it is stored
 
@@ -55,3 +53,7 @@ MSI Mode and IRQ Mode may differ until a restart or when the device driver decid
 - MSI Mode and MSI Limit can be set manually on the device card; a general reset keeps MSI Mode and MSI Limit.
 
 **Conclusion:** MSI MODE on, limit empty, real mode confirmed with **READ IRQ MODE** after a restart.
+
+---
+
+[← Chapter 01](./01-interrupts.en.md) · [Contents](./README.en.md) · [Chapter 03 →](./03-affinity.en.md)
