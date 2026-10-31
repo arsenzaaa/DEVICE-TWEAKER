@@ -138,8 +138,8 @@ pre code { background: none; border: 0; padding: 0; color: inherit; overflow-wra
 .status .sep { color: var(--faint); margin: 0 16px; }
 
 .band { border-top: 1px solid var(--frame); border-bottom: 1px solid var(--frame); background: var(--group); padding: 48px 24px; }
-.shot { display: block; max-width: 980px; margin: 0 auto; }
-.shot img { display: block; width: 100%; }
+.shot { display: block; max-width: 838px; margin: 0 auto; }
+.shot img { display: block; width: 100%; height: auto; }
 
 /* Sections */
 

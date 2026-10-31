@@ -4,7 +4,10 @@ and a soft shadow on a transparent background, so they sit well on light and dar
     python dev/branding/screens.py
 
 Reads assets/screenshots/*.png (captured by dev/qa/Capture-Showcase.ps1) and writes
-assets/screenshots/framed/<name>.png.
+assets/screenshots/framed/<name>.png (full size, for the site and high-density screens) and
+assets/screenshots/readme/<name>.png, reduced in advance to exactly the 838 px README column of
+github.com, so the browser shows it 1:1 instead of resampling it, and
+assets/screenshots/thumbs/<name>.png: the top 4:3 part, reduced for the site gallery.
 """
 from pathlib import Path
 
@@ -13,12 +16,14 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "assets" / "screenshots"
 OUT = SOURCE / "framed"
+README_OUT = SOURCE / "readme"
+THUMB_OUT = SOURCE / "thumbs"
+THUMB_WIDTH = 366
+COLUMN = 838
 
-RADIUS = 14
-PAD = 56
-SHADOW_BLUR = 26
-SHADOW_OFFSET = 18
-SHADOW_ALPHA = 110
+# radius, padding, shadow blur, shadow offset, shadow alpha
+FULL = (14, 56, 26, 18, 110)
+COMPACT = (8, 20, 11, 6, 100)
 EDGE = (255, 255, 255, 34)
 
 
@@ -30,33 +35,54 @@ def rounded_mask(size, radius, scale=4):
     return big.resize(size, Image.LANCZOS)
 
 
-def frame(shot):
+def frame(shot, style=FULL):
+    radius, pad, blur, offset, alpha = style
     shot = shot.convert("RGBA")
     w, h = shot.size
-    mask = rounded_mask((w, h), RADIUS)
+    mask = rounded_mask((w, h), radius)
     shot.putalpha(ImageChops.multiply(shot.getchannel("A"), mask))
 
     edge = Image.new("RGBA", (w * 4, h * 4), (0, 0, 0, 0))
-    ImageDraw.Draw(edge).rounded_rectangle((2, 2, w * 4 - 3, h * 4 - 3), RADIUS * 4, outline=EDGE, width=4)
+    ImageDraw.Draw(edge).rounded_rectangle((2, 2, w * 4 - 3, h * 4 - 3), radius * 4, outline=EDGE, width=4)
     shot.alpha_composite(edge.resize((w, h), Image.LANCZOS))
 
-    canvas = Image.new("RGBA", (w + PAD * 2, h + PAD * 2), (0, 0, 0, 0))
+    canvas = Image.new("RGBA", (w + pad * 2, h + pad * 2), (0, 0, 0, 0))
     shadow = Image.new("L", canvas.size, 0)
-    shadow.paste(mask.point(lambda v: v * SHADOW_ALPHA // 255), (PAD, PAD + SHADOW_OFFSET))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(SHADOW_BLUR))
+    shadow.paste(mask.point(lambda v: v * alpha // 255), (pad, pad + offset))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(blur))
     canvas.putalpha(shadow)
-    canvas.alpha_composite(shot, (PAD, PAD))
+    canvas.alpha_composite(shot, (pad, pad))
     return canvas
 
 
+def reduced(shot):
+    """Lanczos down to the README column, then a light unsharp mask to keep the program text legible."""
+    width = COLUMN - COMPACT[1] * 2
+    height = round(shot.height * width / shot.width)
+    small = shot.convert("RGB").resize((width, height), Image.LANCZOS)
+    return small.filter(ImageFilter.UnsharpMask(radius=0.8, percent=60, threshold=0))
+
+
+def thumb(shot):
+    w = shot.width
+    top = shot.convert("RGB").crop((0, 0, w, round(w * 3 / 4)))
+    small = top.resize((THUMB_WIDTH, round(THUMB_WIDTH * 3 / 4)), Image.LANCZOS)
+    return small.filter(ImageFilter.UnsharpMask(radius=0.8, percent=60, threshold=0))
+
+
 def main():
-    OUT.mkdir(exist_ok=True)
-    for old in OUT.glob("*.png"):
-        old.unlink()
+    for folder in (OUT, README_OUT, THUMB_OUT):
+        folder.mkdir(exist_ok=True)
+        for old in folder.glob("*.png"):
+            old.unlink()
     for path in sorted(SOURCE.glob("*.png")):
-        framed = frame(Image.open(path))
+        shot = Image.open(path)
+        framed = frame(shot)
         framed.save(OUT / path.name, optimize=True)
-        print(path.name, framed.size)
+        small = frame(reduced(shot), COMPACT)
+        small.save(README_OUT / path.name, optimize=True)
+        thumb(shot).save(THUMB_OUT / path.name, optimize=True)
+        print(path.name, framed.size, small.size)
 
 
 if __name__ == "__main__":

@@ -111,6 +111,12 @@ LANDING = {
 }
 
 
+def image_height(path):
+    # PNG IHDR: width and height are big-endian at bytes 16..24.
+    data = path.read_bytes()[16:24]
+    return int.from_bytes(data[4:8], "big")
+
+
 def version():
     match = re.search(r"<Version>([^<]+)</Version>", (ROOT / "src" / "DeviceTweakerCS.csproj").read_text(encoding="utf-8"))
     return match.group(1)
@@ -307,6 +313,7 @@ def landing(lang, ver):
     root = rel(here, "")
     suffix = "en" if lang == "en" else "ru"
     shot = f"{root}assets/screenshots/showcase_intel_14900k_full_{suffix}.png"
+    shot_h = image_height(ROOT / "assets" / "screenshots" / "readme" / f"showcase_intel_14900k_full_{suffix}.png")
     files = "".join(
         f'<p><span class="key">{html.escape(desc)}:</span> <a href="{REPO}/releases/latest/download/{name}">{name}</a></p>'
         for name, desc in t["files"])
@@ -314,7 +321,7 @@ def landing(lang, ver):
     ch11 = next(c for c in chapters(lang) if c.number == "11")
     shots = "".join(
         f'<figure class="shot-card"><figcaption><span class="tag">[{tag}]</span> {cap}</figcaption>'
-        f'<a href="{root}assets/screenshots/raw/{name}_{suffix}.png"><img src="{root}assets/screenshots/raw/{name}_{suffix}.png" alt="{html.escape(cap)}" loading="lazy"></a></figure>'
+        f'<a href="{root}assets/screenshots/raw/{name}_{suffix}.png"><img src="{root}assets/screenshots/thumbs/{name}_{suffix}.png" srcset="{root}assets/screenshots/thumbs/{name}_{suffix}.png 366w, {root}assets/screenshots/raw/{name}_{suffix}.png 1360w" sizes="(max-width: 980px) 100vw, 366px" alt="{html.escape(cap)}" width="366" height="275" loading="lazy"></a></figure>'
         for name, tag, cap in t["shots"])
     body = f"""<main>
 <section class="hero">
@@ -328,7 +335,7 @@ def landing(lang, ver):
 </div>
 {status_line(lang, ver)}
 </section>
-<section class="band"><a class="shot" href="{root}assets/screenshots/raw/showcase_intel_14900k_full_{suffix}.png"><img src="{shot}" alt="{html.escape(t['shot_alt'])}" width="1472" height="1412"></a></section>
+<section class="band"><a class="shot" href="{root}assets/screenshots/raw/showcase_intel_14900k_full_{suffix}.png"><img src="{root}assets/screenshots/readme/showcase_intel_14900k_full_{suffix}.png" srcset="{root}assets/screenshots/readme/showcase_intel_14900k_full_{suffix}.png 1x, {shot} 2x" alt="{html.escape(t['shot_alt'])}" width="838" height="{shot_h}"></a></section>
 <section class="section" id="guide">
 <h2 class="label">[ {t['guide_title']} ]</h2>
 <p class="section-lead">{t['guide_lead']}</p>
@@ -465,6 +472,10 @@ def main():
         shutil.copy(png, assets / "screenshots" / png.name)
     for png in (ROOT / "assets" / "screenshots").glob("*.png"):
         shutil.copy(png, assets / "screenshots" / "raw" / png.name)
+    for folder in ("readme", "thumbs"):
+        (assets / "screenshots" / folder).mkdir()
+        for png in (ROOT / "assets" / "screenshots" / folder).glob("*.png"):
+            shutil.copy(png, assets / "screenshots" / folder / png.name)
     (out / ".nojekyll").write_text("", encoding="utf-8")
 
     ver = version()
