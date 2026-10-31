@@ -228,19 +228,6 @@ def pipeline_mobile(f, c, t):
     return svg(w, h, " → ".join(s[0] for s in t["steps"]), "".join(p))
 
 
-def social(f, c):
-    """Repository social preview, 1280x640 (Settings → Social preview)."""
-    w, h = 1280, 640
-    p = [f'<rect width="{w}" height="{h}" fill="{c["card"]}"/>']
-    p.append(text(f["mono"], "WINDOWS 10 / 11 · x64", 22, 96, 170, c["muted"], 3))
-    size = fit(f["display"], "DEVICE TWEAKER", 128, 1088, -2)
-    p.append(text(f["display"], "DEVICE TWEAKER", size, 92, 300, c["text"], -2))
-    p.append(text(f["mono"], "MSI · AFFINITY · IMOD · NIC ITR · RSS", 28, 96, 372, c["muted"], 2))
-    strip, _ = core_strip(f, c, 96, 452, 52, 16.1, 548, 24)
-    p.append(strip)
-    return svg(w, h, "DEVICE TWEAKER", "".join(p))
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fonts", required=True, type=Path)
@@ -272,7 +259,6 @@ def main():
             (out / f"button-download-{lang}-{theme}.svg").write_text(button(f, c, t["download"], True, ICON_DOWNLOAD), encoding="utf-8")
             (out / f"button-settings-{lang}-{theme}.svg").write_text(button(f, c, t["settings"], False), encoding="utf-8")
             (out / f"button-changelog-{lang}-{theme}.svg").write_text(button(f, c, t["changelog"], False), encoding="utf-8")
-    (out / "social-preview.svg").write_text(social(f, THEMES["dark"]), encoding="utf-8")
     print("\n".join(sorted(p.name for p in out.glob("*.svg"))))
 
 

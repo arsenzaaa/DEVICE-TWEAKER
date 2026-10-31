@@ -25,10 +25,6 @@ src/**/*.tlog
 src/**/*.lastbuildstate
 
 # IDE/user-local files
-/.playwright-cli/
-/.playwright-mcp/
-/.serena/
-/AGENTS.md
 *.user
 *.suo
 *.userosscache
