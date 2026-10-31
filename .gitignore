@@ -44,3 +44,6 @@ docs/*.pdf
 
 # Site build output
 /_site/
+
+# Python bytecode
+__pycache__/
