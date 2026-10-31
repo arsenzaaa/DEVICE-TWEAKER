@@ -68,7 +68,7 @@ pip install markdown==3.7
 python dev/site/build.py --out _site
 ```
 
-Знак и схемы в `assets/branding` рисует `dev/branding/render.py`: текст переводится в кривые, поэтому SVG выглядят одинаково в любой системе. Рамку и тень скриншотов добавляет `dev/branding/screens.py`, исходные снимки делает `dev/qa/Capture-Showcase.ps1`.
+Знак и схемы в `assets/branding` рисует `dev/branding/render.py`: текст переводится в кривые, поэтому SVG выглядят одинаково в любой системе. Рамку и тень скриншотов добавляет `dev/branding/screens.py`, исходные снимки делает `dev/qa/Capture-Showcase.ps1`. Шапку, кнопки и карточки глав для README на GitHub (`assets/readme`) рисует `dev/branding/readme.py` по тем же главам гайда.
 
 ## Устройство кода
 

@@ -68,7 +68,7 @@ pip install markdown==3.7
 python dev/site/build.py --out _site
 ```
 
-The mark and diagrams in `assets/branding` are drawn by `dev/branding/render.py`; text is converted to outlines, so the SVGs look the same on every system. `dev/branding/screens.py` adds the frame and shadow to screenshots captured by `dev/qa/Capture-Showcase.ps1`.
+The mark and diagrams in `assets/branding` are drawn by `dev/branding/render.py`; text is converted to outlines, so the SVGs look the same on every system. `dev/branding/screens.py` adds the frame and shadow to screenshots captured by `dev/qa/Capture-Showcase.ps1`. The README header, buttons and guide cards for GitHub (`assets/readme`) are drawn by `dev/branding/readme.py` from the same guide chapters.
 
 ## Code map
 
