@@ -1,20 +1,22 @@
-name: Предложить функцию
-description: Новая настройка, устройство или улучшение текущей работы
-title: "[Идея]: "
+name: Идея / Feature request
+description: Новая настройка, устройство или улучшение / A new setting, device or improvement
 labels: [enhancement]
 body:
   - type: textarea
+    id: problem
     attributes:
-      label: Что хотите настроить или исправить?
-      description: Укажите устройство и текущую проблему
+      label: Что нужно и зачем / What and why
+      description: Устройство, настройка и текущее ограничение / The device, the setting and the current limitation
     validations:
       required: true
   - type: textarea
+    id: proposal
     attributes:
-      label: Как это должно работать?
+      label: Как это должно работать / How it should work
     validations:
       required: true
   - type: textarea
+    id: technical
     attributes:
-      label: Технические данные
-      description: Hardware ID, документация производителя, регистры или результаты измерений, если они есть
+      label: Технические данные / Technical details
+      description: Hardware ID, документация производителя, регистры, результаты измерений / Hardware ID, vendor documentation, registers, measurements

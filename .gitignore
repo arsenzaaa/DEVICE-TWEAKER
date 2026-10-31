@@ -40,6 +40,4 @@ src/tmp/
 src/**/Backups/
 src/**/logs/
 src/**/last-crash.txt
-/docs/
-src/docs/*.pdf
-src/docs/*.txt
+docs/*.pdf

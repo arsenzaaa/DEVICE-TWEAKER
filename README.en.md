@@ -1,10 +1,12 @@
 <div align="right"><a href="./README.md">Русский</a></div>
 
-# DEVICE TWEAKER
+<h1 align="center"><img src="./assets/icon.png" width="128" height="128" alt="DEVICE TWEAKER"></h1>
 
-Device interrupt tuning for Windows 10 / 11 x64. MSI, affinity, IRQ priority, ReservedCpuSets, RSS, USB IMOD and NIC ITR in one program, with auto-optimization for the CPU topology: P- and E-cores, SMT, CCD / CCX, CPPC.
+<p align="center">Device interrupt tuning for Windows 10 / 11 x64, matched to the CPU topology</p>
 
-**[Download 0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest)** · [Settings guide](./src/docs/SETTINGS.en.md) · [Changelog](./CHANGELOG.en.md)
+<p align="center"><sub>MSI · affinity · IRQ priority · ReservedCpuSets · RSS · USB&nbsp;IMOD · NIC&nbsp;ITR</sub></p>
+
+<p align="center"><a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest"><b>Download 0.0.4</b></a> · <a href="./docs/SETTINGS.en.md">Settings guide</a> · <a href="./CHANGELOG.en.md">Changelog</a></p>
 
 <a href="./assets/screenshots/showcase_intel_14900k_full_en.png"><img src="./assets/screenshots/showcase_intel_14900k_full_en.png" alt="DEVICE TWEAKER: a USB controller on Intel Core i9-14900K" width="100%"></a>
 
@@ -95,4 +97,4 @@ Memory Integrity (HVCI) and the Microsoft Vulnerable Driver Blocklist block load
 
 Report bugs in [issues](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=bug_report.yml) with the log from the `logs` folder next to the EXE, your Windows build and PC configuration. For auto-optimization, three logs help most: before applying, right after, and after a restart. News: [Telegram](https://t.me/arsenzaa).
 
-[Settings guide](./src/docs/SETTINGS.en.md) · [Build](./src/docs/BUILD.md) · [QA](./dev/qa/README.md) · [Security](./.github/SECURITY.md) · [GPL-3.0](./LICENSE)
+[Settings guide](./docs/SETTINGS.en.md) · [Development](./docs/DEVELOPMENT.en.md) · [Third-party components](./docs/THIRD_PARTY_NOTICES.md) · [Security](./.github/SECURITY.md) · [GPL-3.0](./LICENSE)

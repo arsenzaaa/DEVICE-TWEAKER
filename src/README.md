@@ -1,42 +1,15 @@
-# Исходники DEVICE TWEAKER
+# src
 
-[Описание программы](../README.md) · [Как работают настройки](./docs/SETTINGS.md) · [English](./README.en.md)
+Исходники DEVICE TWEAKER. Сборка, тесты и устройство кода — в [docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md).
 
-Здесь лежат исходники Windows Forms приложения. Если вам нужен готовый EXE, скачайте его со [страницы релиза](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4).
+Source code of DEVICE TWEAKER. Build, tests and code map: [docs/DEVELOPMENT.en.md](../docs/DEVELOPMENT.en.md).
 
-## Собрать и проверить
-
-Нужны Windows 10/11 x64, .NET 8 SDK и PowerShell 5.1 или новее. Запускайте команды из корня репозитория:
-
-```powershell
-dotnet restore ".\src\DeviceTweakerCS.csproj"
-dotnet build ".\src\DeviceTweakerCS.csproj" -c Release -p:TreatWarningsAsErrors=true
-dotnet test ".\dev\qa\tests\DeviceTweaker.Tests\DeviceTweaker.Tests.csproj" -c Release
-```
-
-Готовый `IMOD/DTIMOD.sys` уже есть в репозитории. Visual Studio C++ Build Tools и Windows Driver Kit нужны, только если вы хотите пересобрать драйвер.
-
-После изменений драйвера пересоберите его через `publish-variants.ps1 -BuildDriverOnly`. QA сверяет исходники и бинарник с `IMOD/DTIMOD.build.json` и останавливается, если они не совпадают.
-
-Полный QA также использует C++ Build Tools / Windows SDK для нативной модели без загрузки драйвера. Исходники и комплект KDU сверяются с отдельными манифестами; порядок пересборки описан в [IMOD/KDU](IMOD/KDU/README.md).
-
-Два EXE и `SHA256SUMS.txt` собираются так:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File ".\src\publish-variants.ps1" `
-  -Flavor both -Configuration Release -SkipImodDriverBuild
-```
-
-Подробные параметры сборки и порядок выпуска описаны в [BUILD.md](./docs/BUILD.md) и [RELEASE.md](./docs/RELEASE.md).
-
-## Где искать код
-
-- `Affinity`: топология CPU и маски.
-- `Devices`: обнаружение и классификация устройств.
-- `Core`: применение настроек, восстановление, IMOD, NIC ITR и диагностика.
-- `GUI` и `Localization`: интерфейс и строки RU/EN.
-- `Interop`: вызовы Windows API.
-- `IMOD`: драйвер и загрузчик.
-- [`dev/qa`](../dev/qa/README.md). проверки и отдельная сборка с тест-панелью.
-
-Если нашли ошибку или хотите прислать изменение, начните с [CONTRIBUTING.md](../.github/CONTRIBUTING.md).
+| Папка / Folder | |
+| --- | --- |
+| `Affinity` | топология CPU, affinity, ReservedCpuSets / CPU topology, affinity, ReservedCpuSets |
+| `Devices` | обнаружение устройств, RSS, энергосбережение / device discovery, RSS, power saving |
+| `Core` | применение, восстановление, IMOD, NIC ITR, автозапуск / apply, restore, IMOD, NIC ITR, startup |
+| `GUI`, `Localization` | интерфейс, RU / EN / user interface, RU / EN |
+| `Interop` | Windows API |
+| `Startup` | скрипт автозапуска и общий runtime / startup script and shared runtime |
+| `IMOD` | драйвер DTIMOD и загрузчик KDU / DTIMOD driver and KDU loader |

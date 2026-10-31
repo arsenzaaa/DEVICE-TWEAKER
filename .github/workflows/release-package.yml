@@ -40,7 +40,7 @@ jobs:
           [xml]$project = Get-Content -LiteralPath 'src/DeviceTweakerCS.csproj'
           $version = [string]$project.Project.PropertyGroup.Version
           if ($tag -ne "v$version") { throw "Tag $tag differs from project version $version" }
-          $notes = "src/docs/releases/$tag.md"
+          $notes = "docs/releases/$tag.md"
           if (-not (Test-Path -LiteralPath $notes)) { throw "Release notes missing: $notes" }
           "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
           "SOURCE_COMMIT=$head" >> $env:GITHUB_ENV
@@ -79,7 +79,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Source archive failed' }
           $sourceHash = (Get-FileHash -LiteralPath "$package/$sourceName" -Algorithm SHA256).Hash
           "$sourceHash  $sourceName" | Set-Content -LiteralPath "$package/SOURCE-SHA256SUMS.txt" -Encoding ascii
-          $notes = Get-Content -LiteralPath "src/docs/releases/$env:RELEASE_TAG.md" -Raw
+          $notes = Get-Content -LiteralPath "docs/releases/$env:RELEASE_TAG.md" -Raw
           $notes += "`n`nSource commit: ``$env:SOURCE_COMMIT``.`n"
           Set-Content -LiteralPath "$env:RUNNER_TEMP/release-notes.md" -Value $notes -Encoding utf8
 

@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Security vulnerability
+  - name: Уязвимость / Security vulnerability
     url: https://github.com/arsenzaaa/DEVICE-TWEAKER/security/advisories/new
-    about: Report security issues privately.
+    about: Сообщить приватно / Report privately.
   - name: Вопросы и обсуждение / Questions and discussion
     url: https://t.me/arsenzaa
     about: Telegram проекта / Project Telegram channel.

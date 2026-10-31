@@ -1,39 +1,52 @@
-name: Сообщить об ошибке
-description: Если DEVICE TWEAKER показывает или применяет что-то неправильно
-title: "[Баг]: "
+name: Ошибка / Bug report
+description: Программа показывает или применяет что-то неправильно / The program shows or applies something incorrectly
 labels: [bug]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Лог лежит в папке `logs` рядом с EXE. Перед отправкой уберите из него личные пути и имена.
+        The log is in the `logs` folder next to the EXE. Remove personal paths and names before posting.
   - type: input
+    id: version
     attributes:
-      label: Версия программы
-      description: Номер релиза и сборка EXE (обычная или автономная)
+      label: Версия и сборка / Version and build
+      placeholder: 0.0.4, SelfContained
     validations:
       required: true
   - type: textarea
+    id: system
     attributes:
-      label: Система и устройство
-      description: Сборка Windows, CPU, материнская плата, BIOS, Hardware ID устройства и версия драйвера
+      label: Система и устройство / System and device
+      description: Сборка Windows, CPU, материнская плата, BIOS, Hardware ID устройства, версия драйвера / Windows build, CPU, motherboard, BIOS, device Hardware ID, driver version
     validations:
       required: true
   - type: textarea
+    id: steps
     attributes:
-      label: Как повторить
-      description: Что нажали и в каком порядке
+      label: Как повторить / Steps to reproduce
+      description: Что нажимали и в каком порядке / What you clicked and in which order
     validations:
       required: true
   - type: textarea
+    id: result
     attributes:
-      label: Ожидали и получили
+      label: Ожидали и получили / Expected and actual result
     validations:
       required: true
   - type: dropdown
+    id: restart
     attributes:
-      label: После этого перезагружали Windows?
-      options: ["Да", "Нет", "Не относится к ошибке"]
+      label: Перезагружали Windows после этого? / Did you restart Windows afterwards?
+      options:
+        - Да / Yes
+        - Нет / No
+        - Не относится к ошибке / Not relevant
     validations:
       required: true
   - type: textarea
+    id: log
     attributes:
-      label: Фрагмент лога
-      description: Приложите строки, относящиеся к ошибке
+      label: Лог / Log
+      description: Строки, относящиеся к ошибке, или файл целиком / Relevant lines or the whole file
       render: text

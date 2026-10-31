@@ -1,0 +1,21 @@
+# Formatting for the whole repository. Build analyzers: src/.editorconfig.
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{cs,ps1,c,h}]
+indent_size = 4
+
+# Windows PowerShell 5.1 reads scripts without a BOM as ANSI.
+[*.ps1]
+charset = utf-8-bom
+
+[*.{json,yml,yaml,xml,csproj,props,targets,manifest}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
