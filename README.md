@@ -25,19 +25,19 @@
 
 ## Что меняет программа
 
-| Настройка | Куда записывается | Когда действует |
-| --- | --- | --- |
-| MSI Mode, MSI Limit | `MSISupported`, `MessageNumberLimit` в `Interrupt Management\MessageSignaledInterruptProperties` | после перезагрузки |
-| IRQ Priority | `DevicePriority` в `Interrupt Management\Affinity Policy` | после перезагрузки |
-| Policy, Interrupt Affinity | `DevicePolicy`, `AssignmentSetOverride` там же | после перезагрузки |
-| RSS | `*RssBaseProcNumber`, `*NumRssQueues`, `*MaxRssProcessors`, `*RssMaxProcNumber` в ключе класса адаптера | после перезагрузки |
-| ReservedCpuSets | `ReservedCpuSets` в `Session Manager\kernel` | после перезагрузки |
-| Mouse Throttle | `RawMouseThrottleDuration` в `HKCU\Control Panel\Mouse`, Windows 11 | после перезагрузки |
-| Энергосбережение | `PnPCapabilities`, `SelectiveSuspendEnabled`, `EnhancedPowerManagementEnabled`, USB selective suspend в плане питания | после перезагрузки |
-| USB IMOD | регистр IMOD каждого interrupter'а контроллера xHCI | сразу, до перезагрузки или сна |
-| NIC ITR | регистры модерации контроллера: EITR / ITR у Intel, IntrMit у Realtek | сразу, до перезагрузки или сна |
+| Настройка | Куда записывается |
+| --- | --- |
+| MSI Mode, MSI Limit | `MSISupported`, `MessageNumberLimit` в `Interrupt Management\MessageSignaledInterruptProperties` |
+| IRQ Priority | `DevicePriority` в `Interrupt Management\Affinity Policy` |
+| Policy, Interrupt Affinity | `DevicePolicy`, `AssignmentSetOverride` там же |
+| RSS | `*RssBaseProcNumber`, `*NumRssQueues`, `*MaxRssProcessors`, `*RssMaxProcNumber` в ключе класса адаптера |
+| ReservedCpuSets | `ReservedCpuSets` в `Session Manager\kernel` |
+| Mouse Throttle | `RawMouseThrottleDuration` в `HKCU\Control Panel\Mouse`, Windows 11 |
+| Энергосбережение | `PnPCapabilities`, `SelectiveSuspendEnabled`, `EnhancedPowerManagementEnabled`, USB selective suspend в плане питания |
+| USB IMOD | регистр IMOD каждого interrupter'а контроллера xHCI |
+| NIC ITR | регистры модерации контроллера: EITR / ITR у Intel, IntrMit у Realtek |
 
-Перед применением создаётся проверенный бекап. Регистры IMOD и NIC ITR после записи читаются повторно. Что применилось, что пропущено и почему — в логе.
+Настройки реестра вступают в силу после перезагрузки. Регистры IMOD и NIC ITR меняются сразу и держатся до перезагрузки или сна. Перед применением создаётся проверенный бекап. Регистры IMOD и NIC ITR после записи читаются повторно. Что применилось, что пропущено и почему — в логе.
 
 ## Авто-оптимизация
 

@@ -25,19 +25,19 @@ Device interrupt tuning for Windows 10 / 11 x64. MSI, affinity, IRQ priority, Re
 
 ## What it changes
 
-| Setting | Written to | Takes effect |
-| --- | --- | --- |
-| MSI Mode, MSI Limit | `MSISupported`, `MessageNumberLimit` in `Interrupt Management\MessageSignaledInterruptProperties` | after a restart |
-| IRQ Priority | `DevicePriority` in `Interrupt Management\Affinity Policy` | after a restart |
-| Policy, Interrupt Affinity | `DevicePolicy`, `AssignmentSetOverride` in the same key | after a restart |
-| RSS | `*RssBaseProcNumber`, `*NumRssQueues`, `*MaxRssProcessors`, `*RssMaxProcNumber` in the adapter's class key | after a restart |
-| ReservedCpuSets | `ReservedCpuSets` in `Session Manager\kernel` | after a restart |
-| Mouse Throttle | `RawMouseThrottleDuration` in `HKCU\Control Panel\Mouse`, Windows 11 | after a restart |
-| Power saving | `PnPCapabilities`, `SelectiveSuspendEnabled`, `EnhancedPowerManagementEnabled`, USB selective suspend in the power plan | after a restart |
-| USB IMOD | the IMOD register of every xHCI interrupter | immediately, until a restart or sleep |
-| NIC ITR | the controller's moderation registers: EITR / ITR on Intel, IntrMit on Realtek | immediately, until a restart or sleep |
+| Setting | Written to |
+| --- | --- |
+| MSI Mode, MSI Limit | `MSISupported`, `MessageNumberLimit` in `Interrupt Management\MessageSignaledInterruptProperties` |
+| IRQ Priority | `DevicePriority` in `Interrupt Management\Affinity Policy` |
+| Policy, Interrupt Affinity | `DevicePolicy`, `AssignmentSetOverride` in the same key |
+| RSS | `*RssBaseProcNumber`, `*NumRssQueues`, `*MaxRssProcessors`, `*RssMaxProcNumber` in the adapter's class key |
+| ReservedCpuSets | `ReservedCpuSets` in `Session Manager\kernel` |
+| Mouse Throttle | `RawMouseThrottleDuration` in `HKCU\Control Panel\Mouse`, Windows 11 |
+| Power saving | `PnPCapabilities`, `SelectiveSuspendEnabled`, `EnhancedPowerManagementEnabled`, USB selective suspend in the power plan |
+| USB IMOD | the IMOD register of every xHCI interrupter |
+| NIC ITR | the controller's moderation registers: EITR / ITR on Intel, IntrMit on Realtek |
 
-A verified backup is made before settings are applied. IMOD and NIC ITR registers are read back after every write. The log records what was applied, what was skipped and why.
+Registry settings take effect after a restart. IMOD and NIC ITR registers change immediately and hold until a restart or sleep. A verified backup is made before settings are applied. IMOD and NIC ITR registers are read back after every write. The log records what was applied, what was skipped and why.
 
 ## Auto-optimization
 
