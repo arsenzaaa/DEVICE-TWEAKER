@@ -164,7 +164,7 @@ class Chapter:
 
 
 def chapters(lang):
-    pattern = "*.en.md" if lang == "en" else "[0-9]*.md"
+    pattern = "[0-9]*.en.md" if lang == "en" else "[0-9]*.md"
     found = [Chapter(p, lang) for p in sorted((ROOT / "docs" / "guide").glob(pattern))]
     return [c for c in found if (lang == "en") == c.path.name.endswith(".en.md")]
 
