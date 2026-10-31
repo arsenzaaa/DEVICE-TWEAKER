@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://arsenzaaa.github.io/DEVICE-TWEAKER/en/">
+  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="./assets/readme/wordmark-dark.svg">
       <img src="./assets/readme/wordmark-light.svg" alt="DEVICE TWEAKER" width="560">
@@ -11,8 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest"><b>Download 0.0.4</b></a> ·
-  <a href="https://arsenzaaa.github.io/DEVICE-TWEAKER/en/guide/">Guide</a> ·
-  <a href="https://arsenzaaa.github.io/DEVICE-TWEAKER/en/">Site</a> ·
+  <a href="./docs/guide/README.en.md">Guide</a> ·
   <a href="./CHANGELOG.en.md">Changelog</a> ·
   <a href="https://t.me/arsenzaa">Telegram</a> ·
   <a href="./README.md">Русский</a>
@@ -59,7 +58,7 @@ SHA-256 hashes of the files are in `SHA256SUMS.txt` on the release page:
 
 ## <samp>[ GUIDE ]</samp>
 
-How it works in Windows and what the program does. The same chapters with search are on the [site](https://arsenzaaa.github.io/DEVICE-TWEAKER/en/guide/).
+How it works in Windows and what the program does.
 
 1. [Interrupts: ISR, DPC and cores](./docs/guide/01-interrupts.en.md)
 2. [MSI and MSI-X](./docs/guide/02-msi.en.md)

@@ -2,7 +2,7 @@
 
 [Project page](../../README.en.md) · [Русский](./README.md)
 
-How it works in Windows and what the program does, device type by device type. The same chapters with search are on the [site](https://arsenzaaa.github.io/DEVICE-TWEAKER/en/guide/).
+How it works in Windows and what the program does, device type by device type.
 
 - `[IRQ]` **[Interrupts: ISR, DPC and cores](./01-interrupts.en.md)** — How ISRs and DPCs work, why they outrank any game thread, and what happens when drivers share a core with GAME / RENDER / RHI.
 - `[MSI]` **[MSI and MSI-X](./02-msi.en.md)** — Line versus message: why disabling MSI MODE adds extra and longer ISRs, why MessageNumberLimit should be removed, and how the program reads a device's real mode.

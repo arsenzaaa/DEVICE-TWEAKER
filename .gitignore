@@ -42,8 +42,6 @@ src/**/logs/
 src/**/last-crash.txt
 docs/*.pdf
 
-# Site build output
-/_site/
 
 # Python bytecode
 __pycache__/

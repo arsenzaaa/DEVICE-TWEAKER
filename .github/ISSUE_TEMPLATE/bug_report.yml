@@ -8,7 +8,7 @@ body:
         Лог лежит в папке `logs` рядом с EXE. Перед отправкой уберите из него личные пути и имена.
         The log is in the `logs` folder next to the EXE. Remove personal paths and names before posting.
 
-        Если вопрос о том, как работает настройка, сначала загляните в [гайд](https://arsenzaaa.github.io/DEVICE-TWEAKER/guide/). If the question is how a setting works, check the [guide](https://arsenzaaa.github.io/DEVICE-TWEAKER/en/guide/) first.
+        Если вопрос о том, как работает настройка, сначала загляните в [гайд](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/README.md). If the question is how a setting works, check the [guide](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/README.en.md) first.
   - type: input
     id: version
     attributes:

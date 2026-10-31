@@ -1,13 +1,12 @@
-"""Frames the program screenshots for the README and the site: rounded corners, a thin edge
+"""Frames the program screenshots for the README: rounded corners, a thin edge
 and a soft shadow on a transparent background, so they sit well on light and dark pages.
 
     python dev/branding/screens.py
 
 Reads assets/screenshots/*.png (captured by dev/qa/Capture-Showcase.ps1) and writes
-assets/screenshots/framed/<name>.png (full size, for the site and high-density screens) and
+assets/screenshots/framed/<name>.png (full size, for high-density screens) and
 assets/screenshots/readme/<name>.png, reduced in advance to exactly the 838 px README column of
-github.com, so the browser shows it 1:1 instead of resampling it, and
-assets/screenshots/thumbs/<name>.png: the top 4:3 part, reduced for the site gallery.
+github.com, so the browser shows it 1:1 instead of resampling it.
 """
 from pathlib import Path
 
@@ -17,8 +16,6 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "assets" / "screenshots"
 OUT = SOURCE / "framed"
 README_OUT = SOURCE / "readme"
-THUMB_OUT = SOURCE / "thumbs"
-THUMB_WIDTH = 366
 COLUMN = 838
 
 # radius, padding, shadow blur, shadow offset, shadow alpha
@@ -63,15 +60,9 @@ def reduced(shot):
     return small.filter(ImageFilter.UnsharpMask(radius=0.8, percent=60, threshold=0))
 
 
-def thumb(shot):
-    w = shot.width
-    top = shot.convert("RGB").crop((0, 0, w, round(w * 3 / 4)))
-    small = top.resize((THUMB_WIDTH, round(THUMB_WIDTH * 3 / 4)), Image.LANCZOS)
-    return small.filter(ImageFilter.UnsharpMask(radius=0.8, percent=60, threshold=0))
-
 
 def main():
-    for folder in (OUT, README_OUT, THUMB_OUT):
+    for folder in (OUT, README_OUT):
         folder.mkdir(exist_ok=True)
         for old in folder.glob("*.png"):
             old.unlink()
@@ -81,7 +72,6 @@ def main():
         framed.save(OUT / path.name, optimize=True)
         small = frame(reduced(shot), COMPACT)
         small.save(README_OUT / path.name, optimize=True)
-        thumb(shot).save(THUMB_OUT / path.name, optimize=True)
         print(path.name, framed.size, small.size)
 
 

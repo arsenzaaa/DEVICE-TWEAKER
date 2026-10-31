@@ -8,7 +8,7 @@ body:
         Такие отчёты помогают проверить авто-оптимизацию, IMOD и NIC ITR на разном железе. Полезнее всего три лога: до применения, сразу после и после перезагрузки.
         These reports help verify auto-optimization, IMOD and NIC ITR on different hardware. Three logs help most: before applying, right after, and after a restart.
 
-        Как записать трейс ISR / DPC — [глава 10 гайда](https://arsenzaaa.github.io/DEVICE-TWEAKER/guide/10-verification/). How to record an ISR / DPC trace: [guide chapter 10](https://arsenzaaa.github.io/DEVICE-TWEAKER/en/guide/10-verification/).
+        Как записать трейс ISR / DPC — [глава 10 гайда](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/10-verification.md). How to record an ISR / DPC trace: [guide chapter 10](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/10-verification.en.md).
   - type: input
     id: version
     attributes:

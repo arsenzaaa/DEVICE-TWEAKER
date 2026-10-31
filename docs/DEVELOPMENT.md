@@ -59,16 +59,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\src\publish-variants.ps1 -
 
 Полный локальный QA — сборки, тесты, намеренные поломки, нативная модель драйвера и проверки интерфейса на скрытом рабочем столе — описан в [`dev/qa`](../dev/qa/README.md). Он работает только на чтение и не загружает драйвер.
 
-## Сайт и графика
+## Графика README
 
-Сайт [arsenzaaa.github.io/DEVICE-TWEAKER](https://arsenzaaa.github.io/DEVICE-TWEAKER/) собирается из глав гайда `docs/guide`, `docs/`, `CHANGELOG.md` / `CHANGELOG.en.md` и текста главной страницы в `dev/site/build.py`. Workflow `Site` публикует его на GitHub Pages после изменений в `main`. Локально:
-
-```powershell
-pip install markdown==3.7
-python dev/site/build.py --out _site
-```
-
-Знак и схемы в `assets/branding` рисует `dev/branding/render.py`: текст переводится в кривые, поэтому SVG выглядят одинаково в любой системе. Рамку и тень скриншотов добавляет `dev/branding/screens.py`, исходные снимки делает `dev/qa/Capture-Showcase.ps1`. Логотип README (`assets/readme`) рисует `dev/branding/readme.py`, уменьшенные копии скриншотов для README и сайта делает `screens.py`.
+Логотип в `assets/readme` рисует `dev/branding/readme.py`: текст переводится в кривые, поэтому SVG выглядит одинаково в любой системе. Исходные снимки делает `dev/qa/Capture-Showcase.ps1`, рамку, тень и уменьшенную копию для README добавляет `dev/branding/screens.py`.
 
 ## Устройство кода
 
@@ -82,7 +75,7 @@ python dev/site/build.py --out _site
 | `src/Startup` | скрипт автозапуска и общий runtime регистров |
 | `src/IMOD` | драйвер DTIMOD и загрузчик KDU |
 | `dev/qa` | тесты, тест-панель и QA |
-| `dev/site`, `dev/branding` | сайт, знак, схемы и рамка скриншотов |
+| `dev/branding` | логотип и рамка скриншотов README |
 
 Логи приложения пишутся в папку `logs` рядом с EXE, отдельный файл на каждый запуск. При необработанной ошибке там же появляется crash-файл и `last-crash.txt`.
 

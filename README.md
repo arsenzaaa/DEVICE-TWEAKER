@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://arsenzaaa.github.io/DEVICE-TWEAKER/">
+  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="./assets/readme/wordmark-dark.svg">
       <img src="./assets/readme/wordmark-light.svg" alt="DEVICE TWEAKER" width="560">
@@ -11,8 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest"><b>Скачать 0.0.4</b></a> ·
-  <a href="https://arsenzaaa.github.io/DEVICE-TWEAKER/guide/">Гайд</a> ·
-  <a href="https://arsenzaaa.github.io/DEVICE-TWEAKER/">Сайт</a> ·
+  <a href="./docs/guide/README.md">Гайд</a> ·
   <a href="./CHANGELOG.md">Изменения</a> ·
   <a href="https://t.me/arsenzaa">Telegram</a> ·
   <a href="./README.en.md">English</a>
@@ -59,7 +58,7 @@ SHA-256 файлов — в `SHA256SUMS.txt` на странице релиз�
 
 ## <samp>[ ГАЙД ]</samp>
 
-Как это устроено в Windows и что делает программа. Те же главы с поиском — на [сайте](https://arsenzaaa.github.io/DEVICE-TWEAKER/guide/).
+Как это устроено в Windows и что делает программа.
 
 1. [Прерывания: ISR, DPC и ядра](./docs/guide/01-interrupts.md)
 2. [MSI и MSI-X](./docs/guide/02-msi.md)
