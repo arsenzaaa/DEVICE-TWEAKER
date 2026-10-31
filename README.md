@@ -1,186 +1,159 @@
 <p align="right"><a href="./README.en.md">English</a></p>
 
-<h1>
-  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER#gh-dark-mode-only"><picture><source media="(max-width: 600px)" srcset="./assets/branding/hero-mobile-dark.svg"><img src="./assets/branding/hero-dark.svg" alt="DEVICE TWEAKER / Windows 10/11 x64 / 0.0.4" width="1080"></picture></a>
-  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER#gh-light-mode-only"><picture><source media="(max-width: 600px)" srcset="./assets/branding/hero-mobile-light.svg"><img src="./assets/branding/hero-light.svg" alt="DEVICE TWEAKER / Windows 10/11 x64 / 0.0.4" width="1080"></picture></a>
-</h1>
-
-<p align="center"><strong>DEVICE TWEAKER настраивает прерывания устройств в Windows 10/11 x64.</strong></p>
-
-MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + управление IMOD / ITR в одном интерфейсе с интеллектуальной авто-оптимизацией.
-
 <p align="center">
-  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4#gh-dark-mode-only"><img src="./assets/branding/download-ru-dark.svg" alt="Скачать 0.0.4" width="170"></a>
-  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4#gh-light-mode-only"><img src="./assets/branding/download-ru-light.svg" alt="Скачать 0.0.4" width="170"></a>
-  <a href="./src/docs/SETTINGS.md#gh-dark-mode-only"><img src="./assets/branding/settings-ru-dark.svg" alt="Настройки" width="140"></a>
-  <a href="./src/docs/SETTINGS.md#gh-light-mode-only"><img src="./assets/branding/settings-ru-light.svg" alt="Настройки" width="140"></a>
+  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest">
+    <picture>
+      <source media="(prefers-color-scheme: dark) and (max-width: 600px)" srcset="./assets/branding/hero-mobile-ru-dark.svg">
+      <source media="(prefers-color-scheme: light) and (max-width: 600px)" srcset="./assets/branding/hero-mobile-ru-light.svg">
+      <source media="(prefers-color-scheme: dark)" srcset="./assets/branding/hero-ru-dark.svg">
+      <img src="./assets/branding/hero-ru-light.svg" alt="DEVICE TWEAKER — настройка прерываний устройств под топологию процессора" width="100%">
+    </picture>
+  </a>
 </p>
 
-## <samp>[ ИНТЕРФЕЙС ]</samp>
+<p align="center">
+  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/branding/button-download-ru-dark.svg"><img src="./assets/branding/button-download-ru-light.svg" alt="Скачать 0.0.4" height="48"></picture></a>&nbsp;
+  <a href="./src/docs/SETTINGS.md"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/branding/button-settings-ru-dark.svg"><img src="./assets/branding/button-settings-ru-light.svg" alt="Описание настроек" height="48"></picture></a>&nbsp;
+  <a href="./CHANGELOG.md"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/branding/button-changelog-ru-dark.svg"><img src="./assets/branding/button-changelog-ru-light.svg" alt="Что нового" height="48"></picture></a>
+</p>
 
-<p align="center"><a href="./assets/screenshots/showcase_intel_14900k_full_ru.png"><img src="./assets/screenshots/showcase_intel_14900k_full_ru.png" alt="USB IMOD / Intel Core i9-14900K" width="860"></a></p>
+<p align="center">
+  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest"><img src="https://img.shields.io/github/v/release/arsenzaaa/DEVICE-TWEAKER?style=flat-square&label=%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F&labelColor=0b0e13&color=30363d" alt="Версия"></a>
+  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases"><img src="https://img.shields.io/github/downloads/arsenzaaa/DEVICE-TWEAKER/total?style=flat-square&label=%D0%B7%D0%B0%D0%B3%D1%80%D1%83%D0%B7%D0%BA%D0%B8&labelColor=0b0e13&color=30363d" alt="Загрузки"></a>
+  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/arsenzaaa/DEVICE-TWEAKER/ci.yml?branch=main&style=flat-square&label=CI&labelColor=0b0e13" alt="CI"></a>
+  <img src="https://img.shields.io/badge/Windows-10%20%2F%2011%20x64-30363d?style=flat-square&labelColor=0b0e13" alt="Windows 10 / 11 x64">
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/arsenzaaa/DEVICE-TWEAKER?style=flat-square&label=%D0%BB%D0%B8%D1%86%D0%B5%D0%BD%D0%B7%D0%B8%D1%8F&labelColor=0b0e13&color=30363d" alt="Лицензия GPL-3.0"></a>
+</p>
 
-<table width="100%">
-<tr><th align="left" width="860"><samp>Другие конфигурации</samp></th></tr>
-<tr><td width="860"><details><summary><samp>USB IMOD на AMD</samp></summary>
-<p><a href="./assets/screenshots/showcase_amd_imod_full_ru.png"><img src="./assets/screenshots/showcase_amd_imod_full_ru.png" alt="USB IMOD на AMD" width="100%"></a></p>
-</details></td></tr>
-<tr><td width="860"><details><summary><samp>Настройка прерываний GPU</samp></summary>
-<p><a href="./assets/screenshots/showcase_gpu_full_ru.png"><img src="./assets/screenshots/showcase_gpu_full_ru.png" alt="Настройка прерываний GPU" width="100%"></a></p>
-</details></td></tr>
-<tr><td width="860"><details><summary><samp>NIC ITR / RSS</samp></summary>
-<p><a href="./assets/screenshots/showcase_nic_full_ru.png"><img src="./assets/screenshots/showcase_nic_full_ru.png" alt="NIC ITR / RSS" width="100%"></a></p>
-</details></td></tr>
+<p align="center"><strong>MSI Utility&nbsp;V3 + Interrupt Affinity Policy Tool + ReservedCpuSets + IMOD / NIC&nbsp;ITR</strong><br>в одной программе, с интеллектуальной авто-оптимизацией под топологию процессора.</p>
+
+## Интерфейс
+
+<p align="center"><a href="./assets/screenshots/showcase_intel_14900k_full_ru.png"><img src="./assets/screenshots/showcase_intel_14900k_full_ru.png" alt="USB IMOD на Intel Core i9-14900K" width="100%"></a></p>
+
+<table>
+  <tr>
+    <td width="33%" align="center"><a href="./assets/screenshots/showcase_amd_imod_full_ru.png"><img src="./assets/screenshots/showcase_amd_imod_full_ru.png" alt="USB IMOD на AMD Ryzen 9 9950X3D"></a><br><sub>USB IMOD · Ryzen 9 9950X3D</sub></td>
+    <td width="33%" align="center"><a href="./assets/screenshots/showcase_gpu_full_ru.png"><img src="./assets/screenshots/showcase_gpu_full_ru.png" alt="Прерывания GPU"></a><br><sub>GPU · пара физических ядер</sub></td>
+    <td width="33%" align="center"><a href="./assets/screenshots/showcase_nic_full_ru.png"><img src="./assets/screenshots/showcase_nic_full_ru.png" alt="NIC ITR и RSS"></a><br><sub>Сеть · NIC ITR и RSS</sub></td>
+  </tr>
 </table>
 
 <sub>На скриншотах тестовые устройства и значения.</sub>
 
-## <samp>[ ФУНКЦИОНАЛЬНОСТЬ ]</samp>
+## Возможности
 
-<table width="100%">
-<tr><th align="left" width="860"><strong>Интеллектуальная авто-оптимизация</strong></th></tr>
-<tr><td width="860">
-<p>Интеллектуальная авто-оптимизация учитывает P-Core / E-Core, SMT / HT, CPPC-рейтинг, CCD / CCX, количество устройств и их роли. Для дискретной GPU подбираются два разных физических ядра, для USB / сети / аудио используются свои правила распределения.</p><p align="center"><a href="./src/docs/SETTINGS.md#gh-dark-mode-only"><img src="./assets/branding/cpu-allocation-ru-dark.svg" alt="Два физических ядра для дискретной GPU" width="360"></a><a href="./src/docs/SETTINGS.md#gh-light-mode-only"><img src="./assets/branding/cpu-allocation-ru-light.svg" alt="Два физических ядра для дискретной GPU" width="360"></a></p>
-</td></tr>
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Авто-оптимизация</h3>
+      Учитывает P-Core / E-Core, SMT / HT, CCD / CCX, CPPC-рейтинг и роли устройств. Дискретной GPU — два разных физических ядра, вводу, сети и аудио — свои правила. Неясная топология — запись не начинается.
+    </td>
+    <td width="50%" valign="top">
+      <h3>Прерывания</h3>
+      MSI Mode, MSI Limit, IRQ Priority, Policy и Interrupt Affinity. Отдельно показывает настройку из реестра, текущий режим IRQ Mode и возможности устройства (HW).
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>USB IMOD</h3>
+      Модерация прерываний xHCI: одно значение на контроллер, по interrupter'ам или по ролям — мышь, клавиатура, аудио, геймпад. Карта ролей читается из контекстов xHCI.
+    </td>
+    <td width="50%" valign="top">
+      <h3>Сеть</h3>
+      NIC&nbsp;ITR для Intel I210/I211, I219, I225/I226, I350, 82576/82580 и Realtek RTL8111/8168, RTL8125/8126 с отключением модерации драйвера. RSS — по одному CPU на физическое ядро, в пределах векторов MSI-X.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Устройства и CPU</h3>
+      Находит GPU, USB-контроллеры, сетевые и аудиоконтроллеры, накопители. Знает, на каком контроллере мышь, клавиатура и микрофон, и к какому ядру относится каждый поток.
+    </td>
+    <td width="50%" valign="top">
+      <h3>Ввод и система</h3>
+      Замер Polling Rate через Raw Input, Mouse Throttle на Windows 11, ReservedCpuSets и энергосбережение USB-контроллеров, хабов и проводной сети.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Откат</h3>
+      Проверенный бекап перед каждой записью, восстановление исходного состояния или любого бекапа, сброс к настройкам Windows.
+    </td>
+    <td width="50%" valign="top">
+      <h3>Прозрачность</h3>
+      Подробный лог: что применилось, что пропущено и почему. После записи каждое значение читается повторно. Открытый код, включая драйвер.
+    </td>
+  </tr>
 </table>
 
-<table width="100%">
-<tr><th align="left" width="860"><strong>Настройка прерываний</strong></th></tr>
-<tr><td width="860">
-<p>Поддерживает настройку MSI Mode / MSI Limit / IRQ Priority / IRQ Policy / Interrupt Affinity.</p>
-<p>Отдельно отображает настройку MSI Mode из реестра и текущий режим прерываний в IRQ Mode. Поддерживаемые устройством режимы отображаются в HW.</p>
-<p>При открытии использует уже загруженный DTIMOD.sys или ресурсы Windows, без загрузки драйвера. Если по ресурсам Windows нельзя отличить MSI от MSI-X, показывает MSI/MSI-X.</p>
-<p><strong>СЧИТАТЬ IRQ</strong> вверху окна читает режимы всех отображаемых PCI-устройств через DTIMOD.sys; при необходимости загружает драйвер.</p>
-</td></tr>
-</table>
+## Как это работает
 
-<table width="100%">
-<tr><th align="left" width="860"><strong>USB IMOD</strong></th></tr>
-<tr><td width="860">
-<p>Считывает и отображает IMOD у поддерживаемых USB-контроллеров xHCI. Режим <strong>Устройства</strong> задаёт профиль по USB-ролям, <strong>XHCI</strong> использует одно значение для контроллера, <strong>Interrupters</strong> позволяет задать значения по индексам.</p>
-<p>Для чтения и записи использует самописный драйвер DTIMOD.sys, после записи повторно считывает значения. Сохранённые значения применяются при входе в Windows, после выхода из сна и при подключении USB-устройств; скрипт автозапуска работает и без EXE.</p>
-</td></tr>
-</table>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark) and (max-width: 600px)" srcset="./assets/branding/pipeline-mobile-ru-dark.svg">
+    <source media="(prefers-color-scheme: light) and (max-width: 600px)" srcset="./assets/branding/pipeline-mobile-ru-light.svg">
+    <source media="(prefers-color-scheme: dark)" srcset="./assets/branding/pipeline-ru-dark.svg">
+    <img src="./assets/branding/pipeline-ru-light.svg" alt="Скан → План → Бекап → Запись → Проверка → Автозапуск" width="100%">
+  </picture>
+</p>
 
-<table width="100%">
-<tr><th align="left" width="860"><strong>Настройка сети</strong></th></tr>
-<tr><td width="860">
-<p>Считывает и отображает NIC ITR у поддерживаемых сетевых адаптеров Intel / Realtek, включая совместимые Killer. Информация по очередям и RX/TX зависит от семейства контроллера. Позволяет изменить текущие значения и сохранить профиль, который применяется при входе в Windows, после выхода из сна и при подключении USB-устройств.</p>
-<p>Поддерживает настройку RSS у проводных сетевых адаптеров NDIS: базовый CPU, количество очередей и режим RSS/IRQ.</p>
-</td></tr>
-</table>
+Настройки прерываний записываются в реестр и вступают в силу после перезагрузки. IMOD и NIC&nbsp;ITR — регистры самого устройства: их пишет собственный драйвер **DTIMOD.sys**, и только в память, которую Windows выделила этому устройству. Значения в регистрах живут до перезагрузки или сна, поэтому сохранённый профиль применяет открытый скрипт `ApplyIMOD.ps1` из Планировщика заданий — он работает и без EXE.
 
-<table width="100%">
-<tr><th align="left" width="860"><strong>Определение устройств</strong></th></tr>
-<tr><td width="860">
-<p>Автоматически определяет GPU / USB-контроллеры / сетевые адаптеры / аудиоконтроллеры / контроллеры накопителей.</p>
-<p>Автоматически определяет, на каком USB-контроллере находятся мышь / клавиатура / геймпад / микрофон / аудио / камера. Если несколько устройств подключены к одному контроллеру, отображаются все найденные роли.</p>
-</td></tr>
-</table>
+## Скачать
 
-<table width="100%">
-<tr><th align="left" width="860"><strong>Топология процессора</strong></th></tr>
-<tr><td width="860">
-<p>Автоматически определяет и отображает P-Core / E-Core, SMT / HT, AMD CCD / CCX и доступный CPPC-рейтинг. Показывает, к какому физическому ядру относится каждый логический поток.</p>
-</td></tr>
-</table>
+| Сборка | Файл | Что нужно |
+| --- | --- | --- |
+| **Со встроенным .NET** | [`DEVICE.TWEAKER.SelfContained.exe`](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.SelfContained.exe) | ничего, всё внутри |
+| **Обычная** | [`DEVICE.TWEAKER.exe`](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.exe) | [.NET 8 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/8.0) |
 
-<table width="100%">
-<tr><th align="left" width="860"><strong>Резервирование CPU</strong></th></tr>
-<tr><td width="860">
-<p>Поддерживает резервирование выбранных CPU через ReservedCpuSets.</p>
-</td></tr>
-</table>
+DTIMOD.sys и загрузчик KDU встроены в обе сборки. Контрольные суммы — в `SHA256SUMS.txt` на [странице релиза](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest).
 
-<table width="100%">
-<tr><th align="left" width="860"><strong>Polling Rate</strong></th></tr>
-<tr><td width="860">
-<p>Отображает информацию о Polling Rate мыши / клавиатуры и поддерживает замер частоты событий Raw Input. У клавиатуры частота событий зависит от нажатий.</p>
-</td></tr>
-</table>
+## Быстрый старт
 
-<table width="100%">
-<tr><th align="left" width="860"><strong>Mouse Throttle</strong></th></tr>
-<tr><td width="860">
-<p>Поддерживает настройку RawMouseThrottleDuration на совместимых сборках Windows 11 с отображением текущего значения в интерфейсе.</p>
-</td></tr>
-</table>
+1. Запустите программу **от имени администратора**.
+2. Нажмите **АВТООПТИМИЗАЦИЯ** — программа сохранит исходные настройки и предложит включить USB IMOD, если есть подходящий контроллер xHCI. Или настройте устройства вручную и нажмите **ПРИМЕНИТЬ**.
+3. Перезагрузите компьютер.
+4. **ПРОВЕРИТЬ** в блоке IMOD / NIC&nbsp;ITR считывает фактические значения регистров.
+5. Откатить всё можно через **ВОССТАНОВЛЕНИЕ**: исходное состояние, любой бекап или сброс к настройкам Windows.
 
-<table width="100%">
-<tr><th align="left" width="860"><strong>Энергосбережение</strong></th></tr>
-<tr><td width="860">
-<p>Поддерживает настройку энергосбережения USB-контроллеров / корневых USB-хабов / проводных сетевых адаптеров.</p>
-</td></tr>
-</table>
+Подробно о каждой настройке — в [описании настроек](./src/docs/SETTINGS.md).
 
-<table width="100%">
-<tr><th align="left" width="860"><strong>Интерфейс / навигация</strong></th></tr>
-<tr><td width="860">
-<p>Поддерживает поиск по устройствам, переход по категориям и переключение RU/EN без перезапуска.</p>
-</td></tr>
-</table>
+## Вопросы
 
-<table width="100%">
-<tr><th align="left" width="860"><strong>Бекапы / логи</strong></th></tr>
-<tr><td width="860">
-<p>Поддерживает создание бекапов, восстановление выбранного бекапа, удаление старых бекапов и сброс настроек.</p>
-<p>Записывает подробные логи определения устройств и применения настроек (что применилось / что пропущено / по какой причине).</p>
-</td></tr>
-</table>
+<details>
+<summary><strong>Зачем драйвер и почему антивирус может ругаться на KDU</strong></summary>
+<br>
 
-<table width="100%">
-<tr><th align="left" width="860"><strong>Скачать</strong></th></tr>
-<tr><td width="860">
+IMOD и NIC&nbsp;ITR — аппаратные регистры, из пользовательского режима их не записать. DTIMOD.sys не имеет публичной подписи, поэтому его загружает [KDU](./src/IMOD/KDU/README.md) через подписанный уязвимый драйвер. Антивирусы помечают такие загрузчики как HackTool. Исходники DTIMOD и закреплённая версия KDU лежат в репозитории, бинарники сверяются по SHA-256. Драйвер нужен только для IMOD, NIC&nbsp;ITR и кнопки **СЧИТАТЬ IRQ** — остальные настройки работают без него.
+</details>
 
-<p>В <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4">релизе</a> доступны две сборки:</p>
-<p><strong>Обычная сборка</strong><br/><sub>DEVICE.TWEAKER.exe</sub><br/>Для запуска требуется <a href="https://dotnet.microsoft.com/download/dotnet/8.0">.NET 8 Desktop Runtime x64</a>.</p><p><strong>Со встроенным .NET</strong><br/><sub>DEVICE.TWEAKER.SelfContained.exe</sub><br/>Включает .NET, отдельно устанавливать его не нужно.</p>
-<p>Драйвер DTIMOD.sys и загрузчик KDU встроены в обе сборки. SHA-256 каждого EXE указан в SHA256SUMS.txt.</p>
+<details>
+<summary><strong>HVCI, Vulnerable Driver Blocklist и античиты</strong></summary>
+<br>
 
-</td></tr>
-</table>
+Целостность памяти (HVCI) и Microsoft Vulnerable Driver Blocklist блокируют загрузку через KDU; FACEIT и Vanguard могут конфликтовать с ней. Перед USB IMOD программа показывает **ПРОВЕРКУ СИСТЕМЫ** с их состоянием. MSI, affinity, RSS и остальные настройки реестра от драйвера не зависят.
+</details>
 
-<table width="100%">
-<tr><th align="left" width="860"><strong>Использование</strong></th></tr>
-<tr><td width="860">
+<details>
+<summary><strong>Как вернуть всё как было</strong></summary>
+<br>
 
-<p>Скачайте нужную сборку и запустите программу от имени администратора.</p>
-<p>Для интеллектуальной авто-оптимизации нажмите <strong>АВТООПТИМИЗАЦИЯ</strong>. Если есть подходящие USB-контроллеры xHCI, программа предложит включить настройку IMOD перед применением. NIC ITR настраивается вручную.</p>
-<p>Для ручной настройки выберите нужные параметры и нажмите <strong>ПРИМЕНИТЬ</strong>. Эта кнопка применяет настройки прерываний, ReservedCpuSets, RSS, Mouse Throttle, энергосбережения и USB IMOD.</p>
-<p>У IMOD / NIC ITR также есть отдельные кнопки:</p>
-<ul>
-<li>IMOD: <strong>ЗАДАТЬ</strong> применяет настройки и сохраняет значения, отличающиеся от стандартных, для применения при входе в Windows, после выхода из сна и при подключении USB-устройств.</li>
-<li>NIC ITR: <strong>ЗАДАТЬ</strong> меняет текущие значения, <strong>СОХРАНИТЬ</strong> сохраняет профиль для применения при входе в Windows, после выхода из сна и при подключении USB-устройств.</li>
-<li><strong>ПРОВЕРИТЬ</strong> считывает текущие значения IMOD / NIC ITR.</li>
-<li>IMOD: <strong>УДАЛИТЬ</strong> убирает общий автозапуск IMOD / NIC ITR и возвращает поля IMOD к стандартному значению. Чтобы завершить сброс, перезагрузите компьютер.</li>
-</ul>
-<p><strong>ОБНОВИТЬ</strong> повторно определяет устройства. Для отката настроек нажмите <strong>ВОССТАНОВЛЕНИЕ</strong> и выберите нужный бекап.</p>
-<p>После <strong>ПРИМЕНИТЬ</strong> / <strong>АВТООПТИМИЗАЦИЯ</strong> перезагрузите компьютер, чтобы завершить применение настроек.</p>
-<p>Перед ручным применением и сбросом программа создаёт бекап. При интеллектуальной авто-оптимизации сохраняются исходные настройки.</p>
-<p>Подробное описание настроек: <a href="./src/docs/SETTINGS.md">SETTINGS.md</a>.</p>
+**ВОССТАНОВЛЕНИЕ → ИСХОДНЫЙ** возвращает реестр к снимку, сделанному до первого применения, и удаляет автозапуск IMOD / NIC&nbsp;ITR. Затем перезагрузите компьютер. Бекапы лежат в папке `Backups` рядом с EXE.
+</details>
 
-</td></tr>
-</table>
+<details>
+<summary><strong>Сохранятся ли IMOD и NIC ITR после перезагрузки и сна</strong></summary>
+<br>
 
-<table width="100%">
-<tr><th align="left" width="860"><strong>Баги / тестирование</strong></th></tr>
-<tr><td width="860">
+Да. Задача `\DEVICE TWEAKER\IMOD` применяет сохранённый профиль при входе в Windows, после выхода из сна и при подключении USB-устройства. Её файлы и логи — в `%ProgramData%\DEVICE TWEAKER\Startup`.
+</details>
 
-<p>Сообщайте о найденных багах / недоработках в <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=bug_report.yml">issues</a>. Прикладывайте лог, версию программы, сборку Windows и конфигурацию ПК. Также напишите, что делали и что произошло.</p>
-<p>Если хотите помочь с тестированием интеллектуальной авто-оптимизации, отправляйте логи в следующем порядке:</p>
-<ol>
-<li>До применения интеллектуальной авто-оптимизации (или после ресета настроек).</li>
-<li>После применения интеллектуальной авто-оптимизации.</li>
-<li>После перезагрузки компьютера и повторного запуска программы.</li>
-</ol>
-<p>Обновления и обсуждение проекта: <a href="https://t.me/arsenzaa">Telegram</a>.</p>
+## Обратная связь
 
-</td></tr>
-</table>
+Нашли ошибку — откройте [issue](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=bug_report.yml) и приложите лог из папки `logs` рядом с EXE, версию Windows и конфигурацию ПК. Для проверки авто-оптимизации особенно полезны три лога: до применения, сразу после и после перезагрузки.
 
-<table width="100%">
-<tr><th align="left" width="860"><strong>Исходники</strong></th></tr>
-<tr><td width="860">
+Новости и обсуждение — в [Telegram](https://t.me/arsenzaa).
 
-<p><a href="./src/README.md">Сборка и проверки</a> · <a href="./CHANGELOG.md">История изменений</a> · <a href="./LICENSE">GPL-3.0</a></p>
-</td></tr>
-</table>
+## Документация
+
+[Описание настроек](./src/docs/SETTINGS.md) · [История изменений](./CHANGELOG.md) · [Сборка](./src/docs/BUILD.md) · [Проверки](./dev/qa/README.md) · [Безопасность](./.github/SECURITY.md) · [Участие](./.github/CONTRIBUTING.md) · [GPL-3.0](./LICENSE)
