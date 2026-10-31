@@ -101,10 +101,10 @@
 
 ## Скачать
 
-| Сборка | Файл | Что нужно |
-| --- | --- | --- |
-| **Со встроенным .NET** | [`DEVICE.TWEAKER.SelfContained.exe`](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.SelfContained.exe) | ничего, всё внутри |
-| **Обычная** | [`DEVICE.TWEAKER.exe`](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.exe) | [.NET 8 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/8.0) |
+| Сборка | Что нужно |
+| --- | --- |
+| **Со встроенным .NET**<br>[DEVICE.TWEAKER.SelfContained.exe](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.SelfContained.exe) | ничего, всё внутри |
+| **Обычная**<br>[DEVICE.TWEAKER.exe](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.exe) | [.NET 8 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/8.0) |
 
 DTIMOD.sys и загрузчик KDU встроены в обе сборки. Контрольные суммы — в `SHA256SUMS.txt` на [странице релиза](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest).
 

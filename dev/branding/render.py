@@ -166,12 +166,12 @@ def hero(f, c, t):
 def hero_mobile(f, c, t):
     w, h = 640, 330
     p = [f'<rect x="0.5" y="0.5" width="{w - 1}" height="{h - 1}" rx="14" fill="{c["card"]}" stroke="{c["border"]}"/>']
-    p.append(text(f["mono"], t["eyebrow"], 18, 40, 66, c["muted"], 2))
+    p.append(text(f["mono"], t["eyebrow"], 22, 40, 66, c["muted"], 2))
     size = fit(f["display"], "DEVICE TWEAKER", 70, 560, -1)
     p.append(text(f["display"], "DEVICE TWEAKER", size, 38, 136, c["text"], -1))
-    p.append(text(f["medium"], t["tagline"][0], 25, 40, 186, c["muted"]))
-    p.append(text(f["medium"], t["tagline"][1], 25, 40, 220, c["muted"]))
-    strip, _ = core_strip(f, c, 40, 250, 29, 7.07, 312, 19)
+    p.append(text(f["medium"], t["tagline"][0], 30, 40, 186, c["muted"]))
+    p.append(text(f["medium"], t["tagline"][1], 30, 40, 224, c["muted"]))
+    strip, _ = core_strip(f, c, 40, 252, 29, 7.07, 314, 22)
     p.append(strip)
     return svg(w, h, "DEVICE TWEAKER", "".join(p))
 
@@ -216,15 +216,15 @@ def pipeline(f, c, t):
 
 
 def pipeline_mobile(f, c, t):
-    w, h = 640, 470
+    w, h = 640, 600
     p = [f'<rect x="0.5" y="0.5" width="{w - 1}" height="{h - 1}" rx="14" fill="{c["card"]}" stroke="{c["border"]}"/>']
     for i, (title, lines) in enumerate(t["steps"]):
         col, row = i % 2, i // 2
-        x, y = 40 + col * 300, 40 + row * 145
-        p.append(text(f["mono"], f"0{i + 1}", 16, x, y + 18, c["muted"], 1.5))
-        p.append(text(f["semibold"], title, 27, x, y + 58, c["text"]))
-        p.append(text(f["regular"], lines[0], 18, x, y + 90, c["muted"]))
-        p.append(text(f["regular"], lines[1], 18, x, y + 114, c["muted"]))
+        x, y = 36 + col * 300, 36 + row * 186
+        p.append(text(f["mono"], f"0{i + 1}", 20, x, y + 22, c["muted"], 1.5))
+        p.append(text(f["semibold"], title, 34, x, y + 68, c["text"]))
+        p.append(text(f["regular"], lines[0], 23, x, y + 106, c["muted"]))
+        p.append(text(f["regular"], lines[1], 23, x, y + 136, c["muted"]))
     return svg(w, h, " → ".join(s[0] for s in t["steps"]), "".join(p))
 
 
