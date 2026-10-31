@@ -3,3 +3,7 @@
 
 # Pinned upstream KDU sources: kept for reproducible builds, not project code.
 src/IMOD/KDU/** linguist-vendored
+
+# Site and artwork generators: tooling, not program code.
+dev/site/** linguist-documentation
+dev/branding/** linguist-documentation

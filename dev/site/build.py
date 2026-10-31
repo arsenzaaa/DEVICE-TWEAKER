@@ -137,10 +137,10 @@ def rel(from_url, to_url):
 
 
 def typography(markup):
-    """No line break after one-letter Russian words and before a dash, outside tags and code."""
+    """No line break after one-letter Russian words, before a dash or a slash, outside tags and code."""
     parts = re.split(r"(<code>.*?</code>|<pre>.*?</pre>|<[^>]+>)", markup, flags=re.S)
     for i in range(0, len(parts), 2):
-        parts[i] = re.sub(r"(?<![\w-])([иИвВсСкКуУаАоОяЯ]) ", lambda m: m.group(1) + NBSP, parts[i]).replace(" — ", NBSP + "— ")
+        parts[i] = re.sub(r"(?<![\w-])([иИвВсСкКуУаАоОяЯ]) ", lambda m: m.group(1) + NBSP, parts[i]).replace(" — ", NBSP + "— ").replace(" / ", NBSP + "/ ")
     return "".join(parts)
 
 
@@ -240,7 +240,7 @@ def head(lang, title, description, here, slug):
 <link rel="icon" href="{root}assets/mark.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap">
 <link rel="stylesheet" href="{root}assets/site.css">
 </head>
 <body>
@@ -257,7 +257,7 @@ def topbar(lang, here, slug, section):
         f'<a class="lang{" on" if code == lang else ""}" href="{rel(here, page_url(slug, code))}" hreflang="{code}">{code.upper()}</a>'
         for code in ("en", "ru"))
     return f"""<header class="topbar">
-<a class="brand" href="{rel(here, page_url('', lang))}"><img src="{root}assets/mark.svg" width="26" height="26" alt=""><span>DEVICE TWEAKER</span></a>
+<a class="brand" href="{rel(here, page_url('', lang))}">DEVICE TWEAKER</a>
 <nav class="nav">{nav}<a class="chip" href="{REPO}">[ GITHUB ]</a></nav>
 <div class="langs">{langs}</div>
 </header>
@@ -284,12 +284,13 @@ def footer(lang, here, ver):
 # Pages
 
 def card(c, here, ui):
-    return f"""<article class="card" data-tag="{html.escape(c.tag)}" data-text="{html.escape((c.title + ' ' + c.summary + ' ' + c.text).lower())}">
-<a class="card-head" href="{rel(here, c.url())}"><span class="tag">[{c.tag}]</span><span class="num">{c.number}</span><span class="title">{c.title}</span></a>
-<p class="card-text">{html.escape(c.summary)}</p>
-<div class="card-foot"><span class="kv"><span class="key">{ui['chapter']}:</span> {c.number}</span><span class="kv"><span class="key">{ui['reading']}:</span> {c.minutes} {ui['minutes']}</span>
-<a class="button small" href="{rel(here, c.url())}">{ui['open']}</a></div>
-</article>"""
+    # The whole card is the link: a device card header, the summary and the reading time.
+    return f"""<a class="card" href="{rel(here, c.url())}" data-tag="{html.escape(c.tag)}" data-text="{html.escape((c.title + ' ' + c.summary + ' ' + c.text).lower())}">
+<span class="card-head"><span class="tag">[{c.tag}]</span><span class="num">{c.number}</span></span>
+<span class="card-title">{c.title}</span>
+<span class="card-text">{html.escape(c.summary)}</span>
+<span class="card-foot"><span>{c.minutes} {ui['minutes']}</span><span class="arrow">→</span></span>
+</a>"""
 
 
 def guide_index(lang, here, ui):
