@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Гайд / Guide
+    url: https://arsenzaaa.github.io/DEVICE-TWEAKER/guide/
+    about: Как работают прерывания, MSI, affinity, IMOD, RSS и NIC ITR / How interrupts, MSI, affinity, IMOD, RSS and NIC ITR work.
   - name: Уязвимость / Security vulnerability
     url: https://github.com/arsenzaaa/DEVICE-TWEAKER/security/advisories/new
     about: Сообщить приватно / Report privately.

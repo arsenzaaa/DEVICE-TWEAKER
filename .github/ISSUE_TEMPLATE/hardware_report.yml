@@ -7,6 +7,8 @@ body:
       value: |
         Такие отчёты помогают проверить авто-оптимизацию, IMOD и NIC ITR на разном железе. Полезнее всего три лога: до применения, сразу после и после перезагрузки.
         These reports help verify auto-optimization, IMOD and NIC ITR on different hardware. Three logs help most: before applying, right after, and after a restart.
+
+        Как записать трейс ISR / DPC — [глава 10 гайда](https://arsenzaaa.github.io/DEVICE-TWEAKER/guide/10-verification/). How to record an ISR / DPC trace: [guide chapter 10](https://arsenzaaa.github.io/DEVICE-TWEAKER/en/guide/10-verification/).
   - type: input
     id: version
     attributes:
@@ -27,9 +29,11 @@ body:
       label: Что проверяли / What you tested
       options:
         - label: Авто-оптимизация / Auto-optimization
+        - label: MSI / Affinity
         - label: USB IMOD
         - label: NIC ITR
         - label: RSS
+        - label: ReservedCpuSets
         - label: Восстановление / Restore
   - type: textarea
     id: result
@@ -43,3 +47,8 @@ body:
     attributes:
       label: Логи / Logs
       description: Перетащите файлы из папки logs / Drag the files from the logs folder
+  - type: textarea
+    id: trace
+    attributes:
+      label: Трейс (необязательно) / Trace (optional)
+      description: Отчёт xperf -a dpcisr или файл .etl до и после применения / An xperf -a dpcisr report or .etl file before and after applying
