@@ -1,159 +1,98 @@
-<p align="right"><a href="./README.md">Русский</a></p>
+<div align="right"><a href="./README.md">Русский</a></div>
 
-<p align="center">
-  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest">
-    <picture>
-      <source media="(prefers-color-scheme: dark) and (max-width: 600px)" srcset="./assets/branding/hero-mobile-en-dark.svg">
-      <source media="(prefers-color-scheme: light) and (max-width: 600px)" srcset="./assets/branding/hero-mobile-en-light.svg">
-      <source media="(prefers-color-scheme: dark)" srcset="./assets/branding/hero-en-dark.svg">
-      <img src="./assets/branding/hero-en-light.svg" alt="DEVICE TWEAKER — device interrupt tuning matched to your CPU topology" width="100%">
-    </picture>
-  </a>
-</p>
+# DEVICE TWEAKER
 
-<p align="center">
-  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/branding/button-download-en-dark.svg"><img src="./assets/branding/button-download-en-light.svg" alt="Download 0.0.4" height="48"></picture></a>&nbsp;
-  <a href="./src/docs/SETTINGS.en.md"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/branding/button-settings-en-dark.svg"><img src="./assets/branding/button-settings-en-light.svg" alt="Settings guide" height="48"></picture></a>&nbsp;
-  <a href="./CHANGELOG.en.md"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/branding/button-changelog-en-dark.svg"><img src="./assets/branding/button-changelog-en-light.svg" alt="What's new" height="48"></picture></a>
-</p>
+Device interrupt tuning for Windows 10 / 11 x64. MSI, affinity, IRQ priority, ReservedCpuSets, RSS, USB IMOD and NIC ITR in one program, with auto-optimization for the CPU topology: P- and E-cores, SMT, CCD / CCX, CPPC.
 
-<p align="center">
-  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest"><img src="https://img.shields.io/github/v/release/arsenzaaa/DEVICE-TWEAKER?style=flat-square&label=release&labelColor=0b0e13&color=30363d" alt="Release"></a>
-  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases"><img src="https://img.shields.io/github/downloads/arsenzaaa/DEVICE-TWEAKER/total?style=flat-square&label=downloads&labelColor=0b0e13&color=30363d" alt="Downloads"></a>
-  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/arsenzaaa/DEVICE-TWEAKER/ci.yml?branch=main&style=flat-square&label=CI&labelColor=0b0e13" alt="CI"></a>
-  <img src="https://img.shields.io/badge/Windows-10%20%2F%2011%20x64-30363d?style=flat-square&labelColor=0b0e13" alt="Windows 10 / 11 x64">
-  <a href="./LICENSE"><img src="https://img.shields.io/github/license/arsenzaaa/DEVICE-TWEAKER?style=flat-square&label=license&labelColor=0b0e13&color=30363d" alt="License GPL-3.0"></a>
-</p>
+**[Download 0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest)** · [Settings guide](./src/docs/SETTINGS.en.md) · [Changelog](./CHANGELOG.en.md)
 
-<p align="center"><strong>MSI Utility&nbsp;V3 + Interrupt Affinity Policy Tool + ReservedCpuSets + IMOD / NIC&nbsp;ITR</strong><br>in one program, with intelligent auto-optimization for your CPU topology.</p>
-
-## Interface
-
-<p align="center"><a href="./assets/screenshots/showcase_intel_14900k_full_en.png"><img src="./assets/screenshots/showcase_intel_14900k_full_en.png" alt="USB IMOD on Intel Core i9-14900K" width="100%"></a></p>
+<a href="./assets/screenshots/showcase_intel_14900k_full_en.png"><img src="./assets/screenshots/showcase_intel_14900k_full_en.png" alt="DEVICE TWEAKER: a USB controller on Intel Core i9-14900K" width="100%"></a>
 
 <table>
   <tr>
-    <td width="33%" align="center"><a href="./assets/screenshots/showcase_amd_imod_full_en.png"><img src="./assets/screenshots/thumbs/showcase_amd_imod_full_en.png" alt="USB IMOD on AMD Ryzen 9 9950X3D"></a><br><sub>USB IMOD · Ryzen 9 9950X3D</sub></td>
-    <td width="33%" align="center"><a href="./assets/screenshots/showcase_gpu_full_en.png"><img src="./assets/screenshots/thumbs/showcase_gpu_full_en.png" alt="GPU interrupts"></a><br><sub>GPU · a pair of physical cores</sub></td>
-    <td width="33%" align="center"><a href="./assets/screenshots/showcase_nic_full_en.png"><img src="./assets/screenshots/thumbs/showcase_nic_full_en.png" alt="NIC ITR and RSS"></a><br><sub>Network · NIC ITR and RSS</sub></td>
+    <td width="33%"><a href="./assets/screenshots/showcase_amd_imod_full_en.png"><img src="./assets/screenshots/thumbs/showcase_amd_imod_full_en.png" alt="USB IMOD on AMD Ryzen 9 9950X3D"></a></td>
+    <td width="33%"><a href="./assets/screenshots/showcase_gpu_full_en.png"><img src="./assets/screenshots/thumbs/showcase_gpu_full_en.png" alt="GPU interrupts"></a></td>
+    <td width="33%"><a href="./assets/screenshots/showcase_nic_full_en.png"><img src="./assets/screenshots/thumbs/showcase_nic_full_en.png" alt="NIC ITR and RSS"></a></td>
+  </tr>
+  <tr>
+    <td><sub>USB IMOD, Ryzen 9 9950X3D</sub></td>
+    <td><sub>GPU, a pair of physical cores</sub></td>
+    <td><sub>NIC ITR and RSS, Intel I226-V</sub></td>
   </tr>
 </table>
 
 <sub>Screenshots show test devices and values.</sub>
 
-## Features
+## What it changes
 
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>Auto-optimization</h3>
-      Accounts for P-Core / E-Core, SMT / HT, CCD / CCX, CPPC ranking and device roles. A discrete GPU gets two different physical cores; input, network and audio follow their own rules. If the topology is uncertain, nothing is written.
-    </td>
-    <td width="50%" valign="top">
-      <h3>Interrupts</h3>
-      MSI Mode, MSI Limit, IRQ Priority, Policy and Interrupt Affinity. Shows the registry setting, the live IRQ Mode and the device's hardware capabilities (HW) separately.
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>USB IMOD</h3>
-      xHCI interrupt moderation: one value per controller, per interrupter, or per role — mouse, keyboard, audio, gamepad. The role map is read from the xHCI contexts.
-    </td>
-    <td width="50%" valign="top">
-      <h3>Network</h3>
-      NIC&nbsp;ITR for Intel I210/I211, I219, I225/I226, I350, 82576/82580 and Realtek RTL8111/8168, RTL8125/8126, with the driver's own moderation turned off. RSS uses one CPU per physical core, within the MSI-X vectors.
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>Devices and CPU</h3>
-      Finds GPUs, USB controllers, network and audio controllers, and storage. Knows which controller your mouse, keyboard and microphone are on, and which core every thread belongs to.
-    </td>
-    <td width="50%" valign="top">
-      <h3>Input and system</h3>
-      Polling Rate measurement via Raw Input, Mouse Throttle on Windows 11, ReservedCpuSets, and power saving for USB controllers, hubs and wired network.
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>Rollback</h3>
-      A verified backup before settings are applied; restore the original state or any backup, or reset to Windows defaults.
-    </td>
-    <td width="50%" valign="top">
-      <h3>Transparency</h3>
-      Detailed log: what was applied, what was skipped and why. Every value is read back after writing. Open source, including the driver.
-    </td>
-  </tr>
-</table>
+| Setting | Written to | Takes effect |
+| --- | --- | --- |
+| MSI Mode, MSI Limit | `MSISupported`, `MessageNumberLimit` in `Interrupt Management\MessageSignaledInterruptProperties` | after a restart |
+| IRQ Priority | `DevicePriority` in `Interrupt Management\Affinity Policy` | after a restart |
+| Policy, Interrupt Affinity | `DevicePolicy`, `AssignmentSetOverride` in the same key | after a restart |
+| RSS | `*RssBaseProcNumber`, `*NumRssQueues`, `*MaxRssProcessors`, `*RssMaxProcNumber` in the adapter's class key | after a restart |
+| ReservedCpuSets | `ReservedCpuSets` in `Session Manager\kernel` | after a restart |
+| Mouse Throttle | `RawMouseThrottleDuration` in `HKCU\Control Panel\Mouse`, Windows 11 | after a restart |
+| Power saving | `PnPCapabilities`, `SelectiveSuspendEnabled`, `EnhancedPowerManagementEnabled`, USB selective suspend in the power plan | after a restart |
+| USB IMOD | the IMOD register of every xHCI interrupter | immediately, until a restart or sleep |
+| NIC ITR | the controller's moderation registers: EITR / ITR on Intel, IntrMit on Realtek | immediately, until a restart or sleep |
 
-## How it works
+A verified backup is made before settings are applied. IMOD and NIC ITR registers are read back after every write. The log records what was applied, what was skipped and why.
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark) and (max-width: 600px)" srcset="./assets/branding/pipeline-mobile-en-dark.svg">
-    <source media="(prefers-color-scheme: light) and (max-width: 600px)" srcset="./assets/branding/pipeline-mobile-en-light.svg">
-    <source media="(prefers-color-scheme: dark)" srcset="./assets/branding/pipeline-en-dark.svg">
-    <img src="./assets/branding/pipeline-en-light.svg" alt="Scan → Plan → Backup → Write → Verify → Startup" width="100%">
-  </picture>
-</p>
+## Auto-optimization
 
-Interrupt settings are written to the registry and take effect after a restart. IMOD and NIC&nbsp;ITR are registers of the device itself: the project's own driver **DTIMOD.sys** writes them, and only into memory Windows allocated to that device. Register values last until a restart or sleep, so the saved profile is applied by the open `ApplyIMOD.ps1` script from Task Scheduler — it works without the EXE.
+Builds a plan from the CPU topology and device roles.
 
-## Download
+- A discrete GPU gets two different physical cores. Two SMT siblings of one core do not count as two cores.
+- The controller with the mouse and keyboard, the network adapter and audio follow their own rules. On CPUs with several CCDs a target CCD is chosen.
+- Storage controllers get MSI and high priority; their affinity stays with Windows. An integrated GPU's affinity goes back to Windows; Wi-Fi is left untouched.
+- If the topology is uncertain, nothing is written.
 
-| Build | Requires |
+The original state is saved before the first auto-optimization and can be restored at any time.
+
+## USB IMOD and NIC ITR
+
+IMOD is the interrupt moderation interval of an xHCI interrupter in 250 ns steps: `0xC8` = 50 µs, `0x0` turns moderation off. The value is set for the whole controller, per interrupter or per device role. The device → interrupter map is read from the xHCI contexts in memory.
+
+NIC ITR is supported on Intel I210 / I211, I219, I225 / I226, I350, 82576 / 82580 and Realtek RTL8111 / 8168, RTL8125 / 8126. Saving a profile turns off the driver's own moderation in the registry (`*InterruptModeration`), which would otherwise overwrite the register.
+
+The registers are written by the project's own driver, **DTIMOD.sys**, and only into memory Windows allocated to the selected device. Register values last until a restart or sleep, so the saved profile is applied by the Task Scheduler task `\DEVICE TWEAKER\IMOD`: at sign-in, after resume from sleep and when a USB device is attached. The task runs the open `ApplyIMOD.ps1` script from `%ProgramData%\DEVICE TWEAKER\Startup` and works without the EXE.
+
+## Install
+
+| File | Requires |
 | --- | --- |
-| **With built-in .NET**<br>[DEVICE.TWEAKER.SelfContained.exe](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.SelfContained.exe) | nothing, all included |
-| **Standard**<br>[DEVICE.TWEAKER.exe](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.exe) | [.NET 8 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/8.0) |
+| [DEVICE.TWEAKER.SelfContained.exe](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.SelfContained.exe) | nothing, .NET is built in |
+| [DEVICE.TWEAKER.exe](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.exe) | [.NET 8 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/8.0) |
 
-DTIMOD.sys and the KDU loader are built into both. Checksums are in `SHA256SUMS.txt` on the [release page](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest).
+Run as administrator. DTIMOD.sys and the KDU loader are built into both. SHA-256 checksums are in `SHA256SUMS.txt` on the [release page](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest).
 
-## Quick start
+1. **AUTO-OPTIMIZATION** builds the plan and applies it. If a suitable xHCI controller is found, it offers to include USB IMOD. For manual settings, use **APPLY**.
+2. Restart the PC.
+3. **CHECK** in the IMOD or NIC ITR block reads the actual register values.
 
-1. Run the program **as administrator**.
-2. Click **AUTO-OPTIMIZATION** — the program saves your original settings and offers USB IMOD if a suitable xHCI controller is present. Or configure devices manually and click **APPLY**.
-3. Restart the PC.
-4. **CHECK** in the IMOD / NIC&nbsp;ITR block reads the actual register values.
-5. Everything can be rolled back via **RESTORE**: the original state, any backup, or Windows defaults.
+## Rollback
 
-Every setting is explained in the [settings guide](./src/docs/SETTINGS.en.md).
+**RESTORE → ORIGINAL** returns the registry to the state before the first auto-optimization and removes the startup task. The same menu restores any backup or resets to Windows defaults. Backups are kept in the `Backups` folder next to the EXE.
 
 ## FAQ
 
 <details>
-<summary><strong>Why a driver, and why an antivirus may flag KDU</strong></summary>
+<summary>Why a driver, and why an antivirus may flag KDU</summary>
 <br>
 
-IMOD and NIC&nbsp;ITR are hardware registers that user mode cannot write. DTIMOD.sys has no public signature, so [KDU](./src/IMOD/KDU/README.md) loads it through a signed vulnerable driver; antiviruses flag such loaders as HackTool. The DTIMOD sources and the pinned KDU version are in this repository, and binaries are checked by SHA-256. The driver is only needed for IMOD, NIC&nbsp;ITR and the **READ IRQ MODE** button — everything else works without it.
+IMOD and NIC ITR registers cannot be written from user mode. DTIMOD.sys has no public signature, so [KDU](./src/IMOD/KDU/README.md) loads it through a signed vulnerable driver, and antiviruses classify such loaders as HackTool. The DTIMOD sources and the pinned KDU version are in this repository, and the binaries are checked by SHA-256. The driver is only needed for IMOD, NIC ITR and **READ IRQ MODE**.
 </details>
 
 <details>
-<summary><strong>HVCI, Vulnerable Driver Blocklist and anti-cheats</strong></summary>
+<summary>HVCI, Vulnerable Driver Blocklist, FACEIT and Vanguard</summary>
 <br>
 
-Memory Integrity (HVCI) and the Microsoft Vulnerable Driver Blocklist block loading through KDU; FACEIT and Vanguard may conflict with it. Before USB IMOD the program shows a **SYSTEM CHECK** with their state. MSI, affinity, RSS and the other registry settings do not depend on the driver.
-</details>
-
-<details>
-<summary><strong>How to undo everything</strong></summary>
-<br>
-
-**RESTORE → ORIGINAL** returns the registry to the snapshot taken before the first apply and removes the IMOD / NIC&nbsp;ITR startup task. Then restart the PC. Backups are kept in the `Backups` folder next to the EXE.
-</details>
-
-<details>
-<summary><strong>Do IMOD and NIC ITR survive restarts and sleep</strong></summary>
-<br>
-
-Yes. The `\DEVICE TWEAKER\IMOD` task applies the saved profile at sign-in, after resume from sleep and when a USB device is attached. Its files and logs are in `%ProgramData%\DEVICE TWEAKER\Startup`.
+Memory Integrity (HVCI) and the Microsoft Vulnerable Driver Blocklist block loading through KDU; the FACEIT and Vanguard anti-cheats may conflict with it. Before USB IMOD is enabled, the program shows their state in the **SYSTEM CHECK**. Registry settings do not depend on the driver.
 </details>
 
 ## Feedback
 
-Found a bug? Open an [issue](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=bug_report.yml) with the log from the `logs` folder next to the EXE, your Windows build and PC configuration. For auto-optimization, three logs help most: before applying, right after, and after a restart.
+Report bugs in [issues](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=bug_report.yml) with the log from the `logs` folder next to the EXE, your Windows build and PC configuration. For auto-optimization, three logs help most: before applying, right after, and after a restart. News: [Telegram](https://t.me/arsenzaa).
 
-News and discussion: [Telegram](https://t.me/arsenzaa).
-
-## Documentation
-
-[Settings guide](./src/docs/SETTINGS.en.md) · [Changelog](./CHANGELOG.en.md) · [Build](./src/docs/BUILD.md) · [QA](./dev/qa/README.md) · [Security](./.github/SECURITY.md) · [Contributing](./.github/CONTRIBUTING.md) · [GPL-3.0](./LICENSE)
+[Settings guide](./src/docs/SETTINGS.en.md) · [Build](./src/docs/BUILD.md) · [QA](./dev/qa/README.md) · [Security](./.github/SECURITY.md) · [GPL-3.0](./LICENSE)
