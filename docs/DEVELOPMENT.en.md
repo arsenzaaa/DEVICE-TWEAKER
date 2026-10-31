@@ -59,6 +59,17 @@ The KDU loader is pinned to version 1.4.5.2512; its sources and manifests are in
 
 The full local QA — builds, tests, deliberate faults, the native driver model and UI checks on a hidden desktop — is described in [`dev/qa`](../dev/qa/README.md). It is read-only and never loads the driver.
 
+## Site and artwork
+
+The site [arsenzaaa.github.io/DEVICE-TWEAKER](https://arsenzaaa.github.io/DEVICE-TWEAKER/en/) is built from `docs/`, `CHANGELOG.md` / `CHANGELOG.en.md` and the landing page text in `dev/site/build.py`. The `Site` workflow publishes it to GitHub Pages after changes on `main`. Locally:
+
+```powershell
+pip install markdown==3.7
+python dev/site/build.py --out _site
+```
+
+The mark and diagrams in `assets/branding` are drawn by `dev/branding/render.py`; text is converted to outlines, so the SVGs look the same on every system. `dev/branding/screens.py` adds the frame and shadow to screenshots captured by `dev/qa/Capture-Showcase.ps1`.
+
 ## Code map
 
 | Folder | Contents |
@@ -71,6 +82,7 @@ The full local QA — builds, tests, deliberate faults, the native driver model 
 | `src/Startup` | startup script and the shared register runtime |
 | `src/IMOD` | the DTIMOD driver and the KDU loader |
 | `dev/qa` | tests, test panel and QA |
+| `dev/site`, `dev/branding` | site, mark, diagrams and screenshot frames |
 
 Application logs go to the `logs` folder next to the EXE, one file per run. An unhandled error also writes a crash file and `last-crash.txt` there.
 

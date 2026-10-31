@@ -41,3 +41,6 @@ src/**/Backups/
 src/**/logs/
 src/**/last-crash.txt
 docs/*.pdf
+
+# Site build output
+/_site/
