@@ -1,70 +1,82 @@
-<div align="right"><a href="./README.md">Русский</a></div>
+<p align="center">
+  <a href="https://arsenzaaa.github.io/DEVICE-TWEAKER/en/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="./assets/readme/wordmark-dark.svg">
+      <img src="./assets/readme/wordmark-light.svg" alt="DEVICE TWEAKER" width="560">
+    </picture>
+  </a>
+</p>
 
-<p align="center"><samp>[ WINDOWS 10 / 11 x64 ]</samp></p>
-
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/readme/wordmark-dark.svg"><img src="./assets/readme/wordmark-light.svg" alt="DEVICE TWEAKER" width="838"></picture></p>
-
-<p align="center"><b>Device interrupts on Windows, tuned to your CPU topology.</b></p>
-
-<p align="center">MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + RSS + USB IMOD / NIC ITR in one interface, with intelligent auto-optimization.</p>
-
-<p align="center"><samp><b>Windows</b> - 10 / 11 x64 &nbsp;|&nbsp; <b>Version</b> - 0.0.4 &nbsp;|&nbsp; <b>.NET</b> - 8 &nbsp;|&nbsp; <b>License</b> - GPL-3.0</samp></p>
+<p align="center">Device interrupts on Windows 10 / 11 x64, tuned to your CPU topology.</p>
 
 <p align="center">
-<a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/readme/button-download-en-dark.svg"><img src="./assets/readme/button-download-en-light.svg" alt="Download 0.0.4" width="198" height="48"></picture></a>
-<a href="https://arsenzaaa.github.io/DEVICE-TWEAKER/en/guide/"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/readme/button-guide-en-dark.svg"><img src="./assets/readme/button-guide-en-light.svg" alt="Guide" width="106" height="48"></picture></a>
-<a href="https://arsenzaaa.github.io/DEVICE-TWEAKER/en/"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/readme/button-site-en-dark.svg"><img src="./assets/readme/button-site-en-light.svg" alt="Site" width="96" height="48"></picture></a>
-<a href="./CHANGELOG.en.md"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/readme/button-changelog-en-dark.svg"><img src="./assets/readme/button-changelog-en-light.svg" alt="Changelog" width="147" height="48"></picture></a>
+  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest"><b>Download 0.0.4</b></a> ·
+  <a href="https://arsenzaaa.github.io/DEVICE-TWEAKER/en/guide/">Guide</a> ·
+  <a href="https://arsenzaaa.github.io/DEVICE-TWEAKER/en/">Site</a> ·
+  <a href="./CHANGELOG.en.md">Changelog</a> ·
+  <a href="https://t.me/arsenzaa">Telegram</a> ·
+  <a href="./README.md">Русский</a>
 </p>
 
 <p align="center"><a href="./assets/screenshots/showcase_intel_14900k_full_en.png"><picture><source srcset="./assets/screenshots/readme/showcase_intel_14900k_full_en.png 1x, ./assets/screenshots/framed/showcase_intel_14900k_full_en.png 2x"><img src="./assets/screenshots/readme/showcase_intel_14900k_full_en.png" alt="DEVICE TWEAKER: a USB controller on Intel Core i9-14900K, IMOD and interrupt affinity" width="838"></picture></a></p>
 
-## <samp>[ WHY ]</samp>
+---
 
-ISRs / DPCs run above any thread and do not know which cores the game is using. A driver on the core of an important thread (GAME / RENDER / RHI) interrupts it -> the thread waits or moves to another core and loses its L1 / L2 -> frame time grows and stutters appear. Two drivers on one core delay each other's ISRs / DPCs; on one SMT-SET they share cache and EXECUTION-UNITS.
+## <samp>[ ABOUT ]</samp>
 
-DEVICE TWEAKER spreads interrupts across physical cores: drivers share neither cores nor SMT-SETs, and core 0 stays free when possible. **AUTO-OPTIMIZATION** builds a plan from the topology (P-Core / E-Core, SMT / HT, CPPC, CCD / CCX) and device roles. Every device can also be tuned by hand: MSI, affinity, priority, ReservedCpuSets, RSS, USB IMOD, NIC ITR, Mouse Throttle, power saving.
+ISRs / DPCs run above any thread and do not know which cores the game is using. A driver on the core of an important thread (GAME / RENDER / RHI) interrupts it -> the thread waits or moves to another core and loses its L1 / L2 -> frame time grows. Two drivers on one core delay each other's ISRs / DPCs; on one SMT-SET they share cache and EXECUTION-UNITS.
 
-## <samp>[ GUIDE ]</samp>
+DEVICE TWEAKER spreads interrupts across physical cores: MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + RSS + USB IMOD / NIC ITR in one interface, with intelligent auto-optimization.
 
-How it works in Windows and what the program does, device type by device type. The same chapters with search are on the [site](https://arsenzaaa.github.io/DEVICE-TWEAKER/en/guide/).
+## <samp>[ FEATURES ]</samp>
 
-<p align="center">
-<a href="./docs/guide/01-interrupts.en.md"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/readme/card-01-en-dark.svg"><img src="./assets/readme/card-01-en-light.svg" alt="[IRQ] 01 Interrupts: ISR, DPC and cores: How ISRs and DPCs work, why they outrank any game thread, and what happens when drivers share a core with GAME / RENDER / RHI." width="413"></picture></a>
-<a href="./docs/guide/02-msi.en.md"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/readme/card-02-en-dark.svg"><img src="./assets/readme/card-02-en-light.svg" alt="[MSI] 02 MSI and MSI-X: Line versus message: why disabling MSI MODE adds extra and longer ISRs, why MessageNumberLimit should be removed, and how the program reads a device's real mode." width="413"></picture></a>
-<a href="./docs/guide/03-affinity.en.md"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/readme/card-03-en-dark.svg"><img src="./assets/readme/card-03-en-light.svg" alt="[CPU] 03 Affinity, policies and interrupt priority: Interrupt Affinity policies, the AssignmentSetOverride mask, what IRQ Priority really does, Interrupt Steering, and the alternative "all cores except 0" method." width="413"></picture></a>
-<a href="./docs/guide/04-gpu.en.md"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/readme/card-04-en-dark.svg"><img src="./assets/readme/card-04-en-light.svg" alt="[GPU] 04 Graphics card: Why a graphics card needs two different physical cores, how the NVIDIA driver differs from AMD, and what to do when ISRs / DPCs still pile up on one core." width="413"></picture></a>
-<a href="./docs/guide/05-usb-imod.en.md"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/readme/card-05-en-dark.svg"><img src="./assets/readme/card-05-en-light.svg" alt="[USB] 05 USB controllers and IMOD: How an xHCI controller works: interrupters, Event Rings and the IMOD register. Why a mouse gets a different interrupter on every connection, what IMOD to give audio, and how to spread devices across controllers." width="413"></picture></a>
-<a href="./docs/guide/06-network.en.md"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/readme/card-06-en-dark.svg"><img src="./assets/readme/card-06-en-light.svg" alt="[NET] 06 Network: RSS, NDIS and NIC ITR: NDIS versus NetAdapterCx, why a mask does not work on NDIS and RSS is needed instead, how many queues a game really uses, the NDIS thread and MMCSS, NIC ITR and the driver's own moderation." width="413"></picture></a>
-<a href="./docs/guide/07-cpu-topology.en.md"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/readme/card-07-en-dark.svg"><img src="./assets/readme/card-07-en-light.svg" alt="[CPU] 07 CPU topology and ReservedCpuSets: SMT-SETs, P- and E-cores, CCDs and CPPC ranks: how to read the CPU list in the program. ReservedCpuSets, the mask format and two strategies for CPUs with two CCDs or E-cores." width="413"></picture></a>
-<a href="./docs/guide/08-input.en.md"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/readme/card-08-en-dark.svg"><img src="./assets/readme/card-08-en-light.svg" alt="[I/O] 08 Input: Polling Rate, Raw Input and Mouse Throttle: The input path of a mouse, keyboard and controller on Windows 10 and 11, background-window throttling and RawMouseThrottleDuration, Raw Input Buffer and dedicated input threads, and what the Polling Rate measurement really measures." width="413"></picture></a>
-<a href="./docs/guide/09-power.en.md"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/readme/card-09-en-dark.svg"><img src="./assets/readme/card-09-en-light.svg" alt="[PWR] 09 Device power saving: USB selective suspend, letting Windows turn a device off, and the Device Parameters values: what actually works, where it is stored, and how the program verifies the write." width="413"></picture></a>
-<a href="./docs/guide/10-verification.en.md"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/readme/card-10-en-dark.svg"><img src="./assets/readme/card-10-en-light.svg" alt="[LOG] 10 Verification: traces and logs: How to check the result by facts rather than the FPS of one run: an xperf / WPR trace, where to look at ISRs and DPCs in WPA and MXA, what to send in a hardware report and how to read the program log." width="413"></picture></a>
-<a href="./docs/guide/11-driver.en.md"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/readme/card-11-en-dark.svg"><img src="./assets/readme/card-11-en-light.svg" alt="[SYS] 11 DTIMOD.sys, KDU and startup: Why the program has its own driver, where it may write, why KDU loads it and what antivirus software, HVCI and anti-cheats think about that. How IMOD / NIC ITR startup works without the EXE." width="413"></picture></a>
-</p>
+- **Auto-optimization.** A plan built from the topology (P / E-cores, SMT / HT, CPPC, CCD / CCX) and device roles: the GPU on two different physical cores, drivers sharing neither cores nor SMT-SETs, core 0 kept free when possible. [Chapter 01](./docs/guide/01-interrupts.en.md)
+- **MSI and MSI-X.** MSI Mode, MSI Limit, the current IRQ Mode and the device's capabilities shown separately; **READ IRQ MODE** reads the real mode from PCI configuration space. [Chapter 02](./docs/guide/02-msi.en.md)
+- **Interrupt Affinity and priority.** Policy, mask and IRQ Priority per device, with a CPU list showing physical cores, CCDs and CPPC ranks. [Chapter 03](./docs/guide/03-affinity.en.md)
+- **USB IMOD.** Moderation of each xHCI interrupter by device role; the device -> interrupter map is read from controller memory on every apply. [Chapter 05](./docs/guide/05-usb-imod.en.md)
+- **RSS and NIC ITR.** Base CPU and queues of NDIS adapters, one per physical core, and the moderation registers of Intel and Realtek controllers. [Chapter 06](./docs/guide/06-network.en.md)
+- **ReservedCpuSets, Mouse Throttle, Polling Rate, power saving.** [Chapters 07–09](./docs/guide/README.en.md)
+- **Startup without the EXE.** A Task Scheduler task applies the IMOD / NIC ITR profile at sign-in, after sleep and when USB devices connect; the script is readable and its files are checked by SHA-256. [Chapter 11](./docs/guide/11-driver.en.md)
+- **Backups and logs.** A verified backup before every apply; **RESTORE -> ORIGINAL** returns the state before the first auto-optimization; the log shows what was applied, what was skipped and why.
 
 ## <samp>[ INSTALLATION ]</samp>
 
-- [`DEVICE.TWEAKER.SelfContained.exe`](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.SelfContained.exe) — .NET included.
-- [`DEVICE.TWEAKER.exe`](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.exe) — requires the [.NET 8 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/8.0).
+Download one of the files from the [latest release](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest):
+
+- `DEVICE.TWEAKER.SelfContained.exe` — .NET included;
+- `DEVICE.TWEAKER.exe` — requires the [.NET 8 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/8.0).
 
 Run as administrator -> **AUTO-OPTIMIZATION**, or manual settings and **APPLY** -> restart. **CHECK** in the IMOD or NIC ITR block shows the actual register values.
 
-> **DTIMOD.sys and KDU.** IMOD and NIC ITR are written by the custom DTIMOD.sys driver, and only to memory that Windows assigned to the selected device. The driver has no public signature and is loaded by [KDU](./src/IMOD/KDU/README.md) -> antivirus software flags such loaders as HackTool, HVCI and the Microsoft Vulnerable Driver Blocklist block the loading, and FACEIT and Vanguard may conflict with it. All other settings work without the driver. Details in [chapter 11](./docs/guide/11-driver.en.md).
+> [!IMPORTANT]
+> IMOD and NIC ITR are written by the custom DTIMOD.sys driver, and only to memory that Windows assigned to the selected device. The driver has no public signature and is loaded by [KDU](./src/IMOD/KDU/README.md), so antivirus software flags the program as HackTool, and HVCI and the Microsoft Vulnerable Driver Blocklist block the loading. All other settings work without the driver. Details in [chapter 11](./docs/guide/11-driver.en.md).
 
-SHA-256 hashes of the files are in `SHA256SUMS.txt` on the [release page](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest), of the sources in `SOURCE-SHA256SUMS.txt`:
+SHA-256 hashes of the files are in `SHA256SUMS.txt` on the release page:
 
 ```powershell
 (Get-FileHash .\DEVICE.TWEAKER.SelfContained.exe -Algorithm SHA256).Hash
-Select-String -Path .\SHA256SUMS.txt -Pattern 'DEVICE.TWEAKER.SelfContained.exe'
 ```
 
-## <samp>[ ROLLBACK ]</samp>
+## <samp>[ GUIDE ]</samp>
 
-Before every apply the program creates a verified backup in the `Backups` folder next to the EXE. **RESTORE → ORIGINAL** returns the registry to its state before the first auto-optimization and removes the startup task. The same menu has every backup and **RESET WINDOWS DEFAULT**.
+How it works in Windows and what the program does. The same chapters with search are on the [site](https://arsenzaaa.github.io/DEVICE-TWEAKER/en/guide/).
+
+1. [Interrupts: ISR, DPC and cores](./docs/guide/01-interrupts.en.md)
+2. [MSI and MSI-X](./docs/guide/02-msi.en.md)
+3. [Affinity, policies and interrupt priority](./docs/guide/03-affinity.en.md)
+4. [Graphics card](./docs/guide/04-gpu.en.md)
+5. [USB controllers and IMOD](./docs/guide/05-usb-imod.en.md)
+6. [Network: RSS, NDIS and NIC ITR](./docs/guide/06-network.en.md)
+7. [CPU topology and ReservedCpuSets](./docs/guide/07-cpu-topology.en.md)
+8. [Input: Polling Rate, Raw Input and Mouse Throttle](./docs/guide/08-input.en.md)
+9. [Device power saving](./docs/guide/09-power.en.md)
+10. [Verification: traces and logs](./docs/guide/10-verification.en.md)
+11. [DTIMOD.sys, KDU and startup](./docs/guide/11-driver.en.md)
+
+A reference for every interface element is in the [settings guide](./docs/SETTINGS.en.md).
 
 ## <samp>[ FEEDBACK ]</samp>
 
-Report bugs in [issues](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=bug_report.yml) with the log from the `logs` folder, your Windows version and PC configuration. To help with auto-optimization, send a [hardware report](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=hardware_report.yml) with three logs: before applying, right after and after a restart. Updates are posted in [Telegram](https://t.me/arsenzaa).
+Report bugs in [issues](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=bug_report.yml) with the log from the `logs` folder next to the EXE. Results on your hardware go to a [hardware report](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=hardware_report.yml): three logs, before applying, right after and after a restart. Updates are posted in [Telegram](https://t.me/arsenzaa).
 
-<p align="center"><sub><a href="https://arsenzaaa.github.io/DEVICE-TWEAKER/en/">Site</a> · <a href="./docs/SETTINGS.en.md">Settings guide</a> · <a href="./docs/DEVELOPMENT.en.md">Development and build</a> · <a href="./docs/THIRD_PARTY_NOTICES.md">Third-party components</a> · <a href="./.github/SECURITY.md">Security</a> · <a href="./LICENSE">GPL-3.0</a></sub></p>
+Building from source: [docs/DEVELOPMENT.en.md](./docs/DEVELOPMENT.en.md). License: [GPL-3.0](./LICENSE).
