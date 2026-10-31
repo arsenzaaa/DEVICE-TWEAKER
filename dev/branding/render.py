@@ -5,8 +5,7 @@ JetBrains Mono 2.304 (https://github.com/JetBrains/JetBrainsMono/releases/tag/v2
 
     python dev/branding/render.py --fonts <folder with JetBrainsMono-*.ttf>
 
-Device colours are the category colours of the program (src/GUI/DeviceBadgePalette.cs);
-the light theme uses darker shades of the same hues.
+Everything is black and white, like the program window.
 """
 import argparse
 import html
@@ -16,19 +15,20 @@ from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 
+# Black and white, like the program window.
 THEMES = {
     "dark": {
-        "text": "#f0f2f4", "muted": "#9198a1", "line": "#3d444d", "fill": "#151b23", "page": "#0d1117",
-        "usb": "#48d9d0", "gpu": "#76b900", "net": "#62aef5",
+        "text": "#ededed", "muted": "#8f8f8f", "line": "#333333", "fill": "#111111", "page": "#0a0a0a",
+        "usb": "#ededed", "gpu": "#ededed", "net": "#ededed",
     },
     "light": {
-        "text": "#1f2328", "muted": "#59636e", "line": "#c8d1da", "fill": "#f6f8fa", "page": "#ffffff",
-        "usb": "#0a8a82", "gpu": "#4f7d00", "net": "#1f6fc4",
+        "text": "#111111", "muted": "#6b6b6b", "line": "#cfcfcf", "fill": "#f5f5f5", "page": "#ffffff",
+        "usb": "#111111", "gpu": "#111111", "net": "#111111",
     },
 }
 
 # The mark is the same on light and dark pages: a dark tile like the program window.
-MARK = {"tile": "#0b0c10", "line": "#2b3038", "pin": "#4a515c", "usb": "#48d9d0", "gpu": "#76b900", "net": "#62aef5"}
+MARK = {"tile": "#0a0a0a", "line": "#2a2a2a", "pin": "#5c5c5c", "usb": "#f2f2f2", "gpu": "#f2f2f2", "net": "#f2f2f2"}
 
 CORE = {"ru": "ЯДРО", "en": "CORE"}
 
@@ -94,7 +94,7 @@ class Canvas:
 
 
 def mark(th):
-    """Project mark: a CPU package with 4 x 4 cores, the cores of USB, GPU and NET lit in their colours."""
+    """Project mark: a CPU package with 4 x 4 cores; the cores given to USB, GPU and NET are lit."""
     c = Canvas(128, 128, "DEVICE TWEAKER")
     c.rect(0.75, 0.75, 126.5, 126.5, th["line"], th["tile"], 28, 1.5)
     cell, gap, pad = 12, 4, 8
