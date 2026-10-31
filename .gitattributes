@@ -4,5 +4,5 @@
 # Pinned upstream KDU sources: kept for reproducible builds, not project code.
 src/IMOD/KDU/** linguist-vendored
 
-# README artwork generators: tooling, not program code.
+# README screenshot framing: tooling, not program code.
 dev/branding/** linguist-documentation

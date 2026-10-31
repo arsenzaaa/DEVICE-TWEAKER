@@ -1,11 +1,4 @@
-<p align="center">
-  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="./assets/readme/wordmark-dark.svg">
-      <img src="./assets/readme/wordmark-light.svg" alt="DEVICE TWEAKER" width="560">
-    </picture>
-  </a>
-</p>
+<h1 align="center">DEVICE TWEAKER</h1>
 
 <p align="center">Распределение прерываний устройств по ядрам процессора в Windows 10 и 11.</p>
 

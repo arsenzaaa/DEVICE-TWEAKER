@@ -1,11 +1,4 @@
-<p align="center">
-  <a href="https://github.com/arsenzaaa/DEVICE-TWEAKER">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="./assets/readme/wordmark-dark.svg">
-      <img src="./assets/readme/wordmark-light.svg" alt="DEVICE TWEAKER" width="560">
-    </picture>
-  </a>
-</p>
+<h1 align="center">DEVICE TWEAKER</h1>
 
 <p align="center">Spreads device interrupts across CPU cores on Windows 10 and 11.</p>
 

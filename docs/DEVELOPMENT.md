@@ -59,9 +59,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\src\publish-variants.ps1 -
 
 Полный локальный QA — сборки, тесты, намеренные поломки, нативная модель драйвера и проверки интерфейса на скрытом рабочем столе — описан в [`dev/qa`](../dev/qa/README.md). Он работает только на чтение и не загружает драйвер.
 
-## Графика README
+## Скриншоты README
 
-Логотип в `assets/readme` рисует `dev/branding/readme.py`: текст переводится в кривые, поэтому SVG выглядит одинаково в любой системе. Исходные снимки делает `dev/qa/Capture-Showcase.ps1`, рамку, тень и уменьшенную копию для README добавляет `dev/branding/screens.py`.
+Исходные снимки делает `dev/qa/Capture-Showcase.ps1`, рамку, тень и уменьшенную копию для README добавляет `dev/branding/screens.py`.
 
 ## Устройство кода
 
@@ -75,7 +75,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\src\publish-variants.ps1 -
 | `src/Startup` | скрипт автозапуска и общий runtime регистров |
 | `src/IMOD` | драйвер DTIMOD и загрузчик KDU |
 | `dev/qa` | тесты, тест-панель и QA |
-| `dev/branding` | логотип и рамка скриншотов README |
+| `dev/branding` | рамка скриншотов README |
 
 Логи приложения пишутся в папку `logs` рядом с EXE, отдельный файл на каждый запуск. При необработанной ошибке там же появляется crash-файл и `last-crash.txt`.
 

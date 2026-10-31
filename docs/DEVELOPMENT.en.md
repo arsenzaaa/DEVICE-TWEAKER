@@ -59,9 +59,9 @@ The KDU loader is pinned to version 1.4.5.2512; its sources and manifests are in
 
 The full local QA — builds, tests, deliberate faults, the native driver model and UI checks on a hidden desktop — is described in [`dev/qa`](../dev/qa/README.md). It is read-only and never loads the driver.
 
-## README artwork
+## README screenshots
 
-The wordmark in `assets/readme` is drawn by `dev/branding/readme.py`; text is converted to outlines, so the SVG looks the same on every system. Screenshots are captured by `dev/qa/Capture-Showcase.ps1`; `dev/branding/screens.py` adds the frame and shadow and makes the reduced copy for the README.
+Screenshots are captured by `dev/qa/Capture-Showcase.ps1`; `dev/branding/screens.py` adds the frame and shadow and makes the reduced copy for the README.
 
 ## Code map
 
@@ -75,7 +75,7 @@ The wordmark in `assets/readme` is drawn by `dev/branding/readme.py`; text is co
 | `src/Startup` | startup script and the shared register runtime |
 | `src/IMOD` | the DTIMOD driver and the KDU loader |
 | `dev/qa` | tests, test panel and QA |
-| `dev/branding` | README wordmark and screenshot frames |
+| `dev/branding` | README screenshot frames |
 
 Application logs go to the `logs` folder next to the EXE, one file per run. An unhandled error also writes a crash file and `last-crash.txt` there.
 
