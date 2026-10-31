@@ -1,10 +1,9 @@
-"""Renders the README artwork in assets/branding.
+"""Renders the project mark and diagrams in assets/branding.
 
-Text is converted to outlines, so the SVGs look the same on every system. Fonts (OFL):
-Inter 4.1 (https://github.com/rsms/inter/releases/tag/v4.1) for the title and
-JetBrains Mono 2.304 (https://github.com/JetBrains/JetBrainsMono/releases/tag/v2.304) for everything else.
+Text is converted to outlines, so the SVGs look the same on every system. Font (OFL):
+JetBrains Mono 2.304 (https://github.com/JetBrains/JetBrainsMono/releases/tag/v2.304).
 
-    python dev/branding/render.py --fonts <folder with InterDisplay-*.ttf and JetBrainsMono-*.ttf>
+    python dev/branding/render.py --fonts <folder with JetBrainsMono-*.ttf>
 
 Device colours are the category colours of the program (src/GUI/DeviceBadgePalette.cs);
 the light theme uses darker shades of the same hues.
@@ -28,19 +27,13 @@ THEMES = {
     },
 }
 
-TEXT = {
-    "ru": {
-        "buttons": {"download": "СКАЧАТЬ 0.0.4", "settings": "НАСТРОЙКИ", "changelog": "ИЗМЕНЕНИЯ"},
-        "core": "ЯДРО",
-    },
-    "en": {
-        "buttons": {"download": "DOWNLOAD 0.0.4", "settings": "SETTINGS", "changelog": "CHANGELOG"},
-        "core": "CORE",
-    },
-}
+# The mark is the same on light and dark pages: a dark tile like the program window.
+MARK = {"tile": "#0b0c10", "line": "#2b3038", "pin": "#4a515c", "usb": "#48d9d0", "gpu": "#76b900", "net": "#62aef5"}
 
-PLATFORM = "WINDOWS 10 / 11 x64"
-FEATURES = "MSI / AFFINITY / RSS / IMOD / ITR"
+CORE = {"ru": "ЯДРО", "en": "CORE"}
+
+# Cores lit in the mark and their device: the same plan the auto-optimization diagram shows.
+LIT = {(0, 2): "usb", (1, 3): "gpu", (2, 1): "gpu", (3, 0): "net"}
 
 
 def num(value):
@@ -100,79 +93,34 @@ class Canvas:
                 f'<title>{t}</title>{"".join(self.parts)}</svg>\n')
 
 
-def chip(c, f, th, x, y, assigned):
-    """CPU package: 4 x 4 cores with pins, cores filled in the colour of their device."""
-    cell, gap, pad = 24, 8, 18
+def mark(th):
+    """Project mark: a CPU package with 4 x 4 cores, the cores of USB, GPU and NET lit in their colours."""
+    c = Canvas(128, 128, "DEVICE TWEAKER")
+    c.rect(0.75, 0.75, 126.5, 126.5, th["line"], th["tile"], 28, 1.5)
+    cell, gap, pad = 12, 4, 8
     size = pad * 2 + cell * 4 + gap * 3
+    x = y = (128 - size) / 2
+    pins = ""
     for i in range(4):
-        p = y + pad + i * (cell + gap) + cell / 2
-        q = x + pad + i * (cell + gap) + cell / 2
-        c.line(f"M{num(x - 7)} {num(p)}H{num(x)}M{num(x + size)} {num(p)}H{num(x + size + 7)}"
-               f"M{num(q)} {num(y - 7)}V{num(y)}M{num(q)} {num(y + size)}V{num(y + size + 7)}", th["line"], 1.5)
-    c.rect(x + 0.75, y + 0.75, size - 1.5, size - 1.5, th["line"], th["fill"], 8, 1.5)
+        p = x + pad + i * (cell + gap) + cell / 2
+        pins += (f"M{num(x - 8)} {num(p)}H{num(x - 3)}M{num(x + size + 3)} {num(p)}H{num(x + size + 8)}"
+                 f"M{num(p)} {num(y - 8)}V{num(y - 3)}M{num(p)} {num(y + size + 3)}V{num(y + size + 8)}")
+    c.line(pins, th["pin"], 2, "round")
+    c.rect(x + 1, y + 1, size - 2, size - 2, th["pin"], "none", 7, 2)
     for row in range(4):
         for col in range(4):
             cx, cy = x + pad + col * (cell + gap), y + pad + row * (cell + gap)
-            color = assigned.get((row, col))
-            if color:
-                c.rect(cx, cy, cell, cell, None, th[color], 2)
+            key = LIT.get((row, col))
+            if key:
+                c.rect(cx, cy, cell, cell, None, th[key], 2.5)
             else:
-                c.rect(cx + 0.75, cy + 0.75, cell - 1.5, cell - 1.5, th["line"], "none", 2, 1.5)
-    return size, pad, cell, gap
+                c.rect(cx + 0.75, cy + 0.75, cell - 1.5, cell - 1.5, th["pin"], "none", 2, 1.5)
+    return c.svg()
 
 
 def device(c, f, th, key, x, y, w, h, size):
     c.rect(x + 0.75, y + 0.75, w - 1.5, h - 1.5, th["line"], th["fill"], 3, 1.5)
     c.text(f["mono"], key.upper(), size, x + w / 2, y + h / 2 + f["mono"].cap_height(size) / 2, th[key], 0.6, "middle")
-
-
-def diagram(c, f, th, right, top):
-    """USB / GPU / NET wired to the cores they get: GPU on two different physical cores."""
-    probe = Canvas(0, 0, "")
-    size, pad, cell, gap = chip(probe, f, th, 0, 0, {})
-    cx = right - size - 8
-    row_y = [top + pad + i * (cell + gap) + cell / 2 for i in range(4)]
-    chip(c, f, th, cx, top, {(0, 2): "usb", (1, 3): "gpu", (2, 1): "gpu", (3, 0): "net"})
-    bw, bh = 76, 36
-    bx = cx - 7 - 172
-    joint = bx + bw + 30
-    for key, rows in (("usb", [0]), ("gpu", [1, 2]), ("net", [3])):
-        mid = sum(row_y[r] for r in rows) / len(rows)
-        device(c, f, th, key, bx, mid - bh / 2, bw, bh, 15)
-        if len(rows) == 1:
-            c.line(f"M{num(bx + bw)} {num(mid)}H{num(cx - 7)}", th[key], 1.5)
-        else:
-            d = f"M{num(bx + bw)} {num(mid)}H{num(joint)}"
-            for r in rows:
-                d += f"M{num(joint)} {num(mid)}V{num(row_y[r])}H{num(cx - 7)}"
-            c.line(d, th[key], 1.5)
-        for r in rows:
-            c.parts.append(f'<circle cx="{num(cx - 7)}" cy="{num(row_y[r])}" r="2.5" fill="{th[key]}"/>')
-
-
-def hero(f, th):
-    c = Canvas(1080, 200, "DEVICE TWEAKER")
-    c.text(f["label"], PLATFORM, 17, 2, 40, th["muted"], 1.6)
-    c.text(f["title"], "DEVICE TWEAKER", 76, 0, 126, th["text"], -1.9)
-    c.text(f["label"], FEATURES, 19, 2, 170, th["muted"], 1.4)
-    diagram(c, f, th, 1080, 22)
-    return c.svg()
-
-
-def hero_mobile(f, th):
-    size = 80
-    while f["title"].width("DEVICE TWEAKER", size, -1.6) > 596:
-        size -= 1
-    label = f["label"].cap_height(21)
-    top = 20
-    platform = top + label
-    title = platform + 28 + f["title"].cap_height(size)
-    features = title + 28 + label
-    c = Canvas(600, int(features + top), "DEVICE TWEAKER")
-    c.text(f["label"], PLATFORM, 21, 2, platform, th["muted"], 1.6)
-    c.text(f["title"], "DEVICE TWEAKER", size, 0, title, th["text"], -1.6)
-    c.text(f["label"], FEATURES, 21, 2, features, th["muted"], 1.2)
-    return c.svg()
 
 
 # Wide layout for the README column, compact one for phones: canvas width, GPU box width,
@@ -207,20 +155,6 @@ def allocation(f, th, core_label, layout):
     return c.svg()
 
 
-def button(f, th, label, primary):
-    size = 14
-    width = int(round(f["mono"].width(label, size, 1.0) + 48))
-    c = Canvas(width, 40, label)
-    if primary:
-        c.rect(0, 0, width, 40, None, th["text"], 3)
-        color = th["page"]
-    else:
-        c.rect(0.75, 0.75, width - 1.5, 38.5, th["line"], "none", 3, 1.5)
-        color = th["text"]
-    c.text(f["mono"], label, size, width / 2, 20 + f["mono"].cap_height(size) / 2, color, 1.0, "middle")
-    return c.svg(), width
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fonts", required=True, type=Path)
@@ -233,26 +167,18 @@ def main():
             raise SystemExit(f"Font not found: {name}")
         return Font(found[0])
 
-    f = {"title": load("InterDisplay-ExtraBold.ttf"), "mono": load("JetBrainsMono-Bold.ttf"),
-         "label": load("JetBrainsMono-Medium.ttf")}
+    f = {"mono": load("JetBrainsMono-Bold.ttf")}
     out = args.out
     out.mkdir(parents=True, exist_ok=True)
     for old in out.glob("*.svg"):
         old.unlink()
 
-    widths = {}
+    (out / "mark.svg").write_text(mark(MARK), encoding="utf-8")
     for theme, th in THEMES.items():
-        (out / f"hero-{theme}.svg").write_text(hero(f, th), encoding="utf-8")
-        (out / f"hero-mobile-{theme}.svg").write_text(hero_mobile(f, th), encoding="utf-8")
-        for lang, t in TEXT.items():
-            (out / f"cpu-allocation-{lang}-{theme}.svg").write_text(allocation(f, th, t["core"], "wide"), encoding="utf-8")
-            (out / f"cpu-allocation-mobile-{lang}-{theme}.svg").write_text(allocation(f, th, t["core"], "compact"), encoding="utf-8")
-            for key, label in t["buttons"].items():
-                svg, width = button(f, th, label, key == "download")
-                (out / f"button-{key}-{lang}-{theme}.svg").write_text(svg, encoding="utf-8")
-                widths[f"{key}-{lang}"] = width
-    for name, width in sorted(widths.items()):
-        print(f"{name}: {width}px")
+        for lang, core in CORE.items():
+            (out / f"cpu-allocation-{lang}-{theme}.svg").write_text(allocation(f, th, core, "wide"), encoding="utf-8")
+            (out / f"cpu-allocation-mobile-{lang}-{theme}.svg").write_text(allocation(f, th, core, "compact"), encoding="utf-8")
+    print("\n".join(sorted(p.name for p in out.glob("*.svg"))))
 
 
 if __name__ == "__main__":
