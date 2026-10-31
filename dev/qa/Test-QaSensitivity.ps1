@@ -85,7 +85,7 @@ $caseInputs = @(Get-QaInputFiles $workspace | Where-Object {
     $relative = $_.FullName.Substring($workspacePrefix.Length)
     ($relative.StartsWith('src\', [StringComparison]::OrdinalIgnoreCase) -and
         -not $relative.StartsWith('src\IMOD\KDU\', [StringComparison]::OrdinalIgnoreCase) -and
-        -not $relative.StartsWith('src\docs\', [StringComparison]::OrdinalIgnoreCase)) -or
+        -not $relative.EndsWith('.md', [StringComparison]::OrdinalIgnoreCase)) -or
     $relative.StartsWith('dev\qa\tests\DeviceTweaker.Tests\', [StringComparison]::OrdinalIgnoreCase) -or
     $relative.StartsWith('dev\qa\Workbench\', [StringComparison]::OrdinalIgnoreCase)
 })

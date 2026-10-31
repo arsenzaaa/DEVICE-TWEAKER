@@ -1,10 +1,12 @@
 <div align="right"><a href="./README.en.md">English</a></div>
 
-# DEVICE TWEAKER
+<h1 align="center"><img src="./assets/icon.png" width="128" height="128" alt="DEVICE TWEAKER"></h1>
 
-Настройка прерываний устройств в Windows 10 / 11 x64. MSI, affinity, приоритет IRQ, ReservedCpuSets, RSS, USB IMOD и NIC ITR в одной программе, с авто-оптимизацией под топологию процессора: P- и E-ядра, SMT, CCD / CCX, CPPC.
+<p align="center">Настройка прерываний устройств в Windows 10 / 11 x64 под топологию процессора</p>
 
-**[Скачать 0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest)** · [Описание настроек](./src/docs/SETTINGS.md) · [История изменений](./CHANGELOG.md)
+<p align="center"><sub>MSI · affinity · приоритет IRQ · ReservedCpuSets · RSS · USB IMOD · NIC ITR</sub></p>
+
+<p align="center"><a href="https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest"><b>Скачать 0.0.4</b></a> · <a href="./docs/SETTINGS.md">Описание настроек</a> · <a href="./CHANGELOG.md">История изменений</a></p>
 
 <a href="./assets/screenshots/showcase_intel_14900k_full_ru.png"><img src="./assets/screenshots/showcase_intel_14900k_full_ru.png" alt="DEVICE TWEAKER: USB-контроллер на Intel Core i9-14900K" width="100%"></a>
 
@@ -95,4 +97,4 @@ NIC ITR поддерживается для Intel I210 / I211, I219, I225 / I226
 
 Ошибки — в [issues](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=bug_report.yml), с логом из папки `logs` рядом с EXE, версией Windows и конфигурацией ПК. Для авто-оптимизации полезнее всего три лога: до применения, сразу после и после перезагрузки. Новости — в [Telegram](https://t.me/arsenzaa).
 
-[Описание настроек](./src/docs/SETTINGS.md) · [Сборка](./src/docs/BUILD.md) · [Проверки](./dev/qa/README.md) · [Безопасность](./.github/SECURITY.md) · [GPL-3.0](./LICENSE)
+[Описание настроек](./docs/SETTINGS.md) · [Разработка](./docs/DEVELOPMENT.md) · [Сторонние компоненты](./docs/THIRD_PARTY_NOTICES.md) · [Безопасность](./.github/SECURITY.md) · [GPL-3.0](./LICENSE)

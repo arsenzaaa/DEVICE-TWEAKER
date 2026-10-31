@@ -1,0 +1,45 @@
+name: Отчёт о железе / Hardware report
+description: Как программа работает на вашей конфигурации / How the program works on your hardware
+labels: [hardware]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Такие отчёты помогают проверить авто-оптимизацию, IMOD и NIC ITR на разном железе. Полезнее всего три лога: до применения, сразу после и после перезагрузки.
+        These reports help verify auto-optimization, IMOD and NIC ITR on different hardware. Three logs help most: before applying, right after, and after a restart.
+  - type: input
+    id: version
+    attributes:
+      label: Версия / Version
+      placeholder: 0.0.4
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Конфигурация / Configuration
+      description: CPU, материнская плата, BIOS, сборка Windows, USB-контроллеры, сетевая карта, GPU / CPU, motherboard, BIOS, Windows build, USB controllers, network adapter, GPU
+    validations:
+      required: true
+  - type: checkboxes
+    id: features
+    attributes:
+      label: Что проверяли / What you tested
+      options:
+        - label: Авто-оптимизация / Auto-optimization
+        - label: USB IMOD
+        - label: NIC ITR
+        - label: RSS
+        - label: Восстановление / Restore
+  - type: textarea
+    id: result
+    attributes:
+      label: Результат / Result
+      description: Что применилось, что показал ПРОВЕРИТЬ, были ли проблемы / What was applied, what CHECK showed, any problems
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Логи / Logs
+      description: Перетащите файлы из папки logs / Drag the files from the logs folder

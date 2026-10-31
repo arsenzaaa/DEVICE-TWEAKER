@@ -6,12 +6,12 @@
 
 Файлы, которые использует программа:
 
-- `IMOD/Loader/kdu.exe`
-- `IMOD/Loader/drv64.dll`
+- `src/IMOD/Loader/kdu.exe`
+- `src/IMOD/Loader/drv64.dll`
 
 Версия загрузчиков: `1.4.5.2512`.
 
-Лицензия KDU: MIT. Полный текст находится в `IMOD/KDU/LICENSE.txt`.
+Лицензия KDU: MIT. Полный текст находится в `src/IMOD/KDU/LICENSE.txt`.
 
 Контрольные суммы:
 

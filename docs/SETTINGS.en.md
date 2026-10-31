@@ -1,6 +1,6 @@
 # How DEVICE TWEAKER settings work
 
-[Project page](../../README.en.md) · [Русский](./SETTINGS.md)
+[Project page](../README.en.md) · [Русский](./SETTINGS.md)
 
 This page explains what the program writes, what the interface shows, and when it rereads values.
 
