@@ -33,9 +33,9 @@
 
 <table>
   <tr>
-    <td width="33%" align="center"><a href="./assets/screenshots/showcase_amd_imod_full_ru.png"><img src="./assets/screenshots/showcase_amd_imod_full_ru.png" alt="USB IMOD на AMD Ryzen 9 9950X3D"></a><br><sub>USB IMOD · Ryzen 9 9950X3D</sub></td>
-    <td width="33%" align="center"><a href="./assets/screenshots/showcase_gpu_full_ru.png"><img src="./assets/screenshots/showcase_gpu_full_ru.png" alt="Прерывания GPU"></a><br><sub>GPU · пара физических ядер</sub></td>
-    <td width="33%" align="center"><a href="./assets/screenshots/showcase_nic_full_ru.png"><img src="./assets/screenshots/showcase_nic_full_ru.png" alt="NIC ITR и RSS"></a><br><sub>Сеть · NIC ITR и RSS</sub></td>
+    <td width="33%" align="center"><a href="./assets/screenshots/showcase_amd_imod_full_ru.png"><img src="./assets/screenshots/thumbs/showcase_amd_imod_full_ru.png" alt="USB IMOD на AMD Ryzen 9 9950X3D"></a><br><sub>USB IMOD · Ryzen 9 9950X3D</sub></td>
+    <td width="33%" align="center"><a href="./assets/screenshots/showcase_gpu_full_ru.png"><img src="./assets/screenshots/thumbs/showcase_gpu_full_ru.png" alt="Прерывания GPU"></a><br><sub>GPU · пара физических ядер</sub></td>
+    <td width="33%" align="center"><a href="./assets/screenshots/showcase_nic_full_ru.png"><img src="./assets/screenshots/thumbs/showcase_nic_full_ru.png" alt="NIC ITR и RSS"></a><br><sub>Сеть · NIC ITR и RSS</sub></td>
   </tr>
 </table>
 
