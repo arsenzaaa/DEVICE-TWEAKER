@@ -3,9 +3,10 @@
     pip install markdown==3.7
     python dev/site/build.py --out _site
 
-Russian pages are at the root, English ones under /en/. The landing page text lives below in
-LANDING; the settings guide, development notes and changelog are rendered from docs/ and
-CHANGELOG*.md, so the site never drifts from the repository.
+Russian pages are at the root, English ones under /en/. The guide chapters come from docs/guide,
+the settings reference, development notes and changelog from docs/ and CHANGELOG*.md, so the
+site never drifts from the repository. The page chrome copies the program window: a status line,
+framed buttons, [ FILTER ] chips, device cards and the CPU Affinity checklist.
 """
 import argparse
 import html
@@ -24,8 +25,7 @@ SITE = "https://arsenzaaa.github.io/DEVICE-TWEAKER/"
 TELEGRAM = "https://t.me/arsenzaa"
 NBSP = "\u00a0"
 
-# Documents rendered as pages: (slug, language) -> source file.
-PAGES = {
+DOCS = {
     ("settings", "ru"): "docs/SETTINGS.md",
     ("settings", "en"): "docs/SETTINGS.en.md",
     ("development", "ru"): "docs/DEVELOPMENT.md",
@@ -33,226 +33,80 @@ PAGES = {
     ("changelog", "ru"): "CHANGELOG.md",
     ("changelog", "en"): "CHANGELOG.en.md",
 }
-# Repository files that have a page of their own; everything else links to GitHub.
-LINKED = {path: key for key, path in PAGES.items()}
-LINKED["README.md"] = ("", "ru")
-LINKED["README.en.md"] = ("", "en")
 
 UI = {
     "ru": {
-        "other": "en", "other_label": "EN",
-        "nav": [("settings", "Документация"), ("changelog", "Изменения")],
-        "docs_nav": [("", "Обзор"), ("settings", "Настройки"), ("development", "Разработка"), ("changelog", "Изменения")],
-        "download": "Скачать", "docs": "Документация", "on_page": "На странице", "source": "Исходный текст страницы",
-        "license": "Распространяется по лицензии GPL-3.0.",
+        "other": "en",
+        "nav": [("guide", "ГАЙД"), ("settings", "НАСТРОЙКИ"), ("changelog", "ИЗМЕНЕНИЯ")],
+        "docs_nav": [("settings", "Описание настроек"), ("development", "Разработка"), ("changelog", "История изменений")],
+        "download": "СКАЧАТЬ", "guide": "Гайд", "chapter": "Глава", "reading": "Чтение", "minutes": "мин",
+        "open": "ОТКРЫТЬ", "prev": "НАЗАД", "next": "ДАЛЕЕ", "contents": "Оглавление", "on_page": "На странице",
+        "reference": "Справочник", "source": "Исходный текст", "all": "ВСЕ", "search": "Поиск по гайду... (Ctrl+F)",
+        "nothing": "Ничего не найдено.", "license": "Распространяется по лицензии GPL-3.0.",
+        "status": [("Windows", "10 / 11 x64"), ("Версия", "{ver}"), (".NET", "8"), ("Лицензия", "GPL-3.0")],
+        "footer": [("Репозиторий", "github.com/arsenzaaa/DEVICE-TWEAKER", REPO), ("Релизы", "github.com/arsenzaaa/DEVICE-TWEAKER/releases", f"{REPO}/releases"),
+                   ("Ошибки", "issues", f"{REPO}/issues"), ("Новости", "t.me/arsenzaa", TELEGRAM)],
     },
     "en": {
-        "other": "ru", "other_label": "RU",
-        "nav": [("settings", "Docs"), ("changelog", "Changelog")],
-        "docs_nav": [("", "Overview"), ("settings", "Settings"), ("development", "Development"), ("changelog", "Changelog")],
-        "download": "Download", "docs": "Documentation", "on_page": "On this page", "source": "Page source",
-        "license": "Distributed under the GPL-3.0 license.",
+        "other": "ru",
+        "nav": [("guide", "GUIDE"), ("settings", "SETTINGS"), ("changelog", "CHANGELOG")],
+        "docs_nav": [("settings", "Settings guide"), ("development", "Development"), ("changelog", "Changelog")],
+        "download": "DOWNLOAD", "guide": "Guide", "chapter": "Chapter", "reading": "Reading", "minutes": "min",
+        "open": "OPEN", "prev": "BACK", "next": "NEXT", "contents": "Contents", "on_page": "On this page",
+        "reference": "Reference", "source": "Source", "all": "ALL", "search": "Search the guide... (Ctrl+F)",
+        "nothing": "Nothing found.", "license": "Distributed under the GPL-3.0 license.",
+        "status": [("Windows", "10 / 11 x64"), ("Version", "{ver}"), (".NET", "8"), ("License", "GPL-3.0")],
+        "footer": [("Repository", "github.com/arsenzaaa/DEVICE-TWEAKER", REPO), ("Releases", "github.com/arsenzaaa/DEVICE-TWEAKER/releases", f"{REPO}/releases"),
+                   ("Issues", "issues", f"{REPO}/issues"), ("News", "t.me/arsenzaa", TELEGRAM)],
     },
 }
 
-INTERRUPT_KEYS = {
-    "ru": """HKLM\\SYSTEM\\CurrentControlSet\\Enum\\PCI\\<устройство>\\Device Parameters\\Interrupt Management
-  MessageSignaledInterruptProperties  MSISupported           1 = MSI / MSI-X
-                                      MessageNumberLimit     удаляется при Unlimited
-  Affinity Policy                     DevicePriority         3 = High
-                                      DevicePolicy           4 = SpecifiedProcessors
-                                      AssignmentSetOverride  маска CPU""",
-    "en": """HKLM\\SYSTEM\\CurrentControlSet\\Enum\\PCI\\<device>\\Device Parameters\\Interrupt Management
-  MessageSignaledInterruptProperties  MSISupported           1 = MSI / MSI-X
-                                      MessageNumberLimit     removed for Unlimited
-  Affinity Policy                     DevicePriority         3 = High
-                                      DevicePolicy           4 = SpecifiedProcessors
-                                      AssignmentSetOverride  CPU mask""",
-}
-RSS_KEYS = {
-    lang: f"""HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{{4d36e972-e325-11ce-bfc1-08002be10318}}\\<{name}>
-  *RssBaseProcNumber  *NumRssQueues  *MaxRssProcessors  *RssMaxProcNumber"""
-    for lang, name in (("ru", "адаптер"), ("en", "adapter"))
-}
-VERIFY = """(Get-FileHash .\\DEVICE.TWEAKER.SelfContained.exe -Algorithm SHA256).Hash
-Select-String -Path .\\SHA256SUMS.txt -Pattern 'DEVICE.TWEAKER.SelfContained.exe'"""
-
-# Landing page. Text uses **bold** and `code`; each section is (id, title, blocks), where a block is
-# a paragraph string, ("items", [(term, text), ...]) or ("code", text).
 LANDING = {
     "ru": {
         "title": "DEVICE TWEAKER — прерывания устройств Windows под топологию процессора",
-        "description": "MSI, Interrupt Affinity, ReservedCpuSets, RSS, USB IMOD и NIC ITR в одной программе для Windows 10 / 11 x64, с интеллектуальной авто-оптимизацией.",
+        "description": "MSI, Interrupt Affinity, ReservedCpuSets, RSS, USB IMOD и NIC ITR в одной программе для Windows 10 / 11 x64, с интеллектуальной авто-оптимизацией и подробным гайдом.",
         "eyebrow": "WINDOWS 10 / 11 x64",
         "lead": "Прерывания устройств Windows под топологию процессора.",
         "sub": "MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + RSS + USB IMOD / NIC ITR в одном интерфейсе, с интеллектуальной авто-оптимизацией.",
-        "meta": "GPL-3.0 · .NET 8 · RU / EN",
         "shot_alt": "DEVICE TWEAKER: USB-контроллер на Intel Core i9-14900K",
-        "sections": [
-            ("why", "Зачем", [
-                "ISR / DPC выполняются выше любого потока и не знают, какие ядра заняты игрой. Драйвер на ядре с важным потоком (GAME / RENDER / RHI) прерывает его -> поток ждёт или уходит на другое ядро и теряет свой L1 / L2 -> растёт время кадра, появляются статтеры. Два драйвера на одном ядре задерживают ISR / DPC друг друга, на одном SMT-SET делят кэш и EXECUTION-UNITS.",
-                "DEVICE TWEAKER разносит прерывания по физическим ядрам: драйвера не делят ядра и SMT-SET, ядро 0 по возможности остаётся свободным.",
-                ("items", [
-                    ("MSI / Affinity", "MSI Mode, MSI Limit, IRQ Priority, IRQ Policy и Interrupt Affinity для каждого устройства"),
-                    ("ReservedCpuSets", "ядра, на которые Windows не ставит обычные потоки"),
-                    ("RSS", "базовый CPU и очереди проводных адаптеров NDIS"),
-                    ("USB IMOD", "модерация прерываний interrupter'ов xHCI"),
-                    ("NIC ITR", "модерация прерываний сетевых контроллеров Intel и Realtek"),
-                ]),
-            ]),
-            ("auto", "Авто-оптимизация", [
-                "**АВТООПТИМИЗАЦИЯ** читает топологию (P-Core / E-Core, SMT / HT, CPPC, CCD / CCX), находит роли устройств и строит план:",
-                ("items", [
-                    ("GPU", "-> два разных физических ядра. На одном ядре ISR видеокарты прерывает её же DPC -> спайки задержки. SMT-соседи одного ядра за два ядра не считаются."),
-                    ("USB / сеть / аудио", "-> свои ядра по правилам совместного размещения. Контроллер с мышью, клавиатурой и геймпадом определяется автоматически."),
-                    ("CCD", "-> на процессорах с несколькими CCD выбирается целевой CCD."),
-                    ("Накопители", "-> MSI и высокий приоритет, affinity остаётся за Windows: на части NVMe `SpecifiedProcessors` не даёт Windows загрузиться."),
-                    ("iGPU / Wi-Fi", "-> affinity встроенной GPU возвращается Windows, Wi-Fi не трогается."),
-                ]),
-                "Если топология определена ненадёжно, запись не начинается. Перед первым запуском сохраняется исходное состояние, его возвращает **ВОССТАНОВЛЕНИЕ → ИСХОДНЫЙ**.",
-                ("figure", "cpu-allocation", "GPU: CPU 4 на ядре 2 и CPU 8 на ядре 4, SMT-соседи CPU 5 и CPU 9 свободны"),
-            ]),
-            ("interrupts", "Прерывания", [
-                "**MSI MODE** — прерывания сообщениями вместо линии. Без MSI на трейсе xHCI выполнение DPC прерывается двумя ISR, с MSI не прерывается. **MSI LIMIT** — `Unlimited` удаляет ограничение числа сообщений.",
-                "**IRQ PRIORITY** влияет на приоритет аппаратного прерывания. Это не приоритет игры и не приоритет DPC. **INTERRUPT AFFINITY** задаёт логические процессоры для IRQ устройства; Policy `SpecCPU` использует отмеченную маску, остальные политики оставляют выбор Windows.",
-                ("code", INTERRUPT_KEYS["ru"]),
-                "**IRQ MODE** показывает, что устройство использует сейчас: Line / MSI / MSI-X. **HW** — что оно поддерживает. **СЧИТАТЬ IRQ** уточняет режим по битам `MSI Enable` / `MSI-X Enable` в конфигурации PCI через DTIMOD.sys.",
-            ]),
-            ("imod", "USB IMOD", [
-                "IMOD — интервал модерации прерываний у **interrupter'а** контроллера xHCI, а не у отдельной мыши. Шаг 250 нс: `0xC8` = 50 мкс (Windows по умолчанию), `0xFA0` = 1 мс, `0x0` = модерация выключена.",
-                "Interrupter выдаётся устройству при подключении и после перезагрузки может смениться -> программа каждый раз заново читает карту «устройство → interrupter» из контекстов xHCI в памяти.",
-                ("items", [
-                    ("Устройства", "значения по ролям. Профиль AUTO: мышь `0x0`, аудио `0xFA0`, клавиатура и геймпад `0xC8`."),
-                    ("XHCI", "одно значение на весь контроллер."),
-                    ("Interrupters", "значения по индексам."),
-                ]),
-                "После записи регистры читаются повторно. **ПРОВЕРИТЬ** показывает фактические значения и время чтения.",
-            ]),
-            ("network", "Сеть", [
-                "У адаптеров NDIS прерывания распределяет RSS, поэтому вместо маски настраиваются базовый CPU и очереди. Процессоры берутся по одному на физическое ядро, SMT-соседи пропускаются, число очередей ограничено значениями драйвера и векторами MSI-X.",
-                ("code", RSS_KEYS["ru"]),
-                "**NIC ITR** — регистры модерации самого контроллера: EITR у Intel I210 / I211, I225 / I226, I350, 82576 / 82580, ITR у I219, IntrMit у Realtek RTL8111 / 8168, RTL8125 / 8126, включая совместимые Killer. **СОХРАНИТЬ** выключает собственную модерацию драйвера (`*InterruptModeration`, у Intel также `ITR`) -> иначе драйвер перезаписывает регистр.",
-            ]),
-            ("startup", "Автозапуск", [
-                "Регистры IMOD и NIC ITR держат значение до перезагрузки, сна или сброса контроллера. Сохранённый профиль применяет задача Планировщика `\\DEVICE TWEAKER\\IMOD` от SYSTEM: при входе в Windows, после выхода из сна и при подключении USB / HID-устройства.",
-                "Задача запускает открытый `ApplyIMOD.ps1` из `%ProgramData%\\DEVICE TWEAKER\\Startup` и работает без EXE. Перед запуском сверяются SHA-256 runtime, драйвера и загрузчика, изменять папку могут только администраторы и SYSTEM.",
-            ]),
-            ("more", "Остальное", [
-                ("items", [
-                    ("ReservedCpuSets", "Windows не планирует на зарезервированные ядра обычные потоки. Драйвер с маской на такое ядро продолжает работать там, а потоки от него защищены."),
-                    ("Mouse Throttle", "`RawMouseThrottleDuration`: частота Raw Input для фоновых окон Windows 11, 1000 / значение Гц."),
-                    ("Polling Rate", "мышь и клавиатура по данным USB и замер частоты событий Raw Input."),
-                    ("Энергосбережение", "USB-контроллеры, корневые USB-хабы, проводные адаптеры и USB selective suspend; значения перечитываются через WMI."),
-                    ("Бекапы и логи", "проверенный бекап перед каждым применением, лог: что применилось, что пропущено и почему."),
-                ]),
-            ]),
-            ("install", "Установка", [
-                ("items", [
-                    ("SelfContained.exe", ".NET встроен."),
-                    ("DEVICE.TWEAKER.exe", "нужен .NET 8 Desktop Runtime x64."),
-                ]),
-                "Запустите от имени администратора -> **АВТООПТИМИЗАЦИЯ** или ручная настройка и **ПРИМЕНИТЬ** -> перезагрузка. **ПРОВЕРИТЬ** в блоке IMOD или NIC ITR покажет фактические значения регистров.",
-                ("note", "DTIMOD.sys и KDU", "Регистры IMOD и NIC ITR недоступны из пользовательского режима, их пишет собственный драйвер DTIMOD.sys, и только в память, которую Windows выделила выбранному устройству. Публичной подписи у драйвера нет, его загружает KDU -> антивирусы относят такие загрузчики к HackTool. HVCI и Microsoft Vulnerable Driver Blocklist блокируют загрузку, FACEIT и Vanguard могут с ней конфликтовать: состояние показывает **ПРОВЕРКА СИСТЕМЫ**. Остальные настройки от драйвера не зависят."),
-                "SHA-256 файлов — в `SHA256SUMS.txt` на странице релиза, исходников — в `SOURCE-SHA256SUMS.txt`:",
-                ("code", VERIFY),
-                "Откат: **ВОССТАНОВЛЕНИЕ → ИСХОДНЫЙ** возвращает реестр к состоянию до первой авто-оптимизации и удаляет задачу автозапуска.",
-            ]),
-        ],
-        "gallery": [
-            ("showcase_gpu_full", "Fig 1. GPU на двух физических ядрах"),
-            ("showcase_nic_full", "Fig 2. NIC ITR и RSS, Intel I226-V"),
-            ("showcase_amd_imod_full", "Fig 3. USB IMOD, Ryzen 9 9950X3D"),
-        ],
-        "gallery_title": "Скриншоты",
-        "gallery_note": "На скриншотах тестовые устройства и значения.",
-        "more": "Подробно о каждой настройке",
+        "guide_title": "ГАЙД",
+        "guide_lead": "ISR / DPC выполняются выше любого потока и не знают, какие ядра заняты игрой. Драйвер на ядре с GAME / RENDER / RHI прерывает его -> поток ждёт или теряет свой L1 / L2 -> растёт время кадра. Гайд разбирает, как это устроено в Windows, по каждому типу устройства, и что делает программа.",
+        "install_title": "УСТАНОВКА",
+        "files": [("DEVICE.TWEAKER.SelfContained.exe", ".NET встроен"), ("DEVICE.TWEAKER.exe", "нужен .NET 8 Desktop Runtime x64")],
+        "steps": [("1", "Запустите программу от имени администратора."),
+                  ("2", "<b>АВТООПТИМИЗАЦИЯ</b> строит план по топологии и применяет его. Ручная настройка — <b>ПРИМЕНИТЬ</b>."),
+                  ("3", "Перезагрузите компьютер. <b>ПРОВЕРИТЬ</b> в блоке IMOD или NIC ITR покажет фактические значения регистров."),
+                  ("4", "Откат — <b>ВОССТАНОВЛЕНИЕ → ИСХОДНЫЙ</b>: реестр возвращается к состоянию до первой авто-оптимизации.")],
+        "driver": "IMOD и NIC ITR пишет собственный драйвер DTIMOD.sys, только в память выбранного устройства. Его загружает KDU, поэтому антивирусы относят программу к HackTool, а HVCI и Vulnerable Driver Blocklist блокируют загрузку. Остальные настройки от драйвера не зависят.",
+        "driver_link": "Подробно — глава 11",
+        "shots_title": "СКРИНШОТЫ",
+        "shots": [("showcase_gpu_full", "GPU", "Видеокарта на двух физических ядрах"),
+                  ("showcase_nic_full", "NET", "NIC ITR и RSS, Intel I226-V"),
+                  ("showcase_amd_imod_full", "USB", "USB IMOD, Ryzen 9 9950X3D")],
+        "shots_note": "На скриншотах тестовые устройства и значения.",
     },
     "en": {
         "title": "DEVICE TWEAKER — device interrupts on Windows, tuned to your CPU topology",
-        "description": "MSI, Interrupt Affinity, ReservedCpuSets, RSS, USB IMOD and NIC ITR in one program for Windows 10 / 11 x64, with intelligent auto-optimization.",
+        "description": "MSI, Interrupt Affinity, ReservedCpuSets, RSS, USB IMOD and NIC ITR in one program for Windows 10 / 11 x64, with intelligent auto-optimization and an in-depth guide.",
         "eyebrow": "WINDOWS 10 / 11 x64",
         "lead": "Device interrupts on Windows, tuned to your CPU topology.",
         "sub": "MSI Utility V3 + Interrupt Affinity Policy Tool (IAPT) + ReservedCpuSets + RSS + USB IMOD / NIC ITR in one interface, with intelligent auto-optimization.",
-        "meta": "GPL-3.0 · .NET 8 · RU / EN",
         "shot_alt": "DEVICE TWEAKER: a USB controller on Intel Core i9-14900K",
-        "sections": [
-            ("why", "Why", [
-                "ISR / DPC run above any thread and do not know which cores the game is using. A driver on the core of an important thread (GAME / RENDER / RHI) interrupts it -> the thread waits or moves to another core and loses its L1 / L2 -> frame time grows and stutters appear. Two drivers on one core delay each other's ISR / DPC; on one SMT-SET they share cache and EXECUTION-UNITS.",
-                "DEVICE TWEAKER spreads interrupts across physical cores: drivers do not share cores or SMT-SETs, and core 0 stays free when possible.",
-                ("items", [
-                    ("MSI / Affinity", "MSI Mode, MSI Limit, IRQ Priority, IRQ Policy and Interrupt Affinity for each device"),
-                    ("ReservedCpuSets", "cores where Windows does not place ordinary threads"),
-                    ("RSS", "base CPU and queues of wired NDIS adapters"),
-                    ("USB IMOD", "interrupt moderation of xHCI interrupters"),
-                    ("NIC ITR", "interrupt moderation of Intel and Realtek network controllers"),
-                ]),
-            ]),
-            ("auto", "Auto-optimization", [
-                "**AUTO-OPTIMIZATION** reads the topology (P-Core / E-Core, SMT / HT, CPPC, CCD / CCX), finds the device roles and builds a plan:",
-                ("items", [
-                    ("GPU", "-> two different physical cores. On one core the GPU's ISR interrupts its own DPC -> latency spikes. Two SMT siblings of one core do not count as two cores."),
-                    ("USB / network / audio", "-> their own cores, by placement rules. The controller with the mouse, keyboard and gamepad is found automatically."),
-                    ("CCD", "-> on CPUs with several CCDs a target CCD is chosen."),
-                    ("Storage", "-> MSI and high priority, affinity stays with Windows: on some NVMe drives `SpecifiedProcessors` stops Windows from booting."),
-                    ("iGPU / Wi-Fi", "-> integrated GPU affinity goes back to Windows, Wi-Fi is left untouched."),
-                ]),
-                "If the topology cannot be detected reliably, nothing is written. The original state is saved before the first run, and **RESTORE → ORIGINAL** brings it back.",
-                ("figure", "cpu-allocation", "GPU: CPU 4 on core 2 and CPU 8 on core 4, SMT siblings CPU 5 and CPU 9 stay free"),
-            ]),
-            ("interrupts", "Interrupts", [
-                "**MSI MODE** — message-signaled interrupts instead of a line. Without MSI, a trace of an xHCI controller shows its DPC interrupted by two ISRs; with MSI it is not interrupted. **MSI LIMIT** — `Unlimited` removes the message limit.",
-                "**IRQ PRIORITY** affects the priority of the hardware interrupt. It is not the game's priority and not the DPC's priority. **INTERRUPT AFFINITY** sets the logical processors for the device's IRQ; the `SpecCPU` policy uses the checked mask, the other policies leave the choice to Windows.",
-                ("code", INTERRUPT_KEYS["en"]),
-                "**IRQ MODE** shows what the device uses now: Line / MSI / MSI-X. **HW** shows what it supports. **READ IRQ MODE** confirms the mode from the `MSI Enable` / `MSI-X Enable` bits in PCI configuration space through DTIMOD.sys.",
-            ]),
-            ("imod", "USB IMOD", [
-                "IMOD is the interrupt moderation interval of an xHCI **interrupter**, not of a single mouse. 250 ns steps: `0xC8` = 50 µs (Windows default), `0xFA0` = 1 ms, `0x0` = moderation off.",
-                "A device gets its interrupter when it connects, and it may change after a restart -> the program reads the device → interrupter map from the xHCI contexts in memory every time.",
-                ("items", [
-                    ("Devices", "values by role. The AUTO profile: mouse `0x0`, audio `0xFA0`, keyboard and gamepad `0xC8`."),
-                    ("XHCI", "one value for the whole controller."),
-                    ("Interrupters", "values by index."),
-                ]),
-                "Registers are read back after every write. **CHECK** shows the actual values and the time they were read.",
-            ]),
-            ("network", "Network", [
-                "On NDIS adapters RSS distributes the interrupts, so the base CPU and queues are set instead of a mask. Processors are taken one per physical core, SMT siblings are skipped, and the queue count is limited by the driver's values and the MSI-X vectors.",
-                ("code", RSS_KEYS["en"]),
-                "**NIC ITR** — the controller's own moderation registers: EITR on Intel I210 / I211, I225 / I226, I350, 82576 / 82580, ITR on I219, IntrMit on Realtek RTL8111 / 8168, RTL8125 / 8126, including compatible Killer adapters. **SAVE** turns off the driver's own moderation (`*InterruptModeration`, on Intel also `ITR`) -> otherwise the driver overwrites the register.",
-            ]),
-            ("startup", "Startup", [
-                "IMOD and NIC ITR registers keep their value until a restart, sleep or controller reset. A saved profile is applied by the Task Scheduler task `\\DEVICE TWEAKER\\IMOD`, running as SYSTEM: at sign-in, after resume from sleep and when a USB / HID device connects.",
-                "The task runs the readable `ApplyIMOD.ps1` from `%ProgramData%\\DEVICE TWEAKER\\Startup` and works without the EXE. SHA-256 of the runtime, driver and loader is checked before each run; only administrators and SYSTEM can modify the folder.",
-            ]),
-            ("more", "More", [
-                ("items", [
-                    ("ReservedCpuSets", "Windows does not schedule ordinary threads on reserved cores. A driver with a mask on such a core keeps running there, and threads are protected from it."),
-                    ("Mouse Throttle", "`RawMouseThrottleDuration`: the Raw Input rate for background windows on Windows 11, 1000 / value Hz."),
-                    ("Polling Rate", "mouse and keyboard from USB data, plus a Raw Input event-rate measurement."),
-                    ("Power saving", "USB controllers, root USB hubs, wired adapters and USB selective suspend; values are read back through WMI."),
-                    ("Backups and logs", "a verified backup before every apply; the log shows what was applied, what was skipped and why."),
-                ]),
-            ]),
-            ("install", "Installation", [
-                ("items", [
-                    ("SelfContained.exe", ".NET included."),
-                    ("DEVICE.TWEAKER.exe", "requires the .NET 8 Desktop Runtime x64."),
-                ]),
-                "Run as administrator -> **AUTO-OPTIMIZATION**, or manual settings and **APPLY** -> restart. **CHECK** in the IMOD or NIC ITR block shows the actual register values.",
-                ("note", "DTIMOD.sys and KDU", "IMOD and NIC ITR registers are not reachable from user mode; they are written by the custom DTIMOD.sys driver, and only to memory that Windows assigned to the selected device. The driver has no public signature and is loaded by KDU -> antivirus software flags such loaders as HackTool. HVCI and the Microsoft Vulnerable Driver Blocklist block the loading, and FACEIT and Vanguard may conflict with it: **SYSTEM CHECK** shows their state. All other settings work without the driver."),
-                "SHA-256 hashes of the files are in `SHA256SUMS.txt` on the release page, of the sources in `SOURCE-SHA256SUMS.txt`:",
-                ("code", VERIFY),
-                "Rollback: **RESTORE → ORIGINAL** returns the registry to its state before the first auto-optimization and removes the startup task.",
-            ]),
-        ],
-        "gallery": [
-            ("showcase_gpu_full", "Fig 1. GPU on two physical cores"),
-            ("showcase_nic_full", "Fig 2. NIC ITR and RSS, Intel I226-V"),
-            ("showcase_amd_imod_full", "Fig 3. USB IMOD, Ryzen 9 9950X3D"),
-        ],
-        "gallery_title": "Screenshots",
-        "gallery_note": "Screenshots show test devices and values.",
-        "more": "Every setting in detail",
+        "guide_title": "GUIDE",
+        "guide_lead": "ISRs / DPCs run above any thread and do not know which cores the game is using. A driver on the core of GAME / RENDER / RHI interrupts it -> the thread waits or loses its L1 / L2 -> frame time grows. The guide explains how this works in Windows, device type by device type, and what the program does about it.",
+        "install_title": "INSTALLATION",
+        "files": [("DEVICE.TWEAKER.SelfContained.exe", ".NET included"), ("DEVICE.TWEAKER.exe", "requires the .NET 8 Desktop Runtime x64")],
+        "steps": [("1", "Run the program as administrator."),
+                  ("2", "<b>AUTO-OPTIMIZATION</b> builds a plan from the topology and applies it. For manual settings use <b>APPLY</b>."),
+                  ("3", "Restart the PC. <b>CHECK</b> in the IMOD or NIC ITR block shows the actual register values."),
+                  ("4", "Rollback — <b>RESTORE → ORIGINAL</b> returns the registry to its state before the first auto-optimization.")],
+        "driver": "IMOD and NIC ITR are written by the custom DTIMOD.sys driver, only to the selected device's memory. KDU loads it, so antivirus software flags the program as HackTool, and HVCI and the Vulnerable Driver Blocklist block the loading. All other settings work without the driver.",
+        "driver_link": "Details in chapter 11",
+        "shots_title": "SCREENSHOTS",
+        "shots": [("showcase_gpu_full", "GPU", "Graphics card on two physical cores"),
+                  ("showcase_nic_full", "NET", "NIC ITR and RSS, Intel I226-V"),
+                  ("showcase_amd_imod_full", "USB", "USB IMOD, Ryzen 9 9950X3D")],
+        "shots_note": "Screenshots show test devices and values.",
     },
 }
 
@@ -263,7 +117,7 @@ def version():
 
 
 def page_url(slug, lang):
-    """Site-relative path of a page, ending with a slash."""
+    """Site-relative directory of a page."""
     prefix = "en/" if lang == "en" else ""
     return prefix + (slug + "/" if slug else "")
 
@@ -276,18 +130,6 @@ def rel(from_url, to_url):
     return target + "/" if to_url == "" or to_url.endswith("/") else target
 
 
-def inline(text):
-    """**bold** and `code` of the landing text, HTML-escaped."""
-    parts = re.split(r"(`[^`]+`)", text)
-    out = []
-    for part in parts:
-        if part.startswith("`"):
-            out.append(f"<code>{html.escape(part[1:-1])}</code>")
-        else:
-            out.append(re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", html.escape(part, quote=False)))
-    return "".join(out)
-
-
 def typography(markup):
     """No line break after one-letter Russian words and before a dash, outside tags and code."""
     parts = re.split(r"(<code>.*?</code>|<pre>.*?</pre>|<[^>]+>)", markup, flags=re.S)
@@ -296,8 +138,50 @@ def typography(markup):
     return "".join(parts)
 
 
-def rewrite_links(body, source, here):
-    """Points links between documents at their pages; other repository files go to GitHub."""
+# Guide chapters
+
+class Chapter:
+    def __init__(self, path, lang):
+        self.path = path
+        self.lang = lang
+        text = path.read_text(encoding="utf-8-sig")
+        meta = re.match(r"<!--\s*tag:\s*([^|]+)\|\s*summary:\s*(.+?)\s*-->", text, re.S)
+        self.tag = meta.group(1).strip()
+        self.summary = meta.group(2).strip()
+        self.number = path.name[:2]
+        self.slug = re.sub(r"(\.en)?\.md$", "", path.name)
+        self.title = re.search(r"^# (.+)$", text, re.M).group(1).strip()
+        self.text = text
+        words = len(re.findall(r"\w+", re.sub(r"```.*?```", "", text, flags=re.S)))
+        self.minutes = max(2, round(words / 170))
+
+    @property
+    def source(self):
+        return self.path.relative_to(ROOT).as_posix()
+
+    def url(self):
+        return page_url(f"guide/{self.slug}", self.lang)
+
+
+def chapters(lang):
+    pattern = "*.en.md" if lang == "en" else "[0-9]*.md"
+    found = [Chapter(p, lang) for p in sorted((ROOT / "docs" / "guide").glob(pattern))]
+    return [c for c in found if (lang == "en") == c.path.name.endswith(".en.md")]
+
+
+def linked_pages():
+    """Repository files with a page of their own; links to anything else go to GitHub."""
+    pages = {path: page_url(slug, lang) for (slug, lang), path in DOCS.items()}
+    pages["README.md"] = page_url("", "ru")
+    pages["README.en.md"] = page_url("", "en")
+    for lang in UI:
+        pages[f"docs/guide/README{'.en' if lang == 'en' else ''}.md"] = page_url("guide", lang)
+        for c in chapters(lang):
+            pages[c.source] = c.url()
+    return pages
+
+
+def rewrite_links(body, source, here, pages):
     source_dir = posixpath.dirname(source)
 
     def fix(match):
@@ -306,25 +190,14 @@ def rewrite_links(body, source, here):
             return match.group(0)
         path, _, anchor = url.partition("#")
         target = posixpath.normpath(posixpath.join(source_dir, path)) if path else source
-        if target in LINKED:
-            slug, lang = LINKED[target]
-            new = rel(here, page_url(slug, lang))
-        else:
-            new = f"{REPO}/blob/main/{target}"
+        new = rel(here, pages[target]) if target in pages else f"{REPO}/blob/main/{target}"
         return f'{attr}="{new}{"#" + anchor if anchor else ""}"'
 
     return re.sub(r'(href|src)="([^"]+)"', fix, body)
 
 
-ALERT = re.compile(r'<blockquote>\s*<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*', re.S)
-
-
-def alerts(body):
-    return ALERT.sub(lambda m: f'<blockquote class="note"><p class="note-title">{m.group(1).title()}</p><p>', body)
-
-
-def render_document(source, here):
-    text = (ROOT / source).read_text(encoding="utf-8-sig")
+def render_markdown(text, source, here, pages):
+    text = re.sub(r"^<!--.*?-->\s*", "", text, flags=re.S)
     title = re.search(r"^# (.+)$", text, re.M).group(1).strip()
     text = re.sub(r"^# .+\n", "", text, count=1, flags=re.M)
     # The navigation line under the title is replaced by the site navigation.
@@ -333,14 +206,17 @@ def render_document(source, here):
     text = re.sub(r"^  (?=\S)", "    ", text, flags=re.M)
     md = markdown.Markdown(extensions=["tables", "fenced_code", "toc", "attr_list", "sane_lists"],
                            extension_configs={"toc": {"slugify": slugify_unicode, "toc_depth": "2-3"}})
-    body = md.convert(text)
-    body = alerts(rewrite_links(body, source, here))
+    body = rewrite_links(md.convert(text), source, here, pages)
+    body = re.sub(r'<blockquote>\s*<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*',
+                  lambda m: f'<blockquote class="note"><p class="note-title">{m.group(1)}</p><p>', body)
     return title, body, md.toc_tokens
 
 
+# Page chrome
+
 def head(lang, title, description, here, slug):
     root = rel(here, "")
-    alt_lang = UI[lang]["other"]
+    other = UI[lang]["other"]
     return f"""<!doctype html>
 <html lang="{lang}">
 <head>
@@ -351,7 +227,7 @@ def head(lang, title, description, here, slug):
 <meta name="color-scheme" content="dark light">
 <link rel="canonical" href="{SITE}{page_url(slug, lang)}">
 <link rel="alternate" hreflang="{lang}" href="{SITE}{page_url(slug, lang)}">
-<link rel="alternate" hreflang="{alt_lang}" href="{SITE}{page_url(slug, alt_lang)}">
+<link rel="alternate" hreflang="{other}" href="{SITE}{page_url(slug, other)}">
 <meta property="og:title" content="{html.escape(title)}">
 <meta property="og:description" content="{html.escape(description)}">
 <meta property="og:type" content="website">
@@ -361,68 +237,68 @@ def head(lang, title, description, here, slug):
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap">
 <link rel="stylesheet" href="{root}assets/site.css">
 </head>
+<body>
 """
 
 
-def topbar(lang, here, slug, ver):
+def topbar(lang, here, slug, section):
     ui = UI[lang]
     root = rel(here, "")
-    links = "".join(
-        f'<a href="{rel(here, page_url(s, lang))}"{" aria-current=\"page\"" if s == slug else ""}>{label}</a>'
+    nav = "".join(
+        f'<a class="chip{" on" if s == section else ""}" href="{rel(here, page_url(s, lang))}">[ {label} ]</a>'
         for s, label in ui["nav"])
-    other = rel(here, page_url(slug, ui["other"]))
-    return f"""<body>
-<div class="frame">
-<header class="topbar">
-<a class="brand" href="{rel(here, page_url('', lang))}"><img src="{root}assets/mark.svg" width="24" height="24" alt=""><span>DEVICE TWEAKER</span></a>
-<nav class="nav">{links}<a href="{REPO}">GitHub</a><a href="{other}" hreflang="{ui['other']}">{ui['other_label']}</a></nav>
-<a class="button primary small" href="{REPO}/releases/latest">{ui['download']}</a>
+    langs = "".join(
+        f'<a class="lang{" on" if code == lang else ""}" href="{rel(here, page_url(slug, code))}" hreflang="{code}">{code.upper()}</a>'
+        for code in ("en", "ru"))
+    return f"""<header class="topbar">
+<a class="brand" href="{rel(here, page_url('', lang))}"><img src="{root}assets/mark.svg" width="26" height="26" alt=""><span>DEVICE TWEAKER</span></a>
+<nav class="nav">{nav}<a class="chip" href="{REPO}">[ GITHUB ]</a></nav>
+<div class="langs">{langs}</div>
 </header>
 """
 
 
+def status_line(lang, ver):
+    items = [(k, v.format(ver=ver)) for k, v in UI[lang]["status"]]
+    return '<p class="status">' + '<span class="sep">|</span>'.join(f"<span><b>{k}</b> - {v}</span>" for k, v in items) + "</p>"
+
+
 def footer(lang, here, ver):
     ui = UI[lang]
-    cells = [
-        (REPO, "GitHub"),
-        (rel(here, page_url("settings", lang)), ui["docs"]),
-        (rel(here, page_url("changelog", lang)), ui["docs_nav"][3][1]),
-        (TELEGRAM, "Telegram"),
-        (f"{REPO}/releases/latest", f"{ui['download']} <span>[{ver}]</span>"),
-    ]
-    grid = "".join(f'<a href="{href}">{label}</a>' for href, label in cells)
+    rows = "".join(f'<p><span class="key">{k}:</span> <a href="{url}">{v}</a></p>' for k, v, url in ui["footer"])
     return f"""<footer class="footer">
-<nav class="footer-grid">{grid}</nav>
+<div class="footer-info">{rows}<p><span class="key">DEVICE TWEAKER:</span> {ver} · © arsenzaaa · {ui['license']}</p></div>
 </footer>
-</div>
-<p class="colophon">© arsenzaaa · {ui['license']}</p>
+<script src="{rel(here, '')}assets/site.js"></script>
 </body>
 </html>
 """
 
 
-def picture(here, base, alt, width):
-    root = rel(here, "")
-    return (f'<picture><source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="{root}assets/{base.replace("allocation-", "allocation-mobile-")}-dark.svg">'
-            f'<source media="(max-width: 600px)" srcset="{root}assets/{base.replace("allocation-", "allocation-mobile-")}-light.svg">'
-            f'<source media="(prefers-color-scheme: dark)" srcset="{root}assets/{base}-dark.svg">'
-            f'<img src="{root}assets/{base}-light.svg" alt="{html.escape(alt)}" width="{width}"></picture>')
+# Pages
+
+def card(c, here, ui):
+    return f"""<article class="card" data-tag="{html.escape(c.tag)}" data-text="{html.escape((c.title + ' ' + c.summary + ' ' + c.text).lower())}">
+<a class="card-head" href="{rel(here, c.url())}"><span class="tag">[{c.tag}]</span><span class="num">{c.number}</span><span class="title">{c.title}</span></a>
+<p class="card-text">{html.escape(c.summary)}</p>
+<div class="card-foot"><span class="kv"><span class="key">{ui['chapter']}:</span> {c.number}</span><span class="kv"><span class="key">{ui['reading']}:</span> {c.minutes} {ui['minutes']}</span>
+<a class="button small" href="{rel(here, c.url())}">{ui['open']}</a></div>
+</article>"""
 
 
-def block(item, here, suffix):
-    if isinstance(item, str):
-        return f"<p>{inline(item)}</p>"
-    kind = item[0]
-    if kind == "items":
-        rows = "".join(f'<li><span class="mark">[*]</span><span><b>{inline(term)}</b> {inline(text)}</span></li>' for term, text in item[1])
-        return f'<ul class="points">{rows}</ul>'
-    if kind == "code":
-        return f"<pre><code>{html.escape(item[1])}</code></pre>"
-    if kind == "note":
-        return f'<div class="note"><p class="note-title">{inline(item[1])}</p><p>{inline(item[2])}</p></div>'
-    if kind == "figure":
-        return f'<div class="figure">{picture(here, f"{item[1]}-{suffix}", item[2], 560)}</div>'
-    raise ValueError(kind)
+def guide_index(lang, here, ui):
+    chs = chapters(lang)
+    tags = []
+    for c in chs:
+        if c.tag not in tags:
+            tags.append(c.tag)
+    chips = f'<button class="chip on" data-filter="*">[ {ui["all"]} ]</button>' + "".join(
+        f'<button class="chip" data-filter="{html.escape(t)}">[ {html.escape(t)} ]</button>' for t in tags)
+    cards = "".join(card(c, here, ui) for c in chs)
+    return f"""<div class="filterbar"><input class="search" type="search" placeholder="{ui['search']}" aria-label="{ui['search']}">
+<div class="chips">{chips}</div></div>
+<div class="cards">{cards}</div>
+<p class="empty" hidden>{ui['nothing']}</p>"""
 
 
 def landing(lang, ver):
@@ -431,13 +307,15 @@ def landing(lang, ver):
     root = rel(here, "")
     suffix = "en" if lang == "en" else "ru"
     shot = f"{root}assets/screenshots/showcase_intel_14900k_full_{suffix}.png"
-    settings = rel(here, page_url("settings", lang))
-    sections = "".join(
-        f'<section class="section" id="{ident}"><h2>{title}</h2>{"".join(block(b, here, suffix) for b in blocks)}</section>'
-        for ident, title, blocks in t["sections"])
-    gallery = "".join(
-        f'<figure><a href="{root}assets/screenshots/{name}_{suffix}.png"><img src="{root}assets/screenshots/{name}_{suffix}.png" alt="{html.escape(cap)}" loading="lazy"></a><figcaption>{cap.split(". ", 1)[0]}. <b>{cap.split(". ", 1)[1]}</b></figcaption></figure>'
-        for name, cap in t["gallery"])
+    files = "".join(
+        f'<p><span class="key">{html.escape(desc)}:</span> <a href="{REPO}/releases/latest/download/{name}">{name}</a></p>'
+        for name, desc in t["files"])
+    steps = "".join(f'<li><span class="step">{n}</span><span>{text}</span></li>' for n, text in t["steps"])
+    ch11 = next(c for c in chapters(lang) if c.number == "11")
+    shots = "".join(
+        f'<figure class="shot-card"><figcaption><span class="tag">[{tag}]</span> {cap}</figcaption>'
+        f'<a href="{root}assets/screenshots/raw/{name}_{suffix}.png"><img src="{root}assets/screenshots/raw/{name}_{suffix}.png" alt="{html.escape(cap)}" loading="lazy"></a></figure>'
+        for name, tag, cap in t["shots"])
     body = f"""<main>
 <section class="hero">
 <p class="eyebrow">[ {t['eyebrow']} ]</p>
@@ -445,21 +323,55 @@ def landing(lang, ver):
 <p class="lead">{t['lead']}</p>
 <p class="sub">{t['sub']}</p>
 <div class="actions">
-<a class="button primary" href="{REPO}/releases/latest">{ui['download'].upper()} {ver}</a>
-<a class="button" href="{settings}">{ui['docs'].upper()}</a>
+<a class="button primary" href="{REPO}/releases/latest">{ui['download']} {ver}</a>
+<a class="button" href="{rel(here, page_url('guide', lang))}">{ui['guide'].upper()}</a>
 </div>
-<p class="meta">v{ver} · {t['meta']}</p>
+{status_line(lang, ver)}
 </section>
-<section class="band"><a class="shot" href="{shot}"><img src="{shot}" alt="{html.escape(t['shot_alt'])}" width="1472" height="1412"></a></section>
-{sections}
-<section class="section" id="screenshots"><h2>{t['gallery_title']}</h2><div class="gallery">{gallery}</div><p class="faint">{t['gallery_note']}</p>
-<p><a class="button" href="{settings}">{t['more']} →</a></p></section>
+<section class="band"><a class="shot" href="{root}assets/screenshots/raw/showcase_intel_14900k_full_{suffix}.png"><img src="{shot}" alt="{html.escape(t['shot_alt'])}" width="1472" height="1412"></a></section>
+<section class="section" id="guide">
+<h2 class="label">[ {t['guide_title']} ]</h2>
+<p class="section-lead">{t['guide_lead']}</p>
+{guide_index(lang, here, ui)}
+</section>
+<section class="section" id="install">
+<h2 class="label">[ {t['install_title']} ]</h2>
+<div class="panel">
+<div class="panel-head"><span class="tag">[EXE]</span> <b>DEVICE TWEAKER {ver}</b></div>
+<div class="info">{files}</div>
+<ol class="steps">{steps}</ol>
+<div class="actions left"><a class="button primary" href="{REPO}/releases/latest">{ui['download']} {ver}</a><a class="button" href="{rel(here, ch11.url())}">{t['driver_link']}</a></div>
+</div>
+<div class="note"><p class="note-title">DTIMOD.sys / KDU</p><p>{t['driver']}</p></div>
+</section>
+<section class="section" id="screenshots">
+<h2 class="label">[ {t['shots_title']} ]</h2>
+<div class="shots">{shots}</div>
+<p class="faint">{t['shots_note']}</p>
+</section>
 </main>
 """
     if lang == "ru":
         body = typography(body)
-    return (head(lang, t["title"], t["description"], here, "") + topbar(lang, here, "", ver) + body
-            + footer(lang, here, ver))
+    return head(lang, t["title"], t["description"], here, "") + topbar(lang, here, "", "") + body + footer(lang, here, ver)
+
+
+def guide_page(lang, ver):
+    ui = UI[lang]
+    here = page_url("guide", lang)
+    t = LANDING[lang]
+    body = f"""<main class="wide">
+<section class="section first">
+<p class="crumbs"><a href="{rel(here, page_url('', lang))}">DEVICE TWEAKER</a> / {ui['guide']}</p>
+<h1 class="page-title">{ui['guide']}</h1>
+<p class="section-lead">{t['guide_lead']}</p>
+{guide_index(lang, here, ui)}
+</section>
+</main>
+"""
+    if lang == "ru":
+        body = typography(body)
+    return head(lang, f"{ui['guide']} — DEVICE TWEAKER", t["guide_lead"], here, "guide") + topbar(lang, here, "guide", "guide") + body + footer(lang, here, ver)
 
 
 def toc(tokens):
@@ -472,28 +384,68 @@ def toc(tokens):
     return "<ul>" + "".join(items) + "</ul>"
 
 
-def document(slug, lang, source, ver):
+def checklist(entries, here, current):
+    """The left list, drawn like the CPU Affinity checklist of the program."""
+    rows = "".join(
+        f'<li><a href="{rel(here, url)}"{" aria-current=\"page\"" if url == current else ""}><span class="box"></span>{label}</a></li>'
+        for url, label in entries)
+    return f'<ul class="checklist">{rows}</ul>'
+
+
+def doc_layout(lang, ver, here, slug, section, title, body, tokens, source, crumbs, entries, list_title, prevnext="", tag=""):
+    ui = UI[lang]
+    head_tag = f'<span class="tag">[{tag}]</span> ' if tag else ""
+    content = f"""<main class="docs">
+<aside class="sidebar"><div class="side">
+<p class="side-label">{list_title}</p>
+{checklist(entries, here, here)}
+<p class="side-label">{ui['on_page']}</p>
+<div class="side-toc">{toc(tokens)}</div>
+</div></aside>
+<article class="doc">
+<p class="crumbs">{crumbs}</p>
+<h1>{head_tag}{html.escape(title)}</h1>
+{body}
+{prevnext}
+<p class="source"><a href="{REPO}/blob/main/{source}">{ui['source']}: {source}</a></p>
+</article>
+</main>
+"""
+    if lang == "ru":
+        content = typography(content)
+    description = re.sub(r"<[^>]+>", "", (re.search(r"<p>(.*?)</p>", body, re.S) or re.search(r"(.*)", title)).group(1))[:200]
+    return head(lang, f"{title} — DEVICE TWEAKER", description, here, slug) + topbar(lang, here, slug, section) + content + footer(lang, here, ver)
+
+
+def chapter_page(c, lang, ver, pages):
+    ui = UI[lang]
+    here = c.url()
+    chs = chapters(lang)
+    _, body, tokens = render_markdown(c.text, c.source, here, pages)
+    i = [x.slug for x in chs].index(c.slug)
+    prev_link = f'<a class="button" href="{rel(here, chs[i - 1].url())}">← {ui["prev"]}: {chs[i - 1].number}</a>' if i > 0 else "<span></span>"
+    next_link = f'<a class="button" href="{rel(here, chs[i + 1].url())}">{ui["next"]}: {chs[i + 1].number} →</a>' if i < len(chs) - 1 else "<span></span>"
+    entries = [(x.url(), f'<span class="n">{x.number}</span> {x.title}') for x in chs]
+    crumbs = f'<a href="{rel(here, page_url("", lang))}">DEVICE TWEAKER</a> / <a href="{rel(here, page_url("guide", lang))}">{ui["guide"]}</a> / {c.number}'
+    return doc_layout(lang, ver, here, f"guide/{c.slug}", "guide", c.title, body, tokens, c.source, crumbs, entries,
+                      ui["contents"], f'<nav class="prevnext">{prev_link}{next_link}</nav>', c.tag)
+
+
+def reference_page(slug, lang, ver, pages):
     ui = UI[lang]
     here = page_url(slug, lang)
-    title, body, tokens = render_document(source, here)
-    pages = "".join(
-        f'<li><a href="{rel(here, page_url(s, lang))}"{" aria-current=\"page\"" if s == slug else ""}>{label}</a></li>'
-        for s, label in ui["docs_nav"])
-    description = re.sub(r"<[^>]+>", "", re.search(r"<p>(.*?)</p>", body, re.S).group(1))[:200]
-    content = f"""<div class="docs">
-<aside class="sidebar">
-<nav><ul class="side-pages">{pages}</ul>
-<p class="side-label">{ui['on_page']}</p><div class="side-toc">{toc(tokens)}</div></nav>
-</aside>
-<main class="doc">
-<h1>{html.escape(title)}</h1>
-{body}
-<p class="source"><a href="{REPO}/blob/main/{source}">{ui['source']}: {source}</a></p>
-</main>
-</div>
-"""
-    return (head(lang, f"{title} — DEVICE TWEAKER", description, here, slug) + topbar(lang, here, slug, ver)
-            + content + footer(lang, here, ver))
+    source = DOCS[(slug, lang)]
+    title, body, tokens = render_markdown((ROOT / source).read_text(encoding="utf-8-sig"), source, here, pages)
+    entries = [(page_url(s, lang), label) for s, label in ui["docs_nav"]]
+    crumbs = f'<a href="{rel(here, page_url("", lang))}">DEVICE TWEAKER</a> / {ui["reference"]}'
+    section = "changelog" if slug == "changelog" else "settings"
+    return doc_layout(lang, ver, here, slug, section, title, body, tokens, source, crumbs, entries, ui["reference"])
+
+
+def write(out, url, text):
+    target = out / url / "index.html"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
 
 
 def main():
@@ -504,23 +456,26 @@ def main():
     if out.exists():
         shutil.rmtree(out)
     assets = out / "assets"
-    (assets / "screenshots").mkdir(parents=True)
-    shutil.copy(HERE / "site.css", assets / "site.css")
+    (assets / "screenshots" / "raw").mkdir(parents=True)
+    for name in ("site.css", "site.js"):
+        shutil.copy(HERE / name, assets / name)
     for svg in (ROOT / "assets" / "branding").glob("*.svg"):
         shutil.copy(svg, assets / svg.name)
     for png in (ROOT / "assets" / "screenshots" / "framed").glob("*.png"):
         shutil.copy(png, assets / "screenshots" / png.name)
+    for png in (ROOT / "assets" / "screenshots").glob("*.png"):
+        shutil.copy(png, assets / "screenshots" / "raw" / png.name)
     (out / ".nojekyll").write_text("", encoding="utf-8")
 
     ver = version()
+    pages = linked_pages()
     for lang in UI:
-        target = out / page_url("", lang) / "index.html"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(landing(lang, ver), encoding="utf-8")
-    for (slug, lang), source in PAGES.items():
-        target = out / page_url(slug, lang) / "index.html"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(document(slug, lang, source, ver), encoding="utf-8")
+        write(out, page_url("", lang), landing(lang, ver))
+        write(out, page_url("guide", lang), guide_page(lang, ver))
+        for c in chapters(lang):
+            write(out, c.url(), chapter_page(c, lang, ver, pages))
+        for slug in ("settings", "development", "changelog"):
+            write(out, page_url(slug, lang), reference_page(slug, lang, ver, pages))
     print(f"Site built in {out}")
 
 

@@ -61,7 +61,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\src\publish-variants.ps1 -
 
 ## Сайт и графика
 
-Сайт [arsenzaaa.github.io/DEVICE-TWEAKER](https://arsenzaaa.github.io/DEVICE-TWEAKER/) собирается из `docs/`, `CHANGELOG.md` / `CHANGELOG.en.md` и текста главной страницы в `dev/site/build.py`. Workflow `Site` публикует его на GitHub Pages после изменений в `main`. Локально:
+Сайт [arsenzaaa.github.io/DEVICE-TWEAKER](https://arsenzaaa.github.io/DEVICE-TWEAKER/) собирается из глав гайда `docs/guide`, `docs/`, `CHANGELOG.md` / `CHANGELOG.en.md` и текста главной страницы в `dev/site/build.py`. Workflow `Site` публикует его на GitHub Pages после изменений в `main`. Локально:
 
 ```powershell
 pip install markdown==3.7

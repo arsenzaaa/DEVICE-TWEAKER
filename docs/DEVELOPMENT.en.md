@@ -61,7 +61,7 @@ The full local QA — builds, tests, deliberate faults, the native driver model 
 
 ## Site and artwork
 
-The site [arsenzaaa.github.io/DEVICE-TWEAKER](https://arsenzaaa.github.io/DEVICE-TWEAKER/en/) is built from `docs/`, `CHANGELOG.md` / `CHANGELOG.en.md` and the landing page text in `dev/site/build.py`. The `Site` workflow publishes it to GitHub Pages after changes on `main`. Locally:
+The site [arsenzaaa.github.io/DEVICE-TWEAKER](https://arsenzaaa.github.io/DEVICE-TWEAKER/en/) is built from the guide chapters in `docs/guide`, `docs/`, `CHANGELOG.md` / `CHANGELOG.en.md` and the landing page text in `dev/site/build.py`. The `Site` workflow publishes it to GitHub Pages after changes on `main`. Locally:
 
 ```powershell
 pip install markdown==3.7
