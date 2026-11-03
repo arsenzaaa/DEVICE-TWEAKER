@@ -1351,7 +1351,7 @@ public sealed partial class MainForm
                 await ResetBlockSettings(b, report);
                 if (!b.Device.IsTestDevice)
                 {
-                    LoadBlockSettings(b);
+                    await ReloadBlockSettingsAsync(b, report);
                 }
             }
             catch (Exception ex)

@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "id": "display-read-close",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    {
+      "id": "idle",
+      "action": "wait",
+      "target": "@main",
+      "property": "refresh-idle",
+      "value": "true",
+      "durationMs": 5000
+    },
+    {
+      "id": "slow",
+      "action": "display-read-model",
+      "value": "rss",
+      "property": "success",
+      "durationMs": 5000
+    },
+    {
+      "id": "refresh",
+      "action": "click",
+      "target": "id:REFRESH"
+    },
+    {
+      "id": "pending",
+      "action": "wait",
+      "target": "@main",
+      "property": "display-read-pending",
+      "value": "1",
+      "durationMs": 1000
+    },
+    {
+      "id": "before-close",
+      "action": "capture"
+    },
+    {
+      "id": "still-pending-at-exit",
+      "action": "assert",
+      "target": "@main",
+      "property": "display-read-pending",
+      "value": "1"
+    }
+  ]
+}

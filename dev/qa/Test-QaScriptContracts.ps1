@@ -36,6 +36,29 @@ $cases = @(
 '@ },
     @{ name = 'backup-delete-without-scenario'; exit = 1; text = '[ERROR] BACKUP.DELETE: failed path=fixture error=System.IO.IOException: Injected file deletion failure.' }
 )
+$cases += @(
+    @{ name = 'display-read-consumed'; exit = 0; text = @'
+[INFO] TEST.SCENARIO.BEGIN: fault=DisplayRead
+[ERROR] DISPLAY.READ.FAILED: Injected display provider failure.
+[INFO] TEST.SCENARIO.END: status=PASS assertions=2/0 faultConsumed=True
+'@ },
+    @{ name = 'display-read-timeout'; exit = 0; text = @'
+[INFO] TEST.SCENARIO.BEGIN: fault=DisplayRead
+[ERROR] DISPLAY.READ.FAILED: Device state read timed out. The current device list was preserved.
+[INFO] TEST.SCENARIO.END: status=PASS assertions=2/0 faultConsumed=True
+'@ },
+    @{ name = 'display-read-unrelated'; exit = 1; text = @'
+[INFO] TEST.SCENARIO.BEGIN: fault=DisplayRead
+[ERROR] DISPLAY.READ.FAILED: Unexpected real provider error.
+[INFO] TEST.SCENARIO.END: status=PASS assertions=2/0 faultConsumed=True
+'@ },
+    @{ name = 'display-read-without-scenario'; exit = 1; text = '[ERROR] DISPLAY.READ.FAILED: Injected display provider failure.' },
+    @{ name = 'display-read-unconfirmed'; exit = 1; text = @'
+[INFO] TEST.SCENARIO.BEGIN: fault=DisplayRead
+[ERROR] DISPLAY.READ.FAILED: Injected display provider failure.
+[INFO] TEST.SCENARIO.END: status=FAIL assertions=1/1 faultConsumed=False
+'@ }
+)
 $results = @()
 foreach ($case in $cases) {
     $file = Join-Path $OutputDirectory ($case.name + '.log')

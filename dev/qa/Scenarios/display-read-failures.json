@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "id": "display-read-failures",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    {
+      "id": "idle",
+      "action": "wait",
+      "target": "@main",
+      "property": "refresh-idle",
+      "value": "true",
+      "durationMs": 5000
+    },
+    {
+      "id": "before",
+      "action": "capture"
+    },
+    {
+      "id": "failure-model",
+      "action": "display-read-model",
+      "value": "rss",
+      "property": "failure",
+      "durationMs": 1000
+    },
+    {
+      "id": "failure-refresh",
+      "action": "display-read-failure"
+    },
+    {
+      "id": "failure-ended",
+      "action": "wait",
+      "target": "@main",
+      "property": "display-read-failure-complete",
+      "value": "true",
+      "durationMs": 5000
+    },
+    {
+      "id": "failure-old-cards",
+      "action": "assert",
+      "target": "@main",
+      "property": "discovery-cards-preserved",
+      "value": "true"
+    },
+    {
+      "id": "failure-not-published",
+      "action": "assert",
+      "target": "@main",
+      "property": "display-read-published",
+      "value": "false"
+    },
+    {
+      "id": "failure-late-finished",
+      "action": "wait",
+      "target": "@main",
+      "property": "display-read-pending",
+      "value": "0",
+      "durationMs": 5000
+    },
+    {
+      "id": "failure-still-not-published",
+      "action": "assert",
+      "target": "@main",
+      "property": "display-read-published",
+      "value": "false"
+    },
+    {
+      "id": "failure-capture",
+      "action": "capture"
+    },
+    {
+      "id": "timeout-model",
+      "action": "display-read-model",
+      "value": "rss",
+      "property": "timeout",
+      "durationMs": 1000
+    },
+    {
+      "id": "timeout-refresh",
+      "action": "display-read-failure"
+    },
+    {
+      "id": "timeout-ended",
+      "action": "wait",
+      "target": "@main",
+      "property": "display-read-failure-complete",
+      "value": "true",
+      "durationMs": 5000
+    },
+    {
+      "id": "timeout-old-cards",
+      "action": "assert",
+      "target": "@main",
+      "property": "discovery-cards-preserved",
+      "value": "true"
+    },
+    {
+      "id": "timeout-not-published",
+      "action": "assert",
+      "target": "@main",
+      "property": "display-read-published",
+      "value": "false"
+    },
+    {
+      "id": "timeout-late-finished",
+      "action": "wait",
+      "target": "@main",
+      "property": "display-read-pending",
+      "value": "0",
+      "durationMs": 5000
+    },
+    {
+      "id": "timeout-still-not-published",
+      "action": "assert",
+      "target": "@main",
+      "property": "display-read-published",
+      "value": "false"
+    },
+    {
+      "id": "timeout-capture",
+      "action": "capture"
+    },
+    {
+      "id": "retry-model",
+      "action": "display-read-model",
+      "value": "drivers",
+      "property": "success",
+      "durationMs": 500
+    },
+    {
+      "id": "retry",
+      "action": "click",
+      "target": "id:REFRESH"
+    },
+    {
+      "id": "retry-idle",
+      "action": "wait",
+      "target": "@main",
+      "property": "refresh-idle",
+      "value": "true",
+      "durationMs": 5000
+    },
+    {
+      "id": "retry-published",
+      "action": "assert",
+      "target": "@main",
+      "property": "display-read-published",
+      "value": "true"
+    },
+    {
+      "id": "after",
+      "action": "capture"
+    }
+  ]
+}

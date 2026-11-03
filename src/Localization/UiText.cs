@@ -3,6 +3,9 @@ namespace DeviceTweakerCS;
 // Keep these keys stable when a caption changes in Strings.resx.
 internal static class UiText
 {
+    internal const string DeviceStateReading = "Read.DeviceStateReading";
+    internal const string DeviceStateFailed = "Read.DeviceStateFailed";
+    internal const string DeviceReadback = "Read.DeviceReadback";
     internal const string Refresh = "Action.Refresh";
     internal const string Apply = "Action.Apply";
     internal const string Auto = "Action.Auto";

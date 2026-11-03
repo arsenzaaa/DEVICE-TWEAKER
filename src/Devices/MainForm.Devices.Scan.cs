@@ -271,12 +271,12 @@ public sealed partial class MainForm
             return cached;
         }
 
-        NdisRssRuntimeState state = ReadNdisRssRuntimeState(instanceId);
-        _ndisRssRuntimeCache[normalized] = state;
-        return state;
+        // Binding, AUTO planning and diagnostic getters never start a process.
+        // Native reads are awaited before publication or after a write plan.
+        return EmptyNdisRssRuntimeState("not-read");
     }
 
-    private NdisRssRuntimeState ReadNdisRssRuntimeState(string instanceId)
+    private NdisRssRuntimeState ReadNdisRssRuntimeState(string instanceId, CancellationToken cancellation = default)
     {
         string? netCfgInstanceId = GetNdisNetCfgInstanceId(instanceId);
         string script = BuildNdisRssQueryScript(netCfgInstanceId, instanceId);
@@ -299,10 +299,20 @@ public sealed partial class MainForm
             process.StartInfo.ArgumentList.Add(script);
 
             Stopwatch queryTime = Stopwatch.StartNew();
+            cancellation.ThrowIfCancellationRequested();
             if (!process.Start())
             {
                 return EmptyNdisRssRuntimeState("powershell-start-failed");
             }
+
+            // Closing the form cancels its display read and cleans up only the
+            // PowerShell process created by this particular query.
+            using CancellationTokenRegistration stop = cancellation.Register(() =>
+            {
+                try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+                catch (InvalidOperationException) { }
+                catch (System.ComponentModel.Win32Exception) { }
+            });
 
             Task<string> stdout = process.StandardOutput.ReadToEndAsync();
             Task<string> stderr = process.StandardError.ReadToEndAsync();

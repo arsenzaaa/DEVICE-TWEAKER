@@ -249,6 +249,11 @@ public sealed partial class MainForm
         "editor-input-filter" => DevEditorInputFiltered(control).ToString().ToLowerInvariant(),
         "refresh-idle" when control == this => (_devicesBusyDepth == 0 && _lastDeviceRefresh.IsCompleted
             && _layoutRefreshTimer?.Enabled != true).ToString().ToLowerInvariant(),
+        "display-read-pending" when control == this => Volatile.Read(ref _devDisplayReadPending).ToString(),
+        "display-read-ui-calls" when control == this => Volatile.Read(ref _devDisplayReadUiThread).ToString(),
+        "display-read-stages" when control == this => string.Join(",", _devDisplayStages),
+        "display-read-published" when control == this => _displayPowerCache.ContainsKey("QA_DISPLAY").ToString().ToLowerInvariant(),
+        "display-read-failure-complete" when control == this => (_devDisplayRefresh?.IsCompletedSuccessfully == true).ToString().ToLowerInvariant(),
         "discovery-pending" when control == this => (Volatile.Read(ref _devDiscoveryPending) > 0).ToString().ToLowerInvariant(),
         "discovery-cards-preserved" when control == this => _blocks.Select(block => block.Group)
             .SequenceEqual(_devDiscoveryOriginalCards).ToString().ToLowerInvariant(),
@@ -356,6 +361,19 @@ public sealed partial class MainForm
                 break;
             case "card-title-model":
                 DevBlock(step.Device).TitleLabel.Text = step.Value;
+                break;
+            case "display-read-model":
+                if (_devicesBusyDepth != 0 || _devDisplayReadPending != 0 || step.DurationMs < 500
+                    || step.Value is not ("power" or "rss" or "drivers") || step.Property is not ("success" or "failure" or "timeout"))
+                    throw new InvalidDataException("Expected idle display model with a stage, outcome and delay >=500ms.");
+                _devDisplayReadModel = new(step.Value, step.Property, step.DurationMs);
+                _devDisplayReadUiThread = 0;
+                _devDisplayStages.Clear();
+                _displayPowerCache.Remove("QA_DISPLAY");
+                _devDiscoveryOriginalCards = _blocks.Select(block => (Control)block.Group).ToArray();
+                break;
+            case "display-read-failure":
+                _devDisplayRefresh = DevRefreshDisplayFailureAsync();
                 break;
             case "discovery-model":
                 if (_devicesBusyDepth != 0 || _devDiscoveryPending != 0 || step.DurationMs < 300)

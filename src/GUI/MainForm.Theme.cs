@@ -61,7 +61,12 @@ public sealed partial class MainForm
     {
         if (disposing)
         {
-            _uiDisposing = true;
+            if (!_uiDisposing)
+            {
+                _uiDisposing = true;
+                _displayReadLifetime.Cancel();
+                _displayReadLifetime.Dispose();
+            }
             UiLanguage.Changed -= HandleUiLanguageChanged;
             DisposeRawPolling();
             _startupRefreshTimer?.Dispose();

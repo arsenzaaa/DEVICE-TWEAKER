@@ -16,7 +16,8 @@ foreach ($line in [IO.File]::ReadAllLines($LogPath)) {
             $expected.Add([pscustomobject]@{ kind = 'dialog-preview'; line = $line })
         } elseif ($scenario -and $scenario -ne 'None' -and
             ($line -match 'TEST.SANDBOX.(WRITE|IMOD).ERROR:' -or
-             ($scenario -eq 'BackupDelete' -and $line -match 'BACKUP.DELETE: failed .*System.IO.IOException: Injected file deletion failure\.'))) { $pending.Add($line) }
+             ($scenario -eq 'BackupDelete' -and $line -match 'BACKUP.DELETE: failed .*System.IO.IOException: Injected file deletion failure\.') -or
+             ($scenario -eq 'DisplayRead' -and $line -match 'DISPLAY.READ.FAILED: (Injected display provider failure\.|Device state read timed out\. The current device list was preserved\.)$'))) { $pending.Add($line) }
         else { $unexpected.Add($line) }
     }
     if ($line -match 'TEST.SCENARIO.END:') {

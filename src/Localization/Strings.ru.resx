@@ -833,4 +833,7 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
   <data name="Validation.MsiLimitNumber" xml:space="preserve"><value>MSI Limit: укажите Unlimited (или 0) либо целое число от 1 до 2048.</value></data>
   <data name="Validation.MsiUnsupported" xml:space="preserve"><value>По данным Windows, PCI-устройство не поддерживает MSI или MSI-X; числовой лимит сообщений не применён.</value></data>
   <data name="Validation.MsiOnlyLimit" xml:space="preserve"><value>Устройство поддерживает только MSI. Допустимые лимиты сообщений: 1, 2, 4, 8 или 16.</value></data>
+  <data name="Read.DeviceStateReading" xml:space="preserve"><value>Чтение состояния устройств...</value></data>
+  <data name="Read.DeviceStateFailed" xml:space="preserve"><value>Не удалось обновить данные устройств. Текущий список сохранен.</value></data>
+  <data name="Read.DeviceReadback" xml:space="preserve"><value>Чтение состояния устройств</value></data>
 </root>

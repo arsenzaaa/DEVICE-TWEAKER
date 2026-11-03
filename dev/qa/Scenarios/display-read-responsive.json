@@ -1,0 +1,346 @@
+{
+  "schemaVersion": 1,
+  "id": "display-read-responsive",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    {
+      "id": "idle",
+      "action": "wait",
+      "target": "@main",
+      "property": "refresh-idle",
+      "value": "true",
+      "durationMs": 5000
+    },
+    {
+      "id": "limit",
+      "action": "reveal",
+      "target": "role:limit",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "edit",
+      "action": "text",
+      "target": "role:limit",
+      "device": "DEV_461E",
+      "value": "8"
+    },
+    {
+      "id": "before",
+      "action": "capture"
+    },
+    {
+      "id": "power-model",
+      "action": "display-read-model",
+      "value": "power",
+      "property": "success",
+      "durationMs": 1800
+    },
+    {
+      "id": "power-refresh",
+      "action": "click",
+      "target": "id:REFRESH"
+    },
+    {
+      "id": "power-pending",
+      "action": "wait",
+      "target": "@main",
+      "property": "display-read-pending",
+      "value": "1",
+      "durationMs": 1000
+    },
+    {
+      "id": "power-old-cards",
+      "action": "assert",
+      "target": "@main",
+      "property": "discovery-cards-preserved",
+      "value": "true"
+    },
+    {
+      "id": "power-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "power-resize",
+      "action": "resize",
+      "width": 1000,
+      "height": 720
+    },
+    {
+      "id": "power-responsive",
+      "action": "assert",
+      "target": "@main",
+      "property": "display-read-pending",
+      "value": "1"
+    },
+    {
+      "id": "power-frame",
+      "action": "capture"
+    },
+    {
+      "id": "power-idle",
+      "action": "wait",
+      "target": "@main",
+      "property": "refresh-idle",
+      "value": "true",
+      "durationMs": 6000
+    },
+    {
+      "id": "power-off-ui",
+      "action": "assert",
+      "target": "@main",
+      "property": "display-read-ui-calls",
+      "value": "0"
+    },
+    {
+      "id": "power-all-providers",
+      "action": "assert",
+      "target": "@main",
+      "property": "display-read-stages",
+      "value": "power,rss,drivers"
+    },
+    {
+      "id": "power-published",
+      "action": "assert",
+      "target": "@main",
+      "property": "display-read-published",
+      "value": "true"
+    },
+    {
+      "id": "power-limit",
+      "action": "reveal",
+      "target": "role:limit",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "power-retained",
+      "action": "assert",
+      "target": "role:limit",
+      "device": "DEV_461E",
+      "value": "8"
+    },
+    {
+      "id": "power-english",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "power-wide",
+      "action": "resize",
+      "width": 1200,
+      "height": 900
+    },
+    {
+      "id": "rss-model",
+      "action": "display-read-model",
+      "value": "rss",
+      "property": "success",
+      "durationMs": 1800
+    },
+    {
+      "id": "rss-refresh",
+      "action": "click",
+      "target": "id:REFRESH"
+    },
+    {
+      "id": "rss-pending",
+      "action": "wait",
+      "target": "@main",
+      "property": "display-read-pending",
+      "value": "1",
+      "durationMs": 1000
+    },
+    {
+      "id": "rss-old-cards",
+      "action": "assert",
+      "target": "@main",
+      "property": "discovery-cards-preserved",
+      "value": "true"
+    },
+    {
+      "id": "rss-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "rss-resize",
+      "action": "resize",
+      "width": 1000,
+      "height": 720
+    },
+    {
+      "id": "rss-responsive",
+      "action": "assert",
+      "target": "@main",
+      "property": "display-read-pending",
+      "value": "1"
+    },
+    {
+      "id": "rss-frame",
+      "action": "capture"
+    },
+    {
+      "id": "rss-idle",
+      "action": "wait",
+      "target": "@main",
+      "property": "refresh-idle",
+      "value": "true",
+      "durationMs": 6000
+    },
+    {
+      "id": "rss-off-ui",
+      "action": "assert",
+      "target": "@main",
+      "property": "display-read-ui-calls",
+      "value": "0"
+    },
+    {
+      "id": "rss-all-providers",
+      "action": "assert",
+      "target": "@main",
+      "property": "display-read-stages",
+      "value": "power,rss,drivers"
+    },
+    {
+      "id": "rss-published",
+      "action": "assert",
+      "target": "@main",
+      "property": "display-read-published",
+      "value": "true"
+    },
+    {
+      "id": "rss-limit",
+      "action": "reveal",
+      "target": "role:limit",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "rss-retained",
+      "action": "assert",
+      "target": "role:limit",
+      "device": "DEV_461E",
+      "value": "8"
+    },
+    {
+      "id": "rss-english",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "rss-wide",
+      "action": "resize",
+      "width": 1200,
+      "height": 900
+    },
+    {
+      "id": "drivers-model",
+      "action": "display-read-model",
+      "value": "drivers",
+      "property": "success",
+      "durationMs": 1800
+    },
+    {
+      "id": "drivers-refresh",
+      "action": "click",
+      "target": "id:REFRESH"
+    },
+    {
+      "id": "drivers-pending",
+      "action": "wait",
+      "target": "@main",
+      "property": "display-read-pending",
+      "value": "1",
+      "durationMs": 1000
+    },
+    {
+      "id": "drivers-old-cards",
+      "action": "assert",
+      "target": "@main",
+      "property": "discovery-cards-preserved",
+      "value": "true"
+    },
+    {
+      "id": "drivers-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "drivers-resize",
+      "action": "resize",
+      "width": 1000,
+      "height": 720
+    },
+    {
+      "id": "drivers-responsive",
+      "action": "assert",
+      "target": "@main",
+      "property": "display-read-pending",
+      "value": "1"
+    },
+    {
+      "id": "drivers-frame",
+      "action": "capture"
+    },
+    {
+      "id": "drivers-idle",
+      "action": "wait",
+      "target": "@main",
+      "property": "refresh-idle",
+      "value": "true",
+      "durationMs": 6000
+    },
+    {
+      "id": "drivers-off-ui",
+      "action": "assert",
+      "target": "@main",
+      "property": "display-read-ui-calls",
+      "value": "0"
+    },
+    {
+      "id": "drivers-all-providers",
+      "action": "assert",
+      "target": "@main",
+      "property": "display-read-stages",
+      "value": "power,rss,drivers"
+    },
+    {
+      "id": "drivers-published",
+      "action": "assert",
+      "target": "@main",
+      "property": "display-read-published",
+      "value": "true"
+    },
+    {
+      "id": "drivers-limit",
+      "action": "reveal",
+      "target": "role:limit",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "drivers-retained",
+      "action": "assert",
+      "target": "role:limit",
+      "device": "DEV_461E",
+      "value": "8"
+    },
+    {
+      "id": "drivers-english",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "drivers-wide",
+      "action": "resize",
+      "width": 1200,
+      "height": 900
+    },
+    {
+      "id": "after",
+      "action": "capture"
+    }
+  ]
+}

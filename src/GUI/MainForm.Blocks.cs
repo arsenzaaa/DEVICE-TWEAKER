@@ -2093,6 +2093,16 @@ public sealed partial class MainForm
                 return refreshReport;
             }
             IReadOnlyList<DeviceInfo> devs = discovery.Devices;
+            SetDevicesBusyStage(UiResources.English(UiText.DeviceStateReading));
+            SnapshotReadResult<DisplaySnapshot> display = await ReadDisplaySnapshotAsync(devs);
+            if (_uiDisposing || IsDisposed || Disposing) return refreshReport;
+            if (display.Snapshot is null)
+            {
+                refreshReport.MarkNoChangesMade();
+                refreshReport.AddError(UiResources.English(UiText.DeviceReadback), UiResources.English(UiText.DeviceStateFailed), display.Error);
+                WriteLog($"DISPLAY.READ.FAILED: {display.Error}");
+                return refreshReport;
+            }
             ImodConfig? startupConfig = null;
             if (devs.Any(IsUsbImodTarget))
             {
@@ -2108,7 +2118,7 @@ public sealed partial class MainForm
                 _imodConfigCache = startupConfig;
                 _imodConfigLoaded = true;
             }
-            _ndisRssRuntimeCache.Clear();
+            PublishDisplaySnapshot(display.Snapshot, replaceDevices: true);
             Dictionary<string, string> priorImodStatuses = [];
             foreach (DeviceBlock block in _blocks)
             {

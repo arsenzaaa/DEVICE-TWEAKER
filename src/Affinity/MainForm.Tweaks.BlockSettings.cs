@@ -493,7 +493,7 @@ public sealed partial class MainForm
             {
                 if (!isTestDevice)
                 {
-                    _ = UsbSelectiveSuspendPolicy.TryReadEnabled(block.Device.InstanceId, out powerSavingEnabled);
+                    powerSavingEnabled = GetDisplayPowerState(block.Device.InstanceId);
                     block.Device.UsbSelectiveSuspend = powerSavingEnabled ? "on" : "off";
                 }
                 else
@@ -506,19 +506,7 @@ public sealed partial class MainForm
             {
                 if (!isTestDevice)
                 {
-                    bool? wmi = DevicePowerPolicy.TryReadDevicePowerEnable(block.Device.InstanceId);
-                    if (wmi is bool live)
-                    {
-                        powerSavingEnabled = live;
-                    }
-                    else
-                    {
-                        int? pnpCaps = DevicePowerPolicy.TryReadNicPnPCapabilities(GetClassKeyForDevice(block.Device.InstanceId));
-                        if (pnpCaps is int caps)
-                        {
-                            powerSavingEnabled = DevicePowerPolicy.IsNicTurnOffAllowed(caps);
-                        }
-                    }
+                    powerSavingEnabled = GetDisplayPowerState(block.Device.InstanceId);
                 }
                 else
                 {

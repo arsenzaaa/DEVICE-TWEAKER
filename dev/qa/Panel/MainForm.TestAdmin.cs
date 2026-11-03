@@ -2188,7 +2188,8 @@ public sealed partial class MainForm
                 if (IsAutoDisplayAudioMsiOnly(block))
                 {
                     block.MsiCombo.SelectedItem = "Disabled";
-                    block.LimitBox.Text = "17";
+                    // Retain a non-default valid limit; this state is later passed through APPLY.
+                    block.LimitBox.Text = "1";
                     block.PrioCombo.SelectedItem = "Normal";
                     block.PolicyCombo.SelectedItem = "SpecCPU";
                     block.SuppressCpuEvents++;

@@ -833,4 +833,7 @@ Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IM
   <data name="Validation.MsiLimitNumber" xml:space="preserve"><value>MSI Limit must be Unlimited (or 0) or a whole number from 1 to 2048.</value></data>
   <data name="Validation.MsiUnsupported" xml:space="preserve"><value>Windows reports that the PCI device does not support MSI or MSI-X; a numeric message limit was not applied.</value></data>
   <data name="Validation.MsiOnlyLimit" xml:space="preserve"><value>This is an MSI-only device. The allowed multi-message limits are 1, 2, 4, 8, or 16.</value></data>
+  <data name="Read.DeviceStateReading" xml:space="preserve"><value>Reading device state...</value></data>
+  <data name="Read.DeviceStateFailed" xml:space="preserve"><value>Device data could not be refreshed. The current list was preserved.</value></data>
+  <data name="Read.DeviceReadback" xml:space="preserve"><value>Device readback</value></data>
 </root>

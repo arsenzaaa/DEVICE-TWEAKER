@@ -1060,14 +1060,8 @@ public sealed partial class MainForm : Form
         public string? CompatibleIds { get; init; }
     }
 
-    private Dictionary<string, SignedDriverInfo> BuildSignedDriverInfoMap(out string? error)
+    private static Dictionary<string, SignedDriverInfo> ReadSignedDriverInfoMap(out string? error)
     {
-        if (_signedDriverInfoCache is not null)
-        {
-            error = null;
-            return _signedDriverInfoCache;
-        }
-
         error = null;
         Dictionary<string, SignedDriverInfo> map = new(StringComparer.OrdinalIgnoreCase);
         try
@@ -1114,14 +1108,6 @@ public sealed partial class MainForm : Form
             error = ex.ToString();
         }
 
-        if (error is null && map.Count > 0)
-        {
-            // Driver metadata does not change during a GUI session. Reusing the
-            // first successful snapshot avoids repeated COM/WMI query bursts,
-            // which can intermittently fail in System.Management.
-            _signedDriverInfoCache = map;
-        }
-
         return map;
     }
 
@@ -1141,8 +1127,9 @@ public sealed partial class MainForm : Form
         bool wmiMapEmpty = false;
         if (includeDeviceDiagnostics)
         {
-            signedDriverMap = BuildSignedDriverInfoMap(out string? wmiError);
-            wmiMapEmpty = signedDriverMap.Count == 0;
+            signedDriverMap = _signedDriverInfoCache ?? [];
+            string? wmiError = _signedDriverInfoError;
+            wmiMapEmpty = signedDriverMap.Count == 0 && !(_testDevicesEnabled && _testDevicesOnly);
             if (!string.IsNullOrWhiteSpace(wmiError))
             {
                 WriteLog($"GUI.ISSUE: reason=wmiQueryFailed error=\"{SanitizeLogValue(wmiError)}\"");
