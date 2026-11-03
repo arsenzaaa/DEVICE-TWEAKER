@@ -1360,6 +1360,8 @@ public sealed partial class MainForm
         {
             return;
         }
+        using IDisposable? operation = TryBeginDeviceOperation("IMOD SET");
+        if (operation is null) return;
 
         OperationReport report = new();
         if (!CreateDeviceTweakerBackup("pre-imod", showDialog: false))
@@ -1424,6 +1426,8 @@ public sealed partial class MainForm
         {
             return;
         }
+        using IDisposable? operation = TryBeginDeviceOperation("IMOD DELETE");
+        if (operation is null) return;
 
         OperationReport report = new();
         try

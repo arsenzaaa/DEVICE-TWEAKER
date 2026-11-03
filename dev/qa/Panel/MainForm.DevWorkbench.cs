@@ -186,6 +186,12 @@ public sealed partial class MainForm
         }
         if (!DevInViewport(control)) throw new InvalidOperationException("Target could not be fully revealed in its viewport");
     }
+    private static bool DevEditorInputFiltered(Control control)
+    {
+        Message input = Message.Create(control.Handle, 0x102, new IntPtr('9'), IntPtr.Zero);
+        return Application.FilterMessage(ref input);
+    }
+
     private string DevProperty(Control control, string property) => property switch
     {
         "visibleDevices" when control == this => _blocks.Count(b => b.Group.Visible).ToString(),
@@ -211,6 +217,8 @@ public sealed partial class MainForm
         "filter-toolbar-fits" when control == this => (_filterCategoriesHost is not null && DevInViewport(_searchFilterBox)
             && !_searchFilterBox.Parent!.Bounds.IntersectsWith(_filterCategoriesHost.Bounds)
             && _filterCategoryButtons.All(DevInViewport)).ToString().ToLowerInvariant(),
+        "operation-active" when control == this => _operations.IsBusy.ToString().ToLowerInvariant(),
+        "editor-input-filter" => DevEditorInputFiltered(control).ToString().ToLowerInvariant(),
         "refresh-idle" when control == this => (_devicesBusyDepth == 0 && _lastDeviceRefresh.IsCompleted
             && _layoutRefreshTimer?.Enabled != true).ToString().ToLowerInvariant(),
         "discovery-pending" when control == this => (Volatile.Read(ref _devDiscoveryPending) > 0).ToString().ToLowerInvariant(),

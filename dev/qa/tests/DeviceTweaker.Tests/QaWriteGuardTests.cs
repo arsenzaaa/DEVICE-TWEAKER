@@ -77,6 +77,7 @@ public sealed class QaWriteGuardTests
             Kind = DeviceKind.GPU, IsTestDevice = false
         });
         AssertBlocked("SaveBlockSettings", block, false, null);
+        AssertBlocked("ApplyDeviceSettingsPlan", null, null);
         AssertBlocked("ResetBlockSettings", block, null);
         AssertBlocked("WriteNdisIrqPolicy", null, null);
         AssertBlocked("ClearNdisIrqPolicy", null, null);

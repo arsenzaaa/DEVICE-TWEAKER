@@ -378,7 +378,7 @@ public sealed partial class MainForm
         return true;
     }
 
-    private void CheckImodDriverFromBlock(DeviceBlock block)
+    private async Task CheckImodDriverFromBlock(DeviceBlock block)
     {
         WriteLog($"UI: CHECK IMOD button clicked device={block.Device.InstanceId}");
         if (block.Device.IsTestDevice)
@@ -393,9 +393,13 @@ public sealed partial class MainForm
         {
             return;
         }
+        using IDisposable? operation = TryBeginDeviceOperation("IMOD CHECK");
+        if (operation is null) return;
 
         block.ImodReadbackRequested = true;
-        if (!TryCheckImodDriver(out string? error))
+        (bool ok, string? error) = await CheckImodDriverAsync();
+        if (_uiDisposing || IsDisposed || Disposing || block.Group.IsDisposed) return;
+        if (!ok)
         {
             string status = "current: driver load failed";
             block.ImodCurrentLabel.Text = status;
@@ -428,7 +432,8 @@ public sealed partial class MainForm
         }
 
         WriteLog($"IMOD.CHECK: ok device={block.Device.InstanceId}");
-        _ = RefreshImodCurrentValuesAsync(showReadingStatus: false, reason: "imod-check", checkedBlock: block);
+        await AwaitBackgroundUiTasksAsync(null,
+            RefreshImodCurrentValuesAsync(showReadingStatus: false, reason: "imod-check", checkedBlock: block));
     }
 
     private void RevealImodCheckResult(DeviceBlock block)
@@ -2152,7 +2157,33 @@ public sealed partial class MainForm
         }
     }
 
-    private bool TryCheckImodDriver(out string? error)
+    private async Task<(bool Ok, string? Error)> CheckImodDriverAsync()
+    {
+        DeviceBlock[] blocks = _blocks.Where(block => !block.Device.IsTestDevice).ToArray();
+        string[] instances = blocks.Select(block => block.Device.InstanceId).ToArray();
+        Dictionary<string, InterruptModeResult> results = new(StringComparer.OrdinalIgnoreCase);
+        (bool ok, string? error) result = await Task.Run(() =>
+        {
+            try
+            {
+                bool ok = TryCheckImodDriver(instances, results, out string? error);
+                return (ok, error);
+            }
+            catch (Exception error)
+            {
+                WriteLog($"IMOD.DRIVER.CHECK.FAILURE: {FlattenLogText(error.ToString())}");
+                return (false, error.Message);
+            }
+        });
+        if (!_uiDisposing && !IsDisposed && !Disposing)
+            foreach (DeviceBlock block in blocks)
+                if (!block.Group.IsDisposed && _blocks.Contains(block)
+                    && results.TryGetValue(block.Device.InstanceId, out InterruptModeResult? value))
+                    SetInterruptModeResult(block, value);
+        return result;
+    }
+
+    private bool TryCheckImodDriver(string[] instances, Dictionary<string, InterruptModeResult> results, out string? error)
     {
         error = null;
         if (!IsAdministrator())
@@ -2181,8 +2212,8 @@ public sealed partial class MainForm
         using (driverContext)
         {
             ClearImodKernelCiBlockStatus();
-            foreach (DeviceBlock block in _blocks.Where(b => !b.Device.IsTestDevice))
-                SetInterruptModeResult(block, PciInterruptReader.Query(driverContext!.DriverHandle, block.Device.InstanceId));
+            foreach (string instance in instances)
+                results[instance] = PciInterruptReader.Query(driverContext!.DriverHandle, instance);
             WriteLog($"IMOD.DRIVER.CHECK: ok path={driverPath}");
             return true;
         }

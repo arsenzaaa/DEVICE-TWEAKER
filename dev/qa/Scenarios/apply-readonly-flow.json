@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "apply-readonly-flow",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    { "id": "idle", "action": "wait", "target": "@main", "property": "refresh-idle", "value": "true", "durationMs": 5000 },
+    { "id": "reveal", "action": "reveal", "target": "role:limit", "device": "DEV_461E" },
+    { "id": "edit", "action": "text", "target": "role:limit", "device": "DEV_461E", "value": "2" },
+    { "id": "before", "action": "capture" },
+    { "id": "readback-delay", "action": "refresh-readback-model", "value": "slow", "durationMs": 1000 },
+    { "id": "apply-preview", "action": "click", "target": "id:APPLY" },
+    { "id": "operation-entered", "action": "wait", "target": "@main", "property": "operation-active", "value": "true", "durationMs": 2000 },
+    { "id": "card-input-filtered", "action": "assert", "target": "role:limit", "device": "DEV_461E", "property": "editor-input-filter", "value": "true" },
+    { "id": "header-outside-filter", "action": "assert", "target": "id:REFRESH", "property": "editor-input-filter", "value": "false" },
+    { "id": "other-operation-disabled", "action": "assert", "target": "id:REFRESH", "property": "enabled", "value": "false" },
+    { "id": "during", "action": "capture" },
+    { "id": "preview-result", "action": "wait", "target": "id:OK", "property": "visible", "value": "true", "durationMs": 5000 },
+    { "id": "result", "action": "capture", "target": "@active" },
+    { "id": "close-result", "action": "click", "target": "id:OK" },
+    { "id": "operation-released", "action": "wait", "target": "@main", "property": "operation-active", "value": "false", "durationMs": 2000 },
+    { "id": "show-value", "action": "reveal", "target": "role:limit", "device": "DEV_461E" },
+    { "id": "input-restored", "action": "assert", "target": "role:limit", "device": "DEV_461E", "property": "editor-input-filter", "value": "false" },
+    { "id": "value-preserved", "action": "assert", "target": "role:limit", "device": "DEV_461E", "value": "2" },
+    { "id": "after", "action": "capture" }
+  ]
+}

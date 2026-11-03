@@ -420,12 +420,14 @@ public sealed partial class MainForm
 
         btnScan.Click += async (_, _) =>
         {
-            if (_devicesBusyDepth > 0)
+            if (_devicesBusyDepth > 0 || _operations.IsBusy)
             {
                 WriteLog("UI: REFRESH ignored because another operation is active");
                 return;
             }
 
+            using IDisposable? operation = TryBeginDeviceOperation("REFRESH");
+            if (operation is null) return;
             WriteLog("UI: REFRESH button clicked");
             OperationReport report = await RefreshBlocksAsync();
             if (!_uiDisposing && !IsDisposed && !Disposing && report.Errors.Count > 0)
@@ -433,12 +435,14 @@ public sealed partial class MainForm
         };
         btnApply.Click += async (_, _) =>
         {
-            if (_devicesBusyDepth > 0)
+            if (_devicesBusyDepth > 0 || _operations.IsBusy)
             {
                 WriteLog("UI: APPLY ignored because another operation is active");
                 return;
             }
 
+            using IDisposable? operation = TryBeginDeviceOperation("APPLY");
+            if (operation is null) return;
             WriteLog("UI: APPLY button clicked");
             OperationReport report = new();
             bool sandboxDryRun = IsSandboxDryRunActive();
@@ -492,7 +496,7 @@ public sealed partial class MainForm
                             ? $"Previewing device settings ({saved}/{saveTotal})"
                             : $"Applying device settings ({saved}/{saveTotal})",
                         1);
-                    SaveBlockSettings(b, report: report);
+                    await SaveBlockSettings(b, report: report);
                 }
                 if (report.Errors.Count == errorsBeforeDevices)
                 {
@@ -573,12 +577,14 @@ public sealed partial class MainForm
         };
         btnAuto.Click += async (_, _) =>
         {
-            if (_devicesBusyDepth > 0)
+            if (_devicesBusyDepth > 0 || _operations.IsBusy)
             {
                 WriteLog("UI: AUTO-OPTIMIZATION ignored because another operation is active");
                 return;
             }
 
+            using IDisposable? operation = TryBeginDeviceOperation("AUTO-OPTIMIZATION");
+            if (operation is null) return;
             WriteLog("UI: AUTO-OPTIMIZATION button clicked");
             bool hasUsbImodTarget = _blocks.Any(b => IsUsbImodTarget(b.Device));
             bool optimizeUsbImod = false;
@@ -706,7 +712,7 @@ public sealed partial class MainForm
 
                     TickDevicesBusy($"Applying device settings ({saved}/{saveTotal})", 1);
                     deviceWriteAttempts++;
-                    SaveBlockSettings(b, autoMsiOnly: IsAutoMsiOnlyDevice(b), report: report);
+                    await SaveBlockSettings(b, autoMsiOnly: IsAutoMsiOnlyDevice(b), report: report);
                 }
                 if (report.Errors.Count == errorsBeforeDevices)
                 {
@@ -770,12 +776,14 @@ public sealed partial class MainForm
         };
         btnRestore.Click += async (_, _) =>
         {
-            if (_devicesBusyDepth > 0)
+            if (_devicesBusyDepth > 0 || _operations.IsBusy)
             {
                 WriteLog("UI: RESTORE ignored because another operation is active");
                 return;
             }
 
+            using IDisposable? operation = TryBeginDeviceOperation("RESTORE");
+            if (operation is null) return;
             WriteLog("UI: RESTORE button clicked");
             await RestoreLatestDeviceTweakerBackup();
         };
@@ -874,7 +882,7 @@ public sealed partial class MainForm
             return;
         }
 
-        if (_devicesBusyDepth > 0)
+        if (_devicesBusyDepth > 0 || _operations.IsBusy)
         {
             _layoutRefreshTimer?.Stop();
             _layoutRefreshTimer?.Start();

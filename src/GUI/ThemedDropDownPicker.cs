@@ -347,6 +347,8 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
         }
     }
 
+    internal void DismissPopup() => ClosePopup();
+
     private void ClosePopup()
     {
         DropDownForm? popup = _popup;

@@ -272,48 +272,48 @@ public sealed partial class MainForm
         RecalcAffinityMask(block);
     }
 
-    private void WriteNdisIrqPolicy(DeviceBlock block, OperationReport? report = null)
+    private void WriteNdisIrqPolicy(DeviceSettingsWritePlan plan, OperationReport? report = null)
     {
         DemandRealWrite("WriteNdisIrqPolicy");
-        string affPath = block.Device.RegBase + @"\Device Parameters\Interrupt Management\Affinity Policy";
+        string affPath = plan.RegBase + @"\Device Parameters\Interrupt Management\Affinity Policy";
         try
         {
             Registry.LocalMachine.CreateSubKey(affPath)?.Dispose();
             using RegistryKey? affKey = Registry.LocalMachine.OpenSubKey(affPath, writable: true);
             if (affKey is null)
             {
-                report?.AddError($"{block.Device.Name}: RSS IRQ policy", "registry key is unavailable");
+                report?.AddError($"{plan.DeviceName}: RSS IRQ policy", "registry key is unavailable");
                 return;
             }
 
-            ulong mask = block.AffinityMask;
+            ulong mask = plan.AffinityMask;
             affKey.SetValue("DevicePolicy", 4, RegistryValueKind.DWord);
             byte[] bytes = IntPtr.Size >= 8 ? BitConverter.GetBytes(mask) : BitConverter.GetBytes((uint)mask);
             affKey.SetValue("AssignmentSetOverride", bytes, RegistryValueKind.Binary);
-            WriteLog($"RSS.IRQ.SET: {block.Device.InstanceId} DevicePolicy=4 mask=0x{mask:X}");
+            WriteLog($"RSS.IRQ.SET: {plan.InstanceId} DevicePolicy=4 mask=0x{mask:X}");
         }
         catch (Exception ex)
         {
-            WriteLog($"RSS.IRQ.SET: {block.Device.InstanceId} failed: {ex.Message}");
-            report?.AddError($"{block.Device.Name}: RSS IRQ policy", ex.Message);
+            WriteLog($"RSS.IRQ.SET: {plan.InstanceId} failed: {ex.Message}");
+            report?.AddError($"{plan.DeviceName}: RSS IRQ policy", ex.Message);
         }
     }
 
-    private void ClearNdisIrqPolicy(DeviceBlock block, OperationReport? report = null)
+    private void ClearNdisIrqPolicy(DeviceSettingsWritePlan plan, OperationReport? report = null)
     {
         DemandRealWrite("ClearNdisIrqPolicy");
-        string affPath = block.Device.RegBase + @"\Device Parameters\Interrupt Management\Affinity Policy";
+        string affPath = plan.RegBase + @"\Device Parameters\Interrupt Management\Affinity Policy";
         try
         {
             using RegistryKey? affKey = Registry.LocalMachine.OpenSubKey(affPath, writable: true);
             affKey?.DeleteValue("DevicePolicy", throwOnMissingValue: false);
             affKey?.DeleteValue("AssignmentSetOverride", throwOnMissingValue: false);
-            WriteLog($"RSS.IRQ.CLEAR: {block.Device.InstanceId}");
+            WriteLog($"RSS.IRQ.CLEAR: {plan.InstanceId}");
         }
         catch (Exception ex)
         {
-            WriteLog($"RSS.IRQ.CLEAR: {block.Device.InstanceId} failed: {ex.Message}");
-            report?.AddError($"{block.Device.Name}: clear RSS IRQ policy", ex.Message);
+            WriteLog($"RSS.IRQ.CLEAR: {plan.InstanceId} failed: {ex.Message}");
+            report?.AddError($"{plan.DeviceName}: clear RSS IRQ policy", ex.Message);
         }
     }
 
@@ -985,369 +985,64 @@ public sealed partial class MainForm
         }
     }
 
-    private void SaveBlockSettings(
-        DeviceBlock block,
-        bool autoMsiOnly = false,
-        OperationReport? report = null)
+    // Keep the real-write guard synchronous and before any UI/state access.
+    private Task SaveBlockSettings(DeviceBlock block, bool autoMsiOnly = false, OperationReport? report = null)
     {
         if (block.Device.IsTestDevice)
         {
             ApplyTestBlockSettings(block, autoMsiOnly, report);
             UpdateBlockInfoText(block);
             WriteLog($"APPLY.VIRTUAL: {block.Device.InstanceId} Kind={block.Kind} reason=TEST_DEVICE");
-            return;
+            return Task.CompletedTask;
         }
-
         DemandRealWrite("DEVICE SETTINGS");
         RecalcAffinityMask(block);
-        string regBase = block.Device.RegBase;
-        string intBase = regBase + @"\Device Parameters\Interrupt Management";
-        void RecordError(string operation, Exception ex)
+        NdisRssLayout.Layout? layout = block.Kind == DeviceKind.NET_NDIS && !autoMsiOnly
+            ? ApplyNdisSelection(block, block.RssBaseCore ?? GetFirstCheckedCore(block) ?? 0,
+                ClampRssQueueCount((int)(block.RssQueueBox?.Value ?? 1))) : null;
+        if (layout is not null) layout = layout with { Processors = Array.AsReadOnly(layout.Processors.ToArray()) };
+        DeviceSettingsWritePlan plan = new()
         {
-            report?.AddError($"{block.Device.Name}: {operation}", ex.Message);
-        }
-
-        try
-        {
-            Registry.LocalMachine.CreateSubKey(intBase)?.Dispose();
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"APPLY.REG.ERROR: {block.Device.InstanceId} operation=create-interrupt-key path=HKLM\\{intBase} error=\"{FlattenLogText(ex.ToString())}\"");
-            RecordError("create interrupt settings key", ex);
-        }
-
-        string msiPath = intBase + @"\MessageSignaledInterruptProperties";
-        try
-        {
-            Registry.LocalMachine.CreateSubKey(msiPath)?.Dispose();
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"APPLY.REG.ERROR: {block.Device.InstanceId} operation=create-msi-key path=HKLM\\{msiPath} error=\"{FlattenLogText(ex.ToString())}\"");
-            RecordError("create MSI settings key", ex);
-        }
-
-        string mode = block.MsiCombo.SelectedItem?.ToString() ?? "Disabled";
-        int msiVal = mode == "Enabled" ? 1 : 0;
-        try
-        {
-            using RegistryKey? msiKey = Registry.LocalMachine.OpenSubKey(msiPath, writable: true);
-            if (msiKey is null)
-            {
-                throw new InvalidOperationException("MSI registry key could not be opened for writing");
-            }
-
-            DeviceSettingsWriter.SetMsi(new WindowsRegistryValues(msiKey), msiVal == 1);
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"APPLY.REG.ERROR: {block.Device.InstanceId} operation=set-msi value={msiVal} path=HKLM\\{msiPath} error=\"{FlattenLogText(ex.ToString())}\"");
-            RecordError("set MSI mode", ex);
-        }
-
-        if (autoMsiOnly)
-        {
-            string reason = block.Kind == DeviceKind.GPU && block.Device.IsIntegratedGpu
-                ? "integrated-gpu"
-                : IsAutoDisplayAudioMsiOnly(block)
-                    ? "display-audio"
-                    : "auto-policy";
-            WriteLog($"APPLY: {block.Device.InstanceId} MSI={mode} Kind={block.Kind} mode=autoMsiOnly reason={reason} preserved=limit,priority,policy,affinity");
-            return;
-        }
-
-        string limitText = block.LimitBox.Text?.Trim() ?? string.Empty;
-        if (!TryValidateMsiLimitInput(limitText, block.InterruptCapabilities, out bool isUnlocked, out int limitValue, out string validationError))
-        {
-            string msiLimitMessage = validationError + " The invalid value was not applied.";
-            WriteLog($"APPLY.VALIDATION.ERROR: {block.Device.InstanceId} setting=MSI-Limit value=\"{FlattenLogText(limitText)}\" hardware=\"{FormatInterruptCapabilities(block.InterruptCapabilities)}\" error=\"{FlattenLogText(validationError)}\"");
-            if (report is null)
-            {
-                ShowThemedInfo(msiLimitMessage);
-            }
-            else
-            {
-                report.AddError($"{block.Device.Name}: MSI Limit", validationError);
-            }
-        }
-        else
-        {
-            if (!isUnlocked && block.InterruptCapabilities is null)
-            {
-                const string warning = "Windows did not publish this device's PCI interrupt capability; the numeric MSI limit could only be range-checked.";
-                WriteLog($"APPLY.VALIDATION.WARN: {block.Device.InstanceId} setting=MSI-Limit value={limitValue} reason=capability-unknown");
-                report?.AddWarning($"{block.Device.Name}: MSI Limit", warning);
-            }
-            try
-            {
-                using RegistryKey? msiKey = Registry.LocalMachine.OpenSubKey(msiPath, writable: true);
-                if (msiKey is null)
-                {
-                    throw new InvalidOperationException("MSI registry key could not be opened for writing");
-                }
-
-                if (isUnlocked)
-                {
-                    DeviceSettingsWriter.SetMsiLimit(new WindowsRegistryValues(msiKey), null);
-                    block.LimitBox.Text = "Unlimited";
-                    limitText = "Unlimited";
-                }
-                else
-                {
-                    DeviceSettingsWriter.SetMsiLimit(new WindowsRegistryValues(msiKey), limitValue);
-                    block.LimitBox.Text = limitValue.ToString(CultureInfo.InvariantCulture);
-                    limitText = limitValue.ToString(CultureInfo.InvariantCulture);
-                }
-            }
-            catch (Exception ex)
-            {
-                WriteLog($"APPLY.REG.ERROR: {block.Device.InstanceId} operation=set-msi-limit value=\"{limitText}\" path=HKLM\\{msiPath} error=\"{FlattenLogText(ex.ToString())}\"");
-                RecordError("set MSI limit", ex);
-            }
-        }
-
-        string prioPath = intBase + @"\Priority";
-        string prioAffPath = intBase + @"\Affinity Policy";
-        try
-        {
-            Registry.LocalMachine.CreateSubKey(prioAffPath)?.Dispose();
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"APPLY.REG.ERROR: {block.Device.InstanceId} operation=create-affinity-key path=HKLM\\{prioAffPath} error=\"{FlattenLogText(ex.ToString())}\"");
-            RecordError("create affinity settings key", ex);
-        }
-
-        string prioStr = block.PrioCombo.SelectedItem?.ToString() ?? "Undefined";
-        int? prioVal = prioStr switch
-        {
-            "Low" => 1,
-            "Normal" => 2,
-            "High" => 3,
-            _ => null,
+            InstanceId = block.Device.InstanceId, DeviceName = block.Device.Name, RegBase = block.Device.RegBase,
+            Kind = block.Kind, MsiMode = block.MsiCombo.SelectedItem?.ToString() ?? "Disabled",
+            LimitText = block.LimitBox.Text?.Trim() ?? string.Empty, InterruptCapabilities = block.InterruptCapabilities,
+            Priority = block.PrioCombo.SelectedItem?.ToString() ?? "Undefined",
+            Policy = block.PolicyCombo.SelectedItem?.ToString() ?? "MachineDefault", AffinityMask = block.AffinityMask,
+            PowerSaving = block.PowerSavingCheck?.Checked, Wifi = block.Device.Wifi,
+            NdisMode = GetSelectedNdisAffinityMode(block), RssLayout = layout, AutoMsiOnly = autoMsiOnly,
+            AutoReason = block.Kind == DeviceKind.GPU && block.Device.IsIntegratedGpu ? "integrated-gpu"
+                : IsAutoDisplayAudioMsiOnly(block) ? "display-audio" : "auto-policy",
         };
+        return ApplyDeviceSettingsPlanAsync(block, plan, report);
+    }
 
-        try
+    private async Task ApplyDeviceSettingsPlanAsync(DeviceBlock block, DeviceSettingsWritePlan plan, OperationReport? report)
+    {
+        DeviceSettingsWriteResult result = await Task.Run(() =>
         {
-            using RegistryKey? prioKey = Registry.LocalMachine.OpenSubKey(prioAffPath, writable: true);
-            if (prioKey is null)
+            DeviceSettingsWriteResult outcome = new();
+            try { ApplyDeviceSettingsPlan(plan, outcome); }
+            catch (Exception error)
             {
-                throw new InvalidOperationException("Affinity registry key could not be opened for writing");
+                WriteLog($"APPLY.PLAN.FAILURE: {plan.InstanceId} {FlattenLogText(error.ToString())}");
+                outcome.Report.AddError(plan.DeviceName, error.Message);
             }
-
-            if (prioVal.HasValue)
-            {
-                DeviceSettingsWriter.SetPriority(new WindowsRegistryValues(prioKey), prioVal.Value);
-            }
-            else
-            {
-                DeviceSettingsWriter.SetPriority(new WindowsRegistryValues(prioKey), null);
-            }
-        }
-        catch (Exception ex)
+            return outcome;
+        });
+        report?.MergeIssues(result.Report);
+        if (_uiDisposing || IsDisposed || Disposing || block.Group.IsDisposed) return;
+        if (result.NormalizedLimit is not null && block.LimitBox.Text.Trim() == plan.LimitText)
+            block.LimitBox.Text = result.NormalizedLimit;
+        if (result.UsbPower is not null) block.Device.UsbSelectiveSuspend = result.UsbPower;
+        if (result.NicPower is not null) block.Device.NicPowerSaving = result.NicPower;
+        if (result.RssRuntime is not null)
         {
-            WriteLog($"APPLY.REG.ERROR: {block.Device.InstanceId} operation=set-priority value={prioStr} path=HKLM\\{prioAffPath} error=\"{FlattenLogText(ex.ToString())}\"");
-            RecordError("set IRQ priority", ex);
+            _ndisRssRuntimeCache[NormalizeInstanceId(plan.InstanceId)] = result.RssRuntime;
+            block.NdisRssRuntime = result.RssRuntime;
         }
-
-        try
-        {
-            Registry.LocalMachine.DeleteSubKeyTree(prioPath, throwOnMissingSubKey: false);
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"APPLY.REG.ERROR: {block.Device.InstanceId} operation=delete-legacy-priority path=HKLM\\{prioPath} error=\"{FlattenLogText(ex.ToString())}\"");
-            RecordError("remove legacy priority settings", ex);
-        }
-
-        WriteLog($"APPLY: {block.Device.InstanceId} MSI={mode} Limit={limitText} Prio={prioStr} Mask=0x{block.AffinityMask:X} Kind={block.Kind}");
-
-        if (block.PowerSavingCheck is not null && block.Kind == DeviceKind.USB)
-        {
-            bool suspendEnabled = block.PowerSavingCheck.Checked;
-            string suspendMode = suspendEnabled ? "Enabled" : "Disabled";
-            try
-            {
-                UsbSelectiveSuspendPolicy.ApplyResult powerResult =
-                    UsbSelectiveSuspendPolicy.ApplyControllerAndHubs(block.Device.InstanceId, suspendEnabled);
-
-                block.Device.UsbSelectiveSuspend = suspendEnabled ? "on" : "off";
-                WriteLog(
-                    $"APPLY: {block.Device.InstanceId} PowerSaving={suspendMode} " +
-                    $"controller+hubs={powerResult.TargetCount} " +
-                    $"(SelectiveSuspendEnabled + EnhancedPowerManagementEnabled + PnPCapabilities + MSPower) " +
-                    $"pnp={powerResult.PnpSucceeded}/{powerResult.TargetCount} " +
-                    $"wmi={powerResult.WmiSucceeded}/{powerResult.WmiExposed} exposed");
-                foreach (string note in powerResult.Notes)
-                {
-                    WriteLog($"APPLY.POWER.NOTE: {note}");
-                }
-                if (!powerResult.Success)
-                {
-                    RecordError(
-                        "set USB power saving (Device Manager)",
-                        new InvalidOperationException(string.Join(" | ", powerResult.Errors)));
-                }
-
-                UpdateBlockInfoText(block);
-            }
-            catch (Exception ex)
-            {
-                WriteLog(
-                    $"APPLY.REG.ERROR: {block.Device.InstanceId} operation=set-power-saving-usb " +
-                    $"value={suspendMode} error=\"{FlattenLogText(ex.ToString())}\"");
-                RecordError("set USB power saving", ex);
-            }
-        }
-
-        if (block.PowerSavingCheck is not null
-            && (block.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX)
-            && !block.Device.Wifi)
-        {
-            bool allowTurnOff = block.PowerSavingCheck.Checked;
-            string powerMode = allowTurnOff ? "Enabled" : "Disabled";
-            try
-            {
-                string? classKey = GetClassKeyForDevice(block.Device.InstanceId);
-                int pnpCaps = DevicePowerPolicy.ApplyNicPnPCapabilities(classKey ?? string.Empty, allowTurnOff);
-                DevicePowerPolicy.WriteStatus msPowerStatus = DevicePowerPolicy.SetDevicePowerEnable(
-                    block.Device.InstanceId,
-                    allowTurnOff,
-                    out string? msPowerError);
-                block.Device.NicPowerSaving = allowTurnOff ? "on" : "off";
-                WriteLog(
-                    $"APPLY: {block.Device.InstanceId} PowerSaving={powerMode} " +
-                    $"PnPCapabilities=0x{pnpCaps:X} class=HKLM\\{classKey} " +
-                    $"MSPower_DeviceEnable={(msPowerStatus == DevicePowerPolicy.WriteStatus.Applied ? allowTurnOff.ToString() : "unverified")} requested={allowTurnOff} wmiWrite={msPowerStatus}");
-                if (msPowerStatus is DevicePowerPolicy.WriteStatus.NotExposed or DevicePowerPolicy.WriteStatus.NotSupported)
-                {
-                    WriteLog($"APPLY.POWER.NOTE: {block.Device.InstanceId}: MSPower_DeviceEnable status={msPowerStatus} {msPowerError}");
-                }
-                else if (DevicePowerPolicy.IsWriteFailure(msPowerStatus))
-                {
-                    WriteLog($"APPLY.POWER.ERROR: {block.Device.InstanceId} wmiWrite={msPowerStatus} {msPowerError}");
-                    RecordError(
-                        "set NIC power saving (Device Manager)",
-                        new InvalidOperationException(msPowerError ?? "MSPower_DeviceEnable write failed"));
-                }
-
-                UpdateBlockInfoText(block);
-            }
-            catch (Exception ex)
-            {
-                WriteLog(
-                    $"APPLY.REG.ERROR: {block.Device.InstanceId} operation=set-power-saving-nic " +
-                    $"value={powerMode} error=\"{FlattenLogText(ex.ToString())}\"");
-                RecordError("set NIC power saving", ex);
-            }
-        }
-
-        if (block.Kind == DeviceKind.NET_NDIS)
-        {
-            int queues = ClampRssQueueCount(block.RssQueueBox?.Value is decimal val ? (int)val : 1);
-            NdisRssLayout.Layout layout = ApplyNdisSelection(block, block.RssBaseCore ?? GetFirstCheckedCore(block) ?? 0, queues);
-            int baseCore = layout.BaseProcessor;
-            queues = layout.Processors.Count;
-
-            NdisAffinityMode ndisMode = GetSelectedNdisAffinityMode(block);
-            if (ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both)
-            {
-                SetNdisRssQueues(block.Device.InstanceId, queues, report, block.Device.Name);
-                SetNdisBaseCore(block.Device.InstanceId, baseCore, report, block.Device.Name);
-                SetNdisRssExtraValues(block.Device.InstanceId, layout, report, block.Device.Name);
-            }
-            else
-            {
-                ClearNdisBaseCore(block.Device.InstanceId, report, block.Device.Name);
-                ClearNdisRssQueues(block.Device.InstanceId, report, block.Device.Name);
-                ClearNdisRssExtraValues(block.Device.InstanceId, report, block.Device.Name);
-            }
-
-            if (ndisMode is NdisAffinityMode.IrqPolicy or NdisAffinityMode.Both)
-            {
-                WriteNdisIrqPolicy(block, report);
-            }
-            else
-            {
-                ClearNdisIrqPolicy(block, report);
-            }
-
-            WriteLog($"APPLY: NET_NDIS {block.Device.InstanceId} mode={FormatNdisAffinityMode(ndisMode)} baseCore={baseCore} queues={queues} mask=0x{block.AffinityMask:X}");
-            _ndisRssRuntimeCache.Remove(NormalizeInstanceId(block.Device.InstanceId));
-            block.NdisRssRuntime = GetNdisRssRuntimeState(block.Device.InstanceId);
-            WriteLog($"APPLY.RSS.ACTIVE: {block.Device.InstanceId} {FormatNdisRssRuntimeState(block.NdisRssRuntime)}");
-            int? appliedRssBase = ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both ? baseCore : null;
-            int? appliedRssQueues = ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both ? queues : null;
-            LogNdisRssComparison("APPLY", block.Device.InstanceId, block.NdisRssRuntime, appliedRssBase, appliedRssQueues, appliedRssQueues);
-            return;
-        }
-
-        string affPath = intBase + @"\Affinity Policy";
-        if (block.Kind == DeviceKind.STOR)
-        {
-            try
-            {
-                using RegistryKey? affKey = Registry.LocalMachine.OpenSubKey(affPath, writable: true);
-                if (affKey is not null) DeviceSettingsWriter.ClearStorageAffinity(new WindowsRegistryValues(affKey));
-                WriteLog(
-                    $"APPLY: STORAGE {block.Device.InstanceId} MSI={mode} Limit={limitText} Prio={prioStr} " +
-                    "affinity=WindowsDefault removed=AssignmentSetOverride,DevicePolicy");
-            }
-            catch (Exception ex)
-            {
-                WriteLog($"APPLY.REG.ERROR: {block.Device.InstanceId} operation=clear-storage-affinity path=HKLM\\{affPath} error=\"{FlattenLogText(ex.ToString())}\"");
-                RecordError("clear storage affinity", ex);
-            }
-
-            return;
-        }
-
-        try
-        {
-            Registry.LocalMachine.CreateSubKey(affPath)?.Dispose();
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"APPLY.REG.ERROR: {block.Device.InstanceId} operation=create-affinity-key path=HKLM\\{affPath} error=\"{FlattenLogText(ex.ToString())}\"");
-            RecordError("create affinity policy key", ex);
-        }
-
-        string policyStr = block.PolicyCombo.SelectedItem?.ToString() ?? "MachineDefault";
-        int policyVal = MapPolicyText(policyStr) ?? 0;
-
-        ulong mask = block.AffinityMask;
-        if (policyVal == 0)
-        {
-            mask = 0;
-        }
-
-        try
-        {
-            using RegistryKey? affKey = Registry.LocalMachine.OpenSubKey(affPath, writable: true);
-            if (affKey is null)
-            {
-                WriteLog($"APPLY.REG.ERROR: {block.Device.InstanceId} operation=open-affinity-key path=HKLM\\{affPath} error=key-unavailable");
-                report?.AddError($"{block.Device.Name}: set affinity", "registry key is unavailable");
-                return;
-            }
-
-            if (mask == 0 || policyVal == 0)
-            {
-                // Empty CPU selection / MachineDefault = clear DT affinity override (like RESET).
-                DeviceSettingsWriter.SetAffinity(new WindowsRegistryValues(affKey), policyVal, mask, IntPtr.Size);
-                WriteLog($"APPLY: AFFINITY {block.Device.InstanceId} policy=MachineDefault value=0 mask cleared");
-                return;
-            }
-
-            DeviceSettingsWriter.SetAffinity(new WindowsRegistryValues(affKey), policyVal, mask, IntPtr.Size);
-            WriteLog($"APPLY: AFFINITY {block.Device.InstanceId} policy={policyStr} value={policyVal} mask=0x{mask:X}");
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"APPLY.REG.ERROR: {block.Device.InstanceId} operation=set-affinity policy={policyStr} mask=0x{mask:X} path=HKLM\\{affPath} error=\"{FlattenLogText(ex.ToString())}\"");
-            RecordError("set affinity", ex);
-        }
+        UpdateBlockInfoText(block);
+        if (report is null && result.Report.Errors.Count > 0)
+            ShowOperationResult(result.Report, string.Empty, "Some device settings could not be applied.", operationName: "DEVICE SETTINGS");
     }
 
     internal static bool TryParseMsiLimitInput(string? input, out bool isUnlocked, out int value)

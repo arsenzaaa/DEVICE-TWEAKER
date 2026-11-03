@@ -299,8 +299,12 @@ public sealed partial class MainForm
         {
             return;
         }
+        using IDisposable? operation = TryBeginDeviceOperation("NIC ITR CHECK");
+        if (operation is null) return;
 
-        if (!TryCheckImodDriver(out string? error))
+        (bool ok, string? error) = await CheckImodDriverAsync();
+        if (_uiDisposing || IsDisposed || Disposing || block.Group.IsDisposed) return;
+        if (!ok)
         {
             if (block.NicItrStatusLabel is not null)
             {
@@ -368,6 +372,8 @@ public sealed partial class MainForm
         {
             return;
         }
+        using IDisposable? operation = TryBeginDeviceOperation("NIC ITR SET");
+        if (operation is null) return;
 
         if (!CreateDeviceTweakerBackup("pre-nic-itr", showDialog: false))
         {
@@ -486,6 +492,8 @@ public sealed partial class MainForm
         {
             return;
         }
+        using IDisposable? operation = TryBeginDeviceOperation("NIC ITR SAVE");
+        if (operation is null) return;
 
         if (!CreateDeviceTweakerBackup("pre-nic-itr-save", showDialog: false))
         {

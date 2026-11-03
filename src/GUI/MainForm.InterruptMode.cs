@@ -9,7 +9,7 @@ public sealed partial class MainForm
     {
         if (_interruptModesReadButton is null) return;
         if (!_interruptModeCheckRunning)
-            _interruptModesReadButton.Enabled = _devicesBusyDepth == 0 && _blocks.Any(block =>
+            _interruptModesReadButton.Enabled = _devicesBusyDepth == 0 && !_operations.IsBusy && _blocks.Any(block =>
                 block.Device.InstanceId.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase));
         _interruptModesReadButton.AccessibleName = UiLanguage.Text("Read interrupt modes for all PCI devices");
     }
@@ -29,12 +29,14 @@ public sealed partial class MainForm
 
     private async Task CheckInterruptModeAsync()
     {
-        if (_interruptModeCheckRunning || _devicesBusyDepth > 0) return;
+        if (_interruptModeCheckRunning || _devicesBusyDepth > 0 || _operations.IsBusy) return;
         DeviceBlock[] snapshot = _blocks.Where(block =>
             block.Device.InstanceId.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase)).ToArray();
         if (snapshot.Length == 0) return;
         bool simulated = snapshot.All(block => block.Device.IsTestDevice);
         if (!simulated && QaRun.TryBlock("PCI MODE CHECK")) return;
+        using IDisposable? operation = TryBeginDeviceOperation("READ IRQ MODE");
+        if (operation is null) return;
         _interruptModeCheckRunning = true;
         // Disable actions individually. Disabling the form makes native RichEdit
         // blocks paint a system background and darkens otherwise readable labels.
@@ -109,7 +111,7 @@ public sealed partial class MainForm
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        if (_interruptModeCheckRunning && e.CloseReason == CloseReason.UserClosing) e.Cancel = true;
+        if ((_interruptModeCheckRunning || (_operations.IsBusy && _activeOperationName != "REFRESH")) && e.CloseReason == CloseReason.UserClosing) e.Cancel = true;
         base.OnFormClosing(e);
     }
 

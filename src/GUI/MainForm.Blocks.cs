@@ -1106,11 +1106,11 @@ public sealed partial class MainForm
         btnImodDelete.Click += (_, _) => DeleteImodFromBlock(createdBlock);
 
         Button btnImodCheck = NewCardButton("CHECK", UiScale(76, 24));
-        btnImodCheck.Click += (_, _) =>
+        btnImodCheck.Click += async (_, _) =>
         {
             if (createdBlock is not null)
             {
-                CheckImodDriverFromBlock(createdBlock);
+                await CheckImodDriverFromBlock(createdBlock);
             }
         };
 
@@ -2025,6 +2025,7 @@ public sealed partial class MainForm
 
     private void SetOperationButtonsEnabled(bool enabled)
     {
+        enabled &= !_operations.IsBusy;
         foreach (Button button in _operationButtons)
         {
             if (!button.IsDisposed)
@@ -2041,7 +2042,7 @@ public sealed partial class MainForm
 
     private bool TryBlockBusyHardwareWrite(string operation)
     {
-        if (_devicesBusyDepth <= 0)
+        if (_devicesBusyDepth <= 0 && !_operations.IsBusy)
         {
             return false;
         }
