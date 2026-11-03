@@ -86,26 +86,19 @@ public sealed partial class MainForm
         return Path.Combine(GetScriptRoot(), BackupFolderName);
     }
 
-    private bool CreateDeviceTweakerBackup(string reason, bool showDialog)
+    private BackupCreationResult CreateDeviceTweakerBackupCore(string reason, BackupLocation location,
+        string? protectedPath, IReadOnlyList<BackupDeviceTarget> targets)
     {
-        return CreateDeviceTweakerBackup(reason, showDialog, BackupLocation.Local);
-    }
-
-    private bool CreateDeviceTweakerBackup(string reason, bool showDialog, BackupLocation location, string? protectedPath = null)
-    {
-        DemandRealWrite("CREATE BACKUP");
+        DemandRealWrite("CREATE BACKUP worker");
         try
         {
-            if (!_deviceDiscoveryCompleted)
-                throw new InvalidOperationException("The initial device scan has not completed. Refresh devices before creating a backup.");
-
             if (reason.StartsWith("pre-", StringComparison.OrdinalIgnoreCase)
-                && !EnsureOriginalDeviceTweakerBackup(location))
+                && !EnsureOriginalDeviceTweakerBackupCore(location, targets))
             {
                 throw new InvalidOperationException("The original-state backup could not be created or validated.");
             }
 
-            DeviceTweakerBackup backup = CaptureDeviceTweakerBackup(reason);
+            DeviceTweakerBackup backup = CaptureDeviceTweakerBackup(reason, targets);
             string directory = GetBackupDirectory(location);
             Directory.CreateDirectory(directory);
 
@@ -126,35 +119,12 @@ public sealed partial class MainForm
                 $"imodScript={validation.ImodScriptState} bytes={validation.Bytes} sha256={validation.Sha256}");
             WriteLog($"BACKUP: saved location={location} path={path} values={backup.RegistryValues.Count} reason={reason} atomic=true validated=true");
             PruneDeviceTweakerBackups(directory, keepLatest: 10, protectedPaths: new[] { path, protectedPath ?? path });
-            _lastBackupPath = path;
-
-            if (showDialog)
-            {
-                ShowBackupFileResult(path, restored: false);
-            }
-
-            return true;
+            return new(path, null);
         }
-        catch (Exception ex)
-        {
-            WriteLog($"BACKUP: failed reason={reason}: {ex.Message}");
-            if (showDialog)
-            {
-                OperationReport report = new();
-                report.MarkNoChangesMade();
-                report.AddError("BACKUP", "The backup file could not be created.", ex.ToString());
-                ShowOperationResult(
-                    report,
-                    string.Empty,
-                    "No backup was created.",
-                    operationName: "BACKUP");
-            }
-
-            return false;
-        }
+        catch (Exception ex) { return new(null, ex); }
     }
 
-    private bool EnsureOriginalDeviceTweakerBackup(BackupLocation preferredLocation)
+    private bool EnsureOriginalDeviceTweakerBackupCore(BackupLocation preferredLocation, IReadOnlyList<BackupDeviceTarget> targets)
     {
         DemandRealWrite("CREATE ORIGINAL BACKUP");
         foreach (string directory in EnumerateBackupDirectories())
@@ -217,7 +187,7 @@ public sealed partial class MainForm
                 WriteLog($"BACKUP.ORIGINAL: importing oldest known snapshot path={oldestKnown.Path} created={original.CreatedAt:O}");
             }
 
-            original ??= CaptureDeviceTweakerBackup("original-state");
+            original ??= CaptureDeviceTweakerBackup("original-state", targets);
             ValidateCapturedBackupForWrite(original);
             string json = JsonSerializer.Serialize(original, new JsonSerializerOptions { WriteIndented = true });
             WriteAllTextAtomic(path, json, Encoding.UTF8);
@@ -236,7 +206,7 @@ public sealed partial class MainForm
         }
     }
 
-    private DeviceTweakerBackup CaptureDeviceTweakerBackup(string reason)
+    private DeviceTweakerBackup CaptureDeviceTweakerBackup(string reason, IReadOnlyList<BackupDeviceTarget> targets)
     {
         DeviceTweakerBackup backup = new()
         {
@@ -259,14 +229,9 @@ public sealed partial class MainForm
             }
         }
 
-        foreach (DeviceBlock block in _blocks)
+        foreach (BackupDeviceTarget block in targets)
         {
-            if (block.Device.IsTestDevice)
-            {
-                continue;
-            }
-
-            string intBase = block.Device.RegBase + @"\Device Parameters\Interrupt Management";
+            string intBase = block.RegBase + @"\Device Parameters\Interrupt Management";
             AddValues(
                 RegistryHive.LocalMachine,
                 intBase + @"\MessageSignaledInterruptProperties",
@@ -282,7 +247,7 @@ public sealed partial class MainForm
 
             if (block.Kind == DeviceKind.USB)
             {
-                foreach (string instanceId in UsbSelectiveSuspendPolicy.EnumerateBackupInstanceIds(block.Device.InstanceId))
+                foreach (string instanceId in UsbSelectiveSuspendPolicy.EnumerateBackupInstanceIds(block.InstanceId))
                 {
                     AddValues(
                         RegistryHive.LocalMachine,
@@ -303,7 +268,7 @@ public sealed partial class MainForm
 
             if (block.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX)
             {
-                string? classKey = GetClassKeyForDevice(block.Device.InstanceId);
+                string? classKey = GetClassKeyForDevice(block.InstanceId);
                 if (!string.IsNullOrWhiteSpace(classKey))
                 {
                     if (block.Kind == DeviceKind.NET_NDIS)
@@ -355,7 +320,7 @@ public sealed partial class MainForm
     {
         try
         {
-            DeviceTweakerBackup backup = CaptureDeviceTweakerBackup("qa-imod-persistence");
+            DeviceTweakerBackup backup = CaptureDeviceTweakerBackup("qa-imod-persistence", CaptureBackupTargets());
             ValidateDeviceTweakerBackup(backup);
             if (backup.StartupProfile is null
                 || !string.Equals(backup.StartupProfile.Path, GetStartupProfilePath(), StringComparison.OrdinalIgnoreCase))
@@ -422,9 +387,10 @@ public sealed partial class MainForm
     private async Task RestoreLatestDeviceTweakerBackup()
     {
         bool settingsMayHaveChanged = false;
+        string? recoveryBackupPath = null;
         try
         {
-            List<BackupSnapshotInfo> backups = GetBackupSnapshots();
+            List<BackupSnapshotInfo> backups = await Task.Run(GetBackupSnapshots);
             RestoreChoice choice = ShowRestoreChoiceDialog(backups, out string? path, selected =>
             {
                 if (TryBlockSandboxHardwareWrite("BACKUP DELETE")) return 0;
@@ -459,15 +425,35 @@ public sealed partial class MainForm
             }
 
             WriteLog($"BACKUP.RESTORE: restore-backup requested choice={choice} path={path}");
-            BackupRestoreWorkflow workflow = new(
-                ReadDeviceTweakerBackup,
-                selected => CreateDeviceTweakerBackup("pre-restore", showDialog: false, BackupLocation.Local, selected),
-                backup =>
+            BackupDeviceTarget[] targets = CaptureBackupTargets();
+            BackupCreationResult? rollback = null;
+            OperationReport report;
+            try
+            {
+                report = await Task.Run(() =>
                 {
-                    settingsMayHaveChanged = true;
-                    return RestoreDeviceTweakerBackup(backup, path);
+                    BackupRestoreWorkflow workflow = new(
+                        ReadDeviceTweakerBackup,
+                        selected =>
+                        {
+                            rollback = CreateDeviceTweakerBackupCore("pre-restore", BackupLocation.Local, selected, targets);
+                            if (rollback.Error is not null)
+                                WriteLog($"BACKUP: failed reason=pre-restore: {rollback.Error.Message}");
+                            return rollback.Error is null && rollback.Path is not null;
+                        },
+                        backup =>
+                        {
+                            settingsMayHaveChanged = true;
+                            return RestoreDeviceTweakerBackup(backup, path, targets);
+                        });
+                    return workflow.Restore(path);
                 });
-            OperationReport report = workflow.Restore(path);
+            }
+            finally
+            {
+                if (rollback?.Path is { } rollbackPath) _lastBackupPath = recoveryBackupPath = rollbackPath;
+                if (settingsMayHaveChanged) InvalidateImodCache();
+            }
             report.SetBackupPath(_lastBackupPath);
             _pendingReservedCpuSets = null;
             _reservedCpuSetsDirty = false;
@@ -496,6 +482,7 @@ public sealed partial class MainForm
             WriteLog($"BACKUP.RESTORE: failed: {FlattenLogText(ex.ToString())}");
             OperationReport report = new();
             if (!settingsMayHaveChanged) report.MarkNoChangesMade();
+            if (recoveryBackupPath is not null) report.SetBackupPath(recoveryBackupPath);
             report.AddError(
                 "BACKUP RESTORE",
                 settingsMayHaveChanged
@@ -514,7 +501,7 @@ public sealed partial class MainForm
     {
         WriteLog("BACKUP.RESTORE: safe-reset requested");
         OperationReport report = new();
-        if (!_testAutoDryRun && !CreateDeviceTweakerBackup("pre-reset-tweaks", showDialog: false))
+        if (!_testAutoDryRun && !await CreateDeviceTweakerBackup("pre-reset-tweaks", showDialog: false))
         {
             report.MarkNoChangesMade();
             report.AddError("Automatic backup", "backup could not be created; no settings were changed");
@@ -717,7 +704,7 @@ public sealed partial class MainForm
         return backup;
     }
 
-    private OperationReport RestoreDeviceTweakerBackup(DeviceTweakerBackup backup, string path)
+    private OperationReport RestoreDeviceTweakerBackup(DeviceTweakerBackup backup, string path, IReadOnlyList<BackupDeviceTarget> targets)
     {
         DemandRealWrite("RestoreDeviceTweakerBackup");
         using DriverLoadGate gate = DriverLoadGate.Enter();
@@ -733,7 +720,7 @@ public sealed partial class MainForm
             },
             RestoreRegistryValue,
             CaptureStartupProfileFile,
-            profile => { RestoreStartupProfile(profile); InvalidateImodCache(); },
+            RestoreStartupProfile,
             WriteLog);
         service.Restore(backup);
 
@@ -744,7 +731,7 @@ public sealed partial class MainForm
             string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase)))
             report.AddSkipped("Saved setting", "The original backup could not read this value; it was left unchanged.",
                 $"{skipped.Hive}\\{skipped.Path}\\{skipped.Name}: {skipped.Data}");
-        report.MergeIssues(SyncLivePowerManagementAfterRestore(backup));
+        report.MergeIssues(SyncLivePowerManagementAfterRestore(backup, targets));
         return report;
     }
 

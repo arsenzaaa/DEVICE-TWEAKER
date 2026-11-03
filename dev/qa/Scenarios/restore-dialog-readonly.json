@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "restore-dialog-readonly",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    { "id": "open-en", "action": "click", "target": "id:RESTORE" },
+    { "id": "wait-en", "action": "wait", "target": "@active", "value": "RESTORE", "durationMs": 5000 },
+    { "id": "restore-en", "action": "capture", "target": "@active" },
+    { "id": "cancel-en", "action": "click", "target": "id:CANCEL" },
+    { "id": "idle-en", "action": "wait", "target": "@main", "property": "operation-active", "value": "false", "durationMs": 2000 },
+    { "id": "russian", "action": "language", "value": "RU" },
+    { "id": "open-ru", "action": "click", "target": "id:RESTORE" },
+    { "id": "wait-ru", "action": "wait", "target": "@active", "value": "ВОССТАНОВЛЕНИЕ", "durationMs": 5000 },
+    { "id": "restore-ru", "action": "capture", "target": "@active" },
+    { "id": "cancel-ru", "action": "click", "target": "id:CANCEL" },
+    { "id": "idle-ru", "action": "wait", "target": "@main", "property": "operation-active", "value": "false", "durationMs": 2000 }
+  ]
+}

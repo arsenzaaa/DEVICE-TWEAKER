@@ -1350,31 +1350,30 @@ public sealed partial class MainForm
         }
     }
 
-    private OperationReport SyncLivePowerManagementAfterRestore(DeviceTweakerBackup backup)
+    private OperationReport SyncLivePowerManagementAfterRestore(DeviceTweakerBackup backup, IReadOnlyList<BackupDeviceTarget> devices)
     {
         List<LivePowerRestoreTarget> targets = [];
         OperationReport report = new();
-        foreach (DeviceBlock block in _blocks)
+        foreach (BackupDeviceTarget block in devices)
         {
-            if (block.Device.IsTestDevice) continue;
             try
             {
                 if (block.Kind == DeviceKind.USB)
                 {
-                    foreach (string id in UsbSelectiveSuspendPolicy.EnumerateBackupInstanceIds(block.Device.InstanceId))
+                    foreach (string id in UsbSelectiveSuspendPolicy.EnumerateBackupInstanceIds(block.InstanceId))
                         targets.Add(new(id, LivePowerRestoreService.ReadRestoredEnabled(
                             backup, id, DevicePowerPolicy.TryGetClassKeyPath(id), usb: true)));
                 }
-                else if (block.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX && !block.Device.Wifi)
+                else if (block.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX && !block.Wifi)
                 {
-                    string id = block.Device.InstanceId;
+                    string id = block.InstanceId;
                     targets.Add(new(id, LivePowerRestoreService.ReadRestoredEnabled(
                         backup, id, GetClassKeyForDevice(id), usb: false)));
                 }
             }
             catch (Exception ex)
             {
-                report.AddError(block.Device.InstanceId, "Restored live power targets could not be resolved.", ex.ToString());
+                report.AddError(block.InstanceId, "Restored live power targets could not be resolved.", ex.ToString());
             }
         }
 

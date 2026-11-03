@@ -376,7 +376,7 @@ public sealed partial class MainForm
         using IDisposable? operation = TryBeginDeviceOperation("NIC ITR SET");
         if (operation is null) return;
 
-        if (!CreateDeviceTweakerBackup("pre-nic-itr", showDialog: false))
+        if (!await CreateDeviceTweakerBackup("pre-nic-itr", showDialog: false))
         {
             block.NicItrStatusLabel.Text = "current: backup failed";
             block.NicItrStatusLabel.ForeColor = _statusDanger;
@@ -496,7 +496,7 @@ public sealed partial class MainForm
         using IDisposable? operation = TryBeginDeviceOperation("NIC ITR SAVE");
         if (operation is null) return;
 
-        if (!CreateDeviceTweakerBackup("pre-nic-itr-save", showDialog: false))
+        if (!await CreateDeviceTweakerBackup("pre-nic-itr-save", showDialog: false))
         {
             block.NicItrStatusLabel.Text = "current: backup failed";
             block.NicItrStatusLabel.ForeColor = _statusDanger;

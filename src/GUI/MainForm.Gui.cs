@@ -448,7 +448,7 @@ public sealed partial class MainForm
             OperationReport report = CreateApplyReport(sandboxDryRun);
             if (!sandboxDryRun)
             {
-                if (!CreateDeviceTweakerBackup("pre-apply", showDialog: false))
+                if (!await CreateDeviceTweakerBackup("pre-apply", showDialog: false))
                 {
                     report.MarkNoChangesMade();
                     report.AddError("Automatic backup", "backup could not be created; changes were not applied");
@@ -622,7 +622,7 @@ public sealed partial class MainForm
                 if (backupChoice == AutoBackupChoice.Local || backupChoice == AutoBackupChoice.Roaming)
                 {
                     BackupLocation backupLocation = backupChoice == AutoBackupChoice.Local ? BackupLocation.Local : BackupLocation.Roaming;
-                    if (!CreateDeviceTweakerBackup("pre-auto", showDialog: false, backupLocation))
+                    if (!await CreateDeviceTweakerBackup("pre-auto", showDialog: false, backupLocation))
                     {
                         report.MarkNoChangesMade();
                         report.AddError("Automatic backup", "backup could not be created; changes were not applied");
@@ -638,7 +638,7 @@ public sealed partial class MainForm
                 }
                 else
                 {
-                    if (!EnsureOriginalDeviceTweakerBackup(BackupLocation.Local))
+                    if (!await EnsureOriginalDeviceTweakerBackup(BackupLocation.Local))
                     {
                         report.MarkNoChangesMade();
                         report.AddError("Original-state backup", "the initial recovery snapshot could not be created; changes were not applied");

@@ -1376,7 +1376,7 @@ public sealed partial class MainForm
         if (operation is null) return;
 
         OperationReport report = new();
-        if (!CreateDeviceTweakerBackup("pre-imod", showDialog: false))
+        if (!await CreateDeviceTweakerBackup("pre-imod", showDialog: false))
         {
             report.MarkNoChangesMade();
             report.AddError("Automatic backup", "backup could not be created; changes were not applied");
