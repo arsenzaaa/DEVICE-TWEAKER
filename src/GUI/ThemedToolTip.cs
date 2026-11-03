@@ -44,6 +44,9 @@ internal sealed class ThemedToolTip : IDisposable
     public int AutoPopDelay { get; set; } = 5000;
     internal int RegistrationCount => _registrations.Count;
 
+    internal string? GetToolTip(Control control)
+        => _registrations.TryGetValue(control, out Registration? registration) ? registration.Text : null;
+
     public void SetToolTip(Control control, string? caption)
     {
         ThrowIfDisposed();

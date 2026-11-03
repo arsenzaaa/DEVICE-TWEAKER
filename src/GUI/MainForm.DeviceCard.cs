@@ -3,78 +3,21 @@
 // Self-contained parts of a device card; NewDeviceBlock assembles and lays them out.
 public sealed partial class MainForm
 {
-    // Kind badge, title and the hidden "Changed" badge above the card divider.
-    private (FlowLayoutPanel Header, Label Title, Label ModifiedBadge, Panel Divider) BuildDeviceCardHeader(
-        DeviceInfo device, DeviceCardPanel grp, string title)
+    private DeviceCard NewDeviceCard(DeviceInfo device, string title)
     {
-        FlowLayoutPanel headerPanel = new()
-        {
-            AutoSize = false,
-            Size = new Size(grp.Width - UiScale(40), UiScale(24)),
-            Location = new Point(UiScale(18), UiScale(8)),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-            WrapContents = false,
-            Margin = Padding.Empty,
-            Padding = Padding.Empty,
-            BackColor = Color.Transparent,
-        };
-
-        (string kindText, Color kindColor) = device.Kind switch
+        (string badge, Color color) = device.Kind switch
         {
             DeviceKind.USB => ("[USB]", DeviceBadgePalette.Usb),
             DeviceKind.GPU => GetGpuKindBadge(device),
             DeviceKind.NET_NDIS or DeviceKind.NET_CX => ("[NET]", DeviceBadgePalette.Network),
             DeviceKind.AUDIO => ("[AUDIO]", DeviceBadgePalette.Audio),
             DeviceKind.STOR => GetStorageKindBadge(device),
-            _ => ("[DEV]", _statusPrefix)
+            _ => ("[DEV]", _statusPrefix),
         };
-
-        Label kindBadge = new()
-        {
-            Text = kindText,
-            Font = _blockTitleFont,
-            ForeColor = kindColor,
-            AutoSize = true,
-            Margin = new Padding(0, 0, UiScale(6), 0),
-        };
-        headerPanel.Controls.Add(kindBadge);
-
-        Label headerLabel = new HighlightLabel
-        {
-            Text = title,
-            Font = _blockTitleFont,
-            ForeColor = _fgMain,
-            AutoSize = true,
-            Margin = Padding.Empty,
-            HighlightText = "Mouse scanning",
-            HighlightColor = Color.FromArgb(120, 120, 120),
-        };
-        headerPanel.Controls.Add(headerLabel);
-        if (device.Kind == DeviceKind.USB && device.UsbChipPath is UsbChipPathInfo chipTip)
-        {
-            _copyToolTip.SetToolTip(headerLabel, chipTip.TooltipText);
-        }
-
-        Label modifiedBadge = new()
-        {
-            Text = UiLanguage.Text("Changed"),
-            Font = _blockFont,
-            ForeColor = _mutedText,
-            AutoSize = true,
-            Visible = false,
-            Margin = new Padding(UiScale(12), UiScale(1), 0, 0),
-        };
-        headerPanel.Controls.Add(modifiedBadge);
-
-        Panel divider = new()
-        {
-            BackColor = _border,
-            Size = new Size(grp.Width - UiScale(32), UiScale(1)),
-            Location = new Point(UiScale(16), UiScale(36)),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-        };
-
-        return (headerPanel, headerLabel, modifiedBadge, divider);
+        DeviceCard card = new(new(_uiScale, _blockFont, _blockTitleFont, _bgGroup, _fgMain, _mutedText, _border), title, badge, color);
+        if (device.Kind == DeviceKind.USB && device.UsbChipPath is UsbChipPathInfo chip)
+            _copyToolTip.SetToolTip(card.TitleLabel, chip.TooltipText);
+        return card;
     }
 
     // One checkbox per logical CPU, grouped into columns by CCD (AMD) or P/E cores
@@ -293,7 +236,7 @@ public sealed partial class MainForm
         block.NdisModeCombo.SelectedIndexChanged += (_, _) =>
         {
             RecalcAffinityMask(block);
-            UpdateBlockInfoText(block);
+            if (block.SuppressCpuEvents == 0) UpdateBlockInfoText(block);
         };
     }
 

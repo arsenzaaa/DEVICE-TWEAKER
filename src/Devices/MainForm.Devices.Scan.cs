@@ -935,6 +935,9 @@ public sealed partial class MainForm
 
     private List<DeviceInfo> GetDeviceList(DiscoveryInput input)
     {
+#if DEVELOPER_QA
+        DevRecordDataRead("GetDeviceList");
+#endif
         WriteLog("SCAN: Get-DeviceList start");
 
         List<DeviceInfo> SortDevices(List<DeviceInfo> list)

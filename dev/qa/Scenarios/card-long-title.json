@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "card-long-title",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "GPU",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    { "id": "limit", "action": "reveal", "target": "role:limit", "device": "DEV_2684" },
+    { "id": "edit", "action": "text", "target": "role:limit", "device": "DEV_2684", "value": "2" },
+    { "id": "long-title", "action": "card-title-model", "device": "DEV_2684", "value": "NVIDIA GeForce RTX 4090 - PCI Express display adapter with a very long descriptive hardware name and multiple connected high resolution displays" },
+    { "id": "show-title", "action": "reveal", "target": "role:title", "device": "DEV_2684" },
+    { "id": "EN-header-fits", "action": "assert", "target": "role:title", "device": "DEV_2684", "property": "header-fits", "value": "true" },
+    { "id": "EN-long-title", "action": "capture" },
+    { "id": "russian", "action": "language", "value": "RU" },
+    { "id": "narrow", "action": "resize", "width": 1000, "height": 720 },
+    { "id": "show-RU-title", "action": "reveal", "target": "role:title", "device": "DEV_2684" },
+    { "id": "RU-header-fits", "action": "assert", "target": "role:title", "device": "DEV_2684", "property": "header-fits", "value": "true" },
+    { "id": "RU-long-title", "action": "capture" }
+  ]
+}

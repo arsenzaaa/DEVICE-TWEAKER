@@ -428,6 +428,9 @@ public sealed partial class MainForm
 
     private void LoadBlockSettings(DeviceBlock block)
     {
+#if DEVELOPER_QA
+        DevRecordDataRead("LoadBlockSettings");
+#endif
         block.SuppressCpuEvents++;
         try
         {

@@ -8,6 +8,9 @@ public sealed partial class MainForm
 {
     private bool[] GetReservedCpuSets(int count)
     {
+#if DEVELOPER_QA
+        DevRecordDataRead("GetReservedCpuSets");
+#endif
         if (count <= 0)
         {
             return [];
@@ -354,7 +357,7 @@ public sealed partial class MainForm
         tag.ValueLabel.Tag = tag.ValueLabel.Text;
     }
 
-    private Panel? NewReservedCpuSetsPanel()
+    private Panel? NewReservedCpuSetsPanel(bool[]? presentation = null)
     {
         if (!_cpuSetIdsReliable)
         {
@@ -373,11 +376,11 @@ public sealed partial class MainForm
             logicalCount = Environment.ProcessorCount;
         }
 
-        bool[] reservedBits = _pendingReservedCpuSets is { } pending && pending.Length == logicalCount
+        bool[] reservedBits = presentation ?? (_pendingReservedCpuSets is { } pending && pending.Length == logicalCount
             ? pending.ToArray()
-            : GetReservedCpuSets(logicalCount);
+            : GetReservedCpuSets(logicalCount));
 
-        Panel grp = new DeviceCardPanel
+        Panel grp = new BorderedPanel
         {
             BackColor = _bgGroup,
             ForeColor = _fgMain,
@@ -453,7 +456,7 @@ public sealed partial class MainForm
             }
         };
 
-        Panel inner = new DeviceCardPanel
+        Panel inner = new BorderedPanel
         {
             BackColor = _bgForm,
             ForeColor = _fgMain,

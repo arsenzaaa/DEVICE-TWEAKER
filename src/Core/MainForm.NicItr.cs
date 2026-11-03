@@ -13,6 +13,9 @@ public sealed partial class MainForm
 
     private List<NicDriverModeration.Keyword> ReadNicDriverModeration(string instanceId)
     {
+#if DEVELOPER_QA
+        DevRecordDataRead("ReadNicDriverModeration");
+#endif
         List<NicDriverModeration.Keyword> keywords = [];
         string? classKey = GetClassKeyForDevice(instanceId);
         if (string.IsNullOrWhiteSpace(classKey))

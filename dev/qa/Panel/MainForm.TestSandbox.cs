@@ -57,7 +57,8 @@ public sealed partial class MainForm
 
         if (!TryValidateMsiLimitInput(block.LimitBox.Text, block.InterruptCapabilities, out bool unlocked, out int limit, out string limitError))
         {
-            report?.AddError($"{block.Device.Name}: MSI Limit", limitError);
+            report?.AddError($"{block.Device.Name}: MSI Limit", limitError,
+                $"Requested value={block.LimitBox.Text}; hardware={FormatInterruptCapabilities(block.InterruptCapabilities)}");
             return false;
         }
 

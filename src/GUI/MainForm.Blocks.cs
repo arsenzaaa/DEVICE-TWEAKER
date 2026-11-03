@@ -212,15 +212,11 @@ public sealed partial class MainForm
     private void NewDeviceBlock(
         DeviceInfo device,
         int index,
-        IReadOnlyDictionary<string, string>? priorImodStatuses = null)
+        IReadOnlyDictionary<string, string>? priorImodStatuses = null, CardPresentation? presentation = null)
     {
         DeviceBlock? createdBlock = null;
-        DeviceCardPanel grp = new()
-        {
-            BorderColor = _border,
-        };
-
         string title = BuildDeviceBlockTitle(device);
+        DeviceCard grp = NewDeviceCard(device, title);
         string logTitle = device.Kind == DeviceKind.STOR ? $"{title} {StorageAffinityNoteText}" : title;
 
         WriteLog(
@@ -234,7 +230,10 @@ public sealed partial class MainForm
         grp.Margin = new Padding(0);
         grp.Padding = new Padding(UiScale(12), UiScale(16), UiScale(12), UiScale(16));
 
-        (FlowLayoutPanel headerPanel, Label headerLabel, Label modifiedBadge, Panel divider) = BuildDeviceCardHeader(device, grp, title);
+        FlowLayoutPanel headerPanel = grp.Header;
+        Label headerLabel = grp.TitleLabel;
+        Label modifiedBadge = grp.ModifiedBadge;
+        Panel divider = grp.Divider;
         Label? headerNote = null;
 
         int contentTop = UiScale(48);
@@ -254,25 +253,13 @@ public sealed partial class MainForm
         int cpuPanelHeight = UiScale(150);
         bool hasImod = ShouldShowImod(device);
         int desiredSettingsSideWidth = hasImod ? UiScale(460) : UiScale(360);
-        int settingsMinimumWidth = Math.Min(UiScale(360), Math.Max(UiScale(280), grp.Width - UiScale(48)));
-        int settingsSideMinimumWidth = desiredSettingsSideWidth;
-        int cpuPanelMinimumWidth = UiScale(320);
-        int settingsSideGap = UiScale(20);
-        int cpuPanelFullMaximumWidth = Math.Max(
-            cpuPanelMinimumWidth,
-            grp.Width - UiScale(16) - UiScale(24));
-        int cpuPanelSideMaximumWidth = Math.Max(
-            cpuPanelMinimumWidth,
-            grp.Width - UiScale(16) - settingsSideGap - settingsMinimumWidth - UiScale(24));
-        int cpuPanelMaximumWidth = cpuPanelSideMaximumWidth;
-        int cpuPanelWidth = cpuPanelMinimumWidth;
         // Dual-CCD affinity lists are wide; a plain Panel + AutoScroll paints overlapping
         // checkbox columns. BufferedPanel keeps the scroll viewport clean.
         bool affinitySettingsStacked = false;
         BufferedPanel cpuPanel = new()
         {
             Location = new Point(UiScale(16), cpuPanelTop),
-            Size = new Size(cpuPanelWidth, cpuPanelHeight),
+            Size = new Size(UiScale(320), cpuPanelHeight),
             BackColor = _bgForm,
             Font = _blockFont,
             Padding = new Padding(UiScale(8), UiScale(6), UiScale(8), UiScale(6)),
@@ -287,69 +274,14 @@ public sealed partial class MainForm
         };
 
         (List<CheckBox> cpuBoxes, int cpuContentRight, int requiredWidth, int cpuContentHeight) = BuildAffinityCheckboxes(device, cpuPanel);
-        int cpuPanelHorizontalSlack = UiScale(12);
-        int sideSettingsX = 0;
-        int sideSettingsWidth = 0;
         int settingsX = UiScale(18);
         int availableSettingsWidth = Math.Max(UiScale(260), grp.Width - settingsX - UiScale(24));
         void UpdateResponsivePlacement()
         {
-            settingsSideMinimumWidth = Math.Min(desiredSettingsSideWidth, Math.Max(UiScale(320), grp.Width - UiScale(48)));
-            settingsMinimumWidth = Math.Min(UiScale(360), Math.Max(UiScale(280), grp.Width - UiScale(48)));
-            cpuPanelFullMaximumWidth = Math.Max(cpuPanelMinimumWidth, grp.Width - cpuPanel.Left - UiScale(24));
-            cpuPanelSideMaximumWidth = Math.Max(
-                cpuPanelMinimumWidth,
-                grp.Width - cpuPanel.Left - settingsSideGap - settingsSideMinimumWidth - UiScale(24));
-
-            int neededCpuWidth = Math.Max(cpuPanelMinimumWidth, requiredWidth + cpuPanelHorizontalSlack);
-            // Dual-CCD / long CPPC labels: if two columns cannot sit beside MSI/IRQ
-            // settings without a horizontal scrollbar, stack settings under the list.
-            affinitySettingsStacked = neededCpuWidth > cpuPanelSideMaximumWidth + UiScale(4);
-            cpuPanelMaximumWidth = affinitySettingsStacked
-                ? cpuPanelFullMaximumWidth
-                : cpuPanelSideMaximumWidth;
-            int targetCpuPanelWidth = Math.Min(cpuPanelMaximumWidth, neededCpuWidth);
-            if (cpuPanel.Width != targetCpuPanelWidth)
-            {
-                cpuPanel.Width = targetCpuPanelWidth;
-            }
-
-            if (cpuPanel.Height != cpuContentHeight)
-            {
-                cpuPanel.Height = cpuContentHeight;
-            }
-
-            bool needsHorizontalScroll = cpuContentRight > cpuPanel.ClientSize.Width + UiScale(2);
-            if (needsHorizontalScroll)
-            {
-                cpuPanel.AutoScroll = true;
-                cpuPanel.AutoScrollMinSize = new Size(
-                    requiredWidth + cpuPanelHorizontalSlack,
-                    Math.Max(cpuContentHeight, cpuPanel.ClientSize.Height));
-            }
-            else
-            {
-                cpuPanel.AutoScroll = false;
-                cpuPanel.AutoScrollMinSize = Size.Empty;
-                cpuPanel.AutoScrollPosition = Point.Empty;
-                cpuPanel.HorizontalScroll.Visible = false;
-                cpuPanel.VerticalScroll.Visible = false;
-            }
-
-            if (affinitySettingsStacked)
-            {
-                settingsX = cpuPanel.Left;
-                sideSettingsX = settingsX;
-                sideSettingsWidth = cpuPanelFullMaximumWidth;
-                availableSettingsWidth = Math.Max(UiScale(260), cpuPanelFullMaximumWidth);
-            }
-            else
-            {
-                sideSettingsX = cpuPanel.Right + settingsSideGap;
-                sideSettingsWidth = grp.Width - sideSettingsX - UiScale(24);
-                settingsX = sideSettingsX;
-                availableSettingsWidth = Math.Max(UiScale(260), grp.Width - settingsX - UiScale(24));
-            }
+            CardColumns columns = grp.ArrangeAffinity(cpuPanel, requiredWidth, cpuContentRight, cpuContentHeight, desiredSettingsSideWidth);
+            affinitySettingsStacked = columns.Stacked;
+            settingsX = columns.SettingsLeft;
+            availableSettingsWidth = columns.SettingsWidth;
         }
 
         UpdateResponsivePlacement();
@@ -1587,17 +1519,7 @@ public sealed partial class MainForm
 
             int lowerContentBottom = Math.Max(lblIrq.Bottom, settingsPanel.Bottom);
 
-            int currentInfoWidth = Math.Max(UiScale(140), grp.Width - lblInfo.Left - UiScale(24));
-            // Leave one translated-text line of headroom. Runtime language
-            // changes can make the technical diagnostics wrap after the card
-            // has already been measured.
-            int currentInfoHeight = Math.Max(UiScale(70), GetPreferredTextHeight(lblInfo, currentInfoWidth) + UiScale(20));
-            lblInfo.Location = new Point(lblInfo.Left, lowerContentBottom + UiScale(18));
-            lblInfo.Size = new Size(currentInfoWidth, currentInfoHeight);
-            infoDivider.Location = new Point(lblInfo.Left, lblInfo.Top - UiScale(9));
-            infoDivider.Width = currentInfoWidth;
-
-            grp.Height = lblInfo.Bottom + UiScale(20);
+            grp.ArrangeDiagnostics(lblInfo, infoDivider, lowerContentBottom);
         }
 
         btnImodDetails.Click += (_, _) =>
@@ -1612,8 +1534,6 @@ public sealed partial class MainForm
 
         List<Control> chrome =
         [
-            headerPanel,
-            divider,
             cpuLabel,
             cpuPanel,
             lblMask,
@@ -1622,7 +1542,7 @@ public sealed partial class MainForm
             infoDivider,
             lblInfo,
         ];
-        grp.Controls.AddRange(chrome.ToArray());
+        grp.ComposeBody(chrome);
         WireDevicesMouseWheelForwarding(grp);
 
         RelayoutDeviceBlockChrome();
@@ -1719,7 +1639,8 @@ public sealed partial class MainForm
             imodDetailsExpanded = expanded;
             UpdateImodDetailsVisibility();
         };
-        LoadBlockSettings(block);
+        if (presentation is null) LoadBlockSettings(block);
+        else RestoreCardPresentation(block, presentation);
         if (device.Wifi)
         {
             // Wi-Fi drivers are intentionally left completely untouched. Keep
@@ -1738,11 +1659,12 @@ public sealed partial class MainForm
 
         WireDeviceBlockChangeTracking(block, showImod);
 
-        block.CaptureInitialState();
+        if (presentation is null) block.CaptureInitialState();
+        else block.RestoreInitialState(presentation.Baseline);
 
         _devicesPanel.Controls.Add(grp);
         _blocks.Add(block);
-        if (showImod && block.Device.IsTestDevice)
+        if (showImod && block.Device.IsTestDevice && presentation is null)
         {
             RefreshTestImodPreview(block, "test-block-init");
         }
@@ -2196,30 +2118,8 @@ public sealed partial class MainForm
             _devicesPanel.SuspendLayout();
             try
             {
-                // ControlCollection.Clear() only detaches controls. It does not
-                // release their native handles, fonts or event subscriptions.
-                // A REFRESH therefore has to dispose the complete previous card
-                // tree before the new device list is built.
-                foreach (Control control in _devicesPanel.Controls.Cast<Control>().ToArray())
-                {
-                    _copyToolTip.RemoveAll(control);
-                    control.Dispose();
-                }
-
-                _copyToolTip.RemoveDisposedRegistrations();
-                _copyToolTip.RemoveDetachedRegistrations(this);
-                WriteLog(
-                    $"REFRESH.TOOLTIPS: before={tooltipRegistrationsBeforeClear} " +
-                    $"after={_copyToolTip.RegistrationCount}");
-
-                _devicesPanel.Controls.Clear();
-                _devicesPanel.Location = new Point(0, 0);
-                if (_devicesScroll is not null)
-                {
-                    _devicesScroll.Value = 0;
-                }
-                _blocks.Clear();
-                _reservedCpuPanel = null;
+                DisposeDeviceBlocks();
+                WriteLog($"REFRESH.TOOLTIPS: before={tooltipRegistrationsBeforeClear} after={_copyToolTip.RegistrationCount}");
 
                 TickDevicesBusy("Enumerating devices...", ownsBusy ? 1 : 0);
                 WarnIfMissingGpuDriver(devs);

@@ -38,7 +38,7 @@ internal sealed class DevScenario
 internal sealed class DevStep
 {
     public static readonly HashSet<string> Actions = ["capture", "click", "hover", "leave", "focus", "select", "text", "toggle",
-        "assert", "wait", "key", "language", "resize", "scroll", "reveal", "transition", "save-state", "restore-state", "apply-model", "model-error", "gallery", "audit-editors", "dialog", "audit-dialog", "irq-check-model", "refresh-readback-model", "discovery-model"];
+        "assert", "wait", "key", "language", "resize", "scroll", "reveal", "transition", "save-state", "restore-state", "apply-model", "model-error", "gallery", "audit-editors", "dialog", "audit-dialog", "irq-check-model", "refresh-readback-model", "discovery-model", "card-title-model", "layout-rebind", "apply-completion-model", "expect-apply-errors"];
     public string Id { get; set; } = "";
     public string Action { get; set; } = "";
     public string Target { get; set; } = "@main";

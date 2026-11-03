@@ -14,7 +14,7 @@ internal class BufferedPanel : Panel
     }
 }
 
-internal sealed class DeviceCardPanel : BufferedPanel
+internal sealed class BorderedPanel : BufferedPanel
 {
     private Rectangle _lastBounds;
 

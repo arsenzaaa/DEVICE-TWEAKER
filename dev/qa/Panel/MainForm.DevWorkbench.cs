@@ -10,6 +10,16 @@ namespace DeviceTweakerCS;
 
 public sealed partial class MainForm
 {
+    private int _devExpectedApplyErrors = -1;
+    private OperationReport? _devLastApplyReport;
+    private int _devDataReads;
+    private bool _devPresentationBinding;
+    private void DevRecordDataRead(string source)
+    {
+        _devDataReads++;
+        if (_devPresentationBinding) throw new InvalidOperationException("Presentation rebind entered data reader: " + source);
+    }
+
     private int _devDiscoveryDelayMs;
     private int _devDiscoveryPending;
     private Control[] _devDiscoveryOriginalCards = [];
@@ -91,6 +101,7 @@ public sealed partial class MainForm
                 DevFiles.Write(DevArtifact("session.json"), _devRun);
             }
             if (_devPending != 0) throw new InvalidOperationException("Scenario ended with a pending modal action");
+            if (_devExpectedApplyErrors >= 0) throw new InvalidOperationException("Scenario ended with an unused APPLY error expectation");
             _devRun.Status = "PASS";
             DevFiles.Verify(QaRun.OutputDirectory, _devRun);
         }
@@ -145,7 +156,7 @@ public sealed partial class MainForm
                 "title" => b.TitleLabel,
                 "msi" => b.MsiCombo, "limit" => b.LimitBox, "priority" => b.PrioCombo, "policy" => b.PolicyCombo,
                 "imod" => b.ImodBox, "imod-toggle" => b.ImodAutoCheck, "imod-check" => b.ImodCheckButton!,
-                "imod-current" => b.ImodCurrentLabel, "mode" => b.InterruptModeLabel!,
+                "imod-current" => b.ImodCurrentLabel, "imod-map" => b.ImodMapLabel!, "mode" => b.InterruptModeLabel!,
                 "irq" => b.IrqLabel,
                 "nic-itr" => b.NicItrBox!, "rss-queues" => b.RssQueueBox!,
                 "affinity" => b.AffinityLabel,
@@ -186,6 +197,17 @@ public sealed partial class MainForm
         }
         if (!DevInViewport(control)) throw new InvalidOperationException("Target could not be fully revealed in its viewport");
     }
+    private bool DevHeaderFits(Control title)
+    {
+        DeviceBlock block = _blocks.Single(block => block.TitleLabel == title);
+        Control header = block.HeaderPanel!;
+        Control[] parts = header.Controls.Cast<Control>().Where(child => child.Visible).ToArray();
+        return parts.All(child => child.Left >= 0 && child.Top >= 0
+                && child.Right <= header.ClientSize.Width && child.Bottom <= header.ClientSize.Height)
+            && parts.SelectMany((left, i) => parts.Skip(i + 1).Select(right => (left, right)))
+                .All(pair => !pair.left.Bounds.IntersectsWith(pair.right.Bounds));
+    }
+
     private static bool DevEditorInputFiltered(Control control)
     {
         Message input = Message.Create(control.Handle, 0x102, new IntPtr('9'), IntPtr.Zero);
@@ -217,6 +239,11 @@ public sealed partial class MainForm
         "filter-toolbar-fits" when control == this => (_filterCategoriesHost is not null && DevInViewport(_searchFilterBox)
             && !_searchFilterBox.Parent!.Bounds.IntersectsWith(_filterCategoriesHost.Bounds)
             && _filterCategoryButtons.All(DevInViewport)).ToString().ToLowerInvariant(),
+        "last-apply-errors" when control == this => (_devLastApplyReport?.Errors.Count ?? -1).ToString(),
+        "map-rows" when control is ImodMapTextBox map => map.DisplayRowCount.ToString(),
+        "dirty" => _blocks.Single(block => block.TitleLabel == control).IsDirty.ToString().ToLowerInvariant(),
+        "initial-limit" => _blocks.Single(block => block.LimitBox == control).InitialLimitText,
+        "header-fits" => DevHeaderFits(control).ToString().ToLowerInvariant(),
         "operation-active" when control == this => _operations.IsBusy.ToString().ToLowerInvariant(),
         "editor-input-filter" => DevEditorInputFiltered(control).ToString().ToLowerInvariant(),
         "refresh-idle" when control == this => (_devicesBusyDepth == 0 && _lastDeviceRefresh.IsCompleted
@@ -277,6 +304,40 @@ public sealed partial class MainForm
                     throw new InvalidDataException("IRQ model requires an idle reader, success/failure and a delay of at least 100 ms");
                 _devIrqReadDelayMs = step.DurationMs; _devIrqReadOutcome = step.Value;
                 lock (_devIrqReadInstances) _devIrqReadInstances.Clear();
+                break;
+            case "expect-apply-errors":
+                if (_operations.IsBusy || _devExpectedApplyErrors >= 0 || !int.TryParse(step.Value, out int expectedErrors)
+                    || expectedErrors < 0 || _blocks.Any(block => !block.Device.IsTestDevice))
+                    throw new InvalidDataException("Expected an idle synthetic APPLY fixture and a nonnegative error count.");
+                _devExpectedApplyErrors = expectedErrors;
+                break;
+            case "apply-completion-model":
+                OperationReport completion = step.Value switch
+                {
+                    "last" => _devLastApplyReport ?? throw new InvalidOperationException("No APPLY report exists."),
+                    "warning" or "success" => new OperationReport(),
+                    _ => throw new InvalidDataException("Expected last/warning/success completion model."),
+                };
+                if (step.Value == "warning") completion.AddWarning("Readback model", "Readback was not confirmed.");
+                if (step.Value == "success") completion.AddSuccess("Settings model", "Confirmed.");
+                // Exercise the same UI-only acceptance step used after real APPLY.
+                // No write backend is called and no global read-only policy changes.
+                CompleteApplyPresentation(completion, acceptAsApplied: true);
+                break;
+            case "layout-rebind":
+                if (step.Value is not ("96" or "120" or "144")) throw new InvalidDataException("Expected layout model DPI 96/120/144.");
+                int readsBefore = _devDataReads;
+                _devPresentationBinding = true;
+                try
+                {
+                    Environment.SetEnvironmentVariable("DEVICE_TWEAKER_QA_LAYOUT_DPI", step.Value);
+                    await RebuildDeviceBlocksForLayout();
+                    if (_devDataReads != readsBefore) throw new InvalidOperationException("Layout rebind performed data reads.");
+                }
+                finally { _devPresentationBinding = false; }
+                break;
+            case "card-title-model":
+                DevBlock(step.Device).TitleLabel.Text = step.Value;
                 break;
             case "discovery-model":
                 if (_devicesBusyDepth != 0 || _devDiscoveryPending != 0 || step.DurationMs < 300)

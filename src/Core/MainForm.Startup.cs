@@ -56,7 +56,11 @@ public sealed partial class MainForm
 
     // Reads without migration. An unreadable current file never falls back to legacy settings.
     private StartupConfigReadResult<ImodConfig> ReadSavedStartupConfigResult()
-        => StartupConfigReader.Read(GetStartupProfilePath(),
+    {
+#if DEVELOPER_QA
+        DevRecordDataRead("ReadSavedStartupConfigResult");
+#endif
+        return StartupConfigReader.Read(GetStartupProfilePath(),
             new[] { GetLegacyAppDataImodScriptPath(), GetLegacyImodStartupPath() },
             path =>
             {
@@ -70,6 +74,7 @@ public sealed partial class MainForm
                 config.HasScript = true;
                 return config;
             });
+    }
 
     private ImodConfig ReadSavedStartupConfig(out string? source)
     {

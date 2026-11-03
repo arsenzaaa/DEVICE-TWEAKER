@@ -67,7 +67,8 @@ public sealed partial class MainForm
         {
             string msiLimitMessage = validationError + " The invalid value was not applied.";
             WriteLog($"APPLY.VALIDATION.ERROR: {plan.InstanceId} setting=MSI-Limit value=\"{FlattenLogText(limitText)}\" hardware=\"{FormatInterruptCapabilities(plan.InterruptCapabilities)}\" error=\"{FlattenLogText(validationError)}\"");
-            report.AddError($"{plan.DeviceName}: MSI Limit", msiLimitMessage);
+            report.AddError($"{plan.DeviceName}: MSI Limit", msiLimitMessage,
+                $"Requested value={limitText}; hardware={FormatInterruptCapabilities(plan.InterruptCapabilities)}");
         }
         else
         {

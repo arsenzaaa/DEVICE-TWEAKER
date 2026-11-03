@@ -444,8 +444,8 @@ public sealed partial class MainForm
             using IDisposable? operation = TryBeginDeviceOperation("APPLY");
             if (operation is null) return;
             WriteLog("UI: APPLY button clicked");
-            OperationReport report = new();
             bool sandboxDryRun = IsSandboxDryRunActive();
+            OperationReport report = CreateApplyReport(sandboxDryRun);
             if (!sandboxDryRun)
             {
                 if (!CreateDeviceTweakerBackup("pre-apply", showDialog: false))
@@ -543,12 +543,13 @@ public sealed partial class MainForm
                     RefreshImodCurrentValuesAsync(showReadingStatus: true, reason: sandboxDryRun ? "apply-dry-run" : "apply"),
                     CalculateIrqCountsAsync(sandboxDryRun ? "apply-dry-run" : "apply"));
                 if (IsDisposed || Disposing) return;
+                if (sandboxDryRun) ValidateApplyPreviewReport(report);
                 LogGuiSnapshot(sandboxDryRun ? "apply-dry-run" : "apply");
                 _devicesBusyDone = _devicesBusyTotal;
                 UpdateDevicesBusy("Ready", 100);
                 WriteLog(
                     sandboxDryRun
-                        ? $"UI: APPLY dry-run completed blocks={_blocks.Count} errors={report.Errors.Count}"
+                        ? $"UI: APPLY dry-run backend finished blocks={_blocks.Count}; result follows"
                         : $"UI: APPLY completed blocks={_blocks.Count} errors={report.Errors.Count}");
             }
             finally
@@ -556,15 +557,19 @@ public sealed partial class MainForm
                 EndDevicesBusy();
             }
 
-            if (!sandboxDryRun)
-            {
-                UpdateAllBlocksInitialState();
-                UpdateApplyButtonDirtyCount();
-            }
+            CompleteApplyPresentation(report, acceptAsApplied: !sandboxDryRun);
 
             if (sandboxDryRun)
             {
-                ShowThemedInfo("APPLY preview completed.\nSandbox dry-run is ON (no registry changes).");
+                if (report.Succeeded && report.Warnings.Count == 0)
+                    ShowThemedInfo("APPLY preview completed.\nSandbox dry-run is ON (no registry changes).");
+                else
+                {
+                    report.MarkNoChangesMade();
+                    ShowOperationResult(report,
+                        "Preview completed with unconfirmed steps. No real settings were changed.",
+                        "Preview contains failed steps. No real settings were changed.", operationName: "APPLY PREVIEW");
+                }
             }
             else
             {
@@ -877,27 +882,28 @@ public sealed partial class MainForm
         _layoutRefreshTimer.Start();
     }
 
-    private async Task RebuildDeviceBlocksForLayout()
+    private Task RebuildDeviceBlocksForLayout()
     {
         if (IsDisposed)
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        if (_devicesBusyDepth > 0 || _operations.IsBusy)
+        if (_devicesBusyDepth > 0 || _operations.IsBusy || !Enabled)
         {
             _layoutRefreshTimer?.Stop();
             _layoutRefreshTimer?.Start();
-            return;
+            return Task.CompletedTask;
         }
         UpdateUiScale();
         if (_blocks.Count == 0)
         {
             LayoutBlocks();
-            return;
+            return Task.CompletedTask;
         }
 
-        await RefreshBlocksAsync(includeImodReadback: false);
+        RebuildDevicePresentation();
+        return Task.CompletedTask;
     }
 
     private void AdjustInitialDeviceViewportHeight()

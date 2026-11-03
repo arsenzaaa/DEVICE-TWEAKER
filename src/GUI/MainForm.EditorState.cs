@@ -52,6 +52,46 @@ public sealed partial class MainForm
         else SetDevicesScrollOffset(offset);
     }
 
+    private void ApplyEditorState(DeviceBlock block, DeviceEditorState values)
+    {
+        block.SuppressCpuEvents++;
+        block.SuppressImodEvents++;
+        try
+        {
+            static void Select(ThemedDropDownPicker picker, int index)
+            {
+                if (index >= -1 && index < picker.Items.Count) picker.SelectedIndex = index;
+            }
+            if (block.NdisModeCombo is not null && values.NdisModeIndex is int mode) Select(block.NdisModeCombo, mode);
+            Select(block.MsiCombo, values.MsiIndex);
+            block.LimitBox.Text = values.LimitText;
+            Select(block.PrioCombo, values.PriorityIndex);
+            Select(block.PolicyCombo, values.PolicyIndex);
+            if (block.PowerSavingCheck is not null && values.PowerSaving is bool power) block.PowerSavingCheck.Checked = power;
+            if (block.RssQueueBox is not null && values.RssQueues is decimal queues)
+                block.RssQueueBox.Value = Math.Clamp(queues, block.RssQueueBox.Minimum, block.RssQueueBox.Maximum);
+            ApplyMaskToCpuBoxes(block, values.AffinityMask);
+            if (block.Kind == DeviceKind.NET_NDIS)
+            {
+                block.RssBaseCore = GetFirstCheckedCore(block);
+                if (block.RssQueueBox is not null) block.RssQueueLast = (int)block.RssQueueBox.Value;
+            }
+            block.ImodBox.Text = values.ImodText;
+            block.ImodAutoCheck.Checked = values.ImodEnabled;
+            if (block.RawMouseThrottleCheck is not null && values.RawMouseEnabled is bool mouse) block.RawMouseThrottleCheck.Checked = mouse;
+            if (block.RawMouseThrottleCombo is not null) Select(block.RawMouseThrottleCombo, values.RawMouseIndex);
+            if (block.NicItrBox is not null && values.NicItrText is string nic && nic != block.NicItrBox.Text)
+                block.NicItrBox.Text = nic;
+        }
+        finally
+        {
+            block.SuppressImodEvents--;
+            block.SuppressCpuEvents--;
+        }
+        RecalcAffinityMask(block);
+        UpdateImodSelectorsFromText(block);
+    }
+
     private void RestoreEditorDrafts(IReadOnlyDictionary<string, EditorDraft> drafts)
     {
         bool wasRawRefreshing = _rawMouseThrottleUiRefreshing;
@@ -63,45 +103,10 @@ public sealed partial class MainForm
                 if (!drafts.TryGetValue(block.Device.InstanceId, out EditorDraft? draft)) continue;
                 DeviceEditorState current = CaptureEditorState(block);
                 DeviceEditorState merged = DeviceEditorState.MergeDraft(current, draft.Baseline, draft.Values);
-                block.SuppressCpuEvents++;
-                block.SuppressImodEvents++;
-                try
-                {
-                    static void Select(ThemedDropDownPicker picker, int index)
-                    {
-                        if (index >= -1 && index < picker.Items.Count) picker.SelectedIndex = index;
-                    }
-                    if (block.NdisModeCombo is not null && merged.NdisModeIndex is int mode) Select(block.NdisModeCombo, mode);
-                    Select(block.MsiCombo, merged.MsiIndex);
-                    block.LimitBox.Text = merged.LimitText;
-                    Select(block.PrioCombo, merged.PriorityIndex);
-                    Select(block.PolicyCombo, merged.PolicyIndex);
-                    if (block.PowerSavingCheck is not null && merged.PowerSaving is bool power) block.PowerSavingCheck.Checked = power;
-                    if (block.RssQueueBox is not null && merged.RssQueues is decimal queues)
-                        block.RssQueueBox.Value = Math.Clamp(queues, block.RssQueueBox.Minimum, block.RssQueueBox.Maximum);
-                    ApplyMaskToCpuBoxes(block, merged.AffinityMask);
-                    if (block.Kind == DeviceKind.NET_NDIS)
-                    {
-                        block.RssBaseCore = GetFirstCheckedCore(block);
-                        if (block.RssQueueBox is not null) block.RssQueueLast = (int)block.RssQueueBox.Value;
-                    }
-                    block.ImodBox.Text = merged.ImodText;
-                    block.ImodAutoCheck.Checked = merged.ImodEnabled;
-                    if (block.RawMouseThrottleCheck is not null && merged.RawMouseEnabled is bool mouse) block.RawMouseThrottleCheck.Checked = mouse;
-                    if (block.RawMouseThrottleCombo is not null) Select(block.RawMouseThrottleCombo, merged.RawMouseIndex);
-                    if (block.NicItrBox is not null && merged.NicItrText is string nic && nic != block.NicItrBox.Text)
-                        block.NicItrBox.Text = nic;
-                    block.ImodReadbackRequested = draft.ReadbackRequested;
-                    block.ImodDetailsExpanded = draft.DetailsExpanded;
-                    block.RestoreImodDetailsExpansion?.Invoke(draft.DetailsExpanded);
-                }
-                finally
-                {
-                    block.SuppressImodEvents--;
-                    block.SuppressCpuEvents--;
-                }
-                RecalcAffinityMask(block);
-                UpdateImodSelectorsFromText(block);
+                ApplyEditorState(block, merged);
+                block.ImodReadbackRequested = draft.ReadbackRequested;
+                block.ImodDetailsExpanded = draft.DetailsExpanded;
+                block.RestoreImodDetailsExpansion?.Invoke(draft.DetailsExpanded);
                 UpdateBlockInfoText(block);
                 block.RelayoutAction?.Invoke();
                 block.CheckIsDirty();

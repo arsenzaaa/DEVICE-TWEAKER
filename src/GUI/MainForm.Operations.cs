@@ -5,6 +5,34 @@ public sealed partial class MainForm
     private readonly DeviceOperationCoordinator _operations = new();
     private string? _activeOperationName;
 
+    private OperationReport CreateApplyReport(bool preview)
+    {
+#if DEVELOPER_QA
+        return _devLastApplyReport = new OperationReport { IsDeveloperPreview = preview && _devExpectedApplyErrors >= 0 };
+#else
+        return new OperationReport();
+#endif
+    }
+
+    private void ValidateApplyPreviewReport(OperationReport report)
+    {
+#if DEVELOPER_QA
+        int expected = _devExpectedApplyErrors;
+        _devExpectedApplyErrors = -1;
+        if (expected >= 0 && report.Errors.Count != expected)
+            throw new InvalidDataException($"APPLY model expected {expected} errors, observed {report.Errors.Count}.");
+#endif
+    }
+
+    private void CompleteApplyPresentation(OperationReport report, bool acceptAsApplied)
+    {
+        // A partial write or an unconfirmed readback must retain the pending
+        // baseline. REFRESH can reconcile values once Windows confirms them.
+        if (acceptAsApplied && report.Succeeded && report.Warnings.Count == 0)
+            UpdateAllBlocksInitialState();
+        UpdateApplyButtonDirtyCount();
+    }
+
     private IDisposable? TryBeginDeviceOperation(string name)
     {
         IDisposable? lease = _operations.TryEnter();

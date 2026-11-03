@@ -190,7 +190,7 @@ internal sealed class DeviceBlock
 {
     public required DeviceInfo Device { get; init; }
     public required DeviceKind Kind { get; init; }
-    public required Panel Group { get; init; }
+    public required Control Group { get; init; }
     public Panel? HeaderPanel { get; init; }
     public Label? HeaderNote { get; init; }
     public Control? Divider { get; init; }
@@ -270,19 +270,27 @@ internal sealed class DeviceBlock
     public bool? InitialRawMouseThrottleEnabled { get; set; }
     public int InitialRawMouseThrottleIndex { get; set; } = -1;
 
-    public void CaptureInitialState()
+    public void CaptureInitialState() => SetInitialState(MainForm.CaptureEditorState(this));
+
+    internal void RestoreInitialState(DeviceEditorState initial)
     {
-        InitialEditorState = MainForm.CaptureEditorState(this);
-        InitialAffinityMask = AffinityMask;
-        InitialMsiIndex = MsiCombo.SelectedIndex;
-        InitialLimitText = LimitBox.Text ?? string.Empty;
-        InitialPrioIndex = PrioCombo.SelectedIndex;
-        InitialPolicyIndex = PolicyCombo.SelectedIndex;
-        InitialPowerSaving = PowerSavingCheck?.Checked;
-        InitialImodText = ImodBox.Text ?? string.Empty;
-        InitialImodChecked = ImodAutoCheck.Checked;
-        InitialRawMouseThrottleEnabled = RawMouseThrottleCheck?.Checked;
-        InitialRawMouseThrottleIndex = RawMouseThrottleCombo?.SelectedIndex ?? -1;
+        SetInitialState(initial);
+        CheckIsDirty();
+    }
+
+    private void SetInitialState(DeviceEditorState initial)
+    {
+        InitialEditorState = initial;
+        InitialAffinityMask = initial.AffinityMask;
+        InitialMsiIndex = initial.MsiIndex;
+        InitialLimitText = initial.LimitText;
+        InitialPrioIndex = initial.PriorityIndex;
+        InitialPolicyIndex = initial.PolicyIndex;
+        InitialPowerSaving = initial.PowerSaving;
+        InitialImodText = initial.ImodText;
+        InitialImodChecked = initial.ImodEnabled;
+        InitialRawMouseThrottleEnabled = initial.RawMouseEnabled;
+        InitialRawMouseThrottleIndex = initial.RawMouseIndex;
         IsDirty = false;
         UpdateModifiedBadge();
     }

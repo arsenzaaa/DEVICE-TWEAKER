@@ -334,7 +334,7 @@ public sealed partial class MainForm
         => control is Form or Label or ButtonBase or GroupBox or InfoTextBox;
 
     private string GetSourceControlText(Control control)
-        => _localizedControls.TryGetValue(control, out LocalizedControlState? state)
+        => ShouldTranslateControlText(control) && _localizedControls.TryGetValue(control, out LocalizedControlState? state)
             ? state.SourceText
             : control.Text ?? string.Empty;
 

@@ -19,6 +19,7 @@
     { "id": "other-operation-disabled", "action": "assert", "target": "id:REFRESH", "property": "enabled", "value": "false" },
     { "id": "during", "action": "capture" },
     { "id": "preview-result", "action": "wait", "target": "id:OK", "property": "visible", "value": "true", "durationMs": 5000 },
+    { "id": "no-preview-errors", "action": "assert", "target": "@main", "property": "last-apply-errors", "value": "0" },
     { "id": "result", "action": "capture", "target": "@active" },
     { "id": "close-result", "action": "click", "target": "id:OK" },
     { "id": "operation-released", "action": "wait", "target": "@main", "property": "operation-active", "value": "false", "durationMs": 2000 },
