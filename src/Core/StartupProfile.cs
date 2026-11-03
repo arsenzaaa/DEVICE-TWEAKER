@@ -37,6 +37,13 @@ internal sealed class StartupProfile
             throw new InvalidDataException($"Unsupported profile.json schemaVersion {profile.SchemaVersion}.");
         }
 
+        if (profile.Driver is null || profile.Runtime is null || profile.Loader is null
+            || profile.Loader.Kdu is null || profile.Loader.Database is null || profile.Logging is null
+            || profile.Usb is null || profile.Usb.Controllers is null || profile.NicItr is null
+            || profile.Usb.Controllers.Any(controller => controller is null)
+            || profile.NicItr.Any(nic => nic is null || nic.Values is null))
+            throw new InvalidDataException("profile.json contains a null required section or entry.");
+
         return profile;
     }
 

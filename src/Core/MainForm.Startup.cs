@@ -54,46 +54,43 @@ public sealed partial class MainForm
         return reader.ReadToEnd();
     }
 
-    // Reads the saved profile without migrating or repairing anything.
-    private ImodConfig ReadSavedStartupConfig(out string? source)
-    {
-        string profilePath = GetStartupProfilePath();
-        source = null;
-        try
-        {
-            if (File.Exists(profilePath))
+    // Reads without migration. An unreadable current file never falls back to legacy settings.
+    private StartupConfigReadResult<ImodConfig> ReadSavedStartupConfigResult()
+        => StartupConfigReader.Read(GetStartupProfilePath(),
+            new[] { GetLegacyAppDataImodScriptPath(), GetLegacyImodStartupPath() },
+            path =>
             {
-                source = profilePath;
-                ImodConfig config = ConvertStartupProfile(StartupProfile.FromJson(File.ReadAllText(profilePath, Encoding.UTF8)));
+                ImodConfig config = ConvertStartupProfile(StartupProfile.FromJson(File.ReadAllText(path, Encoding.UTF8)));
                 config.HasScript = true;
                 return config;
-            }
-
-            foreach (string legacyPath in new[] { GetLegacyAppDataImodScriptPath(), GetLegacyImodStartupPath() })
+            },
+            path =>
             {
-                if (File.Exists(legacyPath))
-                {
-                    source = legacyPath;
-                    ImodConfig config = ParseImodScriptFile(legacyPath);
-                    config.HasScript = true;
-                    return config;
-                }
-            }
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException
-            or JsonException or FormatException or OverflowException)
-        {
-            WriteLog($"IMOD.CONFIG: failed to read {source}: {FlattenLogText(ex.Message)}");
-        }
+                ImodConfig config = ParseImodScriptFile(path);
+                config.HasScript = true;
+                return config;
+            });
 
-        return new ImodConfig { HasScript = false };
+    private ImodConfig ReadSavedStartupConfig(out string? source)
+    {
+        StartupConfigReadResult<ImodConfig> result = ReadSavedStartupConfigResult();
+        source = result.Source;
+        return result.RequireValueOrCreate(() => new ImodConfig { HasScript = false });
     }
 
     // Loads the profile; a profile saved by an older layout is moved to the
     // current one, and an outdated script / runtime / loader is replaced.
     private ImodConfig LoadStartupConfig()
     {
-        ImodConfig config = ReadSavedStartupConfig(out string? source);
+        StartupConfigReadResult<ImodConfig> result = ReadSavedStartupConfigResult();
+        string? source = result.Source;
+        if (result.State == StartupConfigReadState.Error)
+        {
+            string diagnostic = $"{source}: {result.Error}";
+            WriteLog($"IMOD.CONFIG: read failed; save/apply blocked: {FlattenLogText(diagnostic)}");
+            return new ImodConfig { StartupReadError = diagnostic };
+        }
+        ImodConfig config = result.RequireValueOrCreate(() => new ImodConfig { HasScript = false });
         if (!config.HasScript || QaRun.IsReadOnly)
         {
             return config;
@@ -139,6 +136,10 @@ public sealed partial class MainForm
 
     private void SaveStartupProfile(ImodConfig config)
     {
+        if (config.StartupReadError is not null)
+            throw new InvalidDataException("The startup profile is unreadable; save was cancelled. " + config.StartupReadError);
+        // Recheck before replacement: a corrupt profile must require explicit recovery.
+        _ = ReadSavedStartupConfig(out _);
         InstallStartupBundle(config);
         config.HasScript = true;
         _imodConfigCache = config;
@@ -155,6 +156,10 @@ public sealed partial class MainForm
             throw new IOException("DTIMOD.sys could not be staged: " + driverError);
         }
 
+        StartupProfile profile = BuildStartupProfile(config, driverPath);
+        string profileJson = profile.ToJson();
+        _ = ConvertStartupProfile(StartupProfile.FromJson(profileJson));
+
         SecureStartupFolder(GetStartupParentDirectory());
         SecureStartupFolder(GetStartupRoot());
         // PowerShell 5.1 reads a script without BOM in the ANSI code page.
@@ -165,8 +170,7 @@ public sealed partial class MainForm
             throw new IOException("The startup loader could not be prepared: " + loaderError);
         }
 
-        StartupProfile profile = BuildStartupProfile(config, driverPath);
-        WriteAllTextAtomic(GetStartupProfilePath(), profile.ToJson(), new UTF8Encoding(false));
+        WriteAllTextAtomic(GetStartupProfilePath(), profileJson, new UTF8Encoding(false));
         if (!StartupTask.Register(GetStartupScriptPath(), WriteLog, out string? taskError))
         {
             throw new InvalidOperationException("The startup task could not be registered: " + taskError);

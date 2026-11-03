@@ -733,6 +733,13 @@ public sealed partial class MainForm
                 string defaultText = FormatImodValue(config.GlobalInterval);
                 block.ImodDefaultLabel.Text = $"default: {defaultText}";
                 block.ImodDefaultLabel.Tag = defaultText;
+                if (config.StartupReadError is not null)
+                {
+                    block.ImodDefaultLabel.Text = "profile: unreadable";
+                    block.ImodDefaultLabel.Tag = config.StartupReadError;
+                    block.ImodDefaultLabel.ForeColor = _statusDanger;
+                    SetImodStatusTooltip(block.ImodDefaultLabel);
+                }
                 string currentText = GetSourceControlText(block.ImodCurrentLabel);
                 if (string.IsNullOrWhiteSpace(currentText)
                     || currentText.Equals("current: -", StringComparison.OrdinalIgnoreCase)

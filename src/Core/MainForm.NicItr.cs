@@ -514,6 +514,7 @@ public sealed partial class MainForm
         {
             block.NicItrStatusLabel.Text = "current: save failed";
             block.NicItrStatusLabel.ForeColor = _statusDanger;
+            SetNicItrTooltip(block, $"Save failed: {ex.Message}");
             WriteLog($"NIC.ITR.SAVE: {block.Device.InstanceId} failed: {ex.Message}");
         }
     }
@@ -626,7 +627,7 @@ public sealed partial class MainForm
     {
         EnsureImodConfigLoaded();
         return _imodConfigCache is not null
-            && (_imodConfigCache.HasScript || HasCustomImod(_imodConfigCache));
+            && (_imodConfigCache.StartupReadError is not null || _imodConfigCache.HasScript || HasCustomImod(_imodConfigCache));
     }
 
     private static bool TryValidateNicItrMemoryRange(NicItrProfile profile, ulong memoryLength, out string? error)

@@ -53,6 +53,7 @@ public sealed partial class MainForm
         public List<ImodConfigEntry> Overrides { get; } = [];
         public List<NicItrConfigEntry> NicItrEntries { get; } = [];
         public bool HasScript { get; set; }
+        internal string? StartupReadError { get; init; }
     }
 
     private enum ImodApplyOutcome
