@@ -1,11 +1,11 @@
 ﻿{
     "schemaVersion":  1,
     "configuration":  "Release",
-    "binarySha256":  "CDD742346888938F9F5CD6EEC4719F09686AD061B74EFDF1EF6709EEE1F30830",
+    "binarySha256":  "36C22E6EF301636965C03B30944997DBB28CB5CA481AE6F39A12071F1BE197EC",
     "sources":  [
                     {
                         "path":  "IMOD\\Driver\\imod_driver.c",
-                        "sha256":  "6F0D657C100896E66D42375F850237D9C86D7AF6EC05A1ACCCD25A775E37244E"
+                        "sha256":  "19A4F9C9C5A349220042B8767DB8B18C1AEBDD32DA9899B1BD50204D1B5F94FA"
                     },
                     {
                         "path":  "IMOD\\Driver\\imod_driver.h",

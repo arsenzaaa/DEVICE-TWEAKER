@@ -223,6 +223,10 @@ static void rangeTests(void) {
     put32(list,16,1000); assert(!ImodResourcesContainRange(list,n,0xF7000024ull,4)); /* count beyond buffer */
     n=put32(list,0,2); n=putFull(list,n,1); n=putPartial(list,n,CmResourceTypeMemory,0,0x1000,0x1000);
     n=putFull(list,n,1); n=putPartial(list,n,CmResourceTypeMemoryLarge,CM_RESOURCE_MEMORY_LARGE_64,0x4000000000ull,1);
+    assert(ImodResourcesContainRange(list,n,0x1004,4));           /* first of two valid full descriptors */
+    assert(!ImodResourcesContainRange(list,40,0x1004,4));         /* matching first range, missing second header */
+    assert(!ImodResourcesContainRange(list,55,0x1004,4));         /* matching first range, truncated second header */
+    assert(!ImodResourcesContainRange(list,n-1,0x1004,4));        /* matching first range, truncated later partial */
     assert(ImodResourcesContainRange(list,n,0x40FFFFFFFCull,4));    /* second list, 4 GiB large range */
     assert(!ImodResourcesContainRange(list,n,0x4100000000ull,4));
     n=put32(list,0,1); n=putFull(list,n,1); n=putPartial(list,n,CmResourceTypeMemoryLarge,0,0x5000,0x10);

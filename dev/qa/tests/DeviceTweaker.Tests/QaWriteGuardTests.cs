@@ -85,11 +85,11 @@ public sealed class QaWriteGuardTests
     [Fact]
     public void RestoreAndStartupWriters_BlockBeforeReadingBackupOrDereferencingArguments()
     {
-        AssertBlocked("RestoreDeviceTweakerBackup", "missing-backup.json");
+        AssertBlocked("RestoreDeviceTweakerBackup", null, "missing-backup.json");
         AssertBlocked("RestoreRegistryValue", (object?)null);
         AssertBlocked("RestoreStartupProfile", (object?)null);
         AssertBlocked("DeleteDeviceTweakerBackups", (object?)null);
-        AssertBlocked("PruneDeviceTweakerBackups", "", 0);
+        AssertBlocked("PruneDeviceTweakerBackups", "", 0, null);
         AssertBlocked("InstallStartupBundle", (object?)null);
         AssertBlocked("RemoveStartupBundle", (object?)null);
         AssertBlocked("DeleteImodStartupRegistration", (object?)null);

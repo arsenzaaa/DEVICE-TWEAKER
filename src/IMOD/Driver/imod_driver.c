@@ -392,6 +392,7 @@ static NTSTATUS ImodOpenPciDevice(const WCHAR *pdoName, const WCHAR *instanceId,
 static BOOLEAN ImodResourcesContainRange(const UCHAR *list, ULONG bytes, ULONGLONG address, ULONG size)
 {
     ULONG fullCount, offset, full, partial;
+    BOOLEAN matched = FALSE;
 
     if (list == NULL || size == 0 || bytes < sizeof(ULONG) || address > MAXULONGLONG - size)
         return FALSE;
@@ -428,11 +429,11 @@ static BOOLEAN ImodResourcesContainRange(const UCHAR *list, ULONG bytes, ULONGLO
                 continue;
 
             if (length >= size && address >= start && address - start <= length - size)
-                return TRUE;
+                matched = TRUE;
         }
     }
 
-    return FALSE;
+    return matched;
 }
 
 static VOID ImodWriteDeviceWorker(PVOID IoObject, PVOID Context, PIO_WORKITEM WorkItem)
