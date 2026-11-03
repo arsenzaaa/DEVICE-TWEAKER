@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 
@@ -20,8 +21,11 @@ internal sealed class ThemedNumericUpDown : NumericUpDown
 
     private ButtonsPainter? _buttonsPainter;
 
+    [DefaultValue(typeof(Color), "14, 14, 17")]
     public Color ButtonBackColor { get; set; } = Color.FromArgb(14, 14, 17);
+    [DefaultValue(typeof(Color), "40, 40, 48")]
     public Color ButtonHoverColor { get; set; } = Color.FromArgb(40, 40, 48);
+    [DefaultValue(typeof(Color), "230, 230, 230")]
     public Color ArrowColor { get; set; } = Color.FromArgb(230, 230, 230);
 
     public ThemedNumericUpDown()

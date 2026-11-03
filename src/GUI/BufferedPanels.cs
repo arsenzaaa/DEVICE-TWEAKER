@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace DeviceTweakerCS;
 
 internal class BufferedPanel : Panel
@@ -16,6 +18,7 @@ internal sealed class DeviceCardPanel : BufferedPanel
 {
     private Rectangle _lastBounds;
 
+    [DefaultValue(typeof(Color), "White")]
     public Color BorderColor { get; set; } = Color.White;
 
     protected override void OnParentChanged(EventArgs e)

@@ -79,7 +79,7 @@ public static class DeviceTweakerResourceQaNative {
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..\src')).Path
 $exe = if ([string]::IsNullOrWhiteSpace($ExePath)) {
-    Join-Path $root 'bin\Release\net8.0-windows\win-x64\DEVICE TWEAKER.exe'
+    Join-Path $root 'bin\Release\net10.0-windows\win-x64\DEVICE TWEAKER.exe'
 } else {
     (Resolve-Path $ExePath).Path
 }

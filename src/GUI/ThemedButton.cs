@@ -1,3 +1,4 @@
+using System.ComponentModel;
 namespace DeviceTweakerCS;
 
 /// <summary>
@@ -6,6 +7,7 @@ namespace DeviceTweakerCS;
 /// </summary>
 internal sealed class ThemedButton : Button
 {
+    [DefaultValue(typeof(Color), "125, 125, 132")]
     public Color DisabledForeColor { get; set; } = Color.FromArgb(125, 125, 132);
     protected override void OnEnabledChanged(EventArgs e)
     {

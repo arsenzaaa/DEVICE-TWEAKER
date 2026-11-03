@@ -1,8 +1,12 @@
+using System.ComponentModel;
+
 namespace DeviceTweakerCS;
 
 internal sealed class HighlightLabel : Label
 {
+    [DefaultValue("")]
     public string HighlightText { get; set; } = string.Empty;
+    [DefaultValue(typeof(Color), "Gray")]
     public Color HighlightColor { get; set; } = Color.Gray;
 
     protected override void OnPaint(PaintEventArgs e)

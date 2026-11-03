@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text.RegularExpressions;
 
 namespace DeviceTweakerCS;
@@ -15,8 +16,11 @@ internal sealed partial class ImodMapTextBox : ScrollableControl
     private readonly List<InterruptRow> _interrupts = [];
     private string[] _fallbackLines = [];
 
+    [DefaultValue(typeof(Color), "172, 180, 190")]
     public Color PrefixColor { get; set; } = Color.FromArgb(172, 180, 190);
+    [DefaultValue(typeof(Color), "208, 230, 250")]
     public Color RoleColor { get; set; } = Color.FromArgb(208, 230, 250);
+    [DefaultValue(typeof(Color), "240, 240, 240")]
     public Color ValueColor { get; set; } = Color.FromArgb(240, 240, 240);
 
     public int DisplayRowCount

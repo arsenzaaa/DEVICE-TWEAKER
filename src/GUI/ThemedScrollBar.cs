@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Drawing.Drawing2D;
 
 namespace DeviceTweakerCS;
@@ -14,6 +15,7 @@ internal sealed class ThemedScrollBar : Control
 
     public event EventHandler? ValueChanged;
 
+    [DefaultValue(1)]
     public int Maximum
     {
         get => _maximum;
@@ -29,6 +31,7 @@ internal sealed class ThemedScrollBar : Control
         }
     }
 
+    [DefaultValue(1)]
     public int ViewportSize
     {
         get => _viewport;
@@ -44,24 +47,35 @@ internal sealed class ThemedScrollBar : Control
         }
     }
 
+    [DefaultValue(0)]
     public int Value
     {
         get => _value;
         set => SetValue(value, true);
     }
 
+    [DefaultValue(40)]
     public int SmallChange { get; set; } = 40;
+    [DefaultValue(120)]
     public int LargeChange { get; set; } = 120;
 
     private bool _hovered;
 
+    [DefaultValue(typeof(Color), "White")]
     public Color ThumbColor { get; set; } = Color.White;
+    [DefaultValue(typeof(Color), "")]
     public Color ThumbHoverColor { get; set; } = Color.Empty;
+    [DefaultValue(typeof(Color), "")]
     public Color ThumbDragColor { get; set; } = Color.Empty;
+    [DefaultValue(typeof(Color), "")]
     public Color TrackColor { get; set; } = Color.Empty;
+    [DefaultValue(typeof(Color), "")]
     public Color RailColor { get; set; } = Color.Empty;
+    [DefaultValue(0)]
     public int RailWidth { get; set; } = 0;
+    [DefaultValue(10)]
     public int ThumbWidth { get; set; } = 10;
+    [DefaultValue(7)]
     public int ThumbCornerRadius { get; set; } = 7;
 
     public ThemedScrollBar()

@@ -144,11 +144,11 @@ try {
     Invoke-DotnetStep 'build-developer' @('build', (Join-Path $root 'DeviceTweakerCS.csproj'), '-c', 'Release',
         '-p:DeveloperQa=true', '-p:TreatWarningsAsErrors=true', '-p:BuildImodDriver=false', '--nologo')
     Invoke-DotnetStep 'source-inventory' @('run', '--project', (Join-Path $PSScriptRoot 'Inspect\Inspect.csproj'), '--',
-        (Split-Path $root), (Join-Path $root 'bin\Release\net8.0-windows\win-x64\DEVICE TWEAKER.dll'),
+        (Split-Path $root), (Join-Path $root 'bin\Release\net10.0-windows\win-x64\DEVICE TWEAKER.dll'),
         (Join-Path $runDir 'source-ui-inventory.json'))
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-QaDesktopContracts.ps1') `
         -OutputDirectory (Join-Path $runDir 'desktop-contracts') `
-        -ExePath (Join-Path $root 'bin\Release\net8.0-windows\win-x64\DEVICE TWEAKER.exe')
+        -ExePath (Join-Path $root 'bin\Release\net10.0-windows\win-x64\DEVICE TWEAKER.exe')
     if ($LASTEXITCODE -ne 0) { throw 'Private desktop launcher contracts failed' }
     $steps.Add([pscustomobject]@{ name = 'desktop-contracts'; status = 'PASS'; report = (Join-Path $runDir 'desktop-contracts\contracts.json') })
     if ($SkipGui) {
@@ -157,11 +157,11 @@ try {
         Test-QaInputSnapshot $runDir
     } else {
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-UiControls.ps1') `
-            -AssemblyPath (Join-Path $root 'bin\Release\net8.0-windows\win-x64\DEVICE TWEAKER.dll') `
+            -AssemblyPath (Join-Path $root 'bin\Release\net10.0-windows\win-x64\DEVICE TWEAKER.dll') `
             -OutputDirectory (Join-Path $runDir 'controls')
         if ($LASTEXITCODE -ne 0) { throw 'Production UI control contracts failed' }
         $steps.Add([pscustomobject]@{ name = 'ui-controls'; status = 'PASS'; report = (Join-Path $runDir 'controls\controls.json') })
-        $exe = Join-Path $root 'bin\DeveloperQa\Release\net8.0-windows\win-x64\DEVICE TWEAKER QA.exe'
+        $exe = Join-Path $root 'bin\DeveloperQa\Release\net10.0-windows\win-x64\DEVICE TWEAKER QA.exe'
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-Workbench.ps1') `
             -ExePath $exe -OutputDirectory (Join-Path $runDir 'workbench')
         if ($LASTEXITCODE -ne 0) { throw 'Development workbench failed' }
@@ -202,7 +202,7 @@ try {
             if ($LASTEXITCODE -ne 0) { throw 'Unexpected layout scenario errors' }
         }
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-GuiResourceStability.ps1') `
-            -ExePath (Join-Path $root 'bin\Release\net8.0-windows\win-x64\DEVICE TWEAKER.exe') `
+            -ExePath (Join-Path $root 'bin\Release\net10.0-windows\win-x64\DEVICE TWEAKER.exe') `
             -OutputDirectory (Join-Path $runDir 'resources') @guiDebugArgs
         $resourceCode = $LASTEXITCODE
         $steps.Add([pscustomobject]@{ name = 'gui-resources'; status = $(if ($resourceCode -eq 0) { 'PASS' } else { 'FAIL' });

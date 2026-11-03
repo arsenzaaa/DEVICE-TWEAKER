@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 namespace DeviceTweakerCS;
@@ -21,6 +22,7 @@ public sealed partial class MainForm
             UseVisualStyleBackColor = false;
         }
 
+        [DefaultValue(typeof(Color), "")]
         public Color BorderColor
         {
             get => _borderColor;

@@ -559,7 +559,7 @@ function Invoke-PublishFlavor {
         "-o", $OutputDir
     )
 
-    # Framework-dependent builds may run on newer Desktop runtimes when .NET 8 is absent.
+    # Framework-dependent builds may run on a newer installed Desktop runtime.
     if (-not $SelfContained -and -not [string]::IsNullOrWhiteSpace($RollForward)) {
         $publishArgs += "-p:RollForward=$RollForward"
         Write-Host "RollForward: $RollForward"

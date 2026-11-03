@@ -70,7 +70,7 @@ $root = if ([string]::IsNullOrWhiteSpace($Root)) {
     (Resolve-Path $Root).Path
 }
 $exe = if ([string]::IsNullOrWhiteSpace($ExePath)) {
-    Join-Path $root 'bin\DeveloperQa\Release\net8.0-windows\win-x64\DEVICE TWEAKER QA.exe'
+    Join-Path $root 'bin\DeveloperQa\Release\net10.0-windows\win-x64\DEVICE TWEAKER QA.exe'
 } else {
     (Resolve-Path $ExePath).Path
 }

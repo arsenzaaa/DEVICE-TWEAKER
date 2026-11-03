@@ -1,3 +1,4 @@
+using System.ComponentModel;
 namespace DeviceTweakerCS;
 
 public sealed partial class MainForm
@@ -98,10 +99,15 @@ internal sealed class ThemedComboBox : ComboBox
 
     private ThemedComboDropDownForm? _popup;
 
+    [DefaultValue(typeof(Color), "150, 150, 150")]
     public Color BorderColor { get; set; } = Color.FromArgb(150, 150, 150);
+    [DefaultValue(typeof(Color), "18, 18, 22")]
     public Color DropButtonColor { get; set; } = Color.FromArgb(18, 18, 22);
+    [DefaultValue(typeof(Color), "34, 34, 40")]
     public Color SelectedBackColor { get; set; } = Color.FromArgb(34, 34, 40);
+    [DefaultValue(typeof(Color), "240, 240, 240")]
     public Color SelectedForeColor { get; set; } = Color.FromArgb(240, 240, 240);
+    [DefaultValue(typeof(Color), "240, 240, 240")]
     public Color ArrowColor { get; set; } = Color.FromArgb(240, 240, 240);
 
     public ThemedComboBox()

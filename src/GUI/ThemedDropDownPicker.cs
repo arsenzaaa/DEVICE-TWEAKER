@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace DeviceTweakerCS;
 
 internal sealed class ThemedDropDownPicker : Control, IMessageFilter
@@ -16,17 +18,26 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
     private int _selectedIndex = -1;
 
     public List<object> Items { get; } = [];
+    [DefaultValue(8)]
     public int MaxDropDownItems { get; set; } = 8;
+    [DefaultValue(0)]
     public int DropDownWidth { get; set; }
+    [DefaultValue(18)]
     public int ItemHeight { get; set; } = 18;
+    [DefaultValue(typeof(Color), "150, 150, 150")]
     public Color BorderColor { get; set; } = Color.FromArgb(150, 150, 150);
+    [DefaultValue(typeof(Color), "14, 14, 17")]
     public Color ButtonColor { get; set; } = Color.FromArgb(14, 14, 17);
+    [DefaultValue(typeof(Color), "34, 34, 40")]
     public Color SelectedBackColor { get; set; } = Color.FromArgb(34, 34, 40);
+    [DefaultValue(typeof(Color), "240, 240, 240")]
     public Color SelectedForeColor { get; set; } = Color.FromArgb(240, 240, 240);
+    [DefaultValue(typeof(Color), "240, 240, 240")]
     public Color ArrowColor { get; set; } = Color.FromArgb(240, 240, 240);
 
     public event EventHandler? SelectedIndexChanged;
 
+    [DefaultValue(-1)]
     public int SelectedIndex
     {
         get => _selectedIndex;
@@ -44,6 +55,7 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public object? SelectedItem
     {
         get => _selectedIndex >= 0 && _selectedIndex < Items.Count ? Items[_selectedIndex] : null;

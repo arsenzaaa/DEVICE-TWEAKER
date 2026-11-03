@@ -58,7 +58,11 @@ public sealed partial class MainForm
 
         try
         {
+            // X509CertificateLoader does not extract Authenticode signers from PE files.
+            // This input is the staged driver, not certificate/PFX content.
+#pragma warning disable SYSLIB0057
             using X509Certificate baseCertificate = X509Certificate.CreateFromSignedFile(driverPath);
+#pragma warning restore SYSLIB0057
             using X509Certificate2 certificate = new(baseCertificate);
             using X509Chain chain = new();
 

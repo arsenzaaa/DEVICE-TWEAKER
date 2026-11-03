@@ -1,3 +1,4 @@
+using System.ComponentModel;
 namespace DeviceTweakerCS;
 
 internal sealed class InfoTextBox : RichTextBox
@@ -38,8 +39,11 @@ internal sealed class InfoTextBox : RichTextBox
 
     private bool _formatting;
 
+    [DefaultValue(typeof(Color), "172, 180, 190")]
     public Color PrefixColor { get; set; } = Color.FromArgb(172, 180, 190);
+    [DefaultValue(typeof(Color), "240, 240, 240")]
     public Color ValueColor { get; set; } = Color.FromArgb(240, 240, 240);
+    [DefaultValue(typeof(Color), "70, 70, 78")]
     public Color SeparatorColor { get; set; } = Color.FromArgb(70, 70, 78);
 
     public InfoTextBox()

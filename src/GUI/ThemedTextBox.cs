@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 
 namespace DeviceTweakerCS;
@@ -11,11 +12,14 @@ internal sealed class ThemedTextBox : Panel
     private readonly TextBox _edit;
     private Color _borderColor = Color.FromArgb(120, 120, 128);
 
+    [DefaultValue(6)]
     public int ContentLeftPadding { get; set; } = 6;
+    [DefaultValue(4)]
     public int ContentRightPadding { get; set; } = 4;
 
     public TextBox Inner => _edit;
 
+    [DefaultValue(typeof(Color), "120, 120, 128")]
     public Color BorderColor
     {
         get => _borderColor;
@@ -29,6 +33,7 @@ internal sealed class ThemedTextBox : Panel
         }
     }
 
+    [DefaultValue("")]
     public string PlaceholderText
     {
         get => _edit.PlaceholderText;
@@ -104,6 +109,7 @@ internal sealed class ThemedTextBox : Panel
         set => _edit.Text = value ?? string.Empty;
     }
 
+    [DefaultValue(HorizontalAlignment.Left)]
     public HorizontalAlignment TextAlign
     {
         get => _edit.TextAlign;

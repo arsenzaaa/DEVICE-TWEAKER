@@ -49,7 +49,7 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..\src')).Path
 $exe = if ($ExePath) {
     (Resolve-Path -LiteralPath $ExePath).Path
 } else {
-    Join-Path $root 'bin\DeveloperQa\Release\net8.0-windows\win-x64\DEVICE TWEAKER QA.exe'
+    Join-Path $root 'bin\DeveloperQa\Release\net10.0-windows\win-x64\DEVICE TWEAKER QA.exe'
 }
 if (-not (Test-Path $exe)) {
     throw "Executable not found at $exe. Please build first."

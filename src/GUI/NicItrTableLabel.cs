@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text.RegularExpressions;
 
 namespace DeviceTweakerCS;
@@ -8,7 +9,9 @@ internal sealed partial class NicItrTableLabel : Label
     private sealed record QueueRow(string Queue, string Value, string Rx, string Tx);
     private readonly List<QueueRow> _rows = [];
 
+    [DefaultValue(typeof(Color), "172, 180, 190")]
     public Color HeaderColor { get; set; } = Color.FromArgb(172, 180, 190);
+    [DefaultValue(typeof(Color), "240, 240, 240")]
     public Color ValueColor { get; set; } = Color.FromArgb(240, 240, 240);
 
     public NicItrTableLabel()

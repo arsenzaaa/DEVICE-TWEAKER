@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -63,7 +63,7 @@
     <EmbeddedResource Include="Startup\DeviceTweakerImodRuntime.cs">
       <LogicalName>DeviceTweakerCS.Startup.DeviceTweakerImodRuntime.cs</LogicalName>
     </EmbeddedResource>
-    <PackageReference Include="System.Management" Version="8.0.0" />
+    <PackageReference Include="System.Management" Version="10.0.9" />
     <InternalsVisibleTo Include="DeviceTweaker.Tests" />
   </ItemGroup>
 

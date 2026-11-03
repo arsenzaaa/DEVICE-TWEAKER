@@ -70,7 +70,7 @@ function Test-QaEvidence([string]$RunDirectory) {
             $comparison = Read-QaJson $case.comparison
             if ($case.status -ne 'PASS' -or $comparison.status -ne 'MATCH' -or $comparison.checkpoints.Count -lt 1) { throw 'Workbench comparison did not match' }
             foreach ($dir in @($case.before,$case.after)) {
-                $inspector = Join-Path $manifest.snapshot 'dev\qa\Inspect\bin\Debug\net8.0-windows\Inspect.dll'
+                $inspector = Join-Path $manifest.snapshot 'dev\qa\Inspect\bin\Debug\net10.0-windows\Inspect.dll'
                 & dotnet $inspector --dev-verify-complete $dir *> (Join-Path $dir 'final-evidence.log')
                 if ($LASTEXITCODE -ne 0) { throw 'Workbench execution / scenario / state evidence is inconsistent' }
                 $session = Read-QaJson (Join-Path $dir 'session.json')

@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Drawing.Drawing2D;
 
 namespace DeviceTweakerCS;
@@ -8,16 +9,23 @@ internal sealed class ThemedCheckBox : CheckBox
     private bool _pressed;
     private bool _syncCheckedStateText;
 
+    [DefaultValue(typeof(Color), "150, 150, 150")]
     public Color BorderColor { get; set; } = Color.FromArgb(150, 150, 150);
+    [DefaultValue(typeof(Color), "18, 18, 22")]
     public Color BoxBackColor { get; set; } = Color.FromArgb(18, 18, 22);
+    [DefaultValue(typeof(Color), "28, 28, 34")]
     public Color CheckedBackColor { get; set; } = Color.FromArgb(28, 28, 34);
+    [DefaultValue(typeof(Color), "36, 36, 42")]
     public Color HoverBackColor { get; set; } = Color.FromArgb(36, 36, 42);
+    [DefaultValue(typeof(Color), "48, 48, 56")]
     public Color PressedBackColor { get; set; } = Color.FromArgb(48, 48, 56);
+    [DefaultValue(typeof(Color), "240, 240, 240")]
     public Color CheckColor { get; set; } = Color.FromArgb(240, 240, 240);
 
     /// <summary>
     /// When true, <see cref="Control.Text"/> follows Checked: Enabled / Disabled.
     /// </summary>
+    [DefaultValue(false)]
     public bool SyncCheckedStateText
     {
         get => _syncCheckedStateText;

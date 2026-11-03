@@ -1,10 +1,10 @@
-﻿# QA inputs are the files git tracks or would track under src and dev\qa, so a new
+﻿# QA inputs include global.json and files git tracks or would track under src and dev\qa; a new
 # source file is covered without editing a list. A snapshot copy has no .git; there
 # every file except build output counts, which is how added files are detected.
 function Get-QaInputFiles([string]$Workspace) {
     $Workspace = [IO.Path]::GetFullPath($Workspace).TrimEnd('\')
     if (Test-Path -LiteralPath (Join-Path $Workspace '.git')) {
-        $paths = @(& git -C $Workspace -c core.quotepath=off ls-files --cached --others --exclude-standard -- src dev/qa)
+        $paths = @(& git -C $Workspace -c core.quotepath=off ls-files --cached --others --exclude-standard -- src dev/qa global.json)
         if ($LASTEXITCODE -ne 0) { throw 'git could not list the QA input files' }
         $files = foreach ($path in $paths) {
             $full = Join-Path $Workspace ($path -replace '/', '\')
@@ -16,6 +16,8 @@ function Get-QaInputFiles([string]$Workspace) {
             Get-ChildItem -LiteralPath (Join-Path $Workspace $folder) -Recurse -File -Force |
                 Where-Object { $_.FullName.Substring($Workspace.Length) -notmatch '\\(bin|obj|tmp|TestResults|\.vs)\\' }
         }
+        $sdkSelection = Join-Path $Workspace 'global.json'
+        if (Test-Path -LiteralPath $sdkSelection -PathType Leaf) { $files = @($files) + (Get-Item -LiteralPath $sdkSelection) }
     }
     if (@($files).Count -eq 0) { throw "No QA input files under $Workspace" }
     return @($files | Sort-Object FullName -Unique)
