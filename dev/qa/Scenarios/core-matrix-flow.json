@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "core-matrix-flow",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    { "id": "open-panel", "action": "gallery" },
+    { "id": "panel-ready", "action": "wait", "target": "id:TEST_ADMIN_NAV_SCENARIO", "property": "visible", "value": "true", "durationMs": 4000 },
+    { "id": "show-lab", "action": "click", "target": "id:TEST_ADMIN_NAV_SCENARIO" },
+    { "id": "run-matrix", "action": "click", "target": "text:RUN CORE MATRIX" },
+    { "id": "matrix-ready", "action": "wait", "target": "@active", "value": "SANDBOX MATRIX", "durationMs": 5000 },
+    { "id": "matrix-passed", "action": "assert", "target": "text:Sandbox matrix passed.", "property": "visible", "value": "true" },
+    { "id": "matrix-result", "action": "capture", "target": "@active" },
+    { "id": "close-result", "action": "click", "target": "id:OK" },
+    { "id": "close-panel", "action": "click", "target": "id:TEST_ADMIN_CLOSE" }
+  ]
+}

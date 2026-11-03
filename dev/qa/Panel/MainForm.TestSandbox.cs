@@ -8,20 +8,24 @@ public sealed partial class MainForm
 {
     private TestDeviceState EnsureTestDeviceState(DeviceInfo device)
     {
-        if (device.TestState is not null)
+        // Discovery/layout snapshots copy DeviceInfo. Resolve the catalog owner
+        // on every access because restoring a scenario replaces its TestState.
+        DeviceInfo owner = _testDevices.FirstOrDefault(candidate =>
+            string.Equals(candidate.InstanceId, device.InstanceId, StringComparison.OrdinalIgnoreCase)) ?? device;
+        if (owner.TestState is not null)
         {
-            return device.TestState;
+            return device.TestState = owner.TestState;
         }
 
-        bool powerSaving = device.Kind == DeviceKind.USB
-            ? !string.Equals(device.UsbSelectiveSuspend, "off", StringComparison.OrdinalIgnoreCase)
-            : !string.Equals(device.NicPowerSaving, "off", StringComparison.OrdinalIgnoreCase);
-        device.TestState = new TestDeviceState
+        bool powerSaving = owner.Kind == DeviceKind.USB
+            ? !string.Equals(owner.UsbSelectiveSuspend, "off", StringComparison.OrdinalIgnoreCase)
+            : !string.Equals(owner.NicPowerSaving, "off", StringComparison.OrdinalIgnoreCase);
+        owner.TestState = new TestDeviceState
         {
-            MsiEnabled = !string.Equals(device.TestMsiStatus, "Disabled", StringComparison.OrdinalIgnoreCase),
-            PowerSavingEnabled = device.Wifi ? null : powerSaving,
+            MsiEnabled = !string.Equals(owner.TestMsiStatus, "Disabled", StringComparison.OrdinalIgnoreCase),
+            PowerSavingEnabled = owner.Wifi ? null : powerSaving,
         };
-        return device.TestState;
+        return device.TestState = owner.TestState;
     }
 
     private bool TryConsumeTestFault(TestSandboxFault fault)
