@@ -1642,42 +1642,47 @@ public sealed partial class MainForm
         }
     }
 
-    private void SyncLivePowerManagementAfterRestore()
+    private OperationReport SyncLivePowerManagementAfterRestore(DeviceTweakerBackup backup)
     {
+        List<LivePowerRestoreTarget> targets = [];
+        OperationReport report = new();
         foreach (DeviceBlock block in _blocks)
         {
-            if (block.Device.IsTestDevice)
+            if (block.Device.IsTestDevice) continue;
+            try
             {
-                continue;
-            }
-
-            if (block.Kind == DeviceKind.USB)
-            {
-                _ = UsbSelectiveSuspendPolicy.TryReadEnabled(block.Device.InstanceId, out bool enabled);
-                DevicePowerPolicy.TrySetDevicePowerEnable(block.Device.InstanceId, allowTurnOff: enabled);
-                foreach (string hubId in UsbSelectiveSuspendPolicy.EnumerateRootHubs(block.Device.InstanceId))
+                if (block.Kind == DeviceKind.USB)
                 {
-                    _ = UsbSelectiveSuspendPolicy.TryReadEnabled(hubId, out bool hubEnabled);
-                    DevicePowerPolicy.TrySetDevicePowerEnable(hubId, allowTurnOff: hubEnabled);
+                    foreach (string id in UsbSelectiveSuspendPolicy.EnumerateBackupInstanceIds(block.Device.InstanceId))
+                        targets.Add(new(id, LivePowerRestoreService.ReadRestoredEnabled(
+                            backup, id, DevicePowerPolicy.TryGetClassKeyPath(id), usb: true)));
+                }
+                else if (block.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX && !block.Device.Wifi)
+                {
+                    string id = block.Device.InstanceId;
+                    targets.Add(new(id, LivePowerRestoreService.ReadRestoredEnabled(
+                        backup, id, GetClassKeyForDevice(id), usb: false)));
                 }
             }
-
-            if (block.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX && !block.Device.Wifi)
+            catch (Exception ex)
             {
-                int? caps = DevicePowerPolicy.TryReadNicPnPCapabilities(GetClassKeyForDevice(block.Device.InstanceId));
-                bool allowTurnOff = caps is not int value || DevicePowerPolicy.IsNicTurnOffAllowed(value);
-                DevicePowerPolicy.TrySetDevicePowerEnable(block.Device.InstanceId, allowTurnOff);
+                report.AddError(block.Device.InstanceId, "Restored live power targets could not be resolved.", ex.ToString());
             }
         }
 
-        try
-        {
-            UsbSelectiveSuspendPolicy.ActivateCurrentPowerScheme();
-            WriteLog("BACKUP.RESTORE: re-activated power scheme after USB/NIC power restore");
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"BACKUP.RESTORE: power scheme activate failed: {FlattenLogText(ex.ToString())}");
-        }
+        report.MergeIssues(LivePowerRestoreService.Restore(targets,
+            (id, enabled) =>
+            {
+                DevicePowerPolicy.WriteStatus status = DevicePowerPolicy.SetDevicePowerEnable(id, enabled, out string? error);
+                return new(status, error);
+            },
+            () =>
+            {
+                if (!backup.RegistryValues.Any(value => UsbSelectiveSuspendPolicy.TryParsePowerPlanTarget(
+                    value.Hive, value.Path, value.Name, out _, out _))) return;
+                UsbSelectiveSuspendPolicy.ActivateCurrentPowerScheme();
+                WriteLog("BACKUP.RESTORE: re-activated power scheme after USB/NIC power restore");
+            }, WriteLog));
+        return report;
     }
 }

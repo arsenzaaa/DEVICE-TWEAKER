@@ -50,6 +50,13 @@ internal sealed class OperationReport
         BackupPath = string.IsNullOrWhiteSpace(path) ? null : path.Trim();
     }
 
+    // A child operation's NoChangesMade flag does not describe the parent.
+    public void MergeIssues(OperationReport other)
+    {
+        foreach (OperationIssue issue in other.Issues)
+            AddIssue(issue.Severity, issue.Component, issue.UserMessage, issue.TechnicalDetails, issue.IsSkipped);
+    }
+
     public void AddSuccess(string component, string? message = null)
     {
         AddIssue(OperationIssueSeverity.Success, component, message, null);

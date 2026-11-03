@@ -12,7 +12,7 @@ public sealed partial class MainForm
     private const string BackupFolderName = "Backups";
     private const string BackupFilePrefix = "DeviceTweakerBackup_";
     private string? _lastBackupPath;
-    private const string OriginalBackupFileName = "DeviceTweakerBackup_ORIGINAL.json";
+    private const string OriginalBackupFileName = BackupFileRetention.OriginalFileName;
 
     private enum BackupLocation
     {
@@ -91,7 +91,7 @@ public sealed partial class MainForm
         return CreateDeviceTweakerBackup(reason, showDialog, BackupLocation.Local);
     }
 
-    private bool CreateDeviceTweakerBackup(string reason, bool showDialog, BackupLocation location)
+    private bool CreateDeviceTweakerBackup(string reason, bool showDialog, BackupLocation location, string? protectedPath = null)
     {
         DemandRealWrite("CREATE BACKUP");
         try
@@ -127,7 +127,7 @@ public sealed partial class MainForm
                 $"existing={validation.ExistingCount} missing={validation.MissingCount} readErrors={validation.ReadErrorCount} " +
                 $"imodScript={validation.ImodScriptState} bytes={validation.Bytes} sha256={validation.Sha256}");
             WriteLog($"BACKUP: saved location={location} path={path} values={backup.RegistryValues.Count} reason={reason} atomic=true validated=true");
-            PruneDeviceTweakerBackups(directory, keepLatest: 10);
+            PruneDeviceTweakerBackups(directory, keepLatest: 10, protectedPaths: new[] { path, protectedPath ?? path });
             _lastBackupPath = path;
 
             if (showDialog)
@@ -423,6 +423,7 @@ public sealed partial class MainForm
 
     private void RestoreLatestDeviceTweakerBackup()
     {
+        bool settingsMayHaveChanged = false;
         try
         {
             List<BackupSnapshotInfo> backups = GetBackupSnapshots();
@@ -459,13 +460,17 @@ public sealed partial class MainForm
                 return;
             }
 
-            if (!CreateDeviceTweakerBackup("pre-restore", showDialog: false))
-            {
-                throw new InvalidOperationException("A rollback backup could not be created; restore was cancelled.");
-            }
-
             WriteLog($"BACKUP.RESTORE: restore-backup requested choice={choice} path={path}");
-            RestoreDeviceTweakerBackup(path);
+            BackupRestoreWorkflow workflow = new(
+                ReadDeviceTweakerBackup,
+                selected => CreateDeviceTweakerBackup("pre-restore", showDialog: false, BackupLocation.Local, selected),
+                backup =>
+                {
+                    settingsMayHaveChanged = true;
+                    return RestoreDeviceTweakerBackup(backup, path);
+                });
+            OperationReport report = workflow.Restore(path);
+            report.SetBackupPath(_lastBackupPath);
             BeginDevicesBusyWork("Refreshing devices...", 4);
             try
             {
@@ -476,15 +481,24 @@ public sealed partial class MainForm
                 EndDevicesBusy();
             }
 
-            ShowBackupFileResult(path, restored: true);
+            if (report.Succeeded && report.Warnings.Count == 0)
+                ShowBackupFileResult(path, restored: true);
+            else
+                ShowOperationResult(report,
+                    "Backup restored. Some live power settings are unavailable; open DETAILS.",
+                    "Saved settings were restored, but some live power settings could not be applied. Open DETAILS.",
+                    operationName: "BACKUP RESTORE");
         }
         catch (Exception ex)
         {
             WriteLog($"BACKUP.RESTORE: failed: {FlattenLogText(ex.ToString())}");
             OperationReport report = new();
+            if (!settingsMayHaveChanged) report.MarkNoChangesMade();
             report.AddError(
                 "BACKUP RESTORE",
-                "Restore did not finish. Any completed rollback steps were preserved.",
+                settingsMayHaveChanged
+                    ? "Restore did not finish. Any completed rollback steps were preserved."
+                    : "Restore was cancelled before settings were changed.",
                 ex.ToString());
             ShowOperationResult(
                 report,
@@ -646,7 +660,7 @@ public sealed partial class MainForm
         return deleted;
     }
 
-    private void PruneDeviceTweakerBackups(string directory, int keepLatest)
+    private void PruneDeviceTweakerBackups(string directory, int keepLatest, IEnumerable<string>? protectedPaths = null)
     {
         DemandRealWrite("PruneDeviceTweakerBackups");
         try
@@ -656,22 +670,21 @@ public sealed partial class MainForm
                 return;
             }
 
-            List<FileInfo> files = Directory.EnumerateFiles(directory, $"{BackupFilePrefix}*.json")
-                .Where(file => !string.Equals(Path.GetFileName(file), OriginalBackupFileName, StringComparison.OrdinalIgnoreCase))
+            BackupFileEntry[] files = Directory.EnumerateFiles(directory, $"{BackupFilePrefix}*.json")
                 .Select(path => new FileInfo(path))
-                .OrderByDescending(file => file.LastWriteTimeUtc)
-                .ToList();
+                .Select(file => new BackupFileEntry(file.FullName, file.LastWriteTimeUtc))
+                .ToArray();
 
-            foreach (FileInfo file in files.Skip(Math.Max(1, keepLatest)))
+            foreach (string path in BackupFileRetention.SelectForRemoval(files, keepLatest, protectedPaths))
             {
                 try
                 {
-                    file.Delete();
-                    WriteLog($"BACKUP.PRUNE: deleted old backup path={file.FullName}");
+                    File.Delete(path);
+                    WriteLog($"BACKUP.PRUNE: deleted old backup path={path}");
                 }
                 catch (Exception ex)
                 {
-                    WriteLog($"BACKUP.PRUNE.WARN: failed path={file.FullName}: {ex.Message}");
+                    WriteLog($"BACKUP.PRUNE.WARN: failed path={path}: {ex.Message}");
                 }
             }
         }
@@ -688,11 +701,8 @@ public sealed partial class MainForm
         return choice;
     }
 
-    private void RestoreDeviceTweakerBackup(string path)
+    private DeviceTweakerBackup ReadDeviceTweakerBackup(string path)
     {
-        DemandRealWrite("RestoreDeviceTweakerBackup");
-        using DriverLoadGate gate = DriverLoadGate.Enter();
-        DriverLoadGate.AssertLoaderIdle();
         string json = File.ReadAllText(path, Encoding.UTF8);
         DeviceTweakerBackup? backup = JsonSerializer.Deserialize<DeviceTweakerBackup>(json);
         if (backup is null)
@@ -702,6 +712,14 @@ public sealed partial class MainForm
 
         ValidateDeviceTweakerBackup(backup);
         NormalizeStartupProfileBackup(backup);
+        return backup;
+    }
+
+    private OperationReport RestoreDeviceTweakerBackup(DeviceTweakerBackup backup, string path)
+    {
+        DemandRealWrite("RestoreDeviceTweakerBackup");
+        using DriverLoadGate gate = DriverLoadGate.Enter();
+        DriverLoadGate.AssertLoaderIdle();
 
         BackupRestoreService service = new(
             ValidateDeviceTweakerBackup,
@@ -718,7 +736,14 @@ public sealed partial class MainForm
         service.Restore(backup);
 
         WriteLog($"BACKUP.RESTORE: restored path={path} values={backup.RegistryValues.Count} reason={backup.Reason}");
-        SyncLivePowerManagementAfterRestore();
+        OperationReport report = new();
+        report.AddSuccess("Saved settings", "Registry and startup profile restored and verified.");
+        foreach (RegistryValueBackup skipped in backup.RegistryValues.Where(value =>
+            string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase)))
+            report.AddSkipped("Saved setting", "The original backup could not read this value; it was left unchanged.",
+                $"{skipped.Hive}\\{skipped.Path}\\{skipped.Name}: {skipped.Data}");
+        report.MergeIssues(SyncLivePowerManagementAfterRestore(backup));
+        return report;
     }
 
     private void ValidateDeviceTweakerBackup(DeviceTweakerBackup backup)
