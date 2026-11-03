@@ -162,8 +162,15 @@ try {
             if (-not $window -or -not $metadata.desktop.isolated -or -not $metadata.readOnly) { throw 'Layout startup handshake failed' }
             $factor = $dpi / 96.0
             $script:mainHandle = $handle
-            $wantedWidth = [int](1280*$factor); $wantedHeight = [int](1000*$factor)
+            $scaledWidth = [int](1280*$factor); $scaledHeight = [int](1000*$factor)
             $screenBounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $trackSize = [System.Windows.Forms.SystemInformation]::MaxWindowTrackSize
+            # Keep the test window inside the actual paintable viewport. Windows
+            # can clamp a requested size before WinForms receives it; that is not
+            # a DPI-layout failure. Record both the ideal and the tested size.
+            $wantedWidth = [Math]::Min($scaledWidth, [Math]::Min($screenBounds.Width, $trackSize.Width))
+            $wantedHeight = [Math]::Min($scaledHeight, [Math]::Min($screenBounds.Height, $trackSize.Height))
+            if ($wantedWidth -lt 700 -or $wantedHeight -lt 500) { throw 'Display is too small for the layout matrix' }
             if (-not [LayoutQaNative]::MoveWindow($handle, $screenBounds.X, $screenBounds.Y, $wantedWidth, $wantedHeight, $true)) { throw 'Layout resize failed' }
             # Resize calls the real synchronous LayoutBlocks handler, not REFRESH.
             # Observe resulting geometry and readiness instead of waiting for an unrelated log.
@@ -200,6 +207,11 @@ try {
             $cancel = Wait-Element $dialog 'CANCEL'
             if (-not [LayoutQaNative]::PostMessage([IntPtr]$cancel.Current.NativeWindowHandle, 0xF5, [IntPtr]::Zero, [IntPtr]::Zero)) { throw 'Cancel message rejected' }
             $cases.Add(@{ id = "layout-${dpi}-$language"; status = 'PASS'; layoutDpi = $dpi; language = $language;
+                viewport = @{ scaledTarget = @{ width = $scaledWidth; height = $scaledHeight };
+                    requested = @{ width = $wantedWidth; height = $wantedHeight };
+                    display = @{ width = $screenBounds.Width; height = $screenBounds.Height };
+                    maxTrack = @{ width = $trackSize.Width; height = $trackSize.Height };
+                    constrained = ($wantedWidth -ne $scaledWidth -or $wantedHeight -ne $scaledHeight) };
                 expected = @{ caption = $expectedCaption; headerInsideWindow = $true; languageButtonsOverlap = $false };
                 observed = @{ caption = $apply.Current.Name; geometry = $geometry; window = @{ width = $bounds.Width; height = $bounds.Height } };
                 evidence = @($frame, $dialogFrame); processReport = $report; log = $metadata.logPath })
@@ -214,7 +226,7 @@ try {
     throw
 } finally {
     if ($process -and -not $process.HasExited) { $process.Kill(); $process.WaitForExit() }
-    @{ status = $status; scope = 'Developer layout scaling model at 100/125/150%; native capture viewport and full diagnostic bitmap. Actual Windows DPI transitions are not exercised';
+    @{ status = $status; scope = 'Developer layout scaling model at 100/125/150% within the available display and max-track bounds; ideal and tested window sizes are recorded separately. Native capture viewport and full diagnostic bitmap. Actual Windows DPI transitions and oversized ideal windows are not exercised';
         hardwareValidation = 'SKIPPED'; desktop = [DeviceTweakerQaDesktop]::CurrentDesktop(); cases = $cases.ToArray() } |
         ConvertTo-Json -Depth 9 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'layout.json') -Encoding UTF8
     foreach ($name in $names) { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
