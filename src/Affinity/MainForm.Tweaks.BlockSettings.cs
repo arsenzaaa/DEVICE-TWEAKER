@@ -1095,7 +1095,7 @@ public sealed partial class MainForm
             : 2048U;
         if ((uint)value > hardwareMaximum)
         {
-            error = $"MSI Limit exceeds the hardware maximum reported by Windows ({hardwareMaximum}).";
+            error = string.Format(CultureInfo.InvariantCulture, UiResources.English(UiText.MsiLimitMaximum), hardwareMaximum);
             return false;
         }
 

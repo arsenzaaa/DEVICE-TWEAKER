@@ -828,4 +828,9 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
   <data name="Message.write.failed" xml:space="preserve"><value>ошибка записи</value></data>
   <data name="State.Changed" xml:space="preserve"><value>Изменено</value></data>
   <data name="State.ProfileUnreadable" xml:space="preserve"><value>профиль: ошибка чтения</value></data>
+  <data name="Validation.MsiLimitMaximum" xml:space="preserve"><value>MSI Limit превышает аппаратный максимум, указанный Windows ({0}).</value></data>
+  <data name="Validation.InvalidMsiNotApplied" xml:space="preserve"><value>Некорректное значение не применено.</value></data>
+  <data name="Validation.MsiLimitNumber" xml:space="preserve"><value>MSI Limit: укажите Unlimited (или 0) либо целое число от 1 до 2048.</value></data>
+  <data name="Validation.MsiUnsupported" xml:space="preserve"><value>По данным Windows, PCI-устройство не поддерживает MSI или MSI-X; числовой лимит сообщений не применён.</value></data>
+  <data name="Validation.MsiOnlyLimit" xml:space="preserve"><value>Устройство поддерживает только MSI. Допустимые лимиты сообщений: 1, 2, 4, 8 или 16.</value></data>
 </root>

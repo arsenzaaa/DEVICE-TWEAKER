@@ -828,4 +828,9 @@ Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IM
   <data name="Message.write.failed" xml:space="preserve"><value>write failed</value></data>
   <data name="State.Changed" xml:space="preserve"><value>Changed</value></data>
   <data name="State.ProfileUnreadable" xml:space="preserve"><value>profile: unreadable</value></data>
+  <data name="Validation.MsiLimitMaximum" xml:space="preserve"><value>MSI Limit exceeds the hardware maximum reported by Windows ({0}).</value></data>
+  <data name="Validation.InvalidMsiNotApplied" xml:space="preserve"><value>The invalid value was not applied.</value></data>
+  <data name="Validation.MsiLimitNumber" xml:space="preserve"><value>MSI Limit must be Unlimited (or 0) or a whole number from 1 to 2048.</value></data>
+  <data name="Validation.MsiUnsupported" xml:space="preserve"><value>Windows reports that the PCI device does not support MSI or MSI-X; a numeric message limit was not applied.</value></data>
+  <data name="Validation.MsiOnlyLimit" xml:space="preserve"><value>This is an MSI-only device. The allowed multi-message limits are 1, 2, 4, 8, or 16.</value></data>
 </root>

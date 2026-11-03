@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "apply-validation-ru",
+  "preset": "Intel14900K",
+  "language": "RU",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    { "id": "show-editor", "action": "reveal", "target": "role:limit", "device": "DEV_461E" },
+    { "id": "invalid-limit", "action": "text", "target": "role:limit", "device": "DEV_461E", "value": "12" },
+    { "id": "declare-validation-error", "action": "expect-apply-errors", "value": "1" },
+    { "id": "preview", "action": "click", "target": "id:APPLY" },
+    { "id": "wait-error", "action": "wait", "target": "@active", "value": "ПРЕДПРОСМОТР ПРИМЕНЕНИЯ", "durationMs": 5000 },
+    { "id": "not-applied", "action": "assert", "target": "text:Операция не выполнена", "property": "visible", "value": "true" },
+    { "id": "translated-maximum", "action": "assert", "target": "text:Intel(R) USB 3.20 eXtensible Host Controller - 1.20: MSI Limit: MSI Limit превышает аппаратный максимум, указанный Windows (2).", "property": "visible", "value": "true" },
+    { "id": "validation-ru", "action": "capture", "target": "@active" },
+    { "id": "close-error", "action": "click", "target": "id:OK" },
+    { "id": "idle", "action": "wait", "target": "@main", "property": "operation-active", "value": "false", "durationMs": 2000 },
+    { "id": "pending-retained", "action": "assert", "target": "role:title", "device": "DEV_461E", "property": "dirty", "value": "true" }
+  ]
+}

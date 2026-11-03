@@ -331,6 +331,11 @@ internal static partial class UiLanguage
             return exact;
         }
 
+        string invalidSuffix = " " + UiResources.English(UiText.InvalidMsiNotApplied);
+        if (source.EndsWith(invalidSuffix, StringComparison.Ordinal))
+            return TranslateLine(source[..^invalidSuffix.Length]) + " " + UiResources.Russian(UiText.InvalidMsiNotApplied);
+        if (UiResources.TryTranslateMsiMaximum(source, out string maximumMessage)) return maximumMessage;
+
         if (source.StartsWith("Vulnerable Driver Blocklist (registry): ", StringComparison.Ordinal))
             return "Vulnerable Driver Blocklist (реестр): " + TranslateDriverPreflightState(source["Vulnerable Driver Blocklist (registry): ".Length..]);
         if (source.StartsWith("Memory Integrity / HVCI: runtime ", StringComparison.Ordinal))

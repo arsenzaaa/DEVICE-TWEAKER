@@ -15,4 +15,6 @@ internal static class UiText
     internal const string Details = "Action.Details";
     internal const string Changed = "State.Changed";
     internal const string ProfileUnreadable = "State.ProfileUnreadable";
+    internal const string MsiLimitMaximum = "Validation.MsiLimitMaximum";
+    internal const string InvalidMsiNotApplied = "Validation.InvalidMsiNotApplied";
 }

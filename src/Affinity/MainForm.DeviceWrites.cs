@@ -65,7 +65,7 @@ public sealed partial class MainForm
         string limitText = plan.LimitText;
         if (!TryValidateMsiLimitInput(limitText, plan.InterruptCapabilities, out bool isUnlocked, out int limitValue, out string validationError))
         {
-            string msiLimitMessage = validationError + " The invalid value was not applied.";
+            string msiLimitMessage = validationError + " " + UiResources.English(UiText.InvalidMsiNotApplied);
             WriteLog($"APPLY.VALIDATION.ERROR: {plan.InstanceId} setting=MSI-Limit value=\"{FlattenLogText(limitText)}\" hardware=\"{FormatInterruptCapabilities(plan.InterruptCapabilities)}\" error=\"{FlattenLogText(validationError)}\"");
             report.AddError($"{plan.DeviceName}: MSI Limit", msiLimitMessage,
                 $"Requested value={limitText}; hardware={FormatInterruptCapabilities(plan.InterruptCapabilities)}");
