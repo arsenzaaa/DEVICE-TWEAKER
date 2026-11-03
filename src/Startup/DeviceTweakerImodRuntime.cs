@@ -31,6 +31,97 @@ public sealed class DeviceTweakerImodController
     public string BaseError;
 }
 
+// Shared pending-load policy. Callers hold Global\DEVICE_TWEAKER_DTIMOD_LOAD.
+// File operations are separate from boot discovery so regressions use private temporary files.
+public static class DeviceTweakerLoaderJournal
+{
+    private const string RestartMessage = "DTIMOD is unavailable.\nRestart Windows, then press CHECK.";
+    private static void DemandAccess()
+    {
+#if NET8_0_OR_GREATER
+        DeviceTweakerCS.DriverRuntime.DemandNativeAccess();
+#endif
+    }
+
+    public static string CheckJournal(string record, string bootId)
+    {
+        if (string.IsNullOrEmpty(record)) return null;
+        string[] parts = record.Split('|');
+        Guid recordedBoot;
+        if (parts.Length != 2 || !Guid.TryParse(parts[0], out recordedBoot) || parts[1] != "pending") return RestartMessage;
+        if (!string.Equals(parts[0], bootId, StringComparison.OrdinalIgnoreCase)) return null;
+        return "A previous DTIMOD loader has not completed normally. Restart Windows before loading again.";
+    }
+
+    private static string JournalPath
+    {
+        get { return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "DEVICE TWEAKER", "IMOD", "loader.pending"); }
+    }
+
+    public static void AssertLoaderIdle()
+    {
+        DemandAccess();
+        AssertLoaderIdleAt(JournalPath, BootId());
+    }
+
+    internal static void AssertLoaderIdleAt(string path, string bootId)
+    {
+        string record;
+        try { record = System.IO.File.ReadAllText(path); }
+        catch (System.IO.FileNotFoundException) { return; }
+        catch (System.IO.DirectoryNotFoundException) { return; }
+        string error = string.IsNullOrEmpty(record) ? RestartMessage : CheckJournal(record, bootId);
+        if (error != null) throw new InvalidOperationException(error);
+        System.IO.File.Delete(path);
+    }
+
+    public static void BeginLoader()
+    {
+        DemandAccess();
+        BeginLoaderAt(JournalPath, BootId());
+    }
+
+    internal static void BeginLoaderAt(string path, string bootId)
+    {
+        AssertLoaderIdleAt(path, bootId);
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
+        using (System.IO.FileStream stream = new System.IO.FileStream(path, System.IO.FileMode.CreateNew, System.IO.FileAccess.Write, System.IO.FileShare.Read))
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(bootId + "|pending");
+            stream.Write(bytes, 0, bytes.Length);
+            stream.Flush(true);
+        }
+    }
+
+    public static void CompleteLoader()
+    {
+        DemandAccess();
+        CompleteLoaderAt(JournalPath);
+    }
+
+    internal static void CompleteLoaderAt(string path)
+    {
+        // Only a normally observed terminal process/service start may clear this record.
+        try { System.IO.File.Delete(path); }
+        catch (System.IO.DirectoryNotFoundException) { }
+    }
+
+    private static string BootId()
+    {
+        BootEnvironment info;
+        int length;
+        int status = NtQuerySystemInformation(90, out info, Marshal.SizeOf(typeof(BootEnvironment)), out length);
+        if (status < 0 || info.Identifier == Guid.Empty)
+            throw new InvalidOperationException("Could not identify the Windows boot session; DTIMOD loading was not started.");
+        return info.Identifier.ToString("D");
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BootEnvironment { public Guid Identifier; public uint FirmwareType; public ulong Flags; }
+    [DllImport("ntdll.dll")]
+    private static extern int NtQuerySystemInformation(int informationClass, out BootEnvironment information, int length, out int returned);
+}
+
 public static class DeviceTweakerImodRuntime
 {
     private const uint CmProbDisabled = 0x00000016;

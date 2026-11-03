@@ -667,6 +667,7 @@ try {
 }
 
 function Invoke-ImodKduLoader {
+    [DeviceTweakerLoaderJournal]::AssertLoaderIdle()
     if ([DeviceTweakerImodRuntime]::IsDriverDeviceAvailable()) {
         Write-ImodLog "startup loader: existing device available"
         return $true
@@ -697,6 +698,7 @@ function Invoke-ImodKduLoader {
         }
     }
 
+    $proc = $null
     try {
         $psi = New-Object System.Diagnostics.ProcessStartInfo
         $psi.FileName = $ImodKduPath
@@ -709,18 +711,24 @@ function Invoke-ImodKduLoader {
         $psi.RedirectStandardError = $true
 
         Write-ImodLog "startup loader: KDU map start"
-        $proc = [System.Diagnostics.Process]::Start($psi)
+        [DeviceTweakerLoaderJournal]::BeginLoader()
+        try { $proc = [System.Diagnostics.Process]::Start($psi) }
+        catch { [DeviceTweakerLoaderJournal]::CompleteLoader(); throw }
         if ($null -eq $proc) {
+            [DeviceTweakerLoaderJournal]::CompleteLoader()
             Write-ImodLog "startup loader: KDU process failed to start"
             return $false
         }
 
         $stdoutTask = $proc.StandardOutput.ReadToEndAsync()
         $stderrTask = $proc.StandardError.ReadToEndAsync()
-        if (-not $proc.WaitForExit(60000)) {
+        $timedOut = -not $proc.WaitForExit(60000)
+        if ($timedOut) {
             try { $proc.Kill() } catch {}
             Write-ImodLog "startup loader: KDU timeout"
-            try { $proc.WaitForExit(2000) } catch {}
+            try { [void]$proc.WaitForExit(2000) } catch {}
+        } else {
+            [DeviceTweakerLoaderJournal]::CompleteLoader()
         }
 
         $stdout = if ($stdoutTask.IsCompleted) { $stdoutTask.GetAwaiter().GetResult() } else { "<capture incomplete>" }
@@ -739,7 +747,7 @@ function Invoke-ImodKduLoader {
             Write-ImodLog ("startup loader: KDU " + $stream[0] + " END")
         }
 
-        if (-not $proc.HasExited) {
+        if ($timedOut -or -not $proc.HasExited) {
             return $false
         }
 
@@ -750,6 +758,8 @@ function Invoke-ImodKduLoader {
         }
     } catch {
         Write-ImodLog ("startup loader: KDU failed: " + $_.Exception.Message)
+    } finally {
+        if ($null -ne $proc) { $proc.Dispose() }
     }
 
     return $false
@@ -768,8 +778,10 @@ if (-not $imodLoadGateHeld) {
 }
 
 try {
+    [DeviceTweakerLoaderJournal]::AssertLoaderIdle()
     Write-ImodLog "startup apply begin; driver=$ImodDriverPath loader=kdu-first"
     if (-not (Invoke-ImodKduLoader)) {
+        [DeviceTweakerLoaderJournal]::AssertLoaderIdle()
         Write-ImodLog "startup loader: fallback service"
         [DeviceTweakerImodRuntime]::EnsureDriver($ImodDriverPath)
     }

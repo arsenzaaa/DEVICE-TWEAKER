@@ -8,7 +8,7 @@ namespace DeviceTweaker.Tests;
 
 // Runs the shipped startup script and runtime in Windows PowerShell 5.1, the
 // interpreter Task Scheduler uses. No driver, loader or SCM call is reached.
-public sealed class StartupScriptTests
+public sealed partial class StartupScriptTests
 {
     internal static string ReadResource(string name)
     {

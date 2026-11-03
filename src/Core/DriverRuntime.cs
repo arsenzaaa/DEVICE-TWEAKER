@@ -1,4 +1,4 @@
-﻿// DTIMOD loading policy, protocol check and the loader journal.
+// DTIMOD loading policy, protocol check and the loader journal.
 #if NET8_0_OR_GREATER
 #nullable disable
 #endif
@@ -111,65 +111,16 @@ namespace DeviceTweakerCS
         public static DriverLoadGate Enter() { return new DriverLoadGate(); }
 
         public static string CheckJournal(string record, string bootId)
-        {
-            if (string.IsNullOrEmpty(record)) return null;
-            string[] parts = record.Split('|');
-            System.Guid recordedBoot;
-            if (parts.Length != 2 || !System.Guid.TryParse(parts[0], out recordedBoot) || parts[1] != "pending") return DriverRuntime.RestartMessage;
-            if (!System.String.Equals(parts[0], bootId, System.StringComparison.OrdinalIgnoreCase)) return null;
-            return "A previous DTIMOD loader has not completed normally. Restart Windows before loading again.";
-        }
-
-        private static string JournalPath
-        {
-            get { return System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.CommonApplicationData), "DEVICE TWEAKER", "IMOD", "loader.pending"); }
-        }
+        { return DeviceTweakerLoaderJournal.CheckJournal(record, bootId); }
 
         public static void AssertLoaderIdle()
-        {
-            DriverRuntime.DemandNativeAccess();
-            if (!System.IO.File.Exists(JournalPath)) return;
-            string error = CheckJournal(System.IO.File.ReadAllText(JournalPath), BootId());
-            if (error != null) throw new System.InvalidOperationException(error);
-            System.IO.File.Delete(JournalPath);
-        }
+        { DeviceTweakerLoaderJournal.AssertLoaderIdle(); }
 
         public static void BeginLoader()
-        {
-            DriverRuntime.DemandNativeAccess();
-            AssertLoaderIdle();
-            string bootId = BootId();
-            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(JournalPath));
-            // A crash even before Process.Start leaves a conservative, explicit restart requirement.
-            using (System.IO.FileStream stream = new System.IO.FileStream(JournalPath, System.IO.FileMode.CreateNew, System.IO.FileAccess.Write, System.IO.FileShare.Read))
-            {
-                byte[] bytes = System.Text.Encoding.UTF8.GetBytes(bootId + "|pending");
-                stream.Write(bytes, 0, bytes.Length);
-                stream.Flush(true);
-            }
-        }
+        { DeviceTweakerLoaderJournal.BeginLoader(); }
 
         public static void CompleteLoader()
-        {
-            DriverRuntime.DemandNativeAccess();
-            // Only a normally observed terminal process/service start may clear this record.
-            if (System.IO.File.Exists(JournalPath)) System.IO.File.Delete(JournalPath);
-        }
-
-        private static string BootId()
-        {
-            BootEnvironment info;
-            int length;
-            int status = NtQuerySystemInformation(90, out info, System.Runtime.InteropServices.Marshal.SizeOf(typeof(BootEnvironment)), out length);
-            if (status < 0 || info.Identifier == System.Guid.Empty)
-                throw new System.InvalidOperationException("Could not identify the Windows boot session; DTIMOD loading was not started.");
-            return info.Identifier.ToString("D");
-        }
-
-        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-        private struct BootEnvironment { public System.Guid Identifier; public uint FirmwareType; public ulong Flags; }
-        [System.Runtime.InteropServices.DllImport("ntdll.dll")]
-        private static extern int NtQuerySystemInformation(int informationClass, out BootEnvironment information, int length, out int returned);
+        { DeviceTweakerLoaderJournal.CompleteLoader(); }
 
         public void Dispose()
         {
