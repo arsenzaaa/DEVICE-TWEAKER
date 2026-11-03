@@ -82,6 +82,8 @@ public sealed partial class MainForm
     // current one, and an outdated script / runtime / loader is replaced.
     private ImodConfig LoadStartupConfig()
     {
+        // Virtual fixtures own their saved values; never inherit the host's profile.
+        if (_testDevicesEnabled && _testDevicesOnly) return new ImodConfig { HasScript = false };
         StartupConfigReadResult<ImodConfig> result = ReadSavedStartupConfigResult();
         string? source = result.Source;
         if (result.State == StartupConfigReadState.Error)

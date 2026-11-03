@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "refresh-preserves-network-edits",
+  "preset": "NicItr",
+  "language": "EN",
+  "filter": "NETWORK",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    { "id": "show-queues", "action": "reveal", "target": "role:rss-queues", "device": "DEV_125C" },
+    { "id": "initial-queues", "action": "assert", "target": "role:rss-queues", "device": "DEV_125C", "property": "value", "value": "4" },
+    { "id": "edit-queues", "action": "select", "target": "role:rss-queues", "device": "DEV_125C", "value": "2" },
+    { "id": "base-before", "action": "assert", "target": "role:rss-queues", "device": "DEV_125C", "property": "rss-base", "value": "8" },
+    { "id": "show-nic", "action": "reveal", "target": "role:nic-itr", "device": "DEV_125C" },
+    { "id": "edit-nic", "action": "text", "target": "role:nic-itr", "device": "DEV_125C", "value": "0x28" },
+    { "id": "before-refresh", "action": "capture" },
+    { "id": "refresh", "action": "click", "target": "id:REFRESH" },
+    { "id": "refresh-finished", "action": "wait", "target": "id:REFRESH", "property": "enabled", "value": "true", "durationMs": 5000 },
+    { "id": "nic-preserved", "action": "assert", "target": "role:nic-itr", "device": "DEV_125C", "value": "0x28" },
+    { "id": "queues-preserved", "action": "assert", "target": "role:rss-queues", "device": "DEV_125C", "property": "value", "value": "2" },
+    { "id": "base-preserved", "action": "assert", "target": "role:rss-queues", "device": "DEV_125C", "property": "rss-base", "value": "8" },
+    { "id": "affinity-preserved", "action": "assert", "target": "role:affinity", "device": "DEV_125C", "value": "Affinity (RSS mask): 0x500" },
+    { "id": "scroll-preserved", "action": "assert", "target": "role:nic-itr", "device": "DEV_125C", "property": "viewport", "value": "true" },
+    { "id": "after-refresh", "action": "capture" }
+  ]
+}

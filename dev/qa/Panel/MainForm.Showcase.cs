@@ -37,7 +37,7 @@ public sealed partial class MainForm
                 audioEndpoints: "", storageTag: "", wifi: false,
                 usbIsXhci: true, usbHasDevices: true, integratedGpu: false,
                 testIrqCount: 1, testMsiStatus: "Enabled"));
-            RefreshBlocks();
+            RefreshBlocks(preserveEdits: false);
         }
         else if (showcase.StartsWith("Ryzen9950X3D", StringComparison.OrdinalIgnoreCase))
         {
@@ -148,7 +148,7 @@ public sealed partial class MainForm
         Add(DeviceKind.STOR, "SATA hard disk drive", "DISK_HDD", "HDD");
         Add(DeviceKind.STOR, "Standard SATA AHCI Controller", "DISK_SATA");
         Add(DeviceKind.STOR, "Generic storage controller", "DISK_OTHER");
-        RefreshBlocks();
+        RefreshBlocks(preserveEdits: false);
     }
 
     // USB roles stay canonical in all presets; UiLanguage translates their display.
@@ -236,7 +236,7 @@ public sealed partial class MainForm
             usbIsXhci: false, usbHasDevices: false, integratedGpu: false,
             testIrqCount: 1, testMsiStatus: "Enabled"));
 
-        RefreshBlocks();
+        RefreshBlocks(preserveEdits: false);
 
         // Configure optimal settings on blocks
         foreach (DeviceBlock block in _blocks)
@@ -443,7 +443,7 @@ public sealed partial class MainForm
             usbIsXhci: false, usbHasDevices: false, integratedGpu: false,
             testIrqCount: 1, testMsiStatus: "Enabled"));
 
-        RefreshBlocks();
+        RefreshBlocks(preserveEdits: false);
 
         // Configure optimal settings on blocks (P-Cores only)
         foreach (DeviceBlock block in _blocks)
@@ -614,7 +614,7 @@ public sealed partial class MainForm
             usbIsXhci: true, usbHasDevices: true, integratedGpu: false,
             testIrqCount: 2, testMsiStatus: "Enabled", usbSelectiveSuspend: "off"));
 
-        RefreshBlocks();
+        RefreshBlocks(preserveEdits: false);
 
         foreach (DeviceBlock usbBlock in _blocks.Where(b => b.Kind == DeviceKind.USB))
         {
@@ -729,7 +729,7 @@ public sealed partial class MainForm
             usbIsXhci: false, usbHasDevices: false, integratedGpu: false,
             testIrqCount: 4, testMsiStatus: "Enabled", nicPowerSaving: "off"));
 
-        RefreshBlocks();
+        RefreshBlocks(preserveEdits: false);
 
         foreach (DeviceBlock netBlock in _blocks.Where(b => b.Kind == DeviceKind.NET_NDIS))
         {

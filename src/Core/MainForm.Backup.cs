@@ -471,10 +471,13 @@ public sealed partial class MainForm
                 });
             OperationReport report = workflow.Restore(path);
             report.SetBackupPath(_lastBackupPath);
+            _pendingReservedCpuSets = null;
+            _reservedCpuSetsDirty = false;
+            _rawMouseThrottlePending = false;
             BeginDevicesBusyWork("Refreshing devices...", 4);
             try
             {
-                RefreshBlocks();
+                RefreshBlocks(preserveEdits: false);
             }
             finally
             {

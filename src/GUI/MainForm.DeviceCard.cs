@@ -320,7 +320,11 @@ public sealed partial class MainForm
 
     if (block.NicItrBox is not null)
     {
-        block.NicItrBox.TextChanged += (_, _) => UpdateNicItrInputTimeLabel(block);
+        block.NicItrBox.TextChanged += (_, _) =>
+        {
+            if (block.NicItrEditorUpdateDepth == 0) block.NicItrEditGeneration++;
+            UpdateNicItrInputTimeLabel(block);
+        };
     }
     }
 

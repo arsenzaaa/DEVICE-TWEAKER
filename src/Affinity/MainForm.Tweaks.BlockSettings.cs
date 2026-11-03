@@ -797,6 +797,9 @@ public sealed partial class MainForm
             block.ImodCurrentLabel.Text = string.Empty;
         }
 
+        if (isTestDevice && IsUsbImodTarget(block.Device))
+            block.ImodBox.Text = EnsureTestDeviceState(block.Device).ImodValue;
+
         LoadRawMouseThrottleControls(block);
         RefreshNicItrBlock(block);
         UpdateImodSelectorsFromText(block);

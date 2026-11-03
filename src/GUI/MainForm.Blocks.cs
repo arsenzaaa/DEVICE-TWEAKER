@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 
 namespace DeviceTweakerCS;
@@ -1714,6 +1714,11 @@ public sealed partial class MainForm
             };
         }
 
+        block.RestoreImodDetailsExpansion = expanded =>
+        {
+            imodDetailsExpanded = expanded;
+            UpdateImodDetailsVisibility();
+        };
         LoadBlockSettings(block);
         if (device.Wifi)
         {
@@ -2110,8 +2115,10 @@ public sealed partial class MainForm
         }
     }
 
-    private void RefreshBlocks(bool includeImodReadback = true)
+    private void RefreshBlocks(bool includeImodReadback = true, bool preserveEdits = true)
     {
+        Dictionary<string, EditorDraft> drafts = preserveEdits ? CaptureEditorDrafts() : new(StringComparer.OrdinalIgnoreCase);
+        DeviceViewport viewport = CaptureDeviceViewport();
         long refreshStarted = Stopwatch.GetTimestamp();
         WriteLog($"REFRESH.START: includeImodReadback={includeImodReadback} previousBlocks={_blocks.Count}");
         bool ownsBusy = _devicesBusyDepth == 0;
@@ -2280,8 +2287,10 @@ public sealed partial class MainForm
             }
 
             UpdateAllBlocksInitialState();
+            if (preserveEdits) RestoreEditorDrafts(drafts);
             RebuildFilterCategoryButtons();
             ApplyDeviceFilter();
+            if (preserveEdits) RestoreDeviceViewport(viewport);
             UpdateApplyButtonDirtyCount();
 
             UpdateInterruptModesStatus();

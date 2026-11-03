@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Text.RegularExpressions;
@@ -121,6 +121,15 @@ public sealed partial class MainForm
         }
     }
 
+    private static void SetNicItrReadbackText(DeviceBlock block, string text, bool replaceInput = true)
+    {
+        block.NicItrLastReadText = text;
+        if (!replaceInput || block.NicItrBox is null) return;
+        block.NicItrEditorUpdateDepth++;
+        try { block.NicItrBox.Text = text; }
+        finally { block.NicItrEditorUpdateDepth--; }
+    }
+
     private async void RefreshNicItrBlock(DeviceBlock block, bool showReadingStatus = true)
     {
         if (block.NicItrBox is null || block.NicItrStatusLabel is null)
@@ -131,7 +140,7 @@ public sealed partial class MainForm
         NicItrProfile? profile = TryGetNicItrProfile(block.Device.InstanceId);
         if (profile is null)
         {
-            block.NicItrBox.Text = string.Empty;
+            SetNicItrReadbackText(block, string.Empty);
             block.NicItrStatusLabel.Text = "current: unsupported";
             if (block.NicItrTimeLabel is not null)
             {
@@ -154,7 +163,7 @@ public sealed partial class MainForm
                 previewValues = Enumerable.Repeat(0UL, Math.Max(1, profile.MaxQueues)).ToList();
             }
             string previewText = FormatNicItrValueList(previewValues, profile);
-            block.NicItrBox.Text = previewText;
+            SetNicItrReadbackText(block, previewText);
             // The profile name is already present in the tooltip and log. Keep
             // the inline readback compact so it remains aligned with the value
             // column without being truncated on the narrower settings layout.
@@ -172,6 +181,7 @@ public sealed partial class MainForm
         }
 
         int generation = ++block.NicItrOperationGeneration;
+        int editGeneration = block.NicItrEditGeneration;
         if (showReadingStatus)
         {
             block.NicItrStatusLabel.Text = "current: reading...";
@@ -226,10 +236,12 @@ public sealed partial class MainForm
             string summaryText = "current: read successfully";
             string detailText = FormatNicItrQueueDetailText(result.values, profile);
             string timingText = FormatNicItrTimingList(result.values, profile);
-            block.NicItrBox.Text = valueText;
+            // A late read updates diagnostics, but must not replace newer editor input.
+            bool replaceInput = editGeneration == block.NicItrEditGeneration;
+            SetNicItrReadbackText(block, valueText, replaceInput);
             block.NicItrStatusLabel.Text = summaryText;
             block.NicItrStatusLabel.ForeColor = _statusActive;
-            if (block.NicItrTimeLabel is not null)
+            if (block.NicItrTimeLabel is not null && replaceInput)
             {
                 block.NicItrTimeLabel.Text = detailText;
                 block.NicItrTimeLabel.ForeColor = _mutedText;

@@ -140,6 +140,8 @@ public sealed partial class MainForm
                 "msi" => b.MsiCombo, "limit" => b.LimitBox, "priority" => b.PrioCombo, "policy" => b.PolicyCombo,
                 "imod" => b.ImodBox, "imod-toggle" => b.ImodAutoCheck, "imod-check" => b.ImodCheckButton!,
                 "imod-current" => b.ImodCurrentLabel, "mode" => b.InterruptModeLabel!,
+                "nic-itr" => b.NicItrBox!, "rss-queues" => b.RssQueueBox!,
+                "affinity" => b.AffinityLabel,
                 "mode-refresh" => _interruptModesReadButton,
                 _ => throw new InvalidDataException("Unknown device control role"),
             };
@@ -214,6 +216,8 @@ public sealed partial class MainForm
         "editorFits" when control is ThemedTextBox field => (field.Inner.Height >= field.Inner.PreferredHeight
             && field.Inner.Top >= 1 && field.Inner.Bottom < field.ClientSize.Height).ToString().ToLowerInvariant(),
         "value" when control is ThemedDropDownPicker picker => picker.SelectedItem?.ToString() ?? "",
+        "value" when control is NumericUpDown numeric => numeric.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        "rss-base" when control is NumericUpDown => _blocks.Single(block => block.RssQueueBox == control).RssBaseCore?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "",
         _ => throw new InvalidDataException("Unsupported assertion property: " + property),
     };
     private async Task DevExecute(DevStep step)
@@ -291,6 +295,12 @@ public sealed partial class MainForm
                 if (DevTarget(step) is not TextBoxBase editor || editor.ReadOnly) throw new InvalidOperationException("Text target is not an editable text box");
                 editor.Text = step.Value; break;
             case "select":
+                if (DevTarget(step) is NumericUpDown numeric)
+                {
+                    decimal value = decimal.Parse(step.Value, System.Globalization.CultureInfo.InvariantCulture);
+                    if (value < numeric.Minimum || value > numeric.Maximum) throw new InvalidDataException("Numeric selection is outside the control range");
+                    numeric.Value = value; break;
+                }
                 if (DevTarget(step) is ListBox list && int.TryParse(step.Value, out int row) && row >= 0 && row < list.Items.Count)
                 { list.SelectedIndex = row; break; }
                 if (DevTarget(step) is not ThemedDropDownPicker picker || !picker.Items.Contains(step.Value)) throw new InvalidOperationException("Picker item missing");

@@ -249,9 +249,14 @@ internal sealed class DeviceBlock
     public IReadOnlyList<int>? RssQueueOptions { get; set; }
     public int RssQueueLast { get; set; } = 1;
     public int NicItrOperationGeneration { get; set; }
+    public int NicItrEditGeneration { get; set; }
+    public int NicItrEditorUpdateDepth { get; set; }
+    public string? NicItrLastReadText { get; set; }
     public NdisRssRuntimeState? NdisRssRuntime { get; set; }
 
     public bool IsDirty { get; set; }
+    public DeviceEditorState? InitialEditorState { get; private set; }
+    public Action<bool>? RestoreImodDetailsExpansion { get; set; }
     public Label? ModifiedBadge { get; set; }
     public ulong InitialAffinityMask { get; set; }
     public int InitialMsiIndex { get; set; }
@@ -266,6 +271,7 @@ internal sealed class DeviceBlock
 
     public void CaptureInitialState()
     {
+        InitialEditorState = MainForm.CaptureEditorState(this);
         InitialAffinityMask = AffinityMask;
         InitialMsiIndex = MsiCombo.SelectedIndex;
         InitialLimitText = LimitBox.Text ?? string.Empty;
@@ -292,6 +298,9 @@ internal sealed class DeviceBlock
             || (ImodBox.Visible && !string.Equals(ImodBox.Text?.Trim(), InitialImodText.Trim(), StringComparison.Ordinal))
             || (RawMouseThrottleCheck is not null && RawMouseThrottleCheck.Checked != InitialRawMouseThrottleEnabled)
             || (RawMouseThrottleCombo is not null && RawMouseThrottleCombo.SelectedIndex != InitialRawMouseThrottleIndex);
+        dirty |= InitialEditorState is { } initial
+            && ((NdisModeCombo is not null && NdisModeCombo.SelectedIndex != initial.NdisModeIndex)
+                || (RssQueueBox is not null && RssQueueBox.Value != initial.RssQueues));
 
         IsDirty = dirty;
         UpdateModifiedBadge();

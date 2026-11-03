@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "refresh-preserves-edits",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    { "id": "show-limit", "action": "reveal", "target": "role:limit", "device": "DEV_461E" },
+    { "id": "edit-limit", "action": "text", "target": "role:limit", "device": "DEV_461E", "value": "8" },
+    { "id": "edit-msi", "action": "select", "target": "role:msi", "device": "DEV_461E", "value": "Disabled" },
+    { "id": "before-refresh", "action": "capture" },
+    { "id": "imod-before", "action": "assert", "target": "role:imod", "device": "DEV_461E", "value": "0x0" },
+    { "id": "refresh", "action": "click", "target": "id:REFRESH" },
+    { "id": "refresh-finished", "action": "wait", "target": "id:REFRESH", "property": "enabled", "value": "true", "durationMs": 5000 },
+    { "id": "scroll-preserved", "action": "assert", "target": "role:limit", "device": "DEV_461E", "property": "viewport", "value": "true" },
+    { "id": "limit-preserved", "action": "assert", "target": "role:limit", "device": "DEV_461E", "value": "8" },
+    { "id": "msi-preserved", "action": "assert", "target": "role:msi", "device": "DEV_461E", "property": "value", "value": "Disabled" },
+    { "id": "imod-backend-preserved", "action": "assert", "target": "role:imod", "device": "DEV_461E", "value": "0x0" },
+    { "id": "after-refresh", "action": "capture" },
+    { "id": "russian", "action": "language", "value": "RU" },
+    { "id": "narrow", "action": "resize", "width": 1000, "height": 720 },
+    { "id": "show-limit-ru", "action": "reveal", "target": "role:limit", "device": "DEV_461E" },
+    { "id": "limit-after-layout", "action": "assert", "target": "role:limit", "device": "DEV_461E", "value": "8" },
+    { "id": "after-layout", "action": "capture" }
+  ]
+}

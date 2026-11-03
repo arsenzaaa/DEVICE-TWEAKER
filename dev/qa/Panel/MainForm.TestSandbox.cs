@@ -731,7 +731,7 @@ public sealed partial class MainForm
         _testDevicesOnly = true;
         _testAutoDryRun = true;
         _testSandbox.Backup = null;
-        RefreshBlocks();
+        RefreshBlocks(preserveEdits: false);
         WriteLog($"TEST.SCENARIO.LOAD: name=\"{FlattenLogText(scenario.Name)}\" devices={scenario.Devices.Count}");
     }
 
