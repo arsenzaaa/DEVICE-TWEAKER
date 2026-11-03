@@ -2093,9 +2093,21 @@ public sealed partial class MainForm
                 return refreshReport;
             }
             IReadOnlyList<DeviceInfo> devs = discovery.Devices;
+            ImodConfig? startupConfig = null;
+            if (devs.Any(IsUsbImodTarget))
+            {
+                bool virtualOnly = _testDevicesEnabled && _testDevicesOnly;
+                startupConfig = await LoadStartupConfigForRefreshAsync(virtualOnly);
+                if (_uiDisposing || IsDisposed || Disposing) return refreshReport;
+            }
             Dictionary<string, EditorDraft> drafts = preserveEdits ? CaptureEditorDrafts() : new(StringComparer.OrdinalIgnoreCase);
             DeviceViewport viewport = CaptureDeviceViewport();
             InvalidateImodCache();
+            if (startupConfig is not null)
+            {
+                _imodConfigCache = startupConfig;
+                _imodConfigLoaded = true;
+            }
             _ndisRssRuntimeCache.Clear();
             Dictionary<string, string> priorImodStatuses = [];
             foreach (DeviceBlock block in _blocks)

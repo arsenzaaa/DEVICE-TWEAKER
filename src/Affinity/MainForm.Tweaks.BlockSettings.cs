@@ -1109,7 +1109,7 @@ public sealed partial class MainForm
         return true;
     }
 
-    private void ResetBlockSettings(DeviceBlock block, OperationReport? report = null)
+    private Task ResetBlockSettings(DeviceBlock block, OperationReport? report = null)
     {
         if (block.Device.IsTestDevice)
         {
@@ -1174,149 +1174,18 @@ public sealed partial class MainForm
             UpdateBlockInfoText(block);
             ResetTestBlockState(block);
             WriteLog($"RESET.TEST: {block.Device.InstanceId} kind={block.Kind} -> cleared preview priority/affinity/power");
-            return;
+            return Task.CompletedTask;
         }
 
         DemandRealWrite("DEVICE SETTINGS");
-        string regBase = block.Device.RegBase;
-        string intBase = regBase + @"\Device Parameters\Interrupt Management";
-        void RecordResetError(string operation, Exception ex)
-        {
-            report?.AddError($"{block.Device.Name}: {operation}", ex.Message);
-        }
-
-        string prioPath = intBase + @"\Priority";
-        try
-        {
-            Registry.LocalMachine.DeleteSubKeyTree(prioPath, throwOnMissingSubKey: false);
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"RESET.REG.ERROR: {block.Device.InstanceId} operation=delete-priority-key path=HKLM\\{prioPath} error=\"{FlattenLogText(ex.ToString())}\"");
-            RecordResetError("remove legacy priority settings", ex);
-        }
-
-        string affPath = intBase + @"\Affinity Policy";
-        try
-        {
-            using RegistryKey? key = Registry.LocalMachine.OpenSubKey(affPath, writable: true);
-            if (key is not null)
-            {
-                foreach (string name in new[] { "DevicePriority", "DevicePolicy", "AssignmentSetOverride" })
-                {
-                    key.DeleteValue(name, throwOnMissingValue: false);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"RESET.REG.ERROR: {block.Device.InstanceId} operation=clear-affinity-values path=HKLM\\{affPath} error=\"{FlattenLogText(ex.ToString())}\"");
-            RecordResetError("clear affinity values", ex);
-        }
-
-        try
-        {
-            Registry.LocalMachine.DeleteSubKeyTree(affPath, throwOnMissingSubKey: false);
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"RESET.REG.ERROR: {block.Device.InstanceId} operation=delete-affinity-key path=HKLM\\{affPath} error=\"{FlattenLogText(ex.ToString())}\"");
-            RecordResetError("remove affinity settings key", ex);
-        }
-
-        if (block.Kind == DeviceKind.NET_NDIS)
-        {
-            ClearNdisBaseCore(block.Device.InstanceId, report, block.Device.Name);
-            ClearNdisRssQueues(block.Device.InstanceId, report, block.Device.Name);
-            ClearNdisRssExtraValues(block.Device.InstanceId, report, block.Device.Name);
-        }
-
-        ResetDevicePowerSaving(block, report);
-
-        WriteLog($"RESET: {block.Device.InstanceId} kind={block.Kind} -> cleared priority/affinity (MSI left unchanged by design)");
+        DeviceSettingsResetPlan plan = new(block.Device.InstanceId, block.Device.Name,
+            block.Device.RegBase, block.Kind, block.Device.Wifi, block.PowerSavingCheck is not null);
+        return Task.Run(() => ApplyDeviceResetPlan(plan, report));
     }
 
-    private void ResetDevicePowerSaving(DeviceBlock block, OperationReport? report)
+    private Task ApplyUsbSelectiveSuspendPowerPlan(bool forceDisable, OperationReport? report)
     {
-        void RecordResetError(string operation, Exception ex)
-        {
-            report?.AddError($"{block.Device.Name}: {operation}", ex.Message);
-        }
-
-        if (block.Kind == DeviceKind.USB)
-        {
-            try
-            {
-                UsbSelectiveSuspendPolicy.ApplyResult powerResult =
-                    UsbSelectiveSuspendPolicy.ApplyControllerAndHubs(block.Device.InstanceId, enabled: true);
-
-                block.Device.UsbSelectiveSuspend = "on";
-                if (block.PowerSavingCheck is not null)
-                {
-                    block.PowerSavingCheck.Checked = true;
-                }
-
-                WriteLog(
-                    $"RESET.POWER: {block.Device.InstanceId} -> Power Saving=Enabled " +
-                    $"targets={powerResult.TargetCount} pnp={powerResult.PnpSucceeded}/{powerResult.TargetCount} " +
-                    $"wmi={powerResult.WmiSucceeded}/{powerResult.WmiExposed} exposed");
-                foreach (string note in powerResult.Notes)
-                {
-                    WriteLog($"RESET.POWER.NOTE: {note}");
-                }
-                if (!powerResult.Success)
-                {
-                    RecordResetError(
-                        "reset USB power saving (Device Manager)",
-                        new InvalidOperationException(string.Join(" | ", powerResult.Errors)));
-                }
-            }
-            catch (Exception ex)
-            {
-                WriteLog($"RESET.REG.ERROR: {block.Device.InstanceId} operation=reset-power-saving-usb error=\"{FlattenLogText(ex.ToString())}\"");
-                RecordResetError("reset USB power saving", ex);
-            }
-        }
-
-        if (block.PowerSavingCheck is not null
-            && (block.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX)
-            && !block.Device.Wifi)
-        {
-            try
-            {
-                string? classKey = GetClassKeyForDevice(block.Device.InstanceId);
-                int pnpCaps = DevicePowerPolicy.ApplyNicPnPCapabilities(classKey ?? string.Empty, allowTurnOff: true);
-                DevicePowerPolicy.WriteStatus msPowerStatus = DevicePowerPolicy.SetDevicePowerEnable(
-                    block.Device.InstanceId,
-                    allowTurnOff: true,
-                    out string? msPowerError);
-                block.PowerSavingCheck.Checked = true;
-                block.Device.NicPowerSaving = "on";
-                WriteLog(
-                    $"RESET.POWER: {block.Device.InstanceId} -> Power Saving=Enabled " +
-                    $"PnPCapabilities=0x{pnpCaps:X} wmiWrite={msPowerStatus}");
-                if (msPowerStatus is DevicePowerPolicy.WriteStatus.NotExposed or DevicePowerPolicy.WriteStatus.NotSupported)
-                {
-                    WriteLog($"RESET.POWER.NOTE: {block.Device.InstanceId}: MSPower_DeviceEnable status={msPowerStatus} {msPowerError}");
-                }
-                else if (DevicePowerPolicy.IsWriteFailure(msPowerStatus))
-                {
-                    WriteLog($"RESET.POWER.ERROR: {block.Device.InstanceId} wmiWrite={msPowerStatus} {msPowerError}");
-                    RecordResetError(
-                        "reset NIC power saving (Device Manager)",
-                        new InvalidOperationException(msPowerError ?? "MSPower_DeviceEnable write failed"));
-                }
-            }
-            catch (Exception ex)
-            {
-                WriteLog($"RESET.REG.ERROR: {block.Device.InstanceId} operation=reset-power-saving-nic error=\"{FlattenLogText(ex.ToString())}\"");
-                RecordResetError("reset NIC power saving", ex);
-            }
-        }
-    }
-
-    private void ApplyUsbSelectiveSuspendPowerPlan(bool forceDisable, OperationReport? report)
-    {
+        DemandRealWrite("USB SELECTIVE SUSPEND PLAN");
         // Fake USB blocks must not drive the real machine power-plan USB SS setting.
         // forceDisable (AUTO) also requires at least one real USB block: otherwise
         // test-only AUTO would still call SetPowerPlanEnabled(false) on the host.
@@ -1331,10 +1200,16 @@ public sealed partial class MainForm
         if (!anyUsb)
         {
             WriteLog("USB.SUSPEND.PLAN: skipped (no real USB blocks)");
-            return;
+            return Task.CompletedTask;
         }
 
         bool enable = !forceDisable && !anyDisabled;
+        return Task.Run(() => ApplyUsbSelectiveSuspendPowerPlanCore(enable, report));
+    }
+
+    private void ApplyUsbSelectiveSuspendPowerPlanCore(bool enable, OperationReport? report)
+    {
+        DemandRealWrite("USB SELECTIVE SUSPEND PLAN worker");
         try
         {
             UsbSelectiveSuspendPolicy.SetPowerPlanEnabled(enable);

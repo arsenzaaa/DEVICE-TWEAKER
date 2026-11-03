@@ -356,7 +356,9 @@ public sealed partial class MainForm
             {
                 foreach (DeviceBlock block in _blocks.Where(block => !block.Device.Wifi))
                 {
-                    ResetBlockSettings(block, report);
+                    Task reset = ResetBlockSettings(block, report);
+                    if (!reset.IsCompleted) throw new InvalidOperationException("Synthetic reset must complete inline.");
+                    reset.GetAwaiter().GetResult();
                 }
                 report.AddSuccess("RESET WINDOWS DEFAULT", "Virtual state reset");
             }

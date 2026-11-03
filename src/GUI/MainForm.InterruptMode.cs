@@ -111,7 +111,7 @@ public sealed partial class MainForm
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        if ((_interruptModeCheckRunning || (_operations.IsBusy && _activeOperationName != "REFRESH")) && e.CloseReason == CloseReason.UserClosing) e.Cancel = true;
+        if ((_startupConfigWorkPending || _interruptModeCheckRunning || (_operations.IsBusy && _activeOperationName != "REFRESH")) && e.CloseReason == CloseReason.UserClosing) e.Cancel = true;
         base.OnFormClosing(e);
     }
 

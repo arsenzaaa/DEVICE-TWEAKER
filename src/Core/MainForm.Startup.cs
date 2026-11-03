@@ -85,10 +85,10 @@ public sealed partial class MainForm
 
     // Loads the profile; a profile saved by an older layout is moved to the
     // current one, and an outdated script / runtime / loader is replaced.
-    private ImodConfig LoadStartupConfig()
+    private ImodConfig LoadStartupConfig(bool virtualOnly)
     {
         // Virtual fixtures own their saved values; never inherit the host's profile.
-        if (_testDevicesEnabled && _testDevicesOnly) return new ImodConfig { HasScript = false };
+        if (virtualOnly) return new ImodConfig { HasScript = false };
         StartupConfigReadResult<ImodConfig> result = ReadSavedStartupConfigResult();
         string? source = result.Source;
         if (result.State == StartupConfigReadState.Error)

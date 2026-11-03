@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "reset-readonly-flow",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    { "id": "open-restore", "action": "click", "target": "id:RESTORE" },
+    { "id": "wait-restore", "action": "wait", "target": "@active", "value": "RESTORE", "durationMs": 5000 },
+    { "id": "preview-reset", "action": "click", "target": "id:RESET WINDOWS DEFAULT" },
+    { "id": "wait-result", "action": "wait", "target": "@active", "value": "RESET WINDOWS DEFAULT PREVIEW", "durationMs": 5000 },
+    { "id": "reset-result", "action": "capture", "target": "@active" },
+    { "id": "close-result", "action": "click", "target": "id:OK" },
+    { "id": "idle", "action": "wait", "target": "@main", "property": "operation-active", "value": "false", "durationMs": 3000 },
+    { "id": "reveal-priority", "action": "reveal", "target": "role:priority", "device": "DEV_461E" },
+    { "id": "priority-reset", "action": "assert", "target": "role:priority", "device": "DEV_461E", "property": "value", "value": "Undefined" },
+    { "id": "msi-preserved", "action": "assert", "target": "role:msi", "device": "DEV_461E", "property": "value", "value": "Enabled" },
+    { "id": "reset-state", "action": "capture" }
+  ]
+}

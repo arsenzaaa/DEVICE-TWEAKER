@@ -80,6 +80,10 @@ public sealed class QaWriteGuardTests
         AssertBlocked("ApplyDeviceSettingsPlan", null, null);
         AssertBlocked("TryApplyImod", null, null, false, null, null);
         AssertBlocked("ResetBlockSettings", block, null);
+        AssertBlocked("ApplyDeviceResetPlan", null, null);
+        AssertBlocked("ResetDevicePowerSaving", null, null);
+        AssertBlocked("ApplyUsbSelectiveSuspendPowerPlan", false, null);
+        AssertBlocked("ApplyUsbSelectiveSuspendPowerPlanCore", false, null);
         AssertBlocked("WriteNdisIrqPolicy", null, null);
         AssertBlocked("ClearNdisIrqPolicy", null, null);
     }

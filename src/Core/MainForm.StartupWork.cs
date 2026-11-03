@@ -2,6 +2,18 @@ namespace DeviceTweakerCS;
 
 public sealed partial class MainForm
 {
+    private bool _startupConfigWorkPending;
+
+    private async Task<ImodConfig> LoadStartupConfigForRefreshAsync(bool virtualOnly)
+    {
+        if (virtualOnly) return new ImodConfig { HasScript = false };
+        // Loading an old bundle can migrate files and register its task. Keep
+        // user-close blocked until this work finishes, as for explicit writes.
+        _startupConfigWorkPending = true;
+        try { return await Task.Run(() => LoadStartupConfig(virtualOnly: false)); }
+        finally { _startupConfigWorkPending = false; }
+    }
+
     // A worker owns this copy: subsequent editor/cache updates cannot change
     // the profile that is being validated and installed.
     internal static ImodConfig SnapshotImodConfig(ImodConfig source)

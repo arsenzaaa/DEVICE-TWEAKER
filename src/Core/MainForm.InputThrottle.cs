@@ -344,7 +344,7 @@ public sealed partial class MainForm
         WriteLog($"AUTO.THROTTLE.STAGE: {RawMouseThrottleValueName}={DefaultRawMouseThrottleDuration} cap=50Hz");
     }
 
-    private void ApplyPendingRawMouseThrottle(OperationReport? report)
+    private async Task ApplyPendingRawMouseThrottle(OperationReport? report)
     {
         if (_testAutoDryRun)
         {
@@ -359,7 +359,9 @@ public sealed partial class MainForm
 
         try
         {
-            SetRawMouseThrottle(_pendingRawMouseThrottleEnabled, _pendingRawMouseThrottleDuration);
+            bool enabled = _pendingRawMouseThrottleEnabled;
+            int duration = _pendingRawMouseThrottleDuration;
+            await Task.Run(() => SetRawMouseThrottle(enabled, duration));
             _rawMouseThrottlePending = false;
             RefreshRawMouseThrottleUi();
             WriteLog("USBPOLL.THROTTLE.APPLY: staged value committed after backup");

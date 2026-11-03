@@ -503,8 +503,8 @@ public sealed partial class MainForm
                     report.AddSuccess("DEVICE SETTINGS", $"{_blocks.Count} processed");
                 }
 
-                ApplyPendingReservedCpuSets(report);
-                ApplyPendingRawMouseThrottle(report);
+                await ApplyPendingReservedCpuSets(report);
+                await ApplyPendingRawMouseThrottle(report);
 
                 int errorsBeforePower = report.Errors.Count;
                 TickDevicesBusy(sandboxDryRun ? "Skipping USB selective suspend..." : "Applying USB selective suspend...", 1);
@@ -514,7 +514,7 @@ public sealed partial class MainForm
                 }
                 else
                 {
-                    ApplyUsbSelectiveSuspendPowerPlan(forceDisable: false, report);
+                    await ApplyUsbSelectiveSuspendPowerPlan(forceDisable: false, report);
                 }
                 if (!sandboxDryRun && report.Errors.Count == errorsBeforePower)
                 {
@@ -700,8 +700,8 @@ public sealed partial class MainForm
                     goto AutoCompleted;
                 }
 
-                ApplyPendingReservedCpuSets(report);
-                ApplyPendingRawMouseThrottle(report);
+                await ApplyPendingReservedCpuSets(report);
+                await ApplyPendingRawMouseThrottle(report);
 
                 int errorsBeforeDevices = report.Errors.Count;
                 int saved = 0;
@@ -727,7 +727,7 @@ public sealed partial class MainForm
 
                 int errorsBeforePower = report.Errors.Count;
                 TickDevicesBusy("Applying USB selective suspend...", 1);
-                ApplyUsbSelectiveSuspendPowerPlan(forceDisable: true, report);
+                await ApplyUsbSelectiveSuspendPowerPlan(forceDisable: true, report);
                 if (report.Errors.Count == errorsBeforePower)
                 {
                     report.AddSuccess("USB POWER", "Applied");

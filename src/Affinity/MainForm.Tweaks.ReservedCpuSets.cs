@@ -182,7 +182,7 @@ public sealed partial class MainForm
         return bytes;
     }
 
-    private void ResetReservedCpuSets(OperationReport? report = null)
+    private async Task ResetReservedCpuSets(OperationReport? report = null)
     {
         if (_reservedCpuPanel?.Tag is not ReservedCpuPanelTag tag || tag.Meta.Count == 0)
         {
@@ -190,9 +190,10 @@ public sealed partial class MainForm
         }
 
         bool[] empty = new bool[tag.Meta.Count];
-        if (!SetReservedCpuSets(empty))
+        if (!await Task.Run(() => SetReservedCpuSets(empty)))
         {
             report?.AddError("Reserved CPU sets", "failed to clear ReservedCpuSets in registry");
+            return;
         }
 
         _pendingReservedCpuSets = null;
@@ -286,7 +287,7 @@ public sealed partial class MainForm
         UpdateApplyButtonDirtyCount();
     }
 
-    private void ApplyPendingReservedCpuSets(OperationReport? report)
+    private async Task ApplyPendingReservedCpuSets(OperationReport? report)
     {
         if (_testAutoDryRun)
         {
@@ -299,7 +300,8 @@ public sealed partial class MainForm
             return;
         }
 
-        if (!SetReservedCpuSets(_pendingReservedCpuSets))
+        bool[] bits = (bool[])_pendingReservedCpuSets.Clone();
+        if (!await Task.Run(() => SetReservedCpuSets(bits)))
         {
             report?.AddError("Reserved CPU sets", "failed to write the staged ReservedCpuSets value");
             return;

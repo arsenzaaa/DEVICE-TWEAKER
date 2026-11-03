@@ -82,7 +82,7 @@ public sealed partial class MainForm
         }
 
         _imodConfigLoaded = true;
-        _imodConfigCache = LoadStartupConfig();
+        _imodConfigCache = LoadStartupConfig(_testDevicesEnabled && _testDevicesOnly);
     }
 
     // Backups may hold the current profile or a script saved by an older layout.

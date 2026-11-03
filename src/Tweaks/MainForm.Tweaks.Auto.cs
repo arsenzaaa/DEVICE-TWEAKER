@@ -1216,7 +1216,7 @@ public sealed partial class MainForm
 
                     if (b.Device.IsTestDevice)
                     {
-                        ResetBlockSettings(b, report);
+                        await ResetBlockSettings(b, report);
                     }
                     else
                     {
@@ -1348,7 +1348,7 @@ public sealed partial class MainForm
                     continue;
                 }
 
-                ResetBlockSettings(b, report);
+                await ResetBlockSettings(b, report);
                 if (!b.Device.IsTestDevice)
                 {
                     LoadBlockSettings(b);
@@ -1372,7 +1372,7 @@ public sealed partial class MainForm
                 SetDevicesBusyStage("Resetting reserved CPU sets...");
             }
 
-            ResetReservedCpuSets(report);
+            await ResetReservedCpuSets(report);
         }
         catch (Exception ex)
         {
@@ -1384,7 +1384,7 @@ public sealed partial class MainForm
         {
             if (SupportsRawMouseThrottleOs())
             {
-                SetRawMouseThrottle(enabled: false, DefaultRawMouseThrottleDuration);
+                await Task.Run(() => SetRawMouseThrottle(enabled: false, DefaultRawMouseThrottleDuration));
                 RefreshRawMouseThrottleUi();
                 WriteLog("SAFE_RESET.THROTTLE: custom RawMouseThrottleDuration removed");
             }
