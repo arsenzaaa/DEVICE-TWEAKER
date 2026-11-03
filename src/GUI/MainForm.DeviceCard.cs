@@ -305,7 +305,7 @@ public sealed partial class MainForm
 
     if (block.NicItrApplyButton is not null)
     {
-        block.NicItrApplyButton.Click += (_, _) => ApplyNicItrFromBlock(block);
+        block.NicItrApplyButton.Click += async (_, _) => await ApplyNicItrFromBlock(block);
     }
 
     if (block.NicItrSaveButton is not null)
@@ -315,7 +315,7 @@ public sealed partial class MainForm
 
     if (block.NicItrCheckButton is not null)
     {
-        block.NicItrCheckButton.Click += (_, _) => CheckImodDriverFromNicBlock(block);
+        block.NicItrCheckButton.Click += async (_, _) => await CheckImodDriverFromNicBlock(block);
     }
 
     if (block.NicItrBox is not null)

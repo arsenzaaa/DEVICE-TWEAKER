@@ -130,7 +130,16 @@ public sealed partial class MainForm
         finally { block.NicItrEditorUpdateDepth--; }
     }
 
-    private async void RefreshNicItrBlock(DeviceBlock block, bool showReadingStatus = true)
+#if DEVELOPER_QA
+    private void RefreshNicItrBlock(DeviceBlock block, bool showReadingStatus = true)
+    {
+        Task read = RefreshNicItrBlockAsync(block, showReadingStatus);
+        if (read.IsCompleted) read.GetAwaiter().GetResult();
+        else _ = ObserveDeviceRefreshAsync(read);
+    }
+#endif
+
+    private async Task RefreshNicItrBlockAsync(DeviceBlock block, bool showReadingStatus = true, bool preserveInput = false)
     {
         if (block.NicItrBox is null || block.NicItrStatusLabel is null)
         {
@@ -237,7 +246,7 @@ public sealed partial class MainForm
             string detailText = FormatNicItrQueueDetailText(result.values, profile);
             string timingText = FormatNicItrTimingList(result.values, profile);
             // A late read updates diagnostics, but must not replace newer editor input.
-            bool replaceInput = editGeneration == block.NicItrEditGeneration;
+            bool replaceInput = !preserveInput && editGeneration == block.NicItrEditGeneration;
             SetNicItrReadbackText(block, valueText, replaceInput);
             block.NicItrStatusLabel.Text = summaryText;
             block.NicItrStatusLabel.ForeColor = _statusActive;
@@ -272,7 +281,7 @@ public sealed partial class MainForm
         }
     }
 
-    private void CheckImodDriverFromNicBlock(DeviceBlock block)
+    private async Task CheckImodDriverFromNicBlock(DeviceBlock block)
     {
         WriteLog($"UI: CHECK NIC ITR button clicked device={block.Device.InstanceId}");
         if (block.Device.IsTestDevice)
@@ -317,10 +326,10 @@ public sealed partial class MainForm
         }
 
         WriteLog($"NIC.ITR.CHECK: ok device={block.Device.InstanceId}");
-        RefreshNicItrBlock(block, showReadingStatus: false);
+        await RefreshNicItrBlockAsync(block, showReadingStatus: false);
     }
 
-    private async void ApplyNicItrFromBlock(DeviceBlock block)
+    private async Task ApplyNicItrFromBlock(DeviceBlock block)
     {
         if (block.NicItrBox is null || block.NicItrStatusLabel is null)
         {
@@ -378,6 +387,7 @@ public sealed partial class MainForm
         }
 
         int generation = ++block.NicItrOperationGeneration;
+        int writeEditGeneration = block.NicItrEditGeneration;
         block.NicItrStatusLabel.Text = "current: applying...";
         block.NicItrStatusLabel.ForeColor = _statusInactive;
         if (block.NicItrApplyButton is not null)
@@ -411,7 +421,7 @@ public sealed partial class MainForm
                 return;
             }
 
-            RefreshNicItrBlock(block);
+            await RefreshNicItrBlockAsync(block, preserveInput: writeEditGeneration != block.NicItrEditGeneration);
         }
         catch (Exception ex)
         {

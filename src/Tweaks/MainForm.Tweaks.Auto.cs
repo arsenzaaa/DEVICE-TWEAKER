@@ -1158,7 +1158,7 @@ public sealed partial class MainForm
         return true;
     }
 
-    private void SafeResetTweaks(OperationReport? report = null)
+    private async Task SafeResetTweaks(OperationReport? report = null)
     {
         report ??= new OperationReport();
         WriteLog("SAFE_RESET: requested; MSI mode/limit and Wi-Fi are preserved");
@@ -1177,7 +1177,7 @@ public sealed partial class MainForm
 
         if (_blocks.Count == 0)
         {
-            RefreshBlocks();
+            report.MergeIssues(await RefreshBlocksAsync());
             blockCount = Math.Max(1, _blocks.Count);
             if (ownsBusy)
             {
@@ -1305,7 +1305,8 @@ public sealed partial class MainForm
             }
 
             ResetReservedCpuSetsPreview();
-            CalculateIrqCounts("safe-reset");
+            await AwaitBackgroundUiTasksAsync(report, CalculateIrqCountsAsync("safe-reset"));
+            if (IsDisposed || Disposing) return;
             LogGuiSnapshot("safe-reset-dry-run");
             if (ownsBusy)
             {
@@ -1448,7 +1449,8 @@ public sealed partial class MainForm
             SetDevicesBusyStage("Updating IRQ counts...");
         }
 
-        CalculateIrqCounts("safe-reset");
+        await AwaitBackgroundUiTasksAsync(report, CalculateIrqCountsAsync("safe-reset"));
+        if (IsDisposed || Disposing) return;
         LogGuiSnapshot("safe-reset");
         if (ownsBusy)
         {

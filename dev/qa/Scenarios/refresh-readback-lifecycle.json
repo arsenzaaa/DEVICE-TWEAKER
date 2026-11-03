@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "refresh-readback-lifecycle",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    { "id": "initial-idle", "action": "wait", "target": "@main", "property": "refresh-idle", "value": "true", "durationMs": 5000 },
+    { "id": "slow-model", "action": "refresh-readback-model", "value": "slow", "durationMs": 500 },
+    { "id": "read-progress", "action": "transition", "durationMs": 1400, "intervalMs": 100,
+      "target": "@main", "property": "refresh-progress-valid", "value": "true",
+      "trigger": { "action": "click", "target": "id:REFRESH" } },
+    { "id": "completed-idle", "action": "wait", "target": "@main", "property": "refresh-idle", "value": "true", "durationMs": 5000 },
+    { "id": "completed-irq", "action": "assert", "target": "role:irq", "device": "DEV_461E", "value": "IRQ: 2 | HW: Line/MSI/MSI-X (max 2)" },
+    { "id": "timeout-model", "action": "refresh-readback-model", "value": "timeout", "durationMs": 600 },
+    { "id": "timeout-refresh", "action": "click", "target": "id:REFRESH" },
+    { "id": "timeout-idle", "action": "wait", "target": "@main", "property": "refresh-idle", "value": "true", "durationMs": 5000 },
+    { "id": "timed-out-label", "action": "assert", "target": "role:irq", "device": "DEV_461E", "value": "IRQ: unavailable | HW: unknown" },
+    { "id": "timed-out", "action": "capture" },
+    { "id": "late-completed", "action": "wait", "target": "@main", "property": "refresh-readback-pending", "value": "0", "durationMs": 5000 },
+    { "id": "late-result-rejected", "action": "assert", "target": "role:irq", "device": "DEV_461E", "value": "IRQ: unavailable | HW: unknown" },
+    { "id": "after-late-result", "action": "capture" }
+  ]
+}

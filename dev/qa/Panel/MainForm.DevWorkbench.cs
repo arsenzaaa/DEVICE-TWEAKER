@@ -10,6 +10,12 @@ namespace DeviceTweakerCS;
 
 public sealed partial class MainForm
 {
+    private int _devDiscoveryDelayMs;
+    private int _devDiscoveryPending;
+    private Control[] _devDiscoveryOriginalCards = [];
+    private int _devRefreshReadbackDelayMs;
+    private int _devRefreshReadbackTimeoutMs;
+    private int _devRefreshReadbackPending;
     private DevRun? _devRun;
     private readonly Stopwatch _devClock = new();
     private readonly List<Exception> _devQueuedErrors = [];
@@ -140,6 +146,7 @@ public sealed partial class MainForm
                 "msi" => b.MsiCombo, "limit" => b.LimitBox, "priority" => b.PrioCombo, "policy" => b.PolicyCombo,
                 "imod" => b.ImodBox, "imod-toggle" => b.ImodAutoCheck, "imod-check" => b.ImodCheckButton!,
                 "imod-current" => b.ImodCurrentLabel, "mode" => b.InterruptModeLabel!,
+                "irq" => b.IrqLabel,
                 "nic-itr" => b.NicItrBox!, "rss-queues" => b.RssQueueBox!,
                 "affinity" => b.AffinityLabel,
                 "mode-refresh" => _interruptModesReadButton,
@@ -204,6 +211,14 @@ public sealed partial class MainForm
         "filter-toolbar-fits" when control == this => (_filterCategoriesHost is not null && DevInViewport(_searchFilterBox)
             && !_searchFilterBox.Parent!.Bounds.IntersectsWith(_filterCategoriesHost.Bounds)
             && _filterCategoryButtons.All(DevInViewport)).ToString().ToLowerInvariant(),
+        "refresh-idle" when control == this => (_devicesBusyDepth == 0 && _lastDeviceRefresh.IsCompleted
+            && _layoutRefreshTimer?.Enabled != true).ToString().ToLowerInvariant(),
+        "discovery-pending" when control == this => (Volatile.Read(ref _devDiscoveryPending) > 0).ToString().ToLowerInvariant(),
+        "discovery-cards-preserved" when control == this => _blocks.Select(block => block.Group)
+            .SequenceEqual(_devDiscoveryOriginalCards).ToString().ToLowerInvariant(),
+        "refresh-readback-pending" when control == this => _devRefreshReadbackPending.ToString(),
+        "refresh-progress-valid" when control == this => (_activeReadbackBatches == 0 || _devicesBusyOverlay?.Visible != true
+            || _devicesBusyLabel?.Text.EndsWith("\r\n100%", StringComparison.Ordinal) != true).ToString().ToLowerInvariant(),
         "irq-read-count" when control == this => _devIrqReadInstances.Count.ToString(),
         "irq-read-instance" when control == this => string.Join("|", _devIrqReadInstances),
         "readAt" => _blocks.Single(block => block.InterruptModeLabel == control).InterruptMode.ReadAt?.ToString("O") ?? "",
@@ -254,6 +269,19 @@ public sealed partial class MainForm
                     throw new InvalidDataException("IRQ model requires an idle reader, success/failure and a delay of at least 100 ms");
                 _devIrqReadDelayMs = step.DurationMs; _devIrqReadOutcome = step.Value;
                 lock (_devIrqReadInstances) _devIrqReadInstances.Clear();
+                break;
+            case "discovery-model":
+                if (_devicesBusyDepth != 0 || _devDiscoveryPending != 0 || step.DurationMs < 300)
+                    throw new InvalidDataException("Discovery model requires an idle reader and at least 300 ms.");
+                _devDiscoveryDelayMs = step.DurationMs;
+                _devDiscoveryOriginalCards = _blocks.Select(block => (Control)block.Group).ToArray();
+                break;
+            case "refresh-readback-model":
+                if (_devicesBusyDepth != 0 || _devRefreshReadbackPending != 0
+                    || step.Value is not ("slow" or "timeout") || step.DurationMs < 300)
+                    throw new InvalidDataException("Refresh model requires an idle reader, slow/timeout and at least 300 ms");
+                _devRefreshReadbackDelayMs = step.DurationMs;
+                _devRefreshReadbackTimeoutMs = step.Value == "timeout" ? 100 : 5000;
                 break;
             case "scroll":
                 if (!Enum.TryParse(step.Value, out Keys key) || key is not (Keys.Home or Keys.End or Keys.PageUp or Keys.PageDown)) throw new InvalidDataException("Unsupported list key");

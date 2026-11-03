@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "discovery-responsive",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    { "id": "idle", "action": "wait", "target": "@main", "property": "refresh-idle", "value": "true", "durationMs": 5000 },
+    { "id": "reveal-limit", "action": "reveal", "target": "role:limit", "device": "DEV_461E" },
+    { "id": "edit", "action": "text", "target": "role:limit", "device": "DEV_461E", "value": "8" },
+    { "id": "before", "action": "capture" },
+    { "id": "delay-provider", "action": "discovery-model", "durationMs": 1800 },
+    { "id": "refresh", "action": "click", "target": "id:REFRESH" },
+    { "id": "pending", "action": "assert", "target": "@main", "property": "discovery-pending", "value": "true" },
+    { "id": "old-cards-retained", "action": "assert", "target": "@main", "property": "discovery-cards-preserved", "value": "true" },
+    { "id": "language-while-scanning", "action": "language", "value": "RU" },
+    { "id": "narrow-while-scanning", "action": "resize", "width": 1000, "height": 720 },
+    { "id": "responsive", "action": "capture" },
+    { "id": "settled", "action": "wait", "target": "@main", "property": "refresh-idle", "value": "true", "durationMs": 6000 },
+    { "id": "show-limit", "action": "reveal", "target": "role:limit", "device": "DEV_461E" },
+    { "id": "edit-preserved", "action": "assert", "target": "role:limit", "device": "DEV_461E", "value": "8" },
+    { "id": "after", "action": "capture" }
+  ]
+}

@@ -140,7 +140,7 @@ public sealed partial class MainForm : Form
         // ahead of WM_PAINT and expose half-rendered header/buttons during startup.
         _startupRefreshTimer?.Dispose();
         _startupRefreshTimer = new System.Windows.Forms.Timer { Interval = 80 };
-        _startupRefreshTimer.Tick += (_, _) =>
+        _startupRefreshTimer.Tick += async (_, _) =>
         {
             _startupRefreshTimer?.Stop();
             _startupRefreshTimer?.Dispose();
@@ -154,12 +154,13 @@ public sealed partial class MainForm : Form
 #if DEVELOPER_QA
             if (CheckAndApplyShowcaseSetup())
             {
+                await _lastDeviceRefresh;
                 StartDevWorkbenchIfRequested();
                 return;
             }
 
 #endif
-            RefreshBlocks();
+            await RefreshBlocksAsync();
 #if DEVELOPER_QA
             if (showTestAdmin && !IsDisposed)
             {

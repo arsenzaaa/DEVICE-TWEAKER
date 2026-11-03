@@ -1347,7 +1347,7 @@ public sealed partial class MainForm
     }
 
     // SET on an IMOD card: backup, write the intervals, save autostart, then read them back.
-    private void ApplyImodFromBlock(DeviceBlock? targetBlock)
+    private async Task ApplyImodFromBlock(DeviceBlock? targetBlock)
     {
         WriteLog("UI: SET IMOD button clicked");
         if (targetBlock is not null && targetBlock.Device.IsTestDevice)
@@ -1385,7 +1385,8 @@ public sealed partial class MainForm
             return;
         }
 
-        WaitForBackgroundUiTasks(RefreshImodCurrentValuesAsync(showReadingStatus: true, reason: "imod-set"));
+        await AwaitBackgroundUiTasksAsync(report, RefreshImodCurrentValuesAsync(showReadingStatus: true, reason: "imod-set"));
+        if (IsDisposed || Disposing) return;
         AddImodResultToReport(report, outcome, note, technicalDetails);
 
         if (report.Succeeded && report.Warnings.Count == 0)

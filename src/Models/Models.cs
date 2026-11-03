@@ -151,6 +151,7 @@ internal sealed class DeviceIrqInfo
 
 internal sealed class DeviceInfo
 {
+    internal DeviceInfo CopyForDiscovery() => (DeviceInfo)MemberwiseClone();
     public required string Name { get; init; }
     public required string InstanceId { get; init; }
     public required string Class { get; init; }

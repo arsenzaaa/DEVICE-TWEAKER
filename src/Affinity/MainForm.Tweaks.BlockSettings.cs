@@ -801,7 +801,6 @@ public sealed partial class MainForm
             block.ImodBox.Text = EnsureTestDeviceState(block.Device).ImodValue;
 
         LoadRawMouseThrottleControls(block);
-        RefreshNicItrBlock(block);
         UpdateImodSelectorsFromText(block);
         UpdateBlockInfoText(block);
     }

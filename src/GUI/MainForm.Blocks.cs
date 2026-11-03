@@ -1100,7 +1100,7 @@ public sealed partial class MainForm
         ImodRoleEditor imodRoleEditor = new(this, imodDeviceEditorRoles, txtImod, chkImod, cmbImodMode);
 
         Button btnImodApply = NewCardButton("SET", UiScale(54, 24));
-        btnImodApply.Click += (_, _) => ApplyImodFromBlock(createdBlock);
+        btnImodApply.Click += async (_, _) => await ApplyImodFromBlock(createdBlock);
 
         Button btnImodDelete = NewCardButton("DELETE", UiScale(76, 24));
         btnImodDelete.Click += (_, _) => DeleteImodFromBlock(createdBlock);
@@ -1746,10 +1746,6 @@ public sealed partial class MainForm
         {
             RefreshTestImodPreview(block, "test-block-init");
         }
-        if (showNicItr)
-        {
-            RefreshNicItrBlock(block);
-        }
     }
 
     private void LayoutBlocks()
@@ -1942,7 +1938,8 @@ public sealed partial class MainForm
             return 0;
         }
 
-        return (int)Math.Clamp(Math.Round(100.0 * _devicesBusyDone / _devicesBusyTotal), 0, 100);
+        int percent = (int)Math.Clamp(Math.Round(100.0 * _devicesBusyDone / _devicesBusyTotal), 0, 100);
+        return _activeReadbackBatches > 0 || _devicesBusyDone < _devicesBusyTotal ? Math.Min(99, percent) : percent;
     }
 
     private void SetDevicesBusyStage(string stage)
@@ -1963,12 +1960,13 @@ public sealed partial class MainForm
 
     private void UpdateDevicesBusy(string stage, int percent)
     {
+        _devicesBusyStage = stage;
         if (_devicesBusyOverlay is null || _devicesBusyLabel is null)
         {
             return;
         }
 
-        percent = Math.Clamp(percent, 0, 100);
+        percent = Math.Clamp(percent, 0, _activeReadbackBatches > 0 ? 99 : 100);
         _devicesBusyLabel.Text = $"{stage}\r\n{percent}%";
         if (!_devicesBusyOverlay.Visible)
         {
@@ -1982,6 +1980,11 @@ public sealed partial class MainForm
 
     private void EndDevicesBusy()
     {
+        if (_uiDisposing || IsDisposed || Disposing)
+        {
+            _devicesBusyDepth = 0;
+            return;
+        }
         if (_devicesBusyOverlay is null)
         {
             return;
@@ -2047,78 +2050,97 @@ public sealed partial class MainForm
         return true;
     }
 
-    private void WaitForBackgroundUiTasks(params Task[] tasks)
+    private int _activeReadbackBatches;
+    private string _devicesBusyStage = string.Empty;
+
+    private async Task<bool> AwaitBackgroundUiTasksAsync(OperationReport? report, params Task[] tasks)
     {
-        if (tasks.Length == 0)
-        {
-            return;
-        }
-
-        Task all = Task.WhenAll(tasks);
-        if (all.IsCompleted)
-        {
-            all.GetAwaiter().GetResult();
-            return;
-        }
-
         bool wasButtonsEnabled = _operationButtons.Length > 0 && _operationButtons[0].Enabled;
-        if (wasButtonsEnabled)
-        {
-            SetOperationButtonsEnabled(false);
-        }
+        if (wasButtonsEnabled) SetOperationButtonsEnabled(false);
         _devicesBusyDepth++;
-
-        Stopwatch timeout = Stopwatch.StartNew();
+        _activeReadbackBatches++;
         try
         {
-            while (!all.IsCompleted)
+            if (_devicesBusyOverlay?.Visible == true)
+                UpdateDevicesBusy(_devicesBusyStage, GetDevicesBusyPercent());
+            TimeSpan timeout = TimeSpan.FromSeconds(20);
+#if DEVELOPER_QA
+            if (_devRefreshReadbackTimeoutMs > 0)
             {
-                if (timeout.Elapsed >= TimeSpan.FromSeconds(20))
+                timeout = TimeSpan.FromMilliseconds(_devRefreshReadbackTimeoutMs);
+                _devRefreshReadbackTimeoutMs = 0;
+            }
+#endif
+            BackgroundReadOutcome outcome = await BackgroundReadbacks.WaitAsync(Task.WhenAll(tasks), timeout,
+                () =>
                 {
-                    // Both asynchronous readers validate their generation before touching
-                    // controls. Invalidate late results and keep the main window usable if
-                    // a WMI/provider call gets stuck inside Windows.
                     Interlocked.Increment(ref _irqRefreshGeneration);
                     Interlocked.Increment(ref _imodReadbackGeneration);
-                    WriteLog($"UI.BACKGROUND.TIMEOUT: tasks={tasks.Length} elapsedMs={timeout.ElapsedMilliseconds} late results invalidated");
-                    _ = all.ContinueWith(
-                        completed =>
-                        {
-                            if (completed.Exception is not null)
-                            {
-                                WriteLog($"UI.BACKGROUND.LATE.ERROR: {FlattenLogText(completed.Exception.ToString())}");
-                            }
-                        },
-                        CancellationToken.None,
-                        TaskContinuationOptions.ExecuteSynchronously,
-                        TaskScheduler.Default);
-                    return;
+                    WriteLog($"UI.BACKGROUND.TIMEOUT: tasks={tasks.Length}; late results invalidated");
+                },
+                error => WriteLog($"UI.BACKGROUND.LATE.ERROR: {FlattenLogText(error.ToString())}"));
+            if (outcome == BackgroundReadOutcome.Completed) return true;
+            if (!IsDisposed && !Disposing)
+            {
+                foreach (DeviceBlock block in _blocks)
+                {
+                    if (block.IrqLabel.Text.Contains("reading", StringComparison.OrdinalIgnoreCase))
+                        block.IrqLabel.Text = "IRQ: unavailable | HW: unknown";
+                    if (block.InterruptMode == InterruptModeResult.Pending)
+                        SetInterruptModeResult(block, new(InterruptMode.Unavailable, "Interrupt mode read timed out. Refresh to retry."));
+                    if (block.ImodCurrentLabel.Text.Contains("reading", StringComparison.OrdinalIgnoreCase))
+                    {
+                        block.ImodCurrentLabel.Text = "current: read timed out";
+                        block.ImodCurrentLabel.Tag = block.ImodCurrentLabel.Text;
+                        SetImodStatusTooltip(block.ImodCurrentLabel);
+                    }
+                    if (block.NicItrStatusLabel?.Text.Contains("reading", StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        block.NicItrOperationGeneration++;
+                        block.NicItrStatusLabel.Text = "current: read timed out";
+                        if (block.NicItrTimeLabel is not null) block.NicItrTimeLabel.Text = "time: unavailable";
+                    }
                 }
-
-                Application.DoEvents();
-                Thread.Sleep(10);
             }
-
-            all.GetAwaiter().GetResult();
+            report?.AddWarning("Device readback", "Some device data could not be refreshed within the time limit.",
+                "Late results were invalidated. Hardware readback was not confirmed.");
+            return false;
         }
         finally
         {
-            if (_devicesBusyDepth > 0)
-            {
-                _devicesBusyDepth--;
-            }
-
-            if (wasButtonsEnabled && _devicesBusyDepth == 0)
-            {
-                SetOperationButtonsEnabled(true);
-            }
+            _activeReadbackBatches--;
+            if (_devicesBusyDepth > 0) _devicesBusyDepth--;
+            if (wasButtonsEnabled && _devicesBusyDepth == 0) SetOperationButtonsEnabled(true);
         }
     }
 
+    private Task<OperationReport> _lastDeviceRefresh = Task.FromResult(new OperationReport());
+    private bool _deviceDiscoveryCompleted;
+    private readonly DeviceDiscovery _deviceDiscovery = new();
+
+#if DEVELOPER_QA
+    // Existing fixture editors are synchronous. Pure model readbacks complete inline;
+    // mixed/native developer views keep an observed task rather than block the UI.
     private void RefreshBlocks(bool includeImodReadback = true, bool preserveEdits = true)
     {
-        Dictionary<string, EditorDraft> drafts = preserveEdits ? CaptureEditorDrafts() : new(StringComparer.OrdinalIgnoreCase);
-        DeviceViewport viewport = CaptureDeviceViewport();
+        Task<OperationReport> refresh = RefreshBlocksAsync(includeImodReadback, preserveEdits);
+        if (refresh.IsCompleted) refresh.GetAwaiter().GetResult();
+        else _ = ObserveDeviceRefreshAsync(refresh);
+    }
+
+    private async Task ObserveDeviceRefreshAsync(Task refresh)
+    {
+        try { await refresh; }
+        catch (Exception error) { WriteLog($"UI.REFRESH.ERROR: {FlattenLogText(error.ToString())}"); }
+    }
+#endif
+
+    private Task<OperationReport> RefreshBlocksAsync(bool includeImodReadback = true, bool preserveEdits = true)
+        => _lastDeviceRefresh = RefreshBlocksCoreAsync(includeImodReadback, preserveEdits);
+
+    private async Task<OperationReport> RefreshBlocksCoreAsync(bool includeImodReadback, bool preserveEdits)
+    {
+        OperationReport refreshReport = new();
         long refreshStarted = Stopwatch.GetTimestamp();
         WriteLog($"REFRESH.START: includeImodReadback={includeImodReadback} previousBlocks={_blocks.Count}");
         bool ownsBusy = _devicesBusyDepth == 0;
@@ -2134,6 +2156,21 @@ public sealed partial class MainForm
 
         try
         {
+            DiscoveryInput input = CaptureDiscoveryInput();
+            DeviceDiscoveryResult discovery = await _deviceDiscovery.ReadAsync(
+                () => DiscoverDevicesAsync(input),
+                TimeSpan.FromSeconds(30), error => AppDiagnostics.Warn("SCAN.LATE", error));
+            if (_uiDisposing || IsDisposed || Disposing) return refreshReport;
+            if (discovery.Devices is null)
+            {
+                refreshReport.MarkNoChangesMade();
+                refreshReport.AddError("Device discovery", discovery.Error ?? "Device discovery failed.");
+                WriteLog($"SCAN.FAILED: {discovery.Error}");
+                return refreshReport;
+            }
+            IReadOnlyList<DeviceInfo> devs = discovery.Devices;
+            Dictionary<string, EditorDraft> drafts = preserveEdits ? CaptureEditorDrafts() : new(StringComparer.OrdinalIgnoreCase);
+            DeviceViewport viewport = CaptureDeviceViewport();
             InvalidateImodCache();
             _ndisRssRuntimeCache.Clear();
             Dictionary<string, string> priorImodStatuses = [];
@@ -2184,7 +2221,6 @@ public sealed partial class MainForm
                 _reservedCpuPanel = null;
 
                 TickDevicesBusy("Enumerating devices...", ownsBusy ? 1 : 0);
-                List<DeviceInfo> devs = GetDeviceList();
                 WarnIfMissingGpuDriver(devs);
 
                 int buildUnits = Math.Max(0, devs.Count);
@@ -2254,31 +2290,19 @@ public sealed partial class MainForm
             _devicesPanel.Invalidate(true);
             _devicesHost.Invalidate(true);
 
+            _deviceDiscoveryCompleted = true;
+            List<Task> readbacks = _blocks.Where(block => block.NicItrBox is not null)
+                .Select(block => RefreshNicItrBlockAsync(block)).ToList();
             if (includeImodReadback)
             {
-                // Update the displayed IMOD state without loading DTIMOD.
-                if (ownsBusy)
-                {
-                    TickDevicesBusy("Updating IMOD display...", 1);
-                }
-                else
-                {
-                    SetDevicesBusyStage("Updating IMOD display...");
-                }
-
-                WaitForBackgroundUiTasks(RefreshImodCurrentValuesAsync(showReadingStatus: true, reason: "refresh-blocks"));
+                TickDevicesBusy("Updating IMOD display...", 0);
+                readbacks.Add(RefreshImodCurrentValuesAsync(showReadingStatus: true, reason: "refresh-blocks"));
             }
-
-            if (ownsBusy)
-            {
-                TickDevicesBusy("Updating IRQ counts...", 1);
-            }
-            else
-            {
-                SetDevicesBusyStage("Updating IRQ counts...");
-            }
-
-            WaitForBackgroundUiTasks(CalculateIrqCountsAsync("refresh-blocks"));
+            TickDevicesBusy("Updating IRQ counts...", 0);
+            readbacks.Add(CalculateIrqCountsAsync("refresh-blocks"));
+            await AwaitBackgroundUiTasksAsync(refreshReport, readbacks.ToArray());
+            if (_uiDisposing || IsDisposed || Disposing) return refreshReport;
+            if (ownsBusy) TickDevicesBusy("Finalizing device display...", includeImodReadback ? 2 : 1);
             LogGuiSnapshot("refresh");
             if (ownsBusy)
             {
@@ -2298,6 +2322,7 @@ public sealed partial class MainForm
             WriteLog(
                 $"REFRESH.DONE: includeImodReadback={includeImodReadback} blocks={_blocks.Count} " +
                 $"elapsedMs={Stopwatch.GetElapsedTime(refreshStarted).TotalMilliseconds:0}");
+            return refreshReport;
         }
         finally
         {
@@ -2471,7 +2496,16 @@ public sealed partial class MainForm
     private async Task CalculateIrqCountsAsync(string reason = "refresh")
     {
         int generation = ++_irqRefreshGeneration;
-        foreach (DeviceBlock b in _blocks)
+        DeviceBlock[] snapshot = _blocks.ToArray();
+        DeviceInfo[] devices = snapshot.Select(block => block.Device).ToArray();
+        var nativeRequests = snapshot.Where(block => !block.Device.IsTestDevice)
+            .Select(block => (Block: block, InstanceId: block.Device.InstanceId)).ToArray();
+        bool modelOnly = nativeRequests.Length == 0;
+#if DEVELOPER_QA
+        int modelDelay = modelOnly ? _devRefreshReadbackDelayMs : 0;
+        if (modelOnly) _devRefreshReadbackDelayMs = 0;
+#endif
+        foreach (DeviceBlock b in snapshot)
         {
             b.IrqLabel.Text = "IRQ Count: reading...";
             SetInterruptModeResult(b, b.Device.IsTestDevice ? CreateTestInterruptMode(b.Device) : InterruptModeResult.Pending);
@@ -2482,14 +2516,25 @@ public sealed partial class MainForm
         Dictionary<string, PciInterruptCapabilities> capabilitiesById;
         try
         {
-            irqCounts = _blocks.All(block => block.Device.IsTestDevice)
+#if DEVELOPER_QA
+            if (modelDelay > 0)
+            {
+                _devRefreshReadbackPending++;
+                try { await Task.Delay(modelDelay); }
+                finally { _devRefreshReadbackPending--; }
+            }
+#endif
+            irqCounts = modelOnly
                 ? new Dictionary<string, DeviceIrqInfo>(StringComparer.OrdinalIgnoreCase)
                 : await Task.Run(GetDeviceIrqCounts);
-            capabilitiesById = await Task.Run(() => ReadInterruptCapabilities(_blocks));
+            if (IsDisposed || generation != _irqRefreshGeneration) return;
+            capabilitiesById = modelOnly ? ReadInterruptCapabilities(devices)
+                : await Task.Run(() => ReadInterruptCapabilities(devices));
+            if (IsDisposed || generation != _irqRefreshGeneration) return;
             // Read PCI through an existing device, or Windows allocation if absent. Never load a driver here.
-            DeviceBlock[] snapshot = _blocks.ToArray();
-            var modes = await Task.Run(() => snapshot.Where(b => !b.Device.IsTestDevice)
-                .Select(b => (Block: b, Result: PciInterruptReader.QueryLoaded(b.Device.InstanceId))).ToArray());
+            (DeviceBlock Block, InterruptModeResult Result)[] modes = modelOnly ? []
+                : await Task.Run(() => nativeRequests.Select(request =>
+                    (request.Block, Result: PciInterruptReader.QueryLoaded(request.InstanceId))).ToArray());
             if (IsDisposed || generation != _irqRefreshGeneration) return;
             foreach (var mode in modes) SetInterruptModeResult(mode.Block, mode.Result);
         }
@@ -2501,7 +2546,7 @@ public sealed partial class MainForm
                 return;
             }
 
-            foreach (DeviceBlock b in _blocks)
+            foreach (DeviceBlock b in snapshot)
             {
                 string regMsiStatus = ReadMsiStatusFromRegistry(b);
                 b.IrqCount = null;
@@ -2516,7 +2561,7 @@ public sealed partial class MainForm
             return;
         }
 
-        foreach (DeviceBlock b in _blocks)
+        foreach (DeviceBlock b in snapshot)
         {
             string shortPnp = GetShortPnpId(b.Device.InstanceId);
             if (b.Device.IsTestDevice)
@@ -2563,20 +2608,15 @@ public sealed partial class MainForm
         LogGuiSnapshot("irq-refresh");
     }
 
-    private void CalculateIrqCounts(string reason = "refresh")
-    {
-        WaitForBackgroundUiTasks(CalculateIrqCountsAsync(reason));
-    }
-
-    private Dictionary<string, PciInterruptCapabilities> ReadInterruptCapabilities(IEnumerable<DeviceBlock> blocks)
+    private Dictionary<string, PciInterruptCapabilities> ReadInterruptCapabilities(IEnumerable<DeviceInfo> devices)
     {
         Dictionary<string, PciInterruptCapabilities> result = new(StringComparer.OrdinalIgnoreCase);
-        foreach (DeviceBlock block in blocks)
+        foreach (DeviceInfo device in devices)
         {
-            string key = NormalizeInstanceId(block.Device.InstanceId);
-            if (block.Device.IsTestDevice)
+            string key = NormalizeInstanceId(device.InstanceId);
+            if (device.IsTestDevice)
             {
-                PciInterruptCapabilities? test = CreateTestInterruptCapabilities(block.Device, block.Device.TestIrqCount ?? 1);
+                PciInterruptCapabilities? test = CreateTestInterruptCapabilities(device, device.TestIrqCount ?? 1);
                 if (test is not null)
                 {
                     result[key] = test;
@@ -2585,7 +2625,7 @@ public sealed partial class MainForm
             }
 
             if (!string.IsNullOrWhiteSpace(key)
-                && NativeCfgMgr32.TryGetPciInterruptCapabilities(block.Device.InstanceId, out PciInterruptCapabilities? capabilities)
+                && NativeCfgMgr32.TryGetPciInterruptCapabilities(device.InstanceId, out PciInterruptCapabilities? capabilities)
                 && capabilities is not null)
             {
                 result[key] = capabilities;

@@ -32,9 +32,10 @@ internal static class WmiInterop
                     ConfigManagerErrorCode: ToNullableInt32(mo["ConfigManagerErrorCode"])));
             }
         }
-        catch
+        catch (Exception error)
         {
-            return results;
+            AppDiagnostics.Warn("WMI.DISCOVERY", error);
+            throw;
         }
 
         return results;
@@ -79,7 +80,7 @@ internal static class WmiInterop
         return null;
     }
 
-    public static List<(string ControllerId, string DependentId)> GetUsbControllerDevicePairs(Func<string, string> normalizeInstanceId)
+    public static List<(string ControllerId, string DependentId)> GetUsbControllerDevicePairs(Func<string, string> normalizeInstanceId, bool throwOnError = false)
     {
         List<(string ControllerId, string DependentId)> results = [];
         try
@@ -115,8 +116,10 @@ internal static class WmiInterop
                 results.Add((controllerId, dependentId));
             }
         }
-        catch
+        catch (Exception error)
         {
+            AppDiagnostics.Warn("WMI.USB", error);
+            if (throwOnError) throw;
             return results;
         }
 
@@ -145,9 +148,10 @@ internal static class WmiInterop
                 results.Add(new WmiPhysicalDisk(name, busType, mediaType));
             }
         }
-        catch
+        catch (Exception error)
         {
-            return results;
+            AppDiagnostics.Warn("WMI.DISCOVERY", error);
+            throw;
         }
 
         return results;

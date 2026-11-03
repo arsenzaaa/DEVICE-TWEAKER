@@ -899,7 +899,41 @@ public sealed partial class MainForm
         return DeviceKind.NET_NDIS;
     }
 
-    private List<DeviceInfo> GetDeviceList()
+    private sealed record DiscoveryInput(bool Enabled, bool Only, DeviceInfo[] Devices,
+        HashSet<string> HiddenIds, Dictionary<string, string> HiddenLabels);
+
+    private DiscoveryInput CaptureDiscoveryInput() => new(_testDevicesEnabled, _testDevicesOnly,
+        _testDevices.Select(device => device.CopyForDiscovery()).ToArray(),
+        new(_testHiddenDeviceIds, StringComparer.OrdinalIgnoreCase),
+        new(_testHiddenDeviceLabels, StringComparer.OrdinalIgnoreCase));
+
+    private Task<IReadOnlyList<DeviceInfo>> DiscoverDevicesAsync(DiscoveryInput input)
+    {
+#if DEVELOPER_QA
+        if (_devDiscoveryDelayMs > 0)
+        {
+            if (!input.Enabled || !input.Only) throw new InvalidOperationException("Discovery delay requires a model-only fixture.");
+            int delay = _devDiscoveryDelayMs;
+            _devDiscoveryDelayMs = 0;
+            return DelayedModelAsync();
+            async Task<IReadOnlyList<DeviceInfo>> DelayedModelAsync()
+            {
+                Interlocked.Increment(ref _devDiscoveryPending);
+                try
+                {
+                    await Task.Delay(delay).ConfigureAwait(false);
+                    return GetDeviceList(input);
+                }
+                finally { Interlocked.Decrement(ref _devDiscoveryPending); }
+            }
+        }
+#endif
+        return input.Enabled && input.Only
+            ? Task.FromResult<IReadOnlyList<DeviceInfo>>(GetDeviceList(input))
+            : Task.Run<IReadOnlyList<DeviceInfo>>(() => GetDeviceList(input));
+    }
+
+    private List<DeviceInfo> GetDeviceList(DiscoveryInput input)
     {
         WriteLog("SCAN: Get-DeviceList start");
 
@@ -928,10 +962,10 @@ public sealed partial class MainForm
                 .ToList();
         }
 
-        if (_testDevicesEnabled && _testDevicesOnly && _testDevices.Count > 0)
+        if (input.Enabled && input.Only)
         {
-            WriteLog($"SCAN.TEST: using test devices only count={_testDevices.Count}");
-            List<DeviceInfo> testOnly = _testDevices.ToList();
+            WriteLog($"SCAN.TEST: using test devices only count={input.Devices.Length}");
+            List<DeviceInfo> testOnly = input.Devices.ToList();
             testOnly = SortDevices(testOnly);
             WriteLog($"SCAN: Get-DeviceList done, count={testOnly.Count}");
             return testOnly;
@@ -949,7 +983,7 @@ public sealed partial class MainForm
             }
         }
 
-        List<(string ControllerId, string DependentId)> usbPairs = WmiInterop.GetUsbControllerDevicePairs(NormalizeInstanceId);
+        List<(string ControllerId, string DependentId)> usbPairs = WmiInterop.GetUsbControllerDevicePairs(NormalizeInstanceId, throwOnError: true);
         HashSet<string> usbControllersWithDevice = new(StringComparer.OrdinalIgnoreCase);
         foreach ((string controllerId, string dependentId) in usbPairs)
         {
@@ -1009,9 +1043,9 @@ public sealed partial class MainForm
             }
 
             string normalizedInstanceId = NormalizeInstanceId(d.InstanceId);
-            if (_testHiddenDeviceIds.Contains(normalizedInstanceId))
+            if (input.HiddenIds.Contains(normalizedInstanceId))
             {
-                string hiddenName = _testHiddenDeviceLabels.TryGetValue(normalizedInstanceId, out string? label) ? label : d.Name ?? d.InstanceId;
+                string hiddenName = input.HiddenLabels.TryGetValue(normalizedInstanceId, out string? label) ? label : d.Name ?? d.InstanceId;
                 WriteLog($"SCAN.TEST.HIDE: skipped hidden real device {d.InstanceId} name=\"{hiddenName}\"");
                 continue;
             }
@@ -1290,11 +1324,11 @@ public sealed partial class MainForm
         devices = devices
             .ToList();
 
-        if (_testDevicesEnabled && _testDevices.Count > 0)
+        if (input.Enabled && input.Devices.Length > 0)
         {
-            devices.AddRange(_testDevices);
+            devices.AddRange(input.Devices);
             RefineUsbChipPathIndices(devices);
-            WriteLog($"SCAN.TEST: appended test devices count={_testDevices.Count}");
+            WriteLog($"SCAN.TEST: appended test devices count={input.Devices.Length}");
         }
 
         devices = SortDevices(devices);

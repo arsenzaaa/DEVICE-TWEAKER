@@ -412,13 +412,13 @@ public sealed partial class MainForm
         {
             Interval = 220,
         };
-        _layoutRefreshTimer.Tick += (_, _) =>
+        _layoutRefreshTimer.Tick += async (_, _) =>
         {
             _layoutRefreshTimer.Stop();
-            RebuildDeviceBlocksForLayout();
+            await RebuildDeviceBlocksForLayout();
         };
 
-        btnScan.Click += (_, _) =>
+        btnScan.Click += async (_, _) =>
         {
             if (_devicesBusyDepth > 0)
             {
@@ -427,9 +427,11 @@ public sealed partial class MainForm
             }
 
             WriteLog("UI: REFRESH button clicked");
-            RefreshBlocks();
+            OperationReport report = await RefreshBlocksAsync();
+            if (!_uiDisposing && !IsDisposed && !Disposing && report.Errors.Count > 0)
+                ShowOperationResult(report, string.Empty, "The device list could not be refreshed.", operationName: "REFRESH");
         };
-        btnApply.Click += (_, _) =>
+        btnApply.Click += async (_, _) =>
         {
             if (_devicesBusyDepth > 0)
             {
@@ -532,9 +534,10 @@ public sealed partial class MainForm
                 }
 
                 TickDevicesBusy("Updating IMOD / IRQ display...", 1);
-                WaitForBackgroundUiTasks(
+                await AwaitBackgroundUiTasksAsync(report,
                     RefreshImodCurrentValuesAsync(showReadingStatus: true, reason: sandboxDryRun ? "apply-dry-run" : "apply"),
                     CalculateIrqCountsAsync(sandboxDryRun ? "apply-dry-run" : "apply"));
+                if (IsDisposed || Disposing) return;
                 LogGuiSnapshot(sandboxDryRun ? "apply-dry-run" : "apply");
                 _devicesBusyDone = _devicesBusyTotal;
                 UpdateDevicesBusy("Ready", 100);
@@ -568,7 +571,7 @@ public sealed partial class MainForm
                 MaybeOfferVulnerableDriverBlocklistDisable(report);
             }
         };
-        btnAuto.Click += (_, _) =>
+        btnAuto.Click += async (_, _) =>
         {
             if (_devicesBusyDepth > 0)
             {
@@ -734,7 +737,8 @@ public sealed partial class MainForm
 
                 WriteLog($"UI: AUTO-OPTIMIZATION done errors={report.Errors.Count} -> triggering REFRESH");
                 SetDevicesBusyStage("Refreshing devices...");
-                RefreshBlocks();
+                report.MergeIssues(await RefreshBlocksAsync());
+                if (IsDisposed || Disposing) return;
                 _devicesBusyDone = _devicesBusyTotal;
                 UpdateDevicesBusy("Ready", 100);
             }
@@ -764,7 +768,7 @@ public sealed partial class MainForm
                 MaybeOfferVulnerableDriverBlocklistDisable(report);
             }
         };
-        btnRestore.Click += (_, _) =>
+        btnRestore.Click += async (_, _) =>
         {
             if (_devicesBusyDepth > 0)
             {
@@ -773,7 +777,7 @@ public sealed partial class MainForm
             }
 
             WriteLog("UI: RESTORE button clicked");
-            RestoreLatestDeviceTweakerBackup();
+            await RestoreLatestDeviceTweakerBackup();
         };
 
         _lastLayoutViewportWidth = _devicesHost.ClientSize.Width;
@@ -863,13 +867,19 @@ public sealed partial class MainForm
         _layoutRefreshTimer.Start();
     }
 
-    private void RebuildDeviceBlocksForLayout()
+    private async Task RebuildDeviceBlocksForLayout()
     {
         if (IsDisposed)
         {
             return;
         }
 
+        if (_devicesBusyDepth > 0)
+        {
+            _layoutRefreshTimer?.Stop();
+            _layoutRefreshTimer?.Start();
+            return;
+        }
         UpdateUiScale();
         if (_blocks.Count == 0)
         {
@@ -877,7 +887,7 @@ public sealed partial class MainForm
             return;
         }
 
-        RefreshBlocks(includeImodReadback: false);
+        await RefreshBlocksAsync(includeImodReadback: false);
     }
 
     private void AdjustInitialDeviceViewportHeight()

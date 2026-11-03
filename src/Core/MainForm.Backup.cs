@@ -96,10 +96,8 @@ public sealed partial class MainForm
         DemandRealWrite("CREATE BACKUP");
         try
         {
-            if (_blocks.Count == 0)
-            {
-                RefreshBlocks();
-            }
+            if (!_deviceDiscoveryCompleted)
+                throw new InvalidOperationException("The initial device scan has not completed. Refresh devices before creating a backup.");
 
             if (reason.StartsWith("pre-", StringComparison.OrdinalIgnoreCase)
                 && !EnsureOriginalDeviceTweakerBackup(location))
@@ -421,7 +419,7 @@ public sealed partial class MainForm
 
     private static string EncodeRegistryValue(object value, RegistryValueKind kind) => BackupFormat.EncodeRegistryValue(value, kind);
 
-    private void RestoreLatestDeviceTweakerBackup()
+    private async Task RestoreLatestDeviceTweakerBackup()
     {
         bool settingsMayHaveChanged = false;
         try
@@ -442,7 +440,7 @@ public sealed partial class MainForm
 
             if (choice == RestoreChoice.SafeReset)
             {
-                RunSafeResetFromRestore();
+                await RunSafeResetFromRestore();
                 return;
             }
 
@@ -477,7 +475,8 @@ public sealed partial class MainForm
             BeginDevicesBusyWork("Refreshing devices...", 4);
             try
             {
-                RefreshBlocks(preserveEdits: false);
+                report.MergeIssues(await RefreshBlocksAsync(preserveEdits: false));
+                if (IsDisposed || Disposing) return;
             }
             finally
             {
@@ -488,7 +487,7 @@ public sealed partial class MainForm
                 ShowBackupFileResult(path, restored: true);
             else
                 ShowOperationResult(report,
-                    "Backup restored. Some live power settings are unavailable; open DETAILS.",
+                    "Backup restored with warnings. Open DETAILS.",
                     "Saved settings were restored, but some live power settings could not be applied. Open DETAILS.",
                     operationName: "BACKUP RESTORE");
         }
@@ -511,7 +510,7 @@ public sealed partial class MainForm
         }
     }
 
-    private void RunSafeResetFromRestore()
+    private async Task RunSafeResetFromRestore()
     {
         WriteLog("BACKUP.RESTORE: safe-reset requested");
         OperationReport report = new();
@@ -532,7 +531,7 @@ public sealed partial class MainForm
             Math.Max(4, _blocks.Count + 4));
         try
         {
-            SafeResetTweaks(report);
+            await SafeResetTweaks(report);
         }
         finally
         {
