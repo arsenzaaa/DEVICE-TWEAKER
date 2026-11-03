@@ -206,16 +206,6 @@ public sealed partial class MainForm
         }
     }
 
-    private void RemoveImodPersistenceFiles(OperationReport? report = null)
-    {
-        DemandRealWrite("RemoveImodPersistenceFiles");
-        RestoreNicDriverModerationForSavedProfiles(report);
-        RemoveStartupBundle(report);
-        DeleteFileIfExists(Path.Combine(GetScriptRoot(), "dtimod.sys"), "IMOD.DRIVER.LEGACY", report);
-        DeleteFileIfExists(Path.Combine(GetScriptRoot(), ImodDriverName), "IMOD.DRIVER.LEGACY", report);
-        WriteLog($"IMOD.DRIVER: keep staged system driver {GetImodDriverSystemPath()}");
-    }
-
     // HKCU\...\Run started the script before the scheduled task replaced it.
     private void DeleteImodStartupRegistration(OperationReport? report = null)
     {
@@ -1271,7 +1261,7 @@ public sealed partial class MainForm
         {
             try
             {
-                SaveStartupProfile(config);
+                await SaveStartupProfile(config);
                 WriteLog($"IMOD.CONFIG: startup profile saved {startupPath}");
             }
             catch (Exception ex)
@@ -1284,7 +1274,7 @@ public sealed partial class MainForm
         }
         else
         {
-            RemoveImodPersistenceFiles();
+            await RemoveImodPersistenceFiles();
             config.HasScript = false;
         }
 

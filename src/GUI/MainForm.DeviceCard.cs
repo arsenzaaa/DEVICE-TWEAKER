@@ -253,7 +253,7 @@ public sealed partial class MainForm
 
     if (block.NicItrSaveButton is not null)
     {
-        block.NicItrSaveButton.Click += (_, _) => SaveNicItrPersistenceFromBlock(block);
+        block.NicItrSaveButton.Click += async (_, _) => await SaveNicItrPersistenceFromBlock(block);
     }
 
     if (block.NicItrCheckButton is not null)

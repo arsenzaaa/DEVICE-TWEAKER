@@ -141,18 +141,6 @@ public sealed partial class MainForm
     private static bool FileTextEquals(string path, string expected)
         => File.Exists(path) && string.Equals(File.ReadAllText(path, Encoding.UTF8), expected, StringComparison.Ordinal);
 
-    private void SaveStartupProfile(ImodConfig config)
-    {
-        if (config.StartupReadError is not null)
-            throw new InvalidDataException("The startup profile is unreadable; save was cancelled. " + config.StartupReadError);
-        // Recheck before replacement: a corrupt profile must require explicit recovery.
-        _ = ReadSavedStartupConfig(out _);
-        InstallStartupBundle(config);
-        config.HasScript = true;
-        _imodConfigCache = config;
-        _imodConfigLoaded = true;
-    }
-
     private void InstallStartupBundle(ImodConfig config)
     {
         DemandRealWrite("InstallStartupBundle");

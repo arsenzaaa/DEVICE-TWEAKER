@@ -1410,7 +1410,7 @@ public sealed partial class MainForm
                 SetDevicesBusyStage("Removing IMOD persistence...");
             }
 
-            ClearImodPersistenceForSafeReset(report);
+            await ClearImodPersistenceForSafeReset(report);
         }
         catch (Exception ex)
         {
@@ -1469,7 +1469,7 @@ public sealed partial class MainForm
             operationName: "RESET WINDOWS DEFAULT");
     }
 
-    private void ClearImodPersistenceForSafeReset(OperationReport? report)
+    private async Task ClearImodPersistenceForSafeReset(OperationReport? report)
     {
         foreach (DeviceBlock block in _blocks.Where(block => IsUsbImodTarget(block.Device)))
         {
@@ -1482,9 +1482,9 @@ public sealed partial class MainForm
             return;
         }
 
-        RemoveImodPersistenceFiles(report);
+        await RemoveImodPersistenceFiles(report);
         WriteLog("SAFE_RESET.IMOD: persistence removed; runtime MMIO intentionally untouched until reboot");
-        RefreshImodCurrentValues(reason: "safe-reset");
+        await AwaitBackgroundUiTasksAsync(report, RefreshImodCurrentValuesAsync(reason: "safe-reset"));
     }
 
     private async Task ResetImodIntervalsToDefault(string reason = "reset-imod", OperationReport? report = null)
@@ -1534,13 +1534,13 @@ public sealed partial class MainForm
                         $"(press CHECK first); cleared UI defaults and persistence only reason={reason}");
                 }
 
-                RemoveImodPersistenceFiles(report);
+                await RemoveImodPersistenceFiles(report);
                 await AwaitBackgroundUiTasksAsync(report, RefreshImodCurrentValuesAsync(reason: reason));
             }
         }
         else if (!_testAutoDryRun)
         {
-            RemoveImodPersistenceFiles(report);
+            await RemoveImodPersistenceFiles(report);
         }
         else
         {

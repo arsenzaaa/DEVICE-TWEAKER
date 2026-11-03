@@ -93,6 +93,7 @@ public sealed class QaWriteGuardTests
         AssertBlocked("DeleteDeviceTweakerBackups", (object?)null);
         AssertBlocked("PruneDeviceTweakerBackups", "", 0, null);
         AssertBlocked("InstallStartupBundle", (object?)null);
+        AssertBlocked("SaveStartupProfile", (object?)null);
         AssertBlocked("RemoveStartupBundle", (object?)null);
         AssertBlocked("DeleteImodStartupRegistration", (object?)null);
         AssertBlocked("RemoveImodPersistenceFiles", (object?)null);

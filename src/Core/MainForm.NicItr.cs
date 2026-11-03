@@ -109,18 +109,16 @@ public sealed partial class MainForm
     }
 
     // Removing the saved NIC ITR profile hands moderation back to the driver.
-    private void RestoreNicDriverModerationForSavedProfiles(OperationReport? report)
+    private void RestoreNicDriverModerationForSavedProfiles(IReadOnlyList<string> adapterIds, OperationReport? report)
     {
         HashSet<string> savedKeys = new(
             ReadSavedStartupConfig(out _).NicItrEntries.Select(entry => entry.Hwid),
             StringComparer.OrdinalIgnoreCase);
 
-        foreach (DeviceBlock block in _blocks.Where(block => block.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX
-            && !block.Device.IsTestDevice
-            && savedKeys.Contains(GetNicItrPersistenceKey(block.Device.InstanceId))))
+        foreach (string instanceId in adapterIds.Where(id => savedKeys.Contains(GetNicItrPersistenceKey(id))))
         {
-            List<NicDriverModeration.Change> changes = NicDriverModeration.PlanRestoreDefault(ReadNicDriverModeration(block.Device.InstanceId));
-            WriteNicDriverModeration(block.Device.InstanceId, changes, "RESTORE", report);
+            List<NicDriverModeration.Change> changes = NicDriverModeration.PlanRestoreDefault(ReadNicDriverModeration(instanceId));
+            WriteNicDriverModeration(instanceId, changes, "RESTORE", report);
         }
     }
 
@@ -456,7 +454,7 @@ public sealed partial class MainForm
         }
     }
 
-    private void SaveNicItrPersistenceFromBlock(DeviceBlock block)
+    private async Task SaveNicItrPersistenceFromBlock(DeviceBlock block)
     {
         if (block.NicItrBox is null || block.NicItrStatusLabel is null)
         {
@@ -509,7 +507,8 @@ public sealed partial class MainForm
 
         try
         {
-            ImodConfig config = ReadSavedStartupConfig(out _);
+            string instanceId = block.Device.InstanceId;
+            ImodConfig config = await Task.Run(() => ReadSavedStartupConfig(out _));
             string scriptPath = GetStartupProfilePath();
             string hwid = GetNicItrPersistenceKey(block.Device.InstanceId);
             config.NicItrEntries.RemoveAll(e => string.Equals(e.Hwid, hwid, StringComparison.OrdinalIgnoreCase));
@@ -526,7 +525,7 @@ public sealed partial class MainForm
                 Values = values,
             });
 
-            SaveStartupProfile(config);
+            await SaveStartupProfile(config);
 
             block.NicItrStatusLabel.Text = "current: saved for startup";
             block.NicItrStatusLabel.ForeColor = _statusActive;
@@ -534,8 +533,12 @@ public sealed partial class MainForm
             WriteLog($"NIC.ITR.SAVE: {block.Device.InstanceId} key={hwid} profile=\"{profile.FamilyName}\" values={FormatNicItrValueList(values, profile)} path={scriptPath}");
 
             // Adaptive driver moderation would overwrite the saved register value.
-            List<NicDriverModeration.Change> moderation = NicDriverModeration.PlanDisable(ReadNicDriverModeration(block.Device.InstanceId));
-            if (!WriteNicDriverModeration(block.Device.InstanceId, moderation, "OFF"))
+            bool moderationChanged = await Task.Run(() =>
+            {
+                List<NicDriverModeration.Change> moderation = NicDriverModeration.PlanDisable(ReadNicDriverModeration(instanceId));
+                return WriteNicDriverModeration(instanceId, moderation, "OFF");
+            });
+            if (!moderationChanged)
             {
                 block.NicItrStatusLabel.Text = "current: saved; driver moderation unchanged";
                 block.NicItrStatusLabel.ForeColor = _statusDanger;
