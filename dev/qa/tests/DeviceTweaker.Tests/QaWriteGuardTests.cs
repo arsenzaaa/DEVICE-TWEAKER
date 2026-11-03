@@ -78,6 +78,7 @@ public sealed class QaWriteGuardTests
         });
         AssertBlocked("SaveBlockSettings", block, false, null);
         AssertBlocked("ApplyDeviceSettingsPlan", null, null);
+        AssertBlocked("TryApplyImod", null, null, false, null, null);
         AssertBlocked("ResetBlockSettings", block, null);
         AssertBlocked("WriteNdisIrqPolicy", null, null);
         AssertBlocked("ClearNdisIrqPolicy", null, null);

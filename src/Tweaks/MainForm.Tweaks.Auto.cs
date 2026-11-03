@@ -1487,7 +1487,7 @@ public sealed partial class MainForm
         RefreshImodCurrentValues(reason: "safe-reset");
     }
 
-    private void ResetImodIntervalsToDefault(string reason = "reset-imod", OperationReport? report = null)
+    private async Task ResetImodIntervalsToDefault(string reason = "reset-imod", OperationReport? report = null)
     {
         string defaultText = FormatImodValue(ImodDefaultInterval);
         bool hasUsb = false;
@@ -1516,7 +1516,7 @@ public sealed partial class MainForm
                 // the driver was already loaded explicitly (CHECK / prior IMOD apply).
                 if (IsImodDriverAlreadyAvailable())
                 {
-                    ImodApplyOutcome outcome = ApplyImodSettings(out string? note, out string? technicalDetails);
+                    (ImodApplyOutcome outcome, string? note, string? technicalDetails) = await ApplyImodSettingsAsync();
                     if (!string.IsNullOrWhiteSpace(note))
                     {
                         WriteLog($"RESET.IMOD.USB: {note}");
@@ -1535,7 +1535,7 @@ public sealed partial class MainForm
                 }
 
                 RemoveImodPersistenceFiles(report);
-                RefreshImodCurrentValues(reason: reason);
+                await AwaitBackgroundUiTasksAsync(report, RefreshImodCurrentValuesAsync(reason: reason));
             }
         }
         else if (!_testAutoDryRun)

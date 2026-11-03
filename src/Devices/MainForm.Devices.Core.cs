@@ -4,7 +4,7 @@ namespace DeviceTweakerCS;
 
 public sealed partial class MainForm
 {
-    private string NormalizeInstanceId(string? id)
+    private static string NormalizeInstanceId(string? id)
     {
         if (string.IsNullOrWhiteSpace(id))
         {

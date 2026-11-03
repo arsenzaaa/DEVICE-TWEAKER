@@ -157,8 +157,9 @@ public sealed partial class MainForm
         public string? DriverError { get; set; }
     }
 
-    private bool TryApplyImod(ImodConfig config, bool persistDriver, out ImodApplyStats stats, out string? error)
+    private bool TryApplyImod(ImodConfig config, ImodRoleSnapshot roleSnapshot, bool persistDriver, out ImodApplyStats stats, out string? error)
     {
+        DemandRealWrite("USB IMOD");
         stats = new ImodApplyStats();
         error = null;
 
@@ -309,7 +310,7 @@ public sealed partial class MainForm
                     if (adaptiveEntry?.RoleIntervals is { Count: > 0 } roleIntervals)
                     {
                         if (TryBuildAdaptiveImodIntervals(
-                                controller,
+                                roleSnapshot, controller,
                                 imodDriver,
                                 maxIntrs,
                                 roleIntervals,
@@ -513,11 +514,12 @@ public sealed partial class MainForm
 
         EnsureImodConfigLoaded();
         ImodConfig config = _imodConfigCache ?? new ImodConfig();
+        ImodRoleSnapshot roleSnapshot = CaptureImodRoleSnapshot();
         (bool ok, Dictionary<string, List<uint>> valuesByDeviceId, Dictionary<string, string> mapByDeviceId, Dictionary<string, string> mapDetailByDeviceId, string? error) readback =
             await Task.Run(() =>
             {
                 bool ok = TryReadCurrentImodValues(
-                    config,
+                    config, roleSnapshot,
                     out Dictionary<string, List<uint>> values,
                     out Dictionary<string, string> map,
                     out Dictionary<string, string> mapDetail,
@@ -896,7 +898,7 @@ public sealed partial class MainForm
     }
 
     private bool TryReadCurrentImodValues(
-        ImodConfig config,
+        ImodConfig config, ImodRoleSnapshot roleSnapshot,
         out Dictionary<string, List<uint>> valuesByDeviceId,
         out Dictionary<string, string> mapByDeviceId,
         out Dictionary<string, string> mapDetailByDeviceId,
@@ -997,7 +999,7 @@ public sealed partial class MainForm
                 {
                     string normalizedControllerId = NormalizeInstanceId(controller.DeviceId);
                     valuesByDeviceId[normalizedControllerId] = values;
-                    if (TryFormatImodInterrupterRoleMap(controller, imodDriver, maxIntrs, values, out string mapText, out string mapDetail))
+                    if (TryFormatImodInterrupterRoleMap(roleSnapshot, controller, imodDriver, maxIntrs, values, out string mapText, out string mapDetail))
                     {
                         mapByDeviceId[normalizedControllerId] = mapText;
                         mapDetailByDeviceId[normalizedControllerId] = mapDetail;
@@ -1128,7 +1130,7 @@ public sealed partial class MainForm
     }
 
     private bool TryBuildAdaptiveImodIntervals(
-        ImodControllerInfo controller,
+        ImodRoleSnapshot roleSnapshot, ImodControllerInfo controller,
         ImodDriverContext imodDriver,
         uint maxIntrs,
         IReadOnlyDictionary<string, uint> roleIntervals,
@@ -1146,7 +1148,7 @@ public sealed partial class MainForm
         }
 
         if (!TryResolveAdaptiveRolesByInterrupter(
-                controller,
+                roleSnapshot, controller,
                 imodDriver,
                 maxIntrs,
                 out Dictionary<uint, HashSet<string>> rolesByInterrupter,
@@ -1214,7 +1216,7 @@ public sealed partial class MainForm
     }
 
     private bool TryFormatImodInterrupterRoleMap(
-        ImodControllerInfo controller,
+        ImodRoleSnapshot roleSnapshot, ImodControllerInfo controller,
         ImodDriverContext imodDriver,
         uint maxIntrs,
         IReadOnlyList<uint> currentIntervals,
@@ -1232,7 +1234,7 @@ public sealed partial class MainForm
         Dictionary<uint, HashSet<string>> rolesByInterrupter = [];
         string resolveDetail = string.Empty;
         bool hasRoleMap = TryResolveAdaptiveRolesByInterrupter(
-            controller,
+            roleSnapshot, controller,
             imodDriver,
             maxIntrs,
             out rolesByInterrupter,
@@ -1243,7 +1245,7 @@ public sealed partial class MainForm
             WriteLog($"IMOD.MAP.ROLES.WARN: unavailable {controller.DeviceId}: {resolveDetail}");
         }
 
-        Dictionary<string, List<string>> displayLabelsByRole = BuildAdaptiveRoleDisplayLabels(controller.DeviceId);
+        Dictionary<string, List<string>> displayLabelsByRole = BuildAdaptiveRoleDisplayLabels(roleSnapshot, controller.DeviceId);
         Dictionary<uint, List<string>> displayLabelsByInterrupter = [];
         HashSet<string> mappedLabelsSeen = new(StringComparer.OrdinalIgnoreCase);
 
@@ -1278,7 +1280,7 @@ public sealed partial class MainForm
         string unknownDeviceValue = FormatUnknownImodDeviceValue(currentIntervals);
         List<string> unknownLabels = [];
         HashSet<string> unknownLabelsSeen = new(StringComparer.OrdinalIgnoreCase);
-        foreach (string label in BuildControllerImodDeviceDisplayLabels(controller.DeviceId))
+        foreach (string label in BuildControllerImodDeviceDisplayLabels(roleSnapshot, controller.DeviceId))
         {
             string cleanLabel = FormatImodDeviceMapLabel(label);
             if (!mappedLabelsSeen.Contains(cleanLabel) && unknownLabelsSeen.Add(cleanLabel))
@@ -1300,9 +1302,9 @@ public sealed partial class MainForm
         return true;
     }
 
-    private List<string> BuildControllerImodDeviceDisplayLabels(string controllerDeviceId)
+    private static List<string> BuildControllerImodDeviceDisplayLabels(ImodRoleSnapshot roleSnapshot, string controllerDeviceId)
     {
-        Dictionary<string, List<string>> labelsByRole = BuildAdaptiveRoleDisplayLabels(controllerDeviceId);
+        Dictionary<string, List<string>> labelsByRole = BuildAdaptiveRoleDisplayLabels(roleSnapshot, controllerDeviceId);
         List<string> labels = [];
         HashSet<string> emitted = new(StringComparer.OrdinalIgnoreCase);
 
@@ -1505,49 +1507,52 @@ public sealed partial class MainForm
         return clean;
     }
 
-    private Dictionary<string, List<string>> BuildAdaptiveRoleDisplayLabels(string controllerDeviceId)
+    internal static Dictionary<string, List<string>> BuildAdaptiveRoleDisplayLabels(ImodRoleSnapshot roleSnapshot, string controllerDeviceId)
     {
         Dictionary<string, List<string>> labelsByRole = new(StringComparer.OrdinalIgnoreCase);
-        foreach (DeviceBlock block in _blocks)
+        foreach (ImodRoleDevice device in roleSnapshot.Devices)
         {
-            DeviceInfo device = block.Device;
-            if (device.Kind != DeviceKind.USB || device.IsTestDevice)
-            {
-                continue;
-            }
-
             if (!HostControllerPathMatchesDeviceId(device.InstanceId, controllerDeviceId) &&
                 !HostControllerPathMatchesDeviceId(controllerDeviceId, device.InstanceId))
             {
                 continue;
             }
 
-            AddAdaptiveRoleDisplayLabels(GetEffectiveUsbRolesForController(device, controllerDeviceId), labelsByRole);
+            AddAdaptiveRoleDisplayLabels(GetEffectiveUsbRolesForController(device.UsbRoles, device.InstanceId, controllerDeviceId, roleSnapshot.Overrides), labelsByRole);
             AddAdaptiveRoleDisplayLabels(device.AudioEndpoints, labelsByRole);
         }
 
         return labelsByRole;
     }
 
+    private ImodRoleSnapshot CaptureImodRoleSnapshot() => new(
+        _blocks.Where(block => block.Kind == DeviceKind.USB && !block.Device.IsTestDevice)
+            .Select(block => new ImodRoleDevice(block.Device.InstanceId, block.Device.UsbRoles, block.Device.AudioEndpoints)),
+        _usbRoleOverrideByController);
+
     private string GetEffectiveUsbRolesForController(DeviceInfo device, string controllerDeviceId)
+        => GetEffectiveUsbRolesForController(device.UsbRoles, device.InstanceId, controllerDeviceId, _usbRoleOverrideByController);
+
+    private static string GetEffectiveUsbRolesForController(string usbRoles, string instanceId, string controllerDeviceId,
+        IReadOnlyDictionary<string, string> overrides)
     {
         string controllerKey = NormalizeInstanceId(controllerDeviceId);
         if (!string.IsNullOrWhiteSpace(controllerKey)
-            && _usbRoleOverrideByController.TryGetValue(controllerKey, out string? controllerRoles)
+            && overrides.TryGetValue(controllerKey, out string? controllerRoles)
             && !string.IsNullOrWhiteSpace(controllerRoles))
         {
-            return MergeUsbRolePollingOverrideWithCurrentRoles(device.UsbRoles, controllerRoles);
+            return MergeUsbRolePollingOverrideWithCurrentRoles(usbRoles, controllerRoles);
         }
 
-        string deviceKey = NormalizeInstanceId(device.InstanceId);
+        string deviceKey = NormalizeInstanceId(instanceId);
         if (!string.IsNullOrWhiteSpace(deviceKey)
-            && _usbRoleOverrideByController.TryGetValue(deviceKey, out string? deviceRoles)
+            && overrides.TryGetValue(deviceKey, out string? deviceRoles)
             && !string.IsNullOrWhiteSpace(deviceRoles))
         {
-            return MergeUsbRolePollingOverrideWithCurrentRoles(device.UsbRoles, deviceRoles);
+            return MergeUsbRolePollingOverrideWithCurrentRoles(usbRoles, deviceRoles);
         }
 
-        return device.UsbRoles;
+        return usbRoles;
     }
 
     private static string MergeUsbRolePollingOverrideWithCurrentRoles(string currentRoles, string overrideRoles)
@@ -1712,7 +1717,7 @@ public sealed partial class MainForm
     }
 
     private bool TryResolveAdaptiveRolesByInterrupter(
-        ImodControllerInfo controller,
+        ImodRoleSnapshot roleSnapshot, ImodControllerInfo controller,
         ImodDriverContext imodDriver,
         uint maxIntrs,
         out Dictionary<uint, HashSet<string>> rolesByInterrupter,
@@ -1722,7 +1727,7 @@ public sealed partial class MainForm
         rolesByInterrupter = [];
 
         if (!TryBuildExactAdaptiveRolesByInterrupter(
-                controller,
+                roleSnapshot, controller,
                 imodDriver,
                 maxIntrs,
                 out rolesByInterrupter,
@@ -1745,7 +1750,7 @@ public sealed partial class MainForm
             return true;
         }
 
-        HashSet<string> fallbackRoles = BuildAdaptiveControllerRoleFallback(controller.DeviceId);
+        HashSet<string> fallbackRoles = BuildAdaptiveControllerRoleFallback(roleSnapshot, controller.DeviceId);
         if (fallbackRoles.Count == 0)
         {
             detail = "no exact USB role/interrupter map and no controller role fallback";
@@ -1762,7 +1767,7 @@ public sealed partial class MainForm
     }
 
     private bool TryBuildExactAdaptiveRolesByInterrupter(
-        ImodControllerInfo controller,
+        ImodRoleSnapshot roleSnapshot, ImodControllerInfo controller,
         ImodDriverContext imodDriver,
         uint maxIntrs,
         out Dictionary<uint, HashSet<string>> rolesByInterrupter,
@@ -1796,7 +1801,7 @@ public sealed partial class MainForm
         int rootPortMatches = 0;
         int classifiedEndpoints = 0;
         int filteredGamepadEndpoints = 0;
-        HashSet<string> controllerRoles = BuildAdaptiveControllerRoleFallback(controller.DeviceId);
+        HashSet<string> controllerRoles = BuildAdaptiveControllerRoleFallback(roleSnapshot, controller.DeviceId);
         foreach (UsbEndpointInfo endpoint in endpoints)
         {
             if (!HostControllerPathMatchesDeviceId(endpoint.HostControllerPath, controller.DeviceId)
@@ -1859,24 +1864,18 @@ public sealed partial class MainForm
         }
     }
 
-    private HashSet<string> BuildAdaptiveControllerRoleFallback(string controllerDeviceId)
+    internal static HashSet<string> BuildAdaptiveControllerRoleFallback(ImodRoleSnapshot roleSnapshot, string controllerDeviceId)
     {
         HashSet<string> roles = new(StringComparer.OrdinalIgnoreCase);
-        foreach (DeviceBlock block in _blocks)
+        foreach (ImodRoleDevice device in roleSnapshot.Devices)
         {
-            DeviceInfo device = block.Device;
-            if (device.Kind != DeviceKind.USB || device.IsTestDevice)
-            {
-                continue;
-            }
-
             if (!HostControllerPathMatchesDeviceId(device.InstanceId, controllerDeviceId) &&
                 !HostControllerPathMatchesDeviceId(controllerDeviceId, device.InstanceId))
             {
                 continue;
             }
 
-            AddAdaptiveRolesFromText(GetEffectiveUsbRolesForController(device, controllerDeviceId), roles);
+            AddAdaptiveRolesFromText(GetEffectiveUsbRolesForController(device.UsbRoles, device.InstanceId, controllerDeviceId, roleSnapshot.Overrides), roles);
             AddAdaptiveRolesFromText(device.AudioEndpoints, roles);
         }
 

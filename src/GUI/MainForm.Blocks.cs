@@ -1103,7 +1103,7 @@ public sealed partial class MainForm
         btnImodApply.Click += async (_, _) => await ApplyImodFromBlock(createdBlock);
 
         Button btnImodDelete = NewCardButton("DELETE", UiScale(76, 24));
-        btnImodDelete.Click += (_, _) => DeleteImodFromBlock(createdBlock);
+        btnImodDelete.Click += async (_, _) => await DeleteImodFromBlock(createdBlock);
 
         Button btnImodCheck = NewCardButton("CHECK", UiScale(76, 24));
         btnImodCheck.Click += async (_, _) =>

@@ -528,7 +528,8 @@ public sealed partial class MainForm
                 }
                 else
                 {
-                    ImodApplyOutcome imodOutcome = ApplyImodSettings(out string? imodNote, out string? imodTechnicalDetails);
+                    (ImodApplyOutcome imodOutcome, string? imodNote, string? imodTechnicalDetails) = await ApplyImodSettingsAsync();
+                    if (_uiDisposing || IsDisposed || Disposing) return;
                     if (!string.IsNullOrWhiteSpace(imodNote))
                     {
                         WriteLog($"IMOD.NOTE: {imodNote}");
@@ -731,7 +732,8 @@ public sealed partial class MainForm
                 if (applyImod)
                 {
                     TickDevicesBusy("Applying USB IMOD...", 1);
-                    ImodApplyOutcome imodOutcome = ApplyImodSettings(out string? imodNote, out string? imodTechnicalDetails);
+                    (ImodApplyOutcome imodOutcome, string? imodNote, string? imodTechnicalDetails) = await ApplyImodSettingsAsync();
+                    if (_uiDisposing || IsDisposed || Disposing) return;
                     if (!string.IsNullOrWhiteSpace(imodNote))
                     {
                         WriteLog($"IMOD.NOTE: {imodNote}");
