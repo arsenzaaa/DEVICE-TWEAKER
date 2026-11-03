@@ -1,122 +1,124 @@
-# Как работают настройки DEVICE TWEAKER
+# Settings reference
 
-[Главная страница](../README.md) · [English](./SETTINGS.en.md)
+[Documentation](./README.md) / Settings · [Русский](./SETTINGS.ru.md)
 
-Здесь подробно разобраны настройки: что программа записывает, что показывает в интерфейсе и когда перечитывает значения.
+Settings, stored values and readback for each control.
 
-## Прерывания
+[Interrupts](#interrupts) · [USB xHCI IMOD](#usb-xhci-imod) · [Network adapters](#network-adapters) · [Additional settings](#additional-settings) · [Intelligent auto-optimization and restore](#intelligent-auto-optimization-and-restore)
+
+## Interrupts
 
 ### MSI / MSI-X
 
-**MSI Mode** записывает `MSISupported` для выбранного устройства. [MSI/MSI-X](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/enabling-message-signaled-interrupts-in-the-registry) используют сообщения вместо линии прерывания; MSI-X допускает несколько векторов с разной привязкой к CPU. Наличие MSI-X в контроллере ещё не означает, что драйвер задействовал все векторы.
+**MSI Mode** writes `MSISupported` for the selected device. [MSI/MSI-X](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/enabling-message-signaled-interrupts-in-the-registry) use messages instead of an interrupt line; MSI-X permits multiple vectors with different CPU affinities. MSI-X capability does not mean the driver uses every available vector.
 
-Кнопка **СЧИТАТЬ IRQ** вверху окна считывает режимы всех PCI-устройств в списке через DTIMOD.sys. При необходимости загружает драйвер. Проверка включает карточки, скрытые фильтром. Программа читает выделенные Windows ресурсы прерываний и биты `MSI Enable` / `MSI-X Enable` в конфигурации PCI. При успешном чтении этих битов MSI и MSI-X различаются даже при одном IRQ. Настройки при проверке не применяются.
+The **READ IRQ MODE** button at the top reads all PCI devices in the list through DTIMOD.sys, loading the driver if needed. Cards hidden by filters are included. The query reads Windows allocated interrupt resources and the `MSI Enable` / `MSI-X Enable` bits in PCI configuration space. Reading these bits successfully distinguishes MSI from MSI-X even with one IRQ. The query applies no settings.
 
-**HW** показывает аппаратные возможности устройства. `MSISupported` хранит настройку в реестре.
+**HW** shows device capability; `MSISupported` is the registry setting.
 
-После загрузки DTIMOD остаётся в памяти до перезагрузки Windows. Закрытие программы закрывает подключение к драйверу. Значения IMOD / ITR сохраняются в регистрах до их изменения драйвером устройства, сброса контроллера или перезагрузки. Фоновое чтение IRQ Mode использует уже загруженный DTIMOD или ресурсы Windows, без загрузки драйвера.
+Once loaded, DTIMOD stays in memory until Windows restarts. Closing the application closes its connection. IMOD / ITR values remain in the registers until the device driver changes them, the controller resets, or Windows restarts. Background IRQ Mode reads use an already loaded DTIMOD or Windows resources without loading the driver.
 
-- **MSI Mode**. Реестр: `MSISupported`.
+- **MSI Mode**. Registry: `MSISupported`.
 
-  Сохранённая настройка; выбранное в списке изменение записывается при применении.
+  Saved setting; a change selected in the dropdown is written when settings are applied.
 
-- **IRQ Mode**. Ресурсы Windows; через DTIMOD также конфигурация PCI.
+- **IRQ Mode**. Windows resources; also PCI configuration through DTIMOD.
 
-  Текущий режим Line / MSI / MSI-X; MSI/MSI-X, если данных для различения недостаточно.
+  Current Line / MSI / MSI-X mode; MSI/MSI-X when the data cannot distinguish the two.
 
-- **HW**. Аппаратные возможности устройства.
+- **HW**. Device hardware capabilities.
 
-  Поддерживаемые режимы.
+  Supported modes.
 
-Ошибка чтения IRQ Mode не заменяется значением из реестра. MSI Mode и IRQ Mode могут различаться до перезагрузки или из-за того, как драйвер устройства использует настройку.
+A failed IRQ Mode read is not replaced with the registry value. MSI Mode and IRQ Mode may differ before a restart or because of how the device driver uses the setting.
 
-Для настройки MSI достаточно реестра. IRQ Mode показывает текущее состояние устройства. [Таблица MSI-X и привязка сообщений к CPU могут меняться во время работы](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/dynamically-configuring-msi-x), поэтому результат проверки относится к моменту чтения.
+The registry is sufficient to configure MSI. IRQ Mode is a separate check of the current state. [MSI-X table entries and message routing can change at runtime](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/dynamically-configuring-msi-x), so the result describes the state when it was read.
 
-`HW: Line/MSI/MSI-X` перечисляет поддерживаемые режимы самого устройства. Возможности родительского контроллера ему не приписываются. Количество IRQ берётся из WMI и само по себе не определяет режим.
+`HW: Line/MSI/MSI-X` lists the device's supported modes. Parent-controller capabilities are not substituted. IRQ count comes from WMI and does not identify the mode.
 
-До чтения IRQ Mode показывает "не считан". При открытии и обновлении списка программа обращается к уже загруженному DTIMOD. Если его нет, читает ресурсы Windows; сам драйвер не загружает. По ресурсам Windows MSI и MSI-X различаются, когда это позволяет распределение сообщений и аппаратные возможности устройства. Если данных недостаточно, показывается `MSI/MSI-X` с причиной в подсказке. Такая же подпись остаётся, если DTIMOD подтвердил message interrupts, но не смог прочитать конфигурацию PCI. "Нет IRQ" означает отсутствие выделенных ресурсов прерываний. Ошибка чтения и несовпадение данных показываются отдельно и записываются в лог. После обновления списка старый результат сбрасывается и считывается заново.
+Before reading, IRQ Mode shows "not read". On opening or refreshing the list, the application queries an already loaded DTIMOD. If it is absent, it reads Windows resources without loading the driver. Windows resources distinguish MSI from MSI-X when the message allocation and hardware capabilities allow it. Otherwise, the result is `MSI/MSI-X`, with the reason in the tooltip. The same label remains if DTIMOD confirms message interrupts but cannot read PCI configuration. "No IRQ" means no allocated interrupt resources. Read errors and conflicting evidence are shown separately and logged. Refresh discards the previous result and reads again.
 
-**MSI Limit** задаёт `MessageNumberLimit`. **Unlimited** удаляет ограничение из реестра; введённое число проверяется по возможностям MSI/MSI-X, если их удалось определить. **[IRQ Priority](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_priority)** задаёт `DevicePriority`: Windows учитывает его при назначении приоритета аппаратному прерыванию. Это не приоритет игры, не приоритет DPC и не гарантия фиксированной задержки.
+**MSI Limit** sets `MessageNumberLimit`. **Unlimited** removes the registry limit; numeric input is checked against MSI/MSI-X capabilities when they can be detected. **[IRQ Priority](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_priority)** sets `DevicePriority`, which Windows considers when assigning hardware interrupt priority. It does not change game priority, set DPC priority, or guarantee a fixed latency.
 
 ### Interrupt Affinity
 
-**[Interrupt Affinity](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/interrupt-affinity-and-priority)** задаёт логические процессоры, допустимые для IRQ устройства. В выборе видны SMT/HT-потоки, Intel P/E-cores, AMD CCD/CCX и доступный CPPC-рейтинг. Это позволяет выбирать не просто номера CPU, а конкретные физические ядра и их соседние потоки.
+**[Interrupt Affinity](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/interrupt-affinity-and-priority)** selects the logical processors eligible to service a device's IRQs. The CPU list identifies SMT/HT siblings, Intel P/E cores, AMD CCD/CCX, and available CPPC rankings. The selection can therefore be made by physical core and sibling thread, not just by CPU number.
 
-Режим **SpecCPU** записывает `DevicePolicy` и `AssignmentSetOverride`. Если снять выбор CPU у обычного устройства, программа записывает `DevicePolicy=0` (`MachineDefault`) и удаляет `AssignmentSetOverride`; для сетевых адаптеров NDIS действует выбранный режим RSS/IRQ.
+**SpecCPU** writes `DevicePolicy` and `AssignmentSetOverride`. Clearing the CPU selection for a regular device writes `DevicePolicy=0` (`MachineDefault`) and removes `AssignmentSetOverride`; NDIS adapters follow the selected RSS/IRQ mode.
 
-Поддерживается processor group 0, то есть максимум 64 логических процессора. Маска относится к маршрутизации прерываний; драйвер может направить [DPC](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/organization-of-dpc-queues) на другой CPU и в случае [MSI-X](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/changing-the-cpu-affinity-of-msi-x-table-entries) изменить привязку векторов во время работы. Фактическое размещение ISR/DPC проверяется трассировкой, а не чтением маски из реестра.
+The current mask covers processor group 0, up to 64 logical processors. It controls interrupt routing; a driver can queue [DPCs](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/organization-of-dpc-queues) on another CPU or change [MSI-X](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/changing-the-cpu-affinity-of-msi-x-table-entries) vector affinity at runtime. Actual ISR/DPC placement must be verified with a trace, not inferred from the registry mask.
 
-В **Policy** доступны `MachineDefault`, `All`, `AllClose`, `Single`, `SpecCPU` и [`SpreadMessages`](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_device_policy). Только `SpecCPU` использует отмеченную в списке маску. Остальные политики передают выбор процессоров Windows; `SpreadMessages` может распределять разные сообщения по разным CPU, если устройство и драйвер используют несколько MSI-X-векторов. Сама политика не создаёт дополнительные векторы.
+**Policy** also offers `MachineDefault`, `All`, `AllClose`, `Single`, and [`SpreadMessages`](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_device_policy). Only `SpecCPU` uses the CPUs selected in the list as a mask. The other policies leave processor selection to Windows; `SpreadMessages` can place different messages on different CPUs when the device and driver use multiple MSI-X vectors. The policy itself does not create additional vectors.
 
 ## USB xHCI IMOD
 
-Перед включением USB IMOD программа читает параметры Windows и состояния служб Defender, FACEIT и Vanguard. Если найден античит или возможное ограничение загрузки DTIMOD.sys, это показывается рядом с вопросом о применении. Кнопка **ПРОВЕРКА СИСТЕМЫ** открывает сводку с двумя разделами: параметры Windows и службы. "Нет параметра" означает отсутствие записи в реестре, а не выключенную функцию. Загрузка драйвера этой проверкой не выполняется.
+Before including USB IMOD, the program reads Windows settings and the status of Defender, FACEIT and Vanguard services. A detected anti-cheat or a possible restriction on loading DTIMOD.sys appears beside the apply question. **SYSTEM CHECK** opens two sections: Windows settings and services. "No registry setting" means the registry value is absent, rather than that the feature is off. This check does not load the driver.
 
-Профиль AUTO задаёт для мыши IMOD = 0 независимо от её polling rate: модерация прерываний отключается. Это правило профиля, а не измерение задержки и не изменение частоты USB-опроса. Ручное значение IMOD задаётся отдельно.
+The AUTO profile sets mouse IMOD to 0 regardless of polling rate, disabling interrupt moderation. This is a profile rule, not a latency measurement or a change to USB polling frequency. Manual IMOD is configured separately.
 
-**[IMOD](https://cdrdv2-public.intel.com/625472/625472_xHCI_Rev1_2b.pdf)** задаёт интервал модерации прерываний xHCI. Регистр принадлежит *interrupter* контроллера с собственным Event Ring, а не отдельной мыши или клавиатуре. Один шаг равен 250 нс. Значение `0xC8` задаёт 50 мкс, `0xFA0` задаёт 1 мс, `0x0` отключает модерацию.
+**[IMOD](https://cdrdv2-public.intel.com/625472/625472_xHCI_Rev1_2b.pdf)** sets the xHCI interrupt-moderation interval. The register belongs to a controller *interrupter* with its own Event Ring, not to an individual mouse or keyboard. Each step is 250 ns: `0xC8` is 50 µs, `0xFA0` is 1 ms, and `0x0` disables moderation.
 
-Режим **Устройства** составляет профиль для обнаруженных мышей, клавиатур, геймпадов и USB-аудио и пытается сопоставить их с interrupter по топологии xHCI. При отсутствии надёжной карты применяется общее значение для контроллера. **XHCI** записывает одно значение во все interrupter, **Interrupters** открывает настройку по индексам. В подробностях показываются значения IMOD для первых 64 interrupter.
+**Devices** builds a profile for detected mice, keyboards, gamepads, and USB audio, then attempts to map them to interrupters through the xHCI topology. If a reliable map is unavailable, it applies one controller-wide value. **XHCI** writes one value to all interrupters; **Interrupters** opens per-index control. The details show the controller's first 64 interrupters.
 
-Карта устройств читается из контекстов xHCI в памяти: для каждого подключённого устройства берётся interrupter, указанный в TRB его кольца передачи, а если кольцо не читается — из Slot Context. Рядом с текущим значением показано время чтения. После подключения или отключения устройства карта помечается «устройства изменились»; **ПРОВЕРИТЬ** читает её заново.
+The device map is read from the xHCI contexts in memory: for each attached device, the interrupter named in the TRBs of its transfer ring is used, or the Slot Context target if the ring cannot be read. The read time is shown next to the current value. After a device is attached or removed, the map is marked "devices changed"; **CHECK** reads it again.
 
-Кнопки здесь делают разные вещи:
+The buttons have different jobs:
 
-- **ЗАДАТЬ** записывает выбранную конфигурацию, затем перечитывает регистры. Свои значения программа сохраняет в автозапуск (см. ниже).
-- **ПРОВЕРИТЬ** заново считывает регистры. **ОБНОВИТЬ** перечитывает только список устройств.
-- **УДАЛИТЬ** убирает общий автозапуск IMOD и сохранённых профилей NIC ITR и возвращает модерацию драйвера сетевой карты, выключенную через **СОХРАНИТЬ**. В интерфейсе выставляется значение IMOD по умолчанию (0xC8). Если драйвер уже загружен, это значение записывается в регистры; иначе текущие регистры остаются как есть до следующей загрузки Windows.
+- **SET** writes the selected configuration and reads the registers back. The program saves custom values to the startup task (see below).
+- **CHECK** rereads the registers. **REFRESH** only updates the device list.
+- **DELETE** removes the shared startup configuration for IMOD and saved NIC ITR profiles and restores the network driver's moderation that **SAVE** turned off. The UI switches to the default IMOD value (0xC8). With the driver loaded, the program can also reset IMOD registers. USB IMOD writes are skipped when only saved NIC ITR profiles remain in the configuration. Restart Windows to finish resetting.
 
-Перед **УДАЛИТЬ** отдельный автоматический бекап не создаётся.
+**DELETE** does not create a separate automatic backup.
 
-Общая кнопка **ПРИМЕНИТЬ** также применяет настройки USB IMOD вместе с остальными настройками устройств.
+The main **APPLY** button also applies USB IMOD along with the other device settings.
 
-Интервал IMOD не прибавляется к каждому USB-отчёту: событие после простоя interrupter и событие во время активного отсчёта проходят разные пути. Значение регистра и Polling Rate сами по себе не измеряют задержку ввода.
+The IMOD interval is not added to every USB report. An event after the interrupter has been idle and one arriving during an active countdown take different paths. Neither the register value nor mouse Polling Rate measures end-to-end input latency.
 
-### Автозапуск IMOD / NIC ITR
+### IMOD / NIC ITR at startup
 
-Значения в регистрах живут до перезагрузки, сна или сброса контроллера, поэтому сохранённые настройки применяет отдельный открытый скрипт. Он работает без `DEVICE TWEAKER.exe`: программу можно удалить, автозапуск останется.
+Register values last until a restart, sleep, or controller reset, so a separate open script applies the saved settings. It works without `DEVICE TWEAKER.exe`: the program can be removed and the startup task keeps working.
 
-- Папка `%ProgramData%\DEVICE TWEAKER\Startup`: `ApplyIMOD.ps1` (читаемый PowerShell-скрипт), `DeviceTweakerImodRuntime.cs` (общий с программой код работы с регистрами, компилируется при запуске), `profile.json` (сохранённые значения и SHA-256 всех файлов), `Loader\` (KDU для загрузки DTIMOD.sys) и `logs\` (журналы за 14 дней). Изменять папку могут только администраторы и SYSTEM.
-- Задача Планировщика `\DEVICE TWEAKER\IMOD` запускает скрипт от SYSTEM при входе в Windows, после выхода из сна и при подключении USB/HID-устройства. Перед запуском скрипт сверяет хеши runtime, драйвера и загрузчика с `profile.json`; несовпадение останавливает запуск.
-- Скрипт и программа используют один mutex загрузки DTIMOD, поэтому не загружают драйвер одновременно.
-- Прежний автозапуск из `%AppData%` и ключа `Run` переносится автоматически при первом запуске программы, значения сохраняются.
+- Folder `%ProgramData%\DEVICE TWEAKER\Startup`: `ApplyIMOD.ps1` (a readable PowerShell script), `DeviceTweakerImodRuntime.cs` (register code shared with the program, compiled at run time), `profile.json` (saved values and SHA-256 of every file), `Loader\` (KDU for loading DTIMOD.sys), and `logs\` (the latest 14 log files). Only administrators and SYSTEM can modify the folder.
+- The Task Scheduler task `\DEVICE TWEAKER\IMOD` runs the script as SYSTEM at sign-in, after resume from sleep, and when a USB/HID device is attached. Before running, the script checks the runtime, driver, and loader hashes against `profile.json`; a mismatch stops it.
+- The script and the program share one DTIMOD load mutex, so they never load the driver at the same time.
+- The previous startup entry in `%AppData%` and the `Run` key is migrated automatically the first time the program starts, keeping the saved values.
 
-## Сетевые адаптеры
+## Network adapters
 
 ### RSS
 
-**[RSS](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-receive-side-scaling)** распределяет обработку входящих пакетов по CPU с помощью хеша и таблицы перенаправления. **RSS Queues** задаёт запрашиваемое число приёмных очередей, базовый CPU служит отправной точкой для выбора процессоров. **NDIS Mode** позволяет применить RSS, Interrupt Affinity или оба параметра.
+**[RSS](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-receive-side-scaling)** distributes incoming packet processing across CPUs using a hash and an indirection table. **RSS Queues** sets the requested receive-queue count; the base CPU is the starting point for processor selection. **NDIS Mode** applies RSS, Interrupt Affinity, or both.
 
-Выбор очередей ограничен значениями, которые предлагает драйвер, и числом векторов MSI-X: без MSI-X все очереди приходят одним прерыванием. Процессоры RSS берутся по одному на физическое ядро, SMT-соседи пропускаются; вместе с базовым CPU записываются `*MaxRssProcessors` и `*RssMaxProcNumber`.
+Queue choices in the application account for driver options and available vector information. These limits govern queue selection in DEVICE TWEAKER; RSS hardware support also includes configurations without MSI-X. Processors are selected one per physical core; `*MaxRssProcessors` and `*RssMaxProcNumber` are written with the base CPU. See the [network chapter](./guide/06-network.md).
 
-Записанный `*NumRssQueues` не равен числу очередей, занятых конкретным трафиком. DEVICE TWEAKER отдельно выводит сохранённые параметры и активное состояние `Get-NetAdapterRss`, а расхождения пишет в лог. Профиль [`NdisRssProfileBalanced`](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/standardized-inf-keywords-for-rss) не предусматривает ручную настройку базового CPU. Адаптер после записи RSS автоматически не перезапускается. RSS распределяет обработку входящих пакетов, а Interrupt Affinity задаёт допустимые CPU для IRQ. Эти механизмы не заменяют друг друга.
+The written `*NumRssQueues` value is not the number of queues used by a particular workload. DEVICE TWEAKER displays saved parameters separately from the active `Get-NetAdapterRss` state and logs mismatches. [`NdisRssProfileBalanced`](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/standardized-inf-keywords-for-rss) does not allow manual base-CPU configuration. The adapter is not restarted automatically after an RSS write. RSS controls receive processing; Interrupt Affinity controls eligible CPUs for IRQs. Neither replaces the other.
 
 ### NIC ITR
 
-**NIC ITR** работает с аппаратными регистрами модерации поддерживаемых сетевых контроллеров: Intel I210/I211, I219, I225/I226, I350, 82576/82580, Realtek RTL8111/8168, RTL8125/8126 и совместимых Killer. Для неизвестного PCI ID аппаратная запись закрыта.
+**NIC ITR** accesses hardware moderation registers on supported network controllers: Intel I210/I211, I219, I225/I226, I350, 82576/82580, Realtek RTL8111/8168, RTL8125/8126, and compatible Killer models. Hardware writes are disabled for unknown PCI IDs.
 
-**ЗАДАТЬ** записывает регистр сейчас, **СОХРАНИТЬ** записывает профиль в автозапуск, не меняя текущий регистр; **ПРОВЕРИТЬ** перечитывает аппаратное состояние.
+**SET** writes the register now, **SAVE** stores a profile in the startup task without changing the current register, and **CHECK** rereads the hardware.
 
-Собственная адаптивная модерация драйвера перезаписала бы значение в регистре, поэтому **СОХРАНИТЬ** выключает её в реестре (`*InterruptModeration`, у Intel также `ITR`). Изменение вступает в силу после перезагрузки. Текущее состояние видно в строке **Interrupt Moderation** карточки; **УДАЛИТЬ** в блоке IMOD возвращает значение драйвера по умолчанию. Формат регистра и единицы интервала зависят от семейства контроллера: число из [EITR Intel](https://cdrdv2-public.intel.com/333016/333016%20-%20I210_Datasheet_v_3_7.pdf) не является готовым профилем Realtek. Более короткий интервал может увеличить число прерываний и нагрузку на CPU.
+The driver's own adaptive moderation would overwrite the register, so **SAVE** turns it off in the registry (`*InterruptModeration`, and `ITR` on Intel). The change takes effect after a restart. The card's **Interrupt Moderation** line shows the current state; **DELETE** in the IMOD block restores the driver default. Register formats and interval units differ by controller family: an [Intel EITR](https://cdrdv2-public.intel.com/333016/333016%20-%20I210_Datasheet_v_3_7.pdf) value is not a ready-made Realtek profile. A shorter interval can increase both interrupt rate and CPU load.
 
-## Дополнительные настройки
+## Additional settings
 
-**ReservedCpuSets** задаёт системную маску CPU, которые Windows старается не использовать для обычного планирования. Это не жёсткая изоляция и не замена Interrupt Affinity устройства.
+**ReservedCpuSets** defines a system-wide mask of CPUs that Windows tries to avoid for ordinary scheduling. It is not hard isolation or a substitute for device Interrupt Affinity.
 
-**Power Saving** управляет доступными настройками энергосбережения USB-контроллера и связанных с ним корневых USB-хабов, включая [USB selective suspend](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/usb-selective-suspend). Для проводного сетевого адаптера переключатель меняет разрешение Windows отключать устройство ради экономии энергии. Фактическая доступность этих параметров зависит от драйвера.
+**Power Saving** controls available settings for the USB controller and its root hubs, including [USB selective suspend](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/usb-selective-suspend). For a wired network adapter, the switch changes whether Windows may turn off the device to save power. Availability depends on the driver.
 
-На поддерживаемых сборках Windows 11 **Mouse Throttle** меняет `RawMouseThrottleDuration`. Этот параметр задаёт интервал ограничения для фоновых обработчиков [Raw Input](https://learn.microsoft.com/en-us/windows/win32/inputdev/raw-input), к которым Windows применяет throttling. Некоторые фоновые регистрации могут обходить это ограничение. Настройка не меняет USB polling rate мыши и не нацелена на активное окно.
+On supported Windows 11 builds, **Mouse Throttle** changes `RawMouseThrottleDuration`, a throttle interval for background [Raw Input](https://learn.microsoft.com/en-us/windows/win32/inputdev/raw-input) listeners to which Windows applies this mechanism. Some background registrations can bypass it. The setting does not change the mouse's USB polling rate or target the foreground window.
 
-**Замер Raw Input** оценивает частоту по интервалам обработки событий. Для мыши нужен поток событий при движении; результат зависит в том числе от доставки сообщений и их обработки программой. У клавиатуры события соответствуют нажатиям и отпусканиям клавиш, поэтому несколько нажатий или удержание клавиши не позволяют достоверно определить её USB polling rate. Частота событий Raw Input отличается от частоты USB-опроса и частоты внутреннего сканирования клавиатуры.
+**Raw Input measurements** estimate event rates from the intervals between processed events. Mouse measurements need a stream of movement events; message delivery and processing by the program also affect the result. Keyboard events represent key presses and releases, so pressing several keys or holding a key does not reliably reveal the keyboard's USB polling rate. Raw Input event rate, USB polling rate, and the keyboard's internal scan rate are different quantities.
 
-Кнопки **МЫШЬ**, **КЛАВИАТУРА**, **USB**, **GPU**, **СЕТЬ** и **НАКОПИТЕЛИ** перемещают к соответствующим устройствам в общем списке. Строка поиска скрывает несовпадающие устройства.
+The **MOUSE**, **KEYBOARD**, **USB**, **GPU**, **NETWORK**, and **STORAGE** buttons jump to matching devices in the full list. Text search hides nonmatching devices.
 
-## Интеллектуальная авто-оптимизация и восстановление
+## Intelligent auto-optimization and restore
 
-**АВТООПТИМИЗАЦИЯ** выбирает физические ядра по топологии и CPPC-рейтингу. Для системы с несколькими CCD отдельно выбирается целевой CCD; SMT-потоки одного ядра не считаются двумя независимыми ядрами. Для дискретной GPU подбираются два разных физических ядра; для встроенной GPU аффинити возвращается к выбору Windows. Для устройств ввода, проводной сети и аудио действуют свои правила совместного размещения.
+**AUTO-OPTIMIZATION** selects physical cores from topology and CPPC rankings. On multi-CCD systems it selects a target CCD separately; two SMT threads of one core are not counted as two independent cores. A discrete GPU gets two distinct physical cores; an integrated GPU's affinity is returned to Windows defaults. Input devices, wired network adapters, and audio have separate sharing rules.
 
-Если подходящего ядра или надёжно определённой роли нет, назначение пропускается с причиной в отчёте. Если топология CPU определена ненадёжно, запись масок не начинается. Для NDIS интеллектуальная авто-оптимизация подбирает режим RSS/IRQ по обнаруженному состоянию адаптера. При запуске можно включить настройку USB IMOD, NIC ITR настраивается вручную.
+Assignments without a suitable core or a reliably detected role are skipped with a reason in the report. If CPU topology cannot be determined reliably, affinity masks are not written. For NDIS adapters, the RSS/IRQ mode is chosen using the detected runtime state. USB IMOD tuning can be included when starting intelligent auto-optimization; NIC ITR remains manual.
 
-Перед общим ручным применением, **ЗАДАТЬ** для IMOD / NIC ITR, **СОХРАНИТЬ** для NIC ITR, восстановлением бекапа и общим сбросом создаётся проверенная резервная копия. Для интеллектуальной авто-оптимизации обязателен снимок исходных настроек; дополнительный бекап можно создать по желанию. Если обязательный снимок не создан, запись не начинается. Выбрать сохранённый бекап можно в разделе **ВОССТАНОВЛЕНИЕ**.
+A validated backup is created before the main manual apply, IMOD / NIC ITR **SET**, NIC ITR **SAVE**, backup restoration, and the main reset. Intelligent auto-optimization requires an original-settings snapshot; an extra backup is optional. No write begins if a required snapshot cannot be created. Saved backups can be selected under **RESTORE**.
 
-При общем сбросе сохраняются MSI Mode / MSI Limit и настройки Wi-Fi.
+The main reset preserves MSI Mode / MSI Limit and Wi-Fi settings.

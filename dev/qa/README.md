@@ -1,94 +1,94 @@
-# Проверки для разработчика
+# Developer checks
 
-## Открыть тест-панель вручную
+[Development guide](../../docs/DEVELOPMENT.md) · [Русский](./README.ru.md)
 
-Для цикла "воспроизвести → изменить → увидеть и сравнить" есть [стенд разработки](WORKBENCH.md): `Invoke-DevSession.ps1`, сценарии, native-снимки, кадры переходов, тестовые файлы и фиксация просмотра. Полный набор проверок запускается через `Invoke-Qa.ps1`.
+## Opening the test panel manually
+
+For the "reproduce, change, inspect and compare" cycle, use the [development workbench](WORKBENCH.md): `Invoke-DevSession.ps1`, scenarios, native captures, transition frames, test files and review records. `Invoke-Qa.ps1` runs the full suite.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Open-TestPanel.ps1
 ```
 
-Команда собирает отдельный `local/tools/TestPanel/DEVICE TWEAKER QA.exe` из копии исходников и открывает панель. Эта сборка всегда read-only. Сочетания **Ctrl+Shift+T** и **Ctrl+Alt+Shift+T** открывают панель повторно; в обычных EXE панели нет. `-BuildOnly` собирает и проверяет EXE без открытия окон для запуска из скриптов.
+The command builds `local/tools/TestPanel/DEVICE TWEAKER QA.exe` from a source copy and opens the panel. This build is always read-only. **Ctrl+Shift+T** and **Ctrl+Alt+Shift+T** reopen it; normal EXEs do not include the panel. `-BuildOnly` builds and checks the EXE without opening windows.
 
-## Полный скрытый QA
+## Full hidden QA
 
-Для нативной модели также нужны Visual Studio C++ Build Tools и Windows SDK. Она компилирует функции DTIMOD с подставными системными вызовами; SYS не запускается.
+The native model also requires Visual Studio C++ Build Tools and the Windows SDK. It compiles DTIMOD functions with substituted system calls; it does not run the SYS.
 
-Из корня репозитория:
+From the repository root:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-Qa.ps1
 ```
 
-Нужны Windows, .NET 8 SDK и доступная оконная станция для GUI. По умолчанию весь прогон выполняется на отдельном невидимом рабочем столе Windows. Окна, диалоги и дочерние процессы остаются там; переключение desktop, физический ввод и видимый fallback не используются. `-Monitor` задаёт геометрию для снимков внутри этого рабочего стола. Для интерактивной отладки есть явный `-VisibleGui`; в автоматическом прогоне он не используется.
+Requires Windows, .NET 10 SDK and an available window station for GUI checks. By default, the entire run uses a separate invisible Windows desktop. Windows, dialogs and child processes remain there; there is no desktop switch, physical input or visible fallback. `-Monitor` sets capture geometry on that desktop. `-VisibleGui` is an explicit interactive-debugging option, not part of autonomous QA.
 
-Перед сборкой сохраняется копия исходников, QA-скриптов, тестов и встроенных ресурсов. Список входных файлов берётся из git: всё отслеживаемое и новое неигнорируемое в `src` и `dev/qa`, поэтому новый файл попадает в QA без правки списков. Сборки и тесты используют эту копию в папке прогона, не общие bin/obj проекта. `inputs.json` содержит SHA-256 входных файлов; их неизменность проверяется перед работой и после неё. В итоговом отчёте сохраняются хеши проверенных EXE/DLL.
+Before building, the runner copies sources, QA scripts, tests and embedded resources. Git supplies tracked and new nonignored files in `src` and `dev/qa`, so new files are included without editing a list. Builds and tests use this copy inside the run directory rather than shared project bin/obj. `inputs.json` records input SHA-256 values, checked before and after execution. The final report includes the hashes of the tested EXEs/DLLs.
 
-## Две сборки
+## Two builds
 
-Обычный `DEVICE TWEAKER.exe` не содержит тест-панель, Showcase, пресеты железа или Scenario Lab.
+The normal `DEVICE TWEAKER.exe` contains no test panel, Showcase, hardware presets or Scenario Lab.
 
-Для тест-панели тот же проект собирается с `-p:DeveloperQa=true`. Он подключает `dev/qa/Panel`, использует общий код программы и создаёт отдельный `DEVICE TWEAKER QA.exe` в `src/bin/DeveloperQa/Release/net8.0-windows/win-x64/`. Эта сборка всегда запрещает запись настроек, включая ручной запуск. Выход из эмуляции не разрешает запись.
+The same project with `-p:DeveloperQa=true` includes `dev/qa/Panel`, shares application code and produces `DEVICE TWEAKER QA.exe` in `src/bin/DeveloperQa/Release/net10.0-windows/win-x64/`. This build always blocks settings writes, including manual launches. Leaving emulation does not enable writes.
 
 ```powershell
 dotnet build ".\src\DeviceTweakerCS.csproj" -c Release -p:DeveloperQa=true -p:BuildImodDriver=false
 ```
 
-Обычный EXE можно проверить с `--qa-read-only`. Режим фиксируется на весь процесс: запрещены изменения реестра, WMI, плана питания, автозапуска и настоящих бекапов, загрузка и доступ к драйверу. Логи и отчёты пишутся в папку запуска. Для нового пути записи нужна отдельная проверка блокировки.
+The normal EXE supports `--qa-read-only`. This mode is immutable for the process: registry, WMI, power-plan, startup and real-backup changes, driver loading and driver access are blocked. Logs and reports go to the run directory. Each new write path needs its own blocking check.
 
-## Что проверяется
+## Coverage
 
-| Этап | Область проверки |
-| --- | --- |
-| Сборка | Обычная и разработческая версии; предупреждения считаются ошибками |
-| xUnit | Маски, парсинг, локализация, профили и блокировка настоящих методов записи |
-| WMI / RSS | Общая последовательность запроса, записи и повторного чтения WMI на подставном backend; неподдерживаемая возможность, отказы и несовпадение readback. Настоящий PowerShell-код RSS с подменёнными функциями Get-NetAdapter / Get-NetAdapterRss. Пропуск Wi-Fi, неполное чтение и реальные расхождения проверяются отдельно |
-| ID приложения | В логах и crash report сохраняются MVID сборки и SHA-256 запущенного EXE. Проверка пакета сверяет SHA-256 с файлом; версия остаётся 0.0.4 |
-| IRQ Mode | Разбор PCI MSI / MSI-X Enable и выделенных CM_RESOURCE_LIST, один IRQ для обоих режимов, повреждённые данные, ошибки чтения, несовпадение устройства. QA не открывает DTIMOD; живое чтение PCI проверяется вручную |
-| Реальные образцы ресурсов | Шесть сохранённых ответов Windows 10: USB / GPU / NIC / NVMe / SATA. Разбор обоих списков raw + translated, сверка типов и отказ при повреждённом хвосте. Во время QA используется JSON, обращения к драйверу нет |
-| Подготовка DTIMOD | Параллельные ветки одного процесса проходят общий lock. Проверка на отдельном тестовом файле с настоящими эксклюзивными файловыми дескрипторами |
-| DTIMOD | Сверка исходников и `.sys` с `IMOD/DTIMOD.build.json`. Изменённый исходник или бинарник останавливает QA; отдельные испорченные копии проверяют этот отказ. После изменений драйвера: `publish-variants.ps1 -BuildDriverOnly` |
-| Жизненный цикл DTIMOD | Общая политика GUI / скрипта: чтение без загрузки, таймаут без SCM fallback, протокол и ID сборки, конкурирующие операции и abandoned mutex. Только подставные backends и отдельные тестовые mutex |
-| Нативная модель | Настоящие функции DriverEntry / dispatch / MMIO собираются с fake kernel API: отсутствие выгрузки, ответ протокола, размеры, выравнивание, отказ mapping и освобождение отображения. Запись принимается только внутри памяти, которую Windows выделила устройству: границы, порты, переполнение адреса, повреждённый список ресурсов. Две намеренные поломки (возврат unload и запись через конец диапазона) обнаруживаются утверждениями модели |
-| KDU | Пара EXE/DLL, версии и хеши, манифест сборки и 283 входных файла закреплённого upstream. Подмена исходника, EXE или базы проверяется в отдельных копиях |
-| Применение | Общий DeviceSettingsWriter: MSI, лимит, приоритет, двоичная маска, Windows Default на реестре в памяти |
-| Переименование DTIMOD | Общая политика перехода на подставном SCM: загруженная / отсутствующая / посторонняя служба, отказ удаления |
-| Автозапуск | `profile.json` ↔ настройки программы, перенос старого скрипта из AppData и сохранённых бекапов без потери значений, XML задачи Планировщика (SYSTEM, вход, выход из сна, подключение USB/HID). Настоящий `ApplyIMOD.ps1` запускается в PowerShell 5.1 до чтения профиля и компилирует общий runtime; задача не регистрируется, драйвер не загружается |
-| Восстановление | Общий BackupRestoreService: JSON версии 1, предварительный снимок, запись, readback и откат |
-| План питания | Общий компонент восстановления: AC/DC отдельно, сохранённый GUID, активный/неактивный план и отказы API на модели |
-| IMOD / NIC ITR | Один код записи регистров для программы и автозапуска: адреса, маски, порядок, ошибки чтения/записи/сравнения на модели. Раскладка xHCI и карта interrupter'ов на поддельной памяти контроллера: TRB эндпоинта важнее Slot Context, хабы пропускаются, RTSOFF за пределами BAR отклоняется |
-| CPU | Общий планировщик на синтетических топологиях: SMT, P/E, CCD/CCX, изоляция GPU и input |
-| Polling | Синтетические интервалы, подтверждение и смена частоты; низкая активность клавиатуры не подменяет endpoint rate |
-| Отчёты | Одновременное чтение/обновление JSON и отсутствие тест-панели в обычной сборке |
-| Чувствительность | Девятнадцать испорченных копий: адрес I225, NIC readback, счётчик IMOD, readback бекапа, выбор пары GPU, раннее снижение polling, неверный AC/DC, активация неактивного плана, снятие read-only через окружение, подмена MSI-X Enable размером таблицы, пропуск отличия в один пиксель, освобождение шрифта до контролов, отказ второго списка ресурсов Windows, параллельная подготовка DTIMOD без lock, загрузка из фонового чтения, SCM после таймаута KDU, принятие несовместимого протокола, потеря значений NIC ITR в профиле автозапуска и выбор interrupter'а по Slot Context вместо TRB. Нужные тесты должны упасть; ошибка сборки не засчитывается |
-| GUI | RU/EN, геометрия, диалоги, навигация, тест-панель и виртуальные сценарии |
-| Стенд разработки | Два сценария по два запуска: native-снимки, переход, изменение и восстановление тестового JSON, реальное исключение подставного хранилища, точное сравнение контрольных снимков. Просмотр дизайна фиксируется отдельно |
-| Контролы обычной сборки | Маршрутизация клавиш выпадающего списка, выбор и закрытие popup, Ctrl+Z/Home/End в редакторе, RU→EN→RU с сохранением исходных строк. Восемь снимков normal/hover/focus/disabled; физический ввод не используется |
-| Инвентарь исходников | Активные C#-файлы обычной сборки, методы и строки интерфейса через Roslyn; список помогает ручной сверке, сам по себе не означает проверки всей логики |
-| Скрытый запуск | Независимый отказ в скрипте и EXE при неверном desktop, точная передача кода ошибки и завершение потомков после таймаута |
-| Компоновка | Шесть сценариев RU/EN × 100/125/150%, настоящие WinForms-контролы, отрисованные подписи кнопок и диалог RESTORE. Масштабируется компоновка в QA-сборке; настройки DPI Windows не меняются, переходы между мониторами не проверяются |
-| Логи | Формат и завершение сессии, отклонение неожиданных ERROR/FATAL. Подставленные ошибки принимаются только в успешно проверенном сценарии; образцы диалогов помечены отдельно |
-| Ресурсы | 20 обновлений списка в обычном EXE с read-only, подтверждение каждого нажатия и REFRESH.DONE, ожидание стабилизации handles/GDI/USER, замеры памяти |
-| Доказательства | Повторная сверка TRX, обязательных этапов и классов тестов, девятнадцати регрессий C#, двух нативных регрессий, шести сценариев масштаба, завершённых циклов и хешей файлов |
+- **Build:** normal and developer versions, with warnings treated as errors.
+- **xUnit:** masks, parsing, localization, profiles and blocking of actual write methods.
+- **WMI / RSS:** the shared query/write/readback sequence against a fake backend, unavailable capabilities, failures and readback mismatches. Actual RSS PowerShell code runs with substituted Get-NetAdapter / Get-NetAdapterRss functions. Wi-Fi skips, incomplete reads and mismatches have separate cases.
+- **Application identity:** logs and crash reports include the assembly MVID and running EXE SHA-256. Package checks compare that hash with the file; the version remains 0.0.4.
+- **IRQ Mode:** parsing PCI MSI/MSI-X Enable and allocated CM_RESOURCE_LIST data; one IRQ for either mode, malformed data, read failures and device mismatches. QA does not open DTIMOD; live PCI reads require manual verification.
+- **Recorded resources:** six saved Windows 10 responses covering USB/GPU/NIC/NVMe/SATA. Both raw and translated lists, types and malformed tails are checked from JSON without driver access.
+- **DTIMOD preparation:** concurrent branches share a lock. A separate test file uses real exclusive file handles.
+- **DTIMOD artifact:** sources and SYS must match `IMOD/DTIMOD.build.json`. A changed source or binary stops QA; corrupted copies verify rejection. After driver changes, use `publish-variants.ps1 -BuildDriverOnly`.
+- **DTIMOD lifecycle:** the GUI/script policy covers reads without loading, timeout without SCM fallback, protocol/build identity, competing operations and an abandoned mutex. Only fake backends and separate test mutexes are used.
+- **Native model:** actual DriverEntry/dispatch/MMIO functions compile with fake kernel APIs. Checks cover absent unload, protocol response, sizes, alignment, failed mapping and unmapping. Writes must stay within device-assigned memory: boundaries, ports, address overflow and malformed resource lists are checked. Two deliberate defects, restored unload and an out-of-range write, must be caught by model assertions.
+- **KDU:** the EXE/DLL pair, versions, hashes, build manifest and 283 inputs of the pinned upstream. Source, EXE and database substitutions run in separate copies.
+- **Apply:** shared DeviceSettingsWriter MSI, limit, priority, binary mask and Windows Default operations against an in-memory registry.
+- **DTIMOD rename:** shared migration policy against a fake SCM, covering loaded/missing/unrelated services and failed deletion.
+- **Startup:** `profile.json` and app settings, migration of the older AppData script and saved backups without losing values, and Task Scheduler XML (SYSTEM, logon, resume, USB/HID connection). Actual `ApplyIMOD.ps1` runs in PowerShell 5.1 up to profile loading and compiles the shared runtime. No task is registered and no driver is loaded.
+- **Restore:** shared BackupRestoreService version-1 JSON, initial snapshot, writes, readback and rollback.
+- **Power plan:** shared restore component with separate AC/DC values, saved GUID, active/inactive schemes and modeled API failures.
+- **IMOD / NIC ITR:** shared application/startup register-writing code: addresses, masks, ordering and modeled read/write/compare errors. xHCI layout and interrupter mapping use fake controller memory: endpoint TRB takes precedence over Slot Context, hubs are skipped and RTSOFF outside BAR is rejected.
+- **CPU:** shared scheduler against synthetic SMT, P/E and CCD/CCX topologies, including GPU/input isolation.
+- **Polling:** synthetic intervals, confirmation and rate changes; low keyboard activity must not replace the endpoint rate.
+- **Reports:** concurrent JSON reads/updates and exclusion of the test panel from normal builds.
+- **Sensitivity:** nineteen corrupted C# copies cover the I225 address, NIC readback, IMOD count, backup readback, GPU pair selection, premature polling downgrade, wrong AC/DC, activation of an inactive scheme, removing read-only through the environment, using MSI-X table size as Enable, ignoring a one-pixel difference, disposing fonts before controls, failing the second Windows resource list, concurrent DTIMOD preparation without a lock, loading from background reads, SCM after KDU timeout, accepting an incompatible protocol, losing saved NIC ITR values and choosing an interrupter from Slot Context instead of TRB. The relevant assertions must fail; a build failure does not count.
+- **GUI:** EN/RU, geometry, dialogs, navigation, test panel and virtual scenarios.
+- **Workbench:** two scenarios run twice, with native captures, a transition, test JSON changes/restoration, a real fake-storage exception and exact checkpoint comparison. Design review is recorded separately.
+- **Normal-build controls:** dropdown key routing, selection and popup closing, Ctrl+Z/Home/End in editors and RU→EN→RU with source strings preserved. Eight normal/hover/focus/disabled captures use no physical input.
+- **Source inventory:** Roslyn lists active production C# files, methods and UI strings for manual inspection. This list alone does not verify all logic.
+- **Hidden launch:** independent script/EXE rejection of an incorrect desktop, exact error propagation and descendant cleanup after timeout.
+- **Layout:** six EN/RU × 100/125/150% scenarios with actual WinForms controls, rendered button captions and RESTORE dialog. These are developer-build layout models; Windows DPI settings and monitor transitions are not tested.
+- **Logs:** session format/completion and rejection of unexpected ERROR/FATAL entries. Injected errors are accepted only in a successfully verified scenario; dialog samples are labelled separately.
+- **Resources:** twenty refreshes in the normal read-only EXE, confirmation of every press and REFRESH.DONE, handle/GDI/USER settling and memory measurements.
+- **Evidence:** recheck TRX, mandatory stages/test classes, nineteen C# regressions, two native regressions, six scaling scenarios, completed cycles and file hashes.
 
-Если в локальной папке опубликованной SELF-CONTAINED-сборки есть бекапы, QA читает их и прогоняет через общий компонент восстановления на хранилище в памяти. Оригиналы не меняются. Без этой папки используется синтетический JSON; конкретные случаи видны в TRX.
+If the local published SELF-CONTAINED directory contains backups, QA reads them through the shared restore component against in-memory storage. Originals are unchanged. Without that directory, synthetic JSON is used; TRX identifies the cases.
 
-Виртуальные APPLY/BACKUP/RESTORE тест-панели отдельно помечены как проверки модели. Настоящее применение на железе, readback драйвера и живое измерение Raw Input остаются `SKIPPED`.
+Virtual APPLY/BACKUP/RESTORE actions are labelled as model checks. Actual hardware application, driver readback and live Raw Input measurements remain `SKIPPED`.
 
-## Результаты
+## Results
 
-В `src/tmp/qa/run_*/` сохраняются `qa.json`, `inputs.json`, копия входных файлов, TRX, логи, отчёты намеренных поломок, скриншоты GUI, `layout/layout.json`, `resources/resources.json`, `desktop-contracts/contracts.json`, `isolation/desktop.json` и `evidence.json`. В `desktop.json` записываются имя desktop, проверки активного desktop и подтверждение уборки потомков.
+`src/tmp/qa/run_*/` contains `qa.json`, `inputs.json`, copied inputs, TRX, logs, mutation reports, GUI screenshots, `layout/layout.json`, `resources/resources.json`, `desktop-contracts/contracts.json`, `isolation/desktop.json` and `evidence.json`. `desktop.json` records the desktop name, active-desktop checks and descendant cleanup confirmation.
 
-Отсутствующий результат, пропущенные обязательные тесты, изменённый снимок исходников, ненулевой код worker или неподтверждённый цикл не считаются успешной проверкой. `evidence.json` проверяет полноту и соответствие артефактов. Достоверность результата зависит от целостности самих проверок и отчётов. Скриншоты требуется просмотреть отдельно: автоматическая проверка изображения и геометрии не оценивает весь дизайн.
+A missing result, skipped required tests, changed source snapshot, nonzero worker exit or unconfirmed cycle is not a successful check. `evidence.json` checks artifact completeness and consistency; result validity still depends on the integrity of the checks and reports. Screenshots require visual inspection: image/geometry checks cannot judge the entire design.
 
-В матрице компоновки `main.png` / `restore.png` снимаются через native PrintWindow в пределах геометрии дисплея; если окно выше этой области, снимок явно отмечен `fullWindow=false` и содержит только viewport. Невидимый desktop при этом не выводится на дисплей. Отдельный `*.layout.png` содержит полную диагностическую отрисовку DrawToBitmap: она помогает проверять компоновку, но может отличаться в native-тексте и рамке DWM и не выдаётся за полный визуальный снимок. Большие белые области считаются ошибкой native capture.
+Layout `main.png` / `restore.png` captures use native PrintWindow within display geometry. Taller windows are explicitly marked `fullWindow=false` and show only the viewport. The invisible desktop is not displayed. Separate `*.layout.png` images contain full DrawToBitmap diagnostic rendering; native text and DWM frames can differ, so these are not presented as full visual captures. Large white regions fail native-capture validation.
 
-`PASS` относится к перечисленным проверкам. Количество тестов не означает проверку любого оборудования. `-SkipGui` даёт `PARTIAL`; сбой обязательного этапа даёт `FAIL` и ненулевой код завершения. Скрипт закрывает только собственные процессы и не выполняет публикацию или команды Git.
+`PASS` applies to the listed checks, not every hardware configuration. `-SkipGui` produces `PARTIAL`; a failed mandatory stage produces `FAIL` and a nonzero exit code. The script closes only its own processes and neither publishes nor runs Git commands.
 
-Готовый локальный набор EXE проверяется отдельно:
+Check an existing local EXE package separately:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Test-ReleasePackage.ps1 -PackageDirectory ".\src\bin\ReleasePackages\v0.0.4"
 ```
 
-Проверяются SHA-256, версия, запуск обоих EXE в probe, встроенный драйвер и отсутствие тест-панели. Главное окно и применение настроек не запускаются.
+This checks SHA-256, versions, both EXEs in probe mode, the embedded driver and absence of the test panel. It does not open the main window or apply settings.

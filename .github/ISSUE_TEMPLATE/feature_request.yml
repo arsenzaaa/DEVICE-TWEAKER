@@ -1,22 +1,29 @@
-name: Идея / Feature request
-description: Новая настройка, устройство или улучшение / A new setting, device or improvement
+name: Feature request / Идея
+description: A new setting, device or improvement / Новая настройка, устройство или улучшение
 labels: [enhancement]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the task you want to solve and why the existing settings are not sufficient.
+        Опишите задачу, которую хотите решить, и почему существующих настроек недостаточно.
+
+        [Documentation](https://github.com/arsenzaaa/DEVICE-TWEAKER/tree/main/docs) · [Русский](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/README.ru.md)
   - type: textarea
     id: problem
     attributes:
-      label: Что нужно и зачем / What and why
-      description: Устройство, настройка и текущее ограничение / The device, the setting and the current limitation
+      label: What and why / Что нужно и зачем
+      description: The device, the setting and the current limitation / Устройство, настройка и текущее ограничение
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
-      label: Как это должно работать / How it should work
+      label: How it should work / Как это должно работать
     validations:
       required: true
   - type: textarea
     id: technical
     attributes:
-      label: Технические данные / Technical details
-      description: Hardware ID, документация производителя, регистры, результаты измерений / Hardware ID, vendor documentation, registers, measurements
+      label: Technical details / Технические данные
+      description: Hardware ID, vendor documentation, registers, measurements / Hardware ID, документация производителя, регистры, результаты измерений

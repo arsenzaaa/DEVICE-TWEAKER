@@ -1,35 +1,27 @@
-# Как помочь DEVICE TWEAKER
+# Contributing
 
-Нашли баг, устройство определяется неправильно или есть идея для новой настройки? Откройте issue. Логи и точная конфигурация железа помогут разобраться быстрее, чем описание "не работает".
+[DEVICE TWEAKER](../README.md) / Contributing · [Русский](./CONTRIBUTING.ru.md)
 
-## Если нашли баг
+Bug reports, hardware results, documentation fixes and focused pull requests are welcome.
 
-Укажите версию DEVICE TWEAKER, сборку Windows, CPU, материнскую плату, BIOS, Hardware ID устройства и версию драйвера. Напишите, что нажали, чего ожидали, что произошло и перезагружали ли компьютер. Приложите фрагмент лога с этим действием.
+[Report a bug](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=bug_report.yml) · [Hardware report](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=hardware_report.yml) · [Suggest a feature](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=feature_request.yml)
 
-Перед отправкой уберите из лога личные пути, имена пользователей и серийные номера. Для обычной ошибки не нужны дампы всей системы или экспорт реестра.
+## Bug reports
 
-## Если хотите отправить PR
+Include the application version, Windows build, CPU, motherboard, BIOS, device Hardware ID and driver version. Describe the steps, expected and actual results, and whether you restarted Windows. Attach a relevant log excerpt.
 
-Делайте один PR на одну задачу. Напишите, на каком железе или сборке Windows проверили изменение и как повторить проверку. Если заявляете об уменьшении задержки, приложите методику и исходные результаты измерений.
+Remove personal paths, usernames and serial numbers before posting. A routine bug report does not need a full system dump or registry export.
 
-Перед PR запустите сборку и тесты по [руководству](../docs/DEVELOPMENT.md). Для изменений записи в регистры, IMOD/ITR и восстановления проверьте также случай, когда запись или чтение не удались. Для интерфейса проверьте русский и английский языки и масштаб Windows 100%, 125% и 150%.
+## Pull requests
 
-## Если правите гайд
+Keep each PR focused on one problem. Explain which hardware or Windows build you tested and how to repeat the check. Claims about lower latency need a repeatable method and raw results.
 
-Главы гайда лежат в `docs/guide`, русская и английская версии лежат рядом. Утверждения о Windows должны проверяться трейсом или документацией, утверждения о программе — её кодом.
+For visual changes, include before/after screenshots. Keep Russian and English documentation in sync. Documentation changes do not require hardware operations.
 
-Код проекта распространяется по [GPL-3.0](../LICENSE).
+For code changes, build and run checks for the affected behavior using the [development guide](../docs/DEVELOPMENT.md). For documentation, check links and rendering. For register, IMOD/ITR and restore changes, cover read/write failures. For UI changes, check both languages and Windows scaling at 100%, 125% and 150%; distinguish modeled layouts from tests on Windows.
 
----
+## Guide changes
 
-## Contributing
-
-Bug reports, hardware compatibility results, documentation fixes, and focused pull requests are welcome.
-
-For a bug, include the DEVICE TWEAKER version, Windows build, CPU, motherboard, BIOS, device Hardware ID, driver version, steps to reproduce, expected and actual results, and a relevant log excerpt. Mention whether you restarted Windows. Remove personal paths, usernames, and serial numbers from logs before posting.
-
-Keep each PR focused. Explain which hardware or Windows build you tested and how to repeat the check. Claims about lower latency need a repeatable method and raw results. Run the build and tests from the [development guide](../docs/DEVELOPMENT.en.md) before submitting. Check read/write failures for changes to registers, IMOD/ITR, and restore; check RU/EN and 100%, 125%, and 150% scaling for UI changes.
-
-Guide chapters live in `docs/guide`, Russian and English side by side. Claims about Windows need a trace or documentation behind them, claims about the program need its code.
+Guide chapters live in `docs/guide`, with English and Russian side by side. Support claims about Windows with traces or documentation, and claims about the program with its implementation.
 
 Contributions are distributed under [GPL-3.0](../LICENSE).

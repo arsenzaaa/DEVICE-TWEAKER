@@ -1,69 +1,42 @@
-# Сеть: RSS, NDIS и NIC ITR
+# Network: RSS, NDIS and NIC ITR
 
-## Два вида драйверов
+[Documentation](../README.md) / [Guide](./README.md) / 06 · [Русский](./06-network.ru.md)
 
-От того, какой драйвер стоит на адаптере, зависит, как его настраивать:
+## Driver and affinity mode
 
-- **NetAdapterCx** — данные идут через WDF01000 ISR / DPC и системные потоки NetAdapterCx (отдельно приём и передача). Прерывания переносятся обычной маской.
-- **NDIS** (классический miniport) — всё идёт через NDIS: ISR / DPC и, при активном MMCSS, поток NDIS. Приём и передача не разделены. **Маска через Interrupt Affinity на NDIS не работает** — вместо неё прерывания распределяет RSS.
+DEVICE TWEAKER distinguishes NDIS and NetAdapterCx and exposes the settings available for the adapter. NDIS supports RSS, IRQ and combined modes in the application. Feature availability and processing paths depend on the NIC and driver.
 
-## RSS
+RSS and Interrupt Affinity are not mutually exclusive: one distributes network processing, the other controls interrupt assignment. Their interaction depends on the NIC and driver.
 
-**RSS** (Receive Side Scaling) раскладывает входящие пакеты по очередям, а очереди — по процессорам. Настройки лежат в ключе класса сетевых адаптеров, в подключе вашего адаптера (ищите `DriverDesc` с его именем):
+## What RSS does
 
-```text
-HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}\00NN
-  *RSS                REG_SZ   1 = RSS включён
-  *NumRssQueues       REG_SZ   число очередей
-  *RssBaseProcNumber  REG_SZ   первый процессор
-  *MaxRssProcessors   REG_SZ   сколько процессоров можно занять
-  *RssMaxProcNumber   REG_SZ   последний процессор
+RSS distributes receive processing across CPUs using hashing and an indirection table. Capabilities vary: Microsoft describes single-queue, multiple-queue and MSI hardware support. See [Introduction to receive-side scaling](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-receive-side-scaling).
+
+The driver can schedule receive DPCs on target processors. See [Receive-side scaling support](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/receive-scaling). Multiple queues do not imply that one connection will use them all.
+
+The application selects physical cores with SMT awareness, queue count and available adapter limits. Saved parameters are compared with active RSS state; a mismatch is not presented as confirmed success.
+
+```powershell
+Get-NetAdapterRss -Name "<adapter name>" |
+    Format-List *
 ```
 
-Значения — строки (REG_SZ), как в INF драйвера.
-
-- **Очереди.** Без MSI-X все очереди приходят одним прерыванием, поэтому RSS по разным ядрам требует MSI-X. В онлайн-матче трафик небольшой: замеры показывают, что реально работают максимум две очереди, на сотнях килобит в секунду — одна. Для игры одной-двух очередей достаточно.
-- **Процессоры** берутся по одному на физическое ядро: SMT-соседи пропускаются, иначе две очереди окажутся на одном SMT-SET.
-- Записанный `*NumRssQueues` — это запрос к драйверу. Активное состояние видно в `Get-NetAdapterRss`, и оно может отличаться.
-- Профиль `NdisRssProfileBalanced` не предусматривает ручного базового CPU.
-
-## Поток NDIS и MMCSS
-
-Когда MMCSS активен, работа NDIS переходит из DPC в **поток NDIS** с приоритетом 8, и время DPC NDIS заметно падает. Общее время обработки сети при этом примерно то же, но поток игры может этот поток вытеснить, а DPC — нет. Если цель — FPS, поток NDIS выгоднее DPC.
-
-- Поток NDIS всегда выполняется **на ядре сетевого адаптера** и не переносится — значит, ядро адаптера и есть ядро этого потока.
-- Если MMCSS выключен или `NetworkThrottlingIndex = FFFFFFFF`, вся работа остаётся в DPC.
-- Приоритет потока задаёт `HKLM\SYSTEM\CurrentControlSet\Services\NDIS\Parameters\ReceiveWorkerThreadPriority` (по умолчанию 8).
-
-NDIS удобнее с FACEIT / Vanguard и активным MMCSS: вы точно знаете, на каком ядре окажется поток NDIS.
+More CPUs can add overhead without improving throughput. Select a count for the workload: [Setting the number of RSS processors](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/setting-the-number-of-rss-processors). Compare queue counts using the traffic pattern of the application you are tuning.
 
 ## NIC ITR
 
-**ITR** (Interrupt Throttling Rate) — аппаратная модерация прерываний самого сетевого контроллера, аналог IMOD у USB. Реализация зависит от семейства: где-то приём и передача настраиваются отдельно, где-то интервал общий.
+ITR controls hardware interrupt moderation on supported controllers. **SET** applies a value now, **SAVE** writes the startup profile, and **CHECK** reads registers again. Writes are blocked for unknown PCI IDs.
 
-```text
-Intel I210 / I211, I225 / I226, I350, 82576 / 82580   EITR
-Intel I219                                            ITR
-Realtek RTL8111 / 8168, RTL8125 / 8126                IntrMit
-```
+Intel EITR/ITR and Realtek IntrMit profiles use different registers and units. Follow the selected family's description and range instead of copying another adapter's numeric profile. Matching readback confirms a register value, not better network latency.
 
-Совместимые Killer работают так же, как их базовые чипы. Значение Intel EITR не является готовым профилем для Realtek: единицы интервала разные.
+Adaptive driver moderation can overwrite a manually applied ITR. The application accounts for available driver settings and returns control to the driver when the saved profile is removed. Operation results retain details and unconfirmed steps.
 
-Единого правила здесь нет. Первый подход — выключить модерацию: сеть — источник частых коротких прерываний, и ради задержки их лучше не копить. Второй — Medium / Adaptive: слишком частые прерывания под нагрузкой мешают вводу. Короче интервал → больше прерываний и нагрузки на CPU. Поэтому NIC ITR в DEVICE TWEAKER настраивается **только вручную**.
+## Verification
 
-## Модерация драйвера
+Wi-Fi is excluded from AUTO and supported wired-setting resets. Compare active RSS, ITR readback, packet loss, CPU load and latency under the same traffic. Less moderation can increase interrupt rate and CPU load.
 
-У драйвера адаптера есть своя адаптивная модерация (`*InterruptModeration`, у Intel также `ITR`), и она перезаписывает регистр. **СОХРАНИТЬ** выключает её в реестре, иначе сохранённое значение ITR не удержится. Изменение вступает в силу после перезагрузки, текущее состояние видно в строке **Interrupt Moderation**, а **УДАЛИТЬ** возвращает значение драйвера.
-
-## Что делает DEVICE TWEAKER
-
-- Для NDIS показывает режим **RSS / IRQ / оба**, сохранённые и активные параметры RSS отдельно и пишет расхождения в лог. АВТООПТИМИЗАЦИЯ подбирает режим по состоянию адаптера.
-- Число очередей ограничено значениями драйвера и векторами MSI-X, процессоры — по одному на физическое ядро.
-- NIC ITR: **ЗАДАТЬ** пишет регистр сейчас, **СОХРАНИТЬ** — профиль в автозапуск, **ПРОВЕРИТЬ** перечитывает регистры. Для неизвестного PCI ID запись закрыта.
-- Wi-Fi не трогается.
-
-**Вывод:** на NDIS — RSS вместо маски, одна-две очереди на отдельных физических ядрах, MSI-X обязателен. NIC ITR — осознанный выбор между задержкой и нагрузкой, и только после выключения модерации драйвера.
+MMCSS and `NetworkThrottlingIndex` are outside the application's settings. Use a trace to inspect network worker-thread placement and priority for the installed driver.
 
 ---
 
-[← Глава 05](./05-usb-imod.md) · [Оглавление](./README.md) · [Глава 07 →](./07-cpu-topology.md)
+[Previous: USB and IMOD](./05-usb-imod.md) · [Guide](./README.md) · [Next: CPU topology](./07-cpu-topology.md)

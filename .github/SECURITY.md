@@ -1,5 +1,7 @@
 # Security policy
 
+[DEVICE TWEAKER](../README.md) / Security · [Documentation](../docs/README.md) · [Русский](./SECURITY.ru.md)
+
 ## Supported version
 
 The current supported release is `0.0.4`. Earlier releases are unsupported.

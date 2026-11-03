@@ -1,72 +1,39 @@
-# USB-контроллеры и IMOD
+# USB controllers and IMOD
 
-## Как устроен xHCI
+[Documentation](../README.md) / [Guide](./README.md) / 05 · [Русский](./05-usb-imod.ru.md)
 
-Мышь, клавиатура и звук не генерируют прерывания сами: прерывание генерирует **контроллер xHCI**, к которому они подключены. Путь события:
+## IMOD belongs to an interrupter
 
-```text
-устройство → endpoint → Transfer Event → interrupter → Event Ring → IMOD → вектор MSI / MSI-X → CPU
-```
+USB events are handled by the host controller. An xHCI interrupter has an Event Ring and an IMOD register. Several devices can share an interrupter, so separate role values do not necessarily provide independent control of each physical device.
 
-- **Interrupter** — часть контроллера со своим Event Ring, своим регистром IMOD и своим вектором прерывания. Их может быть до 1024, обычно 8 (столько же, сколько векторов MSI). Число записано в битах 18..8 регистра `HCSPARAMS1`.
-- Каждое подключённое устройство — это **device slot**. В его **Slot Context** записан interrupter, который назначен устройству.
-- Регистры interrupter'ов лежат в Runtime-области контроллера: IMOD первого — `Runtime Base + 0x24`, следующих — с шагом `0x20`.
+IMODI specifies a minimum inter-interrupt interval in 250 ns units. `0x0` disables this moderation, `0xC8` represents 50 microseconds, and `0xFA0` represents 1 millisecond. Interrupt-generation conditions are defined in section 5.5.2.2 of the [xHCI specification](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/extensible-host-controler-interface-usb-xhci.pdf). The interval is not a fixed addition to every USB report's latency.
 
-Отсюда главное: **IMOD задаётся interrupter'у, а не мыши.** На старых контроллерах один interrupter бывает общим для нескольких устройств — тогда IMOD действует на все сразу.
+`0xC8` is DEVICE TWEAKER's baseline interval, not an invariant default for every controller and Windows version.
 
-## Что делает IMOD
+## Card modes
 
-Модерация прерываний задаёт минимальный интервал между прерываниями interrupter'а. Шаг — 250 нс:
+| Mode | Configuration |
+| :--- | :--- |
+| XHCI | A common controller value. |
+| Devices | Recognized role values using the current mapping. |
+| Interrupters | Values by interrupter index. |
 
-```text
-0x0      модерация выключена
-0xC8     50 мкс   (значение Windows 8 / 10 / 11 по умолчанию; на Windows 7 было 1 мс)
-0xFA0    1 мс
-```
+Device mappings can change after reconnect, sleep or reboot. The application rereads available xHCI information and shows read time, mapping and diagnostics. With incomplete information, inspect the applied common value and limitation rather than assuming an old index remains exact.
 
-Данные при модерации не теряются, они **стакаются**. Если опрос 1000 Гц (событие каждые 1000 мкс), а IMOD 2000 мкс, то за интервал придут два события, и следующий ISR обработает оба по очереди: сначала то, что пришло первым. ISR и DPC станут реже, но длиннее.
+**CHECK** reads the registers. **SET** applies values and saves the startup profile. **DELETE** removes the shared IMOD/NIC ITR startup profile and restores network-driver moderation. It resets USB controls to `0xC8`; live writes require an already loaded DTIMOD and are skipped while the configuration contains only saved NIC ITR entries. Restart Windows to complete the reset. Deletion does not create a separate automatic backup.
 
-## Interrupter меняется
+## AUTO policy
 
-Interrupter назначается устройству системой **при каждом подключении**, и после перезагрузки он может быть другим (совпадения случайны). Поэтому нельзя один раз записать «мышь = interrupter 2»: настройку по устройствам нужно пересчитывать каждый раз.
+For detected roles, AUTO proposes `0x0` for the mouse, `0xC8` for keyboard/gamepad, and `0xFA0` for USB audio/microphone. Check audio stability and input responsiveness before keeping these values.
 
-DEVICE TWEAKER читает карту «устройство → interrupter» из контекстов xHCI в памяти при каждом применении: берёт interrupter из TRB кольца передачи устройства, а если кольцо не читается — из Slot Context. Рядом с текущими значениями показано время чтения; после подключения или отключения устройства карта помечается «устройства изменились», и **ПРОВЕРИТЬ** читает её заново.
+Less moderation can increase interrupt rate and CPU load; more moderation changes processing batches. Check input, audio, lost events and load on your controller. When comparing ports on different controllers, record the device mapping for each run.
 
-## Какое значение ставить
+## Startup and recovery
 
-- **Звук на USB** — максимально высокий IMOD, при котором нет глюков звука. ISR / DPC / потоки звука будут работать дольше за раз, но реже: лучше машина реже, но дольше тормозит, чем часто и коротко, особенно если на это ядро попадёт поток рендера. Профиль AUTO ставит аудио `0xFA0` (1 мс).
-- **Мышь** — при 8 кГц отчёт приходит раз в 125 мкс, при 1 кГц раз в 1000 мкс, то есть стандартные 50 мкс почти не склеивают отчёты одного устройства. Профиль AUTO всё равно выключает модерацию для мыши (`0x0`), чтобы её interrupter не ждал вообще. Интервал IMOD не прибавляется к каждому отчёту: событие после простоя и событие во время отсчёта идут разными путями.
-- **Клавиатура и геймпад** — профиль AUTO оставляет `0xC8`.
-- **Сетевая карта** — своя модерация, глава [06](./06-network.md).
+Registers can be reinitialized by reboot, sleep or device reset. A PowerShell task reapplies saved settings; the EXE need not stay open. See [chapter 11](./11-driver.md).
 
-## Как разложить устройства по контроллерам
-
-В одном ISR / DPC контроллера могут оказаться данные нескольких устройств, и тогда они обрабатываются по очереди: данные второго устройства ждут первое. Совпадения редкие, но при высоком опросе случаются. Идеальная раскладка — три контроллера:
-
-```text
-контроллер чипсета (PCH)   звук                 высокий IMOD, своё ядро
-контроллер CPU / второй    мышь                 своё ядро
-третий контроллер          клавиатура           своё ядро
-```
-
-Минимум — отделить мышь и клавиатуру от звука, чтобы поднять IMOD звуку и не трогать ввод. Какой порт к какому контроллеру относится, видно в карточках DEVICE TWEAKER: для каждого контроллера показаны найденные на нём роли (мышь / клавиатура / геймпад / микрофон / аудио / камера).
-
-**Не ставьте драйверы AMD / ASMedia на USB-контроллеры.** DPC у них короче (0–1 мкс против 8–16 мкс у стандартного WDF01000), но дальше данные идут не сразу в потоки ввода DWM / CSRSS, а через системные потоки драйвера, которые сами занимают 40–50 мкс. В сумме выходит хуже.
-
-## Сохранение после перезагрузки
-
-Регистр IMOD живёт до перезагрузки, сна или сброса контроллера. Сохранённый профиль применяет задача Планировщика `\DEVICE TWEAKER\IMOD` при входе в Windows, после выхода из сна и при подключении USB / HID-устройства, каждый раз заново читая карту interrupter'ов. Подробнее — глава [11](./11-driver.md).
-
-## Что делает DEVICE TWEAKER
-
-- **Устройства** — значения по ролям: мышь, клавиатура, геймпад, USB-аудио. Если надёжной карты нет, применяется общее значение для контроллера.
-- **XHCI** — одно значение во все interrupter'ы контроллера.
-- **Interrupters** — значения по индексам; в подробностях видны первые 64.
-- **ЗАДАТЬ** пишет регистры и сохраняет отличающиеся от стандартных значения в автозапуск, **ПРОВЕРИТЬ** перечитывает регистры, **УДАЛИТЬ** убирает автозапуск и возвращает `0xC8`.
-- Перед включением USB IMOD программа показывает состояние HVCI, Blocklist, Defender и служб FACEIT / Vanguard (**ПРОВЕРКА СИСТЕМЫ**).
-
-**Вывод:** IMOD — это настройка interrupter'а, а не устройства. Высокий IMOD звуку, без модерации мыши, устройства разнесены по контроллерам, карта interrupter'ов читается заново при каждом применении.
+Readback confirms the value read from a register. It does not measure input latency or replace physical sleep, resume and reconnect checks.
 
 ---
 
-[← Глава 04](./04-gpu.md) · [Оглавление](./README.md) · [Глава 06 →](./06-network.md)
+[Previous: Graphics card](./04-gpu.md) · [Guide](./README.md) · [Next: Networking, RSS and NIC ITR](./06-network.md)

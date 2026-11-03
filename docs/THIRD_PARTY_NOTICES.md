@@ -1,27 +1,29 @@
-# Сторонние компоненты
+# Third-party components
+
+[DEVICE TWEAKER](../README.md) / [Documentation](./README.md) · [Русский](./THIRD_PARTY_NOTICES.ru.md)
 
 ## KDU
 
-В проекте используется [hfiref0x/KDU](https://github.com/hfiref0x/KDU) для загрузки `DTIMOD.sys`, чтобы программа могла читать и записывать USB IMOD и NIC ITR.
+The project uses [hfiref0x/KDU](https://github.com/hfiref0x/KDU) to load `DTIMOD.sys` for USB IMOD and NIC ITR register access.
 
-Файлы, которые использует программа:
+The application uses:
 
 - `src/IMOD/Loader/kdu.exe`
 - `src/IMOD/Loader/drv64.dll`
 
-Версия загрузчиков: `1.4.5.2512`.
+Loader version: `1.4.5.2512`.
 
-Лицензия KDU: MIT. Полный текст находится в `src/IMOD/KDU/LICENSE.txt`.
+KDU is licensed under MIT. The full license is in `src/IMOD/KDU/LICENSE.txt`.
 
-Контрольные суммы:
+Checksums:
 
 ```text
 B340DAD4DDBE8607F9FDDB79F679375B4FF5080FE1A7EDB6CE015F69D3A0CD4F  kdu.exe
 D032D855A0FF0EF3E3AD6EC8DAFFB8649048F82D3F1EEB89BEE3652EE6F01F80  drv64.dll
 ```
 
-## Прочее
+## Other components
 
-Приложение собирается под .NET 8 для Windows и использует Windows Forms, WMI и Win32 API.
+The application targets .NET 10 for Windows and uses Windows Forms, WMI and Win32 APIs.
 
-Таблицы PCI ID для оценки `CHIP 0` / `CHIP 1` адаптированы из проекта [MariusHeier/cpu-direct-usb](https://github.com/MariusHeier/cpu-direct-usb) и связанных источников. Это оценка класса контроллера, а не измеренная задержка.
+PCI ID tables for the `CHIP 0` / `CHIP 1` indication are adapted from [MariusHeier/cpu-direct-usb](https://github.com/MariusHeier/cpu-direct-usb) and related sources. The indication estimates the controller class; it is not a latency measurement.

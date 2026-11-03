@@ -1,59 +1,49 @@
-# Проверка: трейсы и логи
+# Verification: traces and logs
 
-## Почему не FPS
+[Documentation](../README.md) / [Guide](./README.md) / 10 · [Русский](./10-verification.ru.md)
 
-FPS одного прогона — плохой судья. Результат зависит от баунда (CPU / RAM / GPU), от того, куда в этот раз выпали важные потоки игры, от удачных и неудачных ядер под PBO. Тест «до / после» на нестабильном бенчмарке легко покажет что угодно. Проверять нужно то, что программа меняет: **на каких ядрах выполняются ISR и DPC и сколько они длятся**.
+## Three kinds of evidence
 
-## Записать трейс
+| Check | What it establishes |
+| :--- | :--- |
+| Log and backup | Requested steps, captured values and retained errors. |
+| Readback | A current accessible registry, resource, WMI or hardware-register value. |
+| Trace and measurements | Where processing ran, its duration and the measured workload outcome. |
 
-Нужен Windows Performance Toolkit из [Windows ADK](https://learn.microsoft.com/en-us/windows-hardware/get-started/adk-install). Командная строка от имени администратора:
+These checks complement each other. Matching an IMOD register to an entered value is not a mouse-latency measurement. Saved affinity does not establish where every DPC runs.
 
-```bat
+## ISR/DPC with ETW
+
+Install Windows Performance Toolkit. A short recording can be made from an elevated console:
+
+```powershell
 xperf -on PROC_THREAD+LOADER+INTERRUPT+DPC
-rem 10 секунд обычной нагрузки: игра, движение мышью, звук
-xperf -stop -d C:\kernel.etl
-xperf -i C:\kernel.etl -o C:\report.txt -a dpcisr
+# Reproduce a short, predefined workload.
+xperf -d trace.etl
+xperf -i trace.etl -a dpcisr > report.txt
 ```
 
-`report.txt` — текстовая сводка: для каждого драйвера число ISR / DPC, распределение длительности и **распределение по CPU**. Сразу видно, переехал ли драйвер на нужные ядра.
+The `dpcisr` action produces ISR/DPC summaries: [Microsoft documentation](https://learn.microsoft.com/en-us/previous-versions/windows/desktop/xperf/the-dpc-isr-action). Open the ETL in Windows Performance Analyzer for individual events and CPUs. Do not assume that the text summary alone proves complete per-core placement.
 
-То же самое можно записать через WPR (`wpr -start CPU -start GPU`, затем `wpr -stop trace.etl`) и открыть в WPA или Media eXperience Analyzer (MXA).
+Compare active modules, execution times, CPUs and application-thread activity. Fixed thread names, handler durations or IRQ counts are not universal reference values across Windows and driver versions.
 
-## Что смотреть
+## A fair comparison
 
-- **CPU, на котором выполняются ISR / DPC** каждого драйвера: NVLDDMKM и DXGKRNL — на двух ядрах видеокарты, WDF01000 — на ядрах USB-контроллеров, NDIS — на ядре сети.
-- **ISR и DPC одного драйвера на одном ядре.** Если DPC уходит на другое ядро, появляются IPI.
-- **Прерывания DPC.** Без MSI или с двумя драйверами на ядре видно, как DPC прерывается чужими ISR.
-- **Длительность.** У WDF01000 DPC обычно 8–16 мкс; рост длительности после изменений — повод разбираться.
-- В MXA: `CPU > ISRs and DPCs > Drivers`, перетащите драйвер на панель и посмотрите по ядрам.
+1. Record Windows and driver versions, settings and the original backup.
+2. Define a repeatable workload and a measurable outcome: frame-time distribution, CPU use, packet loss or device latency.
+3. Change one factor, reboot where required and repeat several comparable runs.
+4. Preserve traces and results, including regressions and instability.
 
-Если маска стоит, а ISR / DPC всё равно на одном ядре — это не ошибка программы, а режим перенаправления прерываний: глава [03](./03-affinity.md), Round Robin в BIOS.
+Use repeated runs to distinguish a consistent change from normal variation. For unexpected CPU placement, check the device instance, applied policy and driver behaviour against the trace.
 
-## Лог программы
+## Project QA
 
-DEVICE TWEAKER пишет подробный лог в папку `logs` рядом с EXE, отдельный файл на каждый запуск:
+The developer workbench exercises device models, write guards and the UI in read-only mode. Screenshots establish only the displayed state and require inspection. MATCH means pixel equality.
 
-- что найдено: устройства, роли USB, топология CPU;
-- план АВТООПТИМИЗАЦИИ: какие ядра выбраны и почему, что пропущено и по какой причине;
-- что применилось, что нет, и результат повторного чтения: регистры IMOD / NIC ITR, WMI энергосбережения, активный RSS;
-- источник и время чтения IRQ Mode.
+Virtual runs do not validate real driver loading, physical MMIO/readback, Windows-setting writes, reboot or device resume. The workbench's 100/125/150% sizes model layout rather than actual Windows DPI transitions. Test windows are constrained to the available display, with their sizes recorded explicitly.
 
-При необработанной ошибке там же появляется crash-файл и `last-crash.txt`.
-
-## Отчёт о железе
-
-Авто-оптимизация проверена на конкретных системах, и каждая новая конфигурация делает её точнее. Если хотите помочь, отправьте [отчёт о железе](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=hardware_report.yml) с тремя логами:
-
-```text
-1. до применения авто-оптимизации (или после сброса настроек)
-2. сразу после применения
-3. после перезагрузки и повторного запуска программы
-```
-
-Трейс до и после к отчёту приложите, если записывали: это самое ценное.
-
-**Вывод:** результат проверяется трейсом — где выполняются ISR / DPC и сколько они длятся, а не одним прогоном бенчмарка.
+See [development](../DEVELOPMENT.md). Physical hardware requires separate validation with a known baseline and recovery procedure.
 
 ---
 
-[← Глава 09](./09-power.md) · [Оглавление](./README.md) · [Глава 11 →](./11-driver.md)
+[Previous: Power saving](./09-power.md) · [Guide](./README.md) · [Next: Driver and startup](./11-driver.md)

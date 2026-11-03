@@ -1,52 +1,31 @@
-# Видеокарта
+# Graphics card
 
-## Какие драйверы работают
+[Documentation](../README.md) / [Guide](./README.md) / 04 · [Русский](./04-gpu.ru.md)
 
-Когда вы ставите видеокарту на ядро, туда переезжают все её прерывания:
+## AUTO policy for GPUs
 
-```text
-NVIDIA   NVLDDMKM (ISR + DPC) и DXGKRNL (ISR + DPC)
-AMD      только DXGKRNL (ISR + DPC)
-```
+For a discrete GPU, AUTO selects a pair of physical cores on the target CCD, uses SpecCPU and High, enables MSI and removes the custom MSI Limit. An SMT sibling is not counted as a second physical core; CPU 0 is avoided where possible. AUTO returns integrated-GPU affinity to Windows.
 
-У AMD прерываний DXGKRNL больше, но общая нагрузка на процессор ниже, чем у NVIDIA: драйверу NVIDIA нужны ISR / DPC сразу двух драйверов. Кроме того, у драйвера NVIDIA есть системные потоки NVLDDMKM с приоритетом 29, а у AMD таких потоков нет.
+Work distribution across the selected cores depends on the GPU driver. Compare AUTO with the original settings under the same workload.
 
-## Почему два ядра
+## Manual configuration
 
-Если видеокарта стоит на одном ядре, ISR драйвера видеокарты прерывает её же DPC:
+The GPU card exposes CPU Affinity, MSI Mode/Limit, IRQ Priority and Policy. Reboot after applying interrupt policy and read IRQ Mode again.
 
-```text
-ядро N   DPC NVLDDMKM ... [ ISR NVLDDMKM ] ... DPC продолжается
-```
+Compare the original behavior with AUTO first. For subsequent experiments, change one parameter and keep the game scene, FPS limiter, power mode and graphics settings consistent. Compare repeated runs rather than the best individual result.
 
-DPC не может уйти на другое ядро и ждёт, пока выполнится ISR → спайки задержки в случайные моменты и нарушенная параллельность. Выигрыш от «одного ядра ради кэша» измеряется микросекундами и не стоит таких спайков. Поэтому видеокарта ставится на **два разных физических ядра**: два логических процессора одного SMT-SET делят кэш и EXECUTION-UNITS и за два ядра не считаются.
+## What to inspect in a trace
 
-Тесты на нестабильном бенчмарке легко показывают «одно ядро лучше»: с PBO у процессора бывают удачные и неудачные ядра, и разница между ними выдаётся за разницу между одним и двумя ядрами. Проверять нужно трейсом, а не FPS одного прогона.
+Inspect actual graphics-stack ISR/DPC and worker-thread activity. Interrupt Affinity does not set the affinity of every GPU-driver thread; the driver can select a DPC's target CPU separately. See [DPC queue organization](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/organization-of-dpc-queues).
 
-## Правила
+Record module names and execution times together with the driver version, GPU, HAGS state and workload.
 
-1. Два разных физических ядра, свободных от других драйверов.
-2. Не использовать ядро 0: не ставьте видеокарту на «ядро 0 + ядро X».
-3. Если трейс показывает, что ISR / DPC всё равно идут на одно ядро, в BIOS нужно поставить **Interrupt Redirection Mode Selection = Round Robin** (скрытая настройка, через SCEWIN / GRUB). Подробнее — в главе [03](./03-affinity.md).
+## HAGS and BIOS
 
-## Встроенная графика
+The application does not manage HAGS, graphics-driver threads or firmware. Comparing HAGS is a separate experiment with its own measurement conditions.
 
-Встроенной GPU отдельные ядра не нужны: ей АВТООПТИМИЗАЦИЯ возвращает выбор Windows и не тратит на неё физические ядра, которых и так мало.
-
-## Рядом с DEVICE TWEAKER
-
-Программа настраивает только прерывания. Несколько вещей вокруг видеокарты, которые стоит знать:
-
-- **HAGS** на NVIDIA лучше держать включённым: без него постоянно активен системный поток NVLDDMKM с приоритетом 29 (если его приостановить, система зависнет), а поток DXGMMS2 поднимается до 29. На AMD HAGS включён всегда.
-- Потоки DXGMMS запускаются реже и короче, их можно оставить где есть: свободные ядра важнее для потоков игры.
-
-## Что делает DEVICE TWEAKER
-
-- **АВТООПТИМИЗАЦИЯ** даёт дискретной GPU пару соседних физических ядер на целевом CCD, не используя SMT-соседей как второе ядро и по возможности обходя ядро 0. Политика `SpecCPU`, приоритет High, MSI включён, лимит снят.
-- В карточке видеокарты видно IRQ Mode (обычно MSI-X), HW и маску; вручную ядра отмечаются в списке CPU Affinity.
-
-**Вывод:** дискретная видеокарта — два физических ядра без других драйверов и без ядра 0, проверка трейсом, при необходимости Round Robin в BIOS.
+Judge the outcome by stability and reproducible measurements on your system. Use **RESTORE** if behavior gets worse.
 
 ---
 
-[← Глава 03](./03-affinity.md) · [Оглавление](./README.md) · [Глава 05 →](./05-usb-imod.md)
+[Previous: Affinity and priority](./03-affinity.md) · [Guide](./README.md) · [Next: USB and IMOD](./05-usb-imod.md)

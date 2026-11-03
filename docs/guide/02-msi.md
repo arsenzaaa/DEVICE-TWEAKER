@@ -1,59 +1,45 @@
-# MSI и MSI-X
+# MSI and MSI-X
 
-## Линия и сообщение
+[Documentation](../README.md) / [Guide](./README.md) / 02 · [Русский](./02-msi.ru.md)
 
-Старый способ — **line-based** прерывание: устройство поднимает сигнал на линии IOAPIC. Несколько устройств могут делить одну линию (IRQ-SHARING), и тогда при каждом прерывании Windows по очереди вызывает ISR всех драйверов на этой линии (`KiChainedDispatch`). Windows Internals прямо называет разделяемые прерывания причиной высокой задержки прерываний и нестабильности.
+## Line and message
 
-**MSI** (Message Signaled Interrupts) — прерывание записью в память: устройство пишет сообщение по адресу, и оно приходит в LAPIC нужного процессора. Общих линий нет, данные приходят вместе с прерыванием.
+A line-based interrupt uses an interrupt line; MSI is delivered by writing to a special memory address. MSI-X provides more flexible message management. Availability depends on the device and its driver. See [Introduction to message-signaled interrupts](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/introduction-to-message-signaled-interrupts).
 
-- **MSI** — до 32 сообщений, общий адрес.
-- **MSI-X** — до 2048 сообщений, у каждого свой адрес и своя привязка к CPU. Именно MSI-X позволяет сетевой карте раздать очереди RSS по разным ядрам.
+MSI does not automatically guarantee lower latency or uninterrupted DPC execution. DEVICE TWEAKER changes the setting; compatibility and results must be checked on the actual device after a reboot.
 
-## Что даёт MSI MODE на практике
+## Saved setting and current mode
 
-Тест на USB xHCI Controller с одним вектором:
+| Field | Meaning |
+| :--- | :--- |
+| MSI Mode | The saved `MSISupported` registry setting. |
+| IRQ Mode | Available current-mode evidence: Line, MSI, MSI-X or combined MSI/MSI-X. |
+| HW | The PCI device's capabilities and available message maximum. |
+| IRQ Count | Allocated-resource information, not interrupt frequency. |
 
-```text
-MSI MODE выключен   выполнение DPC (WDF01000) прерывается двумя ISR (WDF01000), сами ISR длиннее
-MSI MODE включён    DPC (WDF01000) выполняется без прерываний, ISR короче
-```
+**READ IRQ MODE** queries all PCI devices in the list and loads DTIMOD if needed. It reads Windows interrupt resources and PCI configuration. Background reads at startup or refresh use Windows resources or an already loaded driver. If the mode cannot be determined, the result includes the reason; the registry setting remains a separate field.
 
-То есть без MSI вы получаете лишние ISR, и каждый из них дольше. Это массовая и значительная проблема, а IRQ-SHARING — редкая, но тоже решается включением MSI.
+## MSI Limit
 
-**Вывод:** если вы всё ещё не используете MSI MODE, вы совершаете ошибку. Исключения — устройства и драйверы, которые с MSI не работают: на части сетевых адаптеров включение MSI приводило к BSOD или пропаже сети. После включения обязательно перезагрузитесь и проверьте устройство.
+`MessageNumberLimit` caps the requested number of messages. **Unlimited** removes this override and leaves the decision to Windows and the driver; it does not promise the maximum number of vectors.
 
-## Лимит сообщений
-
-`MessageNumberLimit` ограничивает число сообщений. **Лимит ставить не нужно**: без него устройство само использует нужное (максимальное) число векторов. В DEVICE TWEAKER это **MSI Limit: Unlimited** — значение удаляется из реестра. Реальное число векторов видно в `msinfo32` → Аппаратные ресурсы → IRQ: посчитайте IRQ вашего устройства (у MSI они отрицательные).
-
-## Где это хранится
+Windows documents 1, 2, 4, 8 and 16 for multi-message MSI, and up to 2048 for MSI-X. See [Enabling MSI in the registry](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/enabling-message-signaled-interrupts-in-the-registry). The application also checks a known hardware maximum and rejects incompatible input.
 
 ```text
-HKLM\SYSTEM\CurrentControlSet\Enum\PCI\<устройство>\<экземпляр>\Device Parameters\Interrupt Management\MessageSignaledInterruptProperties
-  MSISupported         REG_DWORD   1 = MSI / MSI-X, 0 = линия
-  MessageNumberLimit   REG_DWORD   удаляется при Unlimited
+HKLM\SYSTEM\CurrentControlSet\Enum\PCI\<device>\<instance>\Device Parameters\Interrupt Management\MessageSignaledInterruptProperties
+  MSISupported        REG_DWORD
+  MessageNumberLimit  REG_DWORD
 ```
 
-Настройка вступает в силу после перезагрузки. Драйвер может её проигнорировать: NVIDIA, например, включает MSI выборочно по архитектуре.
+## Configuration sequence
 
-## Настройка в реестре и реальный режим — разные вещи
+1. Record the original MSI Mode, IRQ Mode and HW information.
+2. Apply the chosen setting. The application creates a recovery backup before writing.
+3. Reboot, read IRQ mode again and exercise the device under load.
+4. Restore the saved values if device behavior gets worse.
 
-`MSISupported` — это только пожелание. То, что устройство использует на самом деле, DEVICE TWEAKER показывает отдельно:
-
-- **MSI Mode** — сохранённая настройка (`MSISupported`).
-- **IRQ Mode** — текущий режим: Line / MSI / MSI-X. Берётся из ресурсов, которые выделила Windows, или через уже загруженный DTIMOD.sys. Если по ресурсам MSI и MSI-X не различить, показывается `MSI/MSI-X`.
-- **HW** — что поддерживает само устройство, без возможностей родительского контроллера.
-- **СЧИТАТЬ IRQ** вверху окна читает биты `MSI Enable` / `MSI-X Enable` в конфигурации PCI всех устройств из списка через DTIMOD.sys и при необходимости загружает драйвер. Настройки при этом не меняются.
-
-MSI Mode и IRQ Mode могут различаться до перезагрузки или если драйвер устройства так решил. Количество IRQ из WMI само по себе режим не определяет.
-
-## Что делает DEVICE TWEAKER
-
-- **АВТООПТИМИЗАЦИЯ** включает MSI и снимает лимит у устройств, которые она настраивает, включая накопители.
-- Вручную MSI Mode и MSI Limit задаются в карточке устройства; при общем сбросе MSI Mode и MSI Limit сохраняются.
-
-**Вывод:** MSI MODE включён, лимит пустой, реальный режим проверен через **СЧИТАТЬ IRQ** после перезагрузки.
+AUTO selects MSI and removes the custom limit for the device categories it configures. **RESET WINDOWS DEFAULT** deliberately preserves MSI Mode and Limit; restoring those values requires a suitable backup.
 
 ---
 
-[← Глава 01](./01-interrupts.md) · [Оглавление](./README.md) · [Глава 03 →](./03-affinity.md)
+[Previous: Interrupts: ISR, DPC and cores](./01-interrupts.md) · [Guide](./README.md) · [Next: Affinity and priority](./03-affinity.md)

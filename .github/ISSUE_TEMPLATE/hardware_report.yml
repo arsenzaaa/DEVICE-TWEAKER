@@ -1,54 +1,58 @@
-name: Отчёт о железе / Hardware report
-description: Как программа работает на вашей конфигурации / How the program works on your hardware
+name: Hardware report / Отчёт о железе
+description: How the program works on your hardware / Как программа работает на вашей конфигурации
 labels: [hardware]
 body:
   - type: markdown
     attributes:
       value: |
-        Такие отчёты помогают проверить авто-оптимизацию, IMOD и NIC ITR на разном железе. Полезнее всего три лога: до применения, сразу после и после перезагрузки.
         These reports help verify auto-optimization, IMOD and NIC ITR on different hardware. Three logs help most: before applying, right after, and after a restart.
+        Такие отчёты помогают проверить AUTO, IMOD и NIC ITR на разном железе. Полезнее всего три лога: до применения, сразу после и после перезагрузки.
 
-        Как записать трейс ISR / DPC — [глава 10 гайда](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/10-verification.md). How to record an ISR / DPC trace: [guide chapter 10](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/10-verification.en.md).
+        Remove personal paths, names and serial numbers before attaching files.
+        Уберите из файлов личные пути, имена и серийные номера.
+
+        How to record an ISR/DPC trace: [guide chapter 10](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/10-verification.md).
+        Как записать трейс ISR/DPC: [глава 10 на русском](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/10-verification.ru.md).
   - type: input
     id: version
     attributes:
-      label: Версия / Version
+      label: Version / Версия
       placeholder: 0.0.4
     validations:
       required: true
   - type: textarea
     id: hardware
     attributes:
-      label: Конфигурация / Configuration
-      description: CPU, материнская плата, BIOS, сборка Windows, USB-контроллеры, сетевая карта, GPU / CPU, motherboard, BIOS, Windows build, USB controllers, network adapter, GPU
+      label: Configuration / Конфигурация
+      description: CPU, motherboard, BIOS, Windows build, USB controllers, network adapter, GPU / CPU, материнская плата, BIOS, сборка Windows, USB-контроллеры, сетевая карта, GPU
     validations:
       required: true
   - type: checkboxes
     id: features
     attributes:
-      label: Что проверяли / What you tested
+      label: What you tested / Что проверяли
       options:
-        - label: Авто-оптимизация / Auto-optimization
+        - label: Auto-optimization / Авто-оптимизация
         - label: MSI / Affinity
         - label: USB IMOD
         - label: NIC ITR
         - label: RSS
         - label: ReservedCpuSets
-        - label: Восстановление / Restore
+        - label: Restore / Восстановление
   - type: textarea
     id: result
     attributes:
-      label: Результат / Result
-      description: Что применилось, что показал ПРОВЕРИТЬ, были ли проблемы / What was applied, what CHECK showed, any problems
+      label: Result / Результат
+      description: What was applied, what CHECK showed, any problems / Что применилось, что показал ПРОВЕРИТЬ, были ли проблемы
     validations:
       required: true
   - type: textarea
     id: logs
     attributes:
-      label: Логи / Logs
-      description: Перетащите файлы из папки logs / Drag the files from the logs folder
+      label: Logs / Логи
+      description: Drag the files from the logs folder / Перетащите файлы из папки logs
   - type: textarea
     id: trace
     attributes:
-      label: Трейс (необязательно) / Trace (optional)
-      description: Отчёт xperf -a dpcisr или файл .etl до и после применения / An xperf -a dpcisr report or .etl file before and after applying
+      label: Trace (optional) / Трейс (необязательно)
+      description: An xperf -a dpcisr report or .etl file before and after applying / Отчёт xperf -a dpcisr или файл .etl до и после применения

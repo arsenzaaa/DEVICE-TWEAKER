@@ -1,61 +1,38 @@
-# Топология процессора и ReservedCpuSets
+# CPU topology and ReservedCpuSets
 
-## Как читать список CPU
+[Documentation](../README.md) / [Guide](./README.md) / 07 · [Русский](./07-cpu-topology.ru.md)
 
-В карточке каждого устройства DEVICE TWEAKER показывает все логические процессоры с их местом в топологии:
+## Reading the CPU list
 
-```text
-CPU 6  (P-Core, R131, #4)          P-ядро, CPPC-рейтинг 131, физическое ядро №4
-CPU 7  (P-Core/HT, R131, #4)       второй поток того же ядра (SMT / HT)
-CPU 16 (E-Core, R70, #9)           E-ядро
-CPU 8  (P-Core, CCD0, R136, #5)    на AMD с двумя CCD указан CCD
-```
+Cards show logical CPUs, physical cores, SMT siblings and available P/E-core, CCD/CCX and CPPC information. For example, `CPU 6 (P-Core, R131, #4)` and `CPU 7 (P-Core/HT, R131, #4)` belong to one physical core.
 
-- **SMT-SET** — два логических процессора одного физического ядра. Они делят L1 / L2 и EXECUTION-UNITS: нагрузка на один замедляет второй. Драйвера и важные потоки не должны делить SMT-SET.
-- **CPPC-рейтинг** (`R`) — оценка ядра прошивкой: чем выше, тем быстрее ядро. `Pref` — предпочтительные ядра.
-- **CCD / CCX** — у AMD с двумя CCD нет общего L3 между CCD, а межъядерная задержка между ними заметно выше. Поток не должен прыгать между CCD, связанные потоки должны быть на одном CCD.
-- **E-cores** у Intel — медленнее и с большей задержкой при обмене с P-ядрами.
+A CPPC rating is relative firmware guidance, not an application benchmark. CCD/CCX and cache information describe topology; moving work between them has no single fixed cost across processors and workloads.
 
-В строке состояния вверху окна — Hyper-Threading / SMT, Hybrid CPU, CPPC и Dual-CCD.
+## How AUTO uses topology
 
-## Hyper-Threading / SMT
+AUTO selects a target CCD and physical cores using project rules, SMT relationships and available ratings. A GPU receives a physical-core pair; other roles receive their own assignments. Unreliable detection of required topology blocks the relevant automatic write.
 
-Если нагружено одно логическое ядро, второе замедляется. Если игре хватает физических ядер, SMT может ронять FPS: важные потоки делят SMT-SET с фоном, а для ISR / DPC правила SMT не действуют вовсе. Но если игра многопоточная (GAME / RENDER / RHI и пачка BACKGROUND / FOREGROUND WORKERS) и FPS без SMT падает, выключать его не нужно. DEVICE TWEAKER работает в обоих режимах: при SMT он просто не считает соседей двумя ядрами.
+AUTO changes device settings while leaving SMT, E-cores and game-thread affinity unchanged. Core assignments depend on the detected topology; compare the resulting performance under your workload.
 
 ## ReservedCpuSets
 
-`ReservedCpuSets` резервирует логические процессоры: Windows не использует их для обычного планирования потоков, туда не попадают ISR / DPC драйверов без явной маски. На Windows 11 на зарезервированных ядрах остаются прерывания системного таймера и системные события (они короче 1 нс и на практике ничего не стоят).
+The separate panel manages this value:
 
 ```text
-HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\kernel
-  ReservedCpuSets   REG_BINARY   маска CPU, младший байт первым
+HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Kernel
+  ReservedCpuSets  REG_BINARY
 ```
 
-Пример: 12 логических процессоров, резервируем CPU 1–11 → `1111 1111 1110` = `0xFFE` → в REG_BINARY младший байт первым: `FE 0F`.
+Edits remain pending until **APPLY**, after a backup. A failed write preserves the pending state. The panel is unavailable without reliable CPU Set IDs.
 
-Важно понимать, кого защищает резерв. Если зарезервировать ядро, на котором стоит драйвер с маской, драйвер продолжит там работать — **защищены будут потоки от этого драйвера, а не наоборот**. Резерв — не жёсткая изоляция и не замена Interrupt Affinity. Процессу нельзя давать affinity, которая захватывает и зарезервированные, и обычные CPU одновременно: поведение в таком случае непредсказуемо.
+Do not equate this value with per-process CPU Set assignment APIs. The [CPU Sets documentation](https://learn.microsoft.com/en-us/windows/win32/procthread/cpu-sets) describes IDs, affinity constraints and reservation policies; it does not establish isolation of all ISR/DPC activity through this registry setting.
 
-## Два CCD и E-cores
+Reservation does not prove that system events disappeared from a CPU or that a game automatically received the intended cores. Check scheduling and interrupts on your Windows build, preserve the original mask and verify post-reboot behavior.
 
-Здесь резерв раскрывается полностью. Два подхода:
+## Practical verification
 
-```text
-Вариант 1   зарезервировать P-cores / CCD0, драйвера — на E-cores / CCD1,
-            игру и важные системные потоки вручную — на зарезервированные ядра без драйверов
-Вариант 2   зарезервировать E-cores / CCD1 и вручную унести туда весь фон,
-            драйвера и игра — на P-cores / CCD0 обычным способом
-```
-
-У первого минус: прерывания дисков и DPC вроде KBDHID останутся на медленных ядрах, а потоки игры придётся ставить после каждой перезагрузки. У второго — весь фон нужно переносить вручную после каждой перезагрузки. Игру на X3D всегда держите на CCD с 3D V-Cache, драйверам много кэша не нужно.
-
-## Что делает DEVICE TWEAKER
-
-- Определяет P / E-cores, SMT / HT, CCD / CCX и CPPC-рейтинг и показывает, к какому физическому ядру относится каждый поток.
-- **АВТООПТИМИЗАЦИЯ** выбирает целевой CCD и раскладывает драйвера по физическим ядрам по рейтингу. Если топология определена ненадёжно, запись не начинается.
-- ReservedCpuSets задаётся отдельным блоком; маска собирается из отмеченных процессоров.
-
-**Вывод:** считайте физические ядра, а не логические. Драйвера не делят SMT-SET, потоки не прыгают между CCD, резерв — инструмент для двух CCD и E-cores, а не способ «изолировать драйвер».
+Confirm how selected CPUs map to physical cores, then compare ISR/DPC and application-thread placement. Two SMT siblings are not two independent physical cores. Measure contention under your own workload.
 
 ---
 
-[← Глава 06](./06-network.md) · [Оглавление](./README.md) · [Глава 08 →](./08-input.md)
+[Previous: Networking, RSS and NIC ITR](./06-network.md) · [Guide](./README.md) · [Next: Input and Polling Rate](./08-input.md)

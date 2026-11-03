@@ -1,54 +1,55 @@
-name: Ошибка / Bug report
-description: Программа показывает или применяет что-то неправильно / The program shows or applies something incorrectly
+name: Bug report / Ошибка
+description: The program shows or applies something incorrectly / Программа показывает или применяет что-то неправильно
 labels: [bug]
 body:
   - type: markdown
     attributes:
       value: |
-        Лог лежит в папке `logs` рядом с EXE. Перед отправкой уберите из него личные пути и имена.
         The log is in the `logs` folder next to the EXE. Remove personal paths and names before posting.
+        Лог лежит в папке `logs` рядом с EXE. Перед отправкой уберите из него личные пути и имена.
 
-        Если вопрос о том, как работает настройка, сначала загляните в [гайд](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/README.md). If the question is how a setting works, check the [guide](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/README.en.md) first.
+        For questions about settings, check the [guide](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/README.md) first.
+        Описание настроек: [руководство на русском](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/README.ru.md).
   - type: input
     id: version
     attributes:
-      label: Версия и сборка / Version and build
+      label: Version and build / Версия и сборка
       placeholder: 0.0.4, SelfContained
     validations:
       required: true
   - type: textarea
     id: system
     attributes:
-      label: Система и устройство / System and device
-      description: Сборка Windows, CPU, материнская плата, BIOS, Hardware ID устройства, версия драйвера / Windows build, CPU, motherboard, BIOS, device Hardware ID, driver version
+      label: System and device / Система и устройство
+      description: Windows build, CPU, motherboard, BIOS, device Hardware ID, driver version / Сборка Windows, CPU, материнская плата, BIOS, Hardware ID устройства, версия драйвера
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
-      label: Как повторить / Steps to reproduce
-      description: Что нажимали и в каком порядке / What you clicked and in which order
+      label: Steps to reproduce / Как повторить
+      description: What you clicked and in which order / Что нажимали и в каком порядке
     validations:
       required: true
   - type: textarea
     id: result
     attributes:
-      label: Ожидали и получили / Expected and actual result
+      label: Expected and actual result / Ожидали и получили
     validations:
       required: true
   - type: dropdown
     id: restart
     attributes:
-      label: Перезагружали Windows после этого? / Did you restart Windows afterwards?
+      label: Did you restart Windows afterwards? / Перезагружали Windows после этого?
       options:
-        - Да / Yes
-        - Нет / No
-        - Не относится к ошибке / Not relevant
+        - Yes / Да
+        - No / Нет
+        - Not relevant / Не относится к ошибке
     validations:
       required: true
   - type: textarea
     id: log
     attributes:
-      label: Лог / Log
-      description: Строки, относящиеся к ошибке, или файл целиком / Relevant lines or the whole file
+      label: Log / Лог
+      description: Relevant lines or the whole file / Строки, относящиеся к ошибке, или файл целиком
       render: text

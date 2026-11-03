@@ -1,57 +1,44 @@
-# DTIMOD.sys, KDU и автозапуск
+# DTIMOD.sys, KDU and startup
 
-## Зачем драйвер
+[Documentation](../README.md) / [Guide](./README.md) / 11 · [Русский](./11-driver.ru.md)
 
-Регистры IMOD (контроллер xHCI) и NIC ITR (сетевой контроллер) лежат в памяти устройства (MMIO) и недоступны из пользовательского режима. Читать конфигурацию PCI для **СЧИТАТЬ IRQ** тоже нужно из ядра. Поэтому у программы есть собственный драйвер **DTIMOD.sys**.
+## Operations that need DTIMOD
 
-Всё остальное — MSI, affinity, приоритет, RSS, ReservedCpuSets, Mouse Throttle, энергосбережение — пишется в реестр и **работает без драйвера**.
+DTIMOD.sys provides hardware access to supported USB IMOD/NIC ITR registers and additional PCI information. Writes are restricted to checked MMIO ranges of the selected device; it exposes no general arbitrary physical-memory write interface.
 
-## Куда драйвер может писать
+MSI, affinity, RSS, ReservedCpuSets, Mouse Throttle and available power settings do not require DTIMOD. Some IRQ Mode information comes from Windows resources without the driver; an available driver supplies additional evidence. Incomplete mode detection is distinct from a failed setting write.
 
-DTIMOD.sys пишет **только в память, которую Windows выделила выбранному PCI-устройству** (его BAR). Общей записи в физическую память в драйвере нет. Проверка диапазона выполняется на модели драйвера вместе с намеренной поломкой. После записи регистры читаются повторно, и в интерфейсе видно фактическое значение.
+## Loading through KDU
 
-## Почему KDU
+DTIMOD has no public Microsoft signature for ordinary loading. The project uses a pinned [KDU](../../src/IMOD/KDU/README.md) version that relies on a vulnerable signed driver. This is a highly privileged hardware tool; antivirus, HVCI, Vulnerable Driver Blocklist and anti-cheat software can prevent it from working.
 
-У DTIMOD.sys нет публичной подписи Microsoft. Его загружает [KDU](../../src/IMOD/KDU/README.md) — загрузчик, который использует подписанный уязвимый драйвер, чтобы загрузить неподписанный. Отсюда:
+**SYSTEM CHECK** displays available protection/service information without loading the driver. Failure to find a service is not an anti-cheat compatibility guarantee. Do not disable protections merely to obtain a green status; other features remain available without the loader.
 
-- **антивирусы** относят такие загрузчики к HackTool;
-- **HVCI** (целостность памяти) и **Microsoft Vulnerable Driver Blocklist** блокируют такую загрузку;
-- **FACEIT** и **Vanguard** могут конфликтовать с загруженным драйвером.
+The application checks pinned file hashes and blocks fallback loading after an uncertain load outcome. Inspect the operation details for the reason. Restart Windows to replace an already loaded older driver or unload DTIMOD; closing the EXE only closes its connection.
 
-Перед включением USB IMOD программа показывает состояние HVCI, Blocklist, Microsoft Defender и служб FACEIT / Vanguard — кнопка **ПРОВЕРКА СИСТЕМЫ**. Проверка ничего не загружает.
+## Saved profile
 
-Исходники DTIMOD и закреплённая версия KDU 1.4.5.2512 лежат в репозитории, бинарники сверяются по SHA-256, а QA не запускается, пока собранный драйвер не совпадает с исходниками.
-
-После загрузки DTIMOD остаётся в памяти до перезагрузки Windows. Если загружен драйвер старой версии, программа просит перезагрузиться, а не пишет через него.
-
-## Автозапуск без EXE
-
-Значения в регистрах держатся до перезагрузки, сна или сброса контроллера. Чтобы сохранённый профиль применялся снова, программа ставит задачу Планировщика:
+The `\DEVICE TWEAKER\IMOD` SYSTEM task has logon, resume and relevant PnP triggers. Its files are stored here:
 
 ```text
-Задача      \DEVICE TWEAKER\IMOD   от SYSTEM
-Триггеры    вход в Windows, выход из сна, подключение USB / HID-устройства
-Папка       %ProgramData%\DEVICE TWEAKER\Startup   (изменять могут только администраторы и SYSTEM)
-  ApplyIMOD.ps1                 читаемый PowerShell-скрипт
-  DeviceTweakerImodRuntime.cs   общий с программой код работы с регистрами
-  profile.json                  сохранённые значения и SHA-256 всех файлов
-  Loader\                       KDU для загрузки DTIMOD.sys
-  logs\                         журналы за 14 дней
+%ProgramData%\DEVICE TWEAKER\Startup
+  ApplyIMOD.ps1
+  DeviceTweakerImodRuntime.cs
+  profile.json
+  Loader\
+  logs\
 ```
 
-Перед запуском скрипт сверяет хеши runtime, драйвера и загрузчика с `profile.json`; несовпадение останавливает запуск. Программа и скрипт используют один mutex загрузки и не загружают драйвер одновременно. EXE для автозапуска не нужен — программу можно удалить, задача останется. **УДАЛИТЬ** в блоке IMOD убирает её.
+The runtime is shared with Windows PowerShell 5.1. File hashes are checked before application; a shared mutex prevents simultaneous loading by the application and startup script. Administrator/SYSTEM permissions protect the directory. Startup logs retain the latest 14 files.
 
-## Проверка файлов
+The task runs independently of the EXE. Profile read or parse errors stop changes to the profile. **DELETE** in the IMOD block removes the shared startup configuration for USB IMOD and NIC ITR, including the scheduled task.
 
-SHA-256 обоих EXE — в `SHA256SUMS.txt` на странице релиза, исходников — в `SOURCE-SHA256SUMS.txt`:
+## Verification and recovery
 
-```powershell
-(Get-FileHash .\DEVICE.TWEAKER.SelfContained.exe -Algorithm SHA256).Hash
-Select-String -Path .\SHA256SUMS.txt -Pattern 'DEVICE.TWEAKER.SelfContained.exe'
-```
+Compare an EXE's SHA-256 with `SHA256SUMS.txt` from the same release package. `SOURCE-SHA256SUMS.txt` identifies the corresponding sources. Matching hashes establish package consistency, not hardware behavior.
 
-**Вывод:** драйвер нужен только для IMOD, NIC ITR и **СЧИТАТЬ IRQ**, пишет только в память выбранного устройства, исходники открыты. Если HVCI, Blocklist или античит важнее — всё остальное работает без него.
+Hardware changes need readback and device checks, including sleep and reconnect. Local QA does not perform these: it uses models and real write blocking. Preserve the original profile and a recovery backup before experimenting.
 
 ---
 
-[← Глава 10](./10-verification.md) · [Оглавление](./README.md)
+[Previous: Verifying results](./10-verification.md) · [Guide](./README.md)

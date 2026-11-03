@@ -3,6 +3,3 @@
 
 # Pinned upstream KDU sources: kept for reproducible builds, not project code.
 src/IMOD/KDU/** linguist-vendored
-
-# README screenshot framing: tooling, not program code.
-dev/branding/** linguist-documentation

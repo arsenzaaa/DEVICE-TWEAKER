@@ -1,28 +1,59 @@
-# Гайд
+# Guide
 
-[Главная](../../README.md) · [English](./README.en.md)
+[Documentation](../README.md) / Guide · [Русский](./README.ru.md)
 
-Как это устроено в Windows и что делает программа, по каждому типу устройства.
+From interrupt handling to device settings. Read in order or jump to the hardware you are configuring.
 
-1. **[Прерывания: ISR, DPC и ядра](./01-interrupts.md)**\
-   Как устроены ISR и DPC, почему они важнее любого потока игры и что происходит, когда драйвера стоят на одном ядре с GAME / RENDER / RHI.
-2. **[MSI и MSI-X](./02-msi.md)**\
-   Линия против сообщения: почему без MSI MODE появляются лишние и более длинные ISR, зачем удалять MessageNumberLimit и как программа читает реальный режим устройства.
-3. **[Affinity, политики и приоритет прерываний](./03-affinity.md)**\
-   Политики Interrupt Affinity, маска AssignmentSetOverride, что на самом деле делает IRQ Priority, Interrupt Steering и альтернативный метод «все ядра, кроме 0».
-4. **[Видеокарта](./04-gpu.md)**\
-   Почему видеокарте нужны два разных физических ядра, чем драйвер NVIDIA отличается от AMD и что делать, если ISR / DPC всё равно собираются на одном ядре.
-5. **[USB-контроллеры и IMOD](./05-usb-imod.md)**\
-   Как устроен контроллер xHCI: interrupter, Event Ring и регистр IMOD. Почему interrupter у мыши меняется при каждом подключении, какой IMOD ставить звуку и как разложить устройства по контроллерам.
-6. **[Сеть: RSS, NDIS и NIC ITR](./06-network.md)**\
-   NDIS и NetAdapterCx, почему маска не работает на NDIS и вместо неё нужен RSS, сколько очередей реально использует игра, поток NDIS и MMCSS, NIC ITR и модерация драйвера.
-7. **[Топология процессора и ReservedCpuSets](./07-cpu-topology.md)**\
-   SMT-SET, P- и E-cores, CCD и CPPC-рейтинг: как читать список CPU в программе. ReservedCpuSets, формат маски и две стратегии для процессоров с двумя CCD или E-cores.
-8. **[Ввод: Polling Rate, Raw Input и Mouse Throttle](./08-input.md)**\
-   Путь ввода мыши, клавиатуры и контроллера в Windows 10 и 11, ограничение фоновых окон и RawMouseThrottleDuration, Raw Input Buffer и выделенный поток ввода, что на самом деле измеряет замер Polling Rate.
-9. **[Энергосбережение устройств](./09-power.md)**\
-   USB selective suspend, разрешение Windows отключать устройство и параметры Device Parameters: что из этого реально работает, где хранится и как программа проверяет запись.
-10. **[Проверка: трейсы и логи](./10-verification.md)**\
-   Как проверить результат не по FPS одного прогона, а по факту: трейс xperf / WPR, где смотреть ISR и DPC в WPA и MXA, что писать в отчёт о железе и как читать лог программы.
-11. **[DTIMOD.sys, KDU и автозапуск](./11-driver.md)**\
-   Зачем программе собственный драйвер, куда он может писать, почему его загружает KDU и что об этом думают антивирусы, HVCI и античиты. Как устроен автозапуск IMOD / NIC ITR без EXE.
+## Foundations
+
+**01 · [Interrupts: ISR, DPC and cores](./01-interrupts.md)**
+
+The path from a device to an application thread. Execution levels, interrupts and competition for a physical core.
+
+**02 · [MSI and MSI-X](./02-msi.md)**
+
+Lines and messages, interrupt vectors, MSI Limit and reading the current device mode.
+
+**03 · [Affinity and priority](./03-affinity.md)**
+
+Windows policies, CPU masks, IRQ Priority and the rules used by the program.
+
+## Devices and processor
+
+**04 · [Graphics card](./04-gpu.md)**
+
+Selecting a pair of physical cores, SMT siblings and GPU interrupt handling.
+
+**05 · [USB and IMOD](./05-usb-imod.md)**
+
+xHCI controllers, Event Rings and interrupters. Role-based values and rereading the device map.
+
+**06 · [Networking, RSS and NIC ITR](./06-network.md)**
+
+NDIS and NetAdapterCx, RSS queues, moderation registers and the network driver's own settings.
+
+**07 · [CPU topology](./07-cpu-topology.md)**
+
+Physical cores, P/E, CPPC, CCD/CCX and ReservedCpuSets. How to read the processor map.
+
+**08 · [Input and Polling Rate](./08-input.md)**
+
+USB polling, Raw Input events, background input processing and Mouse Throttle.
+
+**09 · [Power saving](./09-power.md)**
+
+USB selective suspend, permission to turn off a device and verification of written settings.
+
+## Verification and implementation
+
+**10 · [Verifying results](./10-verification.md)**
+
+Logs, readback, external traces and evidence for understanding behaviour on particular hardware.
+
+**11 · [Driver and startup](./11-driver.md)**
+
+DTIMOD.sys, KDU, write boundaries and the independent PowerShell profile.
+
+---
+
+[Settings reference](../SETTINGS.md) · [Build and develop](../DEVELOPMENT.md)

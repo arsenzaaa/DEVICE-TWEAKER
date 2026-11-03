@@ -1,65 +1,38 @@
-# Ввод: Polling Rate, Raw Input и Mouse Throttle
+# Input: Polling Rate, Raw Input and Mouse Throttle
 
-## Путь ввода
+[Documentation](../README.md) / [Guide](./README.md) / 08 · [Русский](./08-input.ru.md)
 
-```text
-Мышь, Windows 10        WDF01000 ISR → DPC → CSRSS (Win32k Raw Input Thread)    → поток игры
-Мышь, Windows 11        WDF01000 ISR → DPC → DWM KERNEL SENSOR THREAD           → поток игры
-Клавиатура, 10 / 11     WDF01000 ISR → DPC → CSRSS (winsrvext.dll)              → поток игры
-Контроллер, Windows 11  WDF01000 ISR → DPC → DWM MASTER INPUT THREAD            → поток игры
-```
+## USB polling and Raw Input
 
-У Windows 11 нет преимущества перед Windows 10: в CSRSS за мышь и клавиатуру и так отвечают разные потоки. Иногда ввод мыши проходит через два потока DWM, ввод контроллера может идти через поток DWM `WINDOWS.GAMING.INPUT` или сразу из DPC в игру.
+USB transfer rate, delivered Raw Input event rate and a game's input-processing time are different quantities. The driver, message queue and application affect when received data is used. See [Raw Input overview](https://learn.microsoft.com/en-us/windows/win32/inputdev/about-raw-input).
 
-Потоки ввода DWM и CSRSS тоже нужно держать подальше от ядер с драйверами — это работа уже не DEVICE TWEAKER, а ручной настройки потоков.
+DEVICE TWEAKER displays available polling information and measures mouse event frequency through Raw Input. Move the mouse during measurement. The result is neither an exact USB packet rate nor end-to-end screen latency. Sparse key press/release events cannot reliably establish keyboard polling rate.
 
-## Как игра обрабатывает ввод
+## How applications read input
 
-Качество зависит от разработчиков. От худшего к лучшему:
+Windows provides individual-message reads and [GetRawInputBuffer](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getrawinputbuffer) for accumulated data. Buffering and dedicated input threads are implemented by each application. Measure their effect in the game or program being tested.
 
-```text
-1. один поток считает физику и обрабатывает мышь + клавиатуру
-2. один поток рендерит и обрабатывает мышь + клавиатуру
-3. отдельный поток для мыши, клавиатура смешана с физикой (или наоборот)
-4. один поток для мыши и клавиатуры
-5. отдельные потоки для мыши и для клавиатуры
-```
+Higher report rates increase the amount of event processing. Compare available mouse modes in the actual game, including frame-time consistency and responsiveness. DEVICE TWEAKER does not change a game's input implementation or reflash the mouse.
 
-Если поток ввода смешан с чем-то ещё и не успевает, игры используют:
+## Mouse Throttle
 
-- **RIB** (Raw Input Buffer) — накопленные сообщения обрабатываются пачкой за тик. Задержку это не увеличивает (миф пошёл от сравнения RIB с IMOD), зато убирает просадки FPS на высоком опросе.
-- **DIT** (Dedicated Input Thread) — отдельный поток ввода. Лучше RIB для производительности. Например, в Fortnite появился `WindowsRawInputThread`.
-
-Без RIB и без DIT высокий опрос (4–8 кГц) роняет FPS на уровне потока физики. Узнать, что использует игра, можно через API Monitor или MXA.
-
-## Фоновые окна и Mouse Throttle
-
-Если ввод получают несколько приложений, данные идут во все их потоки ввода. Windows 11 ограничивает частоту для потоков ввода **фоновых** приложений до 125 Гц; ограничение выполняет DWM KERNEL SENSOR THREAD. Порог задаётся параметром:
+On supported Windows 11 builds, the application can configure `RawMouseThrottleDuration`:
 
 ```text
 HKCU\Control Panel\Mouse
-  RawMouseThrottleDuration   REG_DWORD   интервал в мс, частота = 1000 / значение
+  RawMouseThrottleDuration  REG_DWORD
 ```
 
-`20` → 50 Гц, минимальная частота; `8` → 125 Гц, значение по умолчанию. Остальные параметры (`RawMouseThrottleEnabled`, `Leeway`, `Forced`) практического применения не имеют. Настройка не меняет polling rate мыши и не касается активного окна.
+The UI offers intervals from 1 to 20 ms. Its 1 kHz, 125 Hz and 50 Hz labels use the nominal `1000 / interval` calculation; they do not promise the actual delivery rate of all events.
 
-Контроллер этим ограничением не охвачен: его данные не проходят через KERNEL SENSOR THREAD и приходят на полной частоте в DWM MASTER INPUT THREAD, `WINDOWS.GAMING.INPUT` и службу GameInputSvc. Чем больше фоновых потоков их получают, тем дольше DPC и главный поток ввода.
+The setting concerns background Raw Input, not USB polling rate. The application exposes it only for a supported OS. Its version check accounts for high-report-rate input improvements introduced in Windows 11 22H2 with [KB5027303](https://support.microsoft.com/en-us/servicing/os/windows-11/2023/06/june-27-2023-kb5027303-os-build-22621-1928-preview).
 
-## Polling Rate
+AUTO proposes 20 ms for background receivers. Verify event delivery in the affected applications before keeping the setting.
 
-DEVICE TWEAKER показывает Polling Rate мыши и клавиатуры по данным USB и умеет **замерять частоту событий Raw Input**: двигайте мышью во время замера, после подтверждённого замера в интерфейсе выводится измеренная частота.
+## Applying changes
 
-- Частота событий Raw Input — это не USB polling rate и не частота сканирования клавиатуры: на неё влияют доставка сообщений и их обработка.
-- У клавиатуры события — это нажатия и отпускания клавиш, поэтому замер клавиатуры не определяет её polling rate.
-
-## Что делает DEVICE TWEAKER
-
-- **Mouse Throttle** — пресеты от 50 Гц (`20`) до 1 кГц (`1`) на поддерживаемых сборках Windows 11, текущее значение видно рядом.
-- **АВТООПТИМИЗАЦИЯ** ставит 50 Гц: фоновые приложения получают ввод реже всего.
-- Для каждого USB-контроллера показаны найденные на нём устройства ввода и их частота.
-
-**Вывод:** фоновый ввод — на минимум, высокий опрос — только если игра умеет RIB или DIT, потоки ввода DWM / CSRSS — на ядра без драйверов.
+Mouse Throttle edits remain pending until **APPLY**. Writing follows a backup; a failed write is not accepted as applied. Measuring event frequency and changing the setting are separate actions.
 
 ---
 
-[← Глава 07](./07-cpu-topology.md) · [Оглавление](./README.md) · [Глава 09 →](./09-power.md)
+[Previous: CPU topology](./07-cpu-topology.md) · [Guide](./README.md) · [Next: Power saving](./09-power.md)

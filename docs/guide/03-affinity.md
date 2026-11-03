@@ -1,91 +1,50 @@
-# Affinity, политики и приоритет прерываний
+# Affinity, policies and interrupt priority
 
-## Affinity
+[Documentation](../README.md) / [Guide](./README.md) / 03 · [Русский](./03-affinity.ru.md)
 
-**Affinity** — на каких логических процессорах разрешено выполняться ISR / DPC драйвера (или потоку). Для потоков это жёсткое правило: поток с приоритетом 7 и маской на ядро 1 прервёт поток с приоритетом 6 на ядре 1, даже если ядро 2 свободно. **IDEAL PROCESSOR** — только предпочтение: если ядро занято, поток запустится на другом.
+## What Interrupt Affinity changes
 
-Для устройства affinity задаётся политикой:
+A device policy controls the processor assignment of its interrupts. **SpecCPU** uses the selected mask; it does not pin every DPC and driver thread to those CPUs. Microsoft recommends the default policy where appropriate. See [Interrupt affinity](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/interrupt-affinity-and-priority).
+
+| Application | Code | CPU selection |
+| :--- | :--- | :--- |
+| MachineDefault | 0 | Windows default |
+| AllClose | 1 | Close to device |
+| Single | 2 | One close CPU |
+| All | 3 | All available |
+| SpecCPU | 4 | Selected mask |
+| SpreadMessages | 5 | Different CPUs for messages |
+
+See [IRQ_DEVICE_POLICY](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_device_policy). SpreadMessages spreads existing messages when possible; it does not create extra vectors.
+
+## Mask and persistence
 
 ```text
-HKLM\SYSTEM\CurrentControlSet\Enum\PCI\<устройство>\<экземпляр>\Device Parameters\Interrupt Management\Affinity Policy
-  DevicePolicy           REG_DWORD    политика (ниже)
-  AssignmentSetOverride  REG_BINARY   маска CPU, только для SpecifiedProcessors
-  DevicePriority         REG_DWORD    приоритет IRQ (ниже)
+...\Device Parameters\
+  Interrupt Management\Affinity Policy
+  DevicePolicy           REG_DWORD
+  AssignmentSetOverride  REG_BINARY
+  DevicePriority         REG_DWORD
 ```
 
-```text
-DevicePolicy  Политика Windows                              В программе     Что делает
-0             IrqPolicyMachineDefault                       MachineDefault  выбор Windows
-1             IrqPolicyAllCloseProcessors                   AllClose        все CPU рядом с устройством (NUMA)
-2             IrqPolicyOneCloseProcessor                    Single          один CPU рядом с устройством
-3             IrqPolicyAllProcessorsInMachine               All             любой CPU
-4             IrqPolicySpecifiedProcessors                  SpecCPU         только CPU из маски
-5             IrqPolicySpreadMessagesAcrossAllProcessors    SpreadMessages  сообщения MSI-X на разные CPU
-```
+In DEVICE TWEAKER, mask bit N represents logical CPU N in supported processor group 0. CPUs 8 and 9 give `0x300`, stored as `00 03 00 00 00 00 00 00`. The application calculates the mask from the selected CPUs. Clearing the selection for an ordinary device restores MachineDefault and removes the override. Network devices have separate [RSS/IRQ modes](./06-network.md).
 
-Только `SpecCPU` использует отмеченную маску, остальные политики оставляют выбор Windows. `SpreadMessages` имеет смысл, только если устройство и драйвер реально используют несколько векторов MSI-X; сама политика векторы не создаёт.
-
-## Маска
-
-`AssignmentSetOverride` — битовая маска: бит N = логический процессор N. CPU 8 и 9:
-
-```powershell
-$mask = 0
-@(8, 9) | ForEach-Object { $mask = $mask -bor (1 -shl $_) }
-'{0:X16}' -f $mask    # 0000000000000300
-```
-
-В реестре байты идут от младшего к старшему: `00 03 00 00 00 00 00 00`. DEVICE TWEAKER считает маску сам по отмеченным процессорам и показывает её в строке **Affinity Mask**. Поддерживается processor group 0, то есть до 64 логических процессоров.
-
-Если снять выбор CPU у обычного устройства, программа пишет `DevicePolicy = 0` и удаляет `AssignmentSetOverride` — устройство возвращается под управление Windows.
+Saved policy and actual processing placement can differ. Compare readback and an ETW trace after rebooting.
 
 ## IRQ Priority
 
-`DevicePriority` задаёт IRQL прерывания внутри диапазона устройства:
+Undefined, Low, Normal and High express interrupt servicing preference. Windows considers it when assigning IRQLs for the platform and device resources. This is neither application thread priority nor DPC queue priority. See [IRQ_PRIORITY](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_priority).
 
-```text
-Undefined  = Normal
-Low        = IRQL 3-4
-Normal     = IRQL 5-11
-High       = IRQL 12
-```
+AUTO uses High for the devices it configures. Evaluate the effect under your workload.
 
-Это **не** приоритет игры, не приоритет потока и не приоритет DPC. Microsoft сами называют это подсказкой: Windows — не система реального времени. Приоритет IRQ влияет на то, какой ISR может прервать какой при одновременной работе, и на генерацию DPC. Любой ISR всё равно может прервать любой другой. Профиль AUTO ставит High тем устройствам, которые настраивает.
+## Unexpected results
 
-## Interrupt Steering
+Check the device instance, policy, mask, reboot and current interrupt mode. Then distinguish ISR, DPC and worker-thread activity in a trace: the driver can distribute them differently. A single busy CPU under a two-CPU mask does not by itself establish a fault.
 
-На системах с несколькими ядрами Windows может сама перераспределять прерывания (Interrupt Steering) и уводить их с запаркованных ядер. События steering выполняются в DPC `ntoskrnl.exe!PpmCheckRun`; перенаправление создаёт лишние IPI. С явной маской прерывание сразу приходит в нужный LAPIC. Отключение самого steering возможно только через переменные ядра и программой не делается.
+Preserve settings, versions and the trace for further diagnosis. Firmware management is outside DEVICE TWEAKER; examine interrupt behavior through Windows resources and the driver.
 
-## Устройства, которым маску ставить нельзя
-
-ISR / DPC накопителей NVMe переносить бесполезно и опасно: на части дисков `DevicePolicy = SpecifiedProcessors` не даёт Windows загрузиться. Поэтому АВТООПТИМИЗАЦИЯ включает накопителям MSI и высокий приоритет, но affinity оставляет за Windows.
-
-## Если ISR / DPC не переносятся
-
-Если трейс показывает, что маска не работает (например, видеокарта на двух ядрах, но все ISR / DPC на одном), в BIOS нужно выставить скрытую настройку **Interrupt Redirection Mode Selection = Round Robin** (через SCEWIN / GRUB):
-
-```text
-Fixed Priority  первый включённый APIC в кластере
-Round Robin     следующий включённый APIC по кругу от последнего выбранного
-Hash Vector     по кругу, начиная с хеша номера вектора
-```
-
-## Альтернативный метод
-
-Есть и другой подход: поставить GPU, XHCI и звук на **все ядра, кроме 0** (и кроме ядра сети). Тогда ISR / DPC выбирают ядро, свободное от других прерываний, и не прерывают друг друга. Минусы:
-
-- ISR / DPC всё равно не знают о потоках и могут прервать любой поток, даже когда есть свободные ядра;
-- если ISR / DPC каждый раз выполняются на разных ядрах, они теряют преимущество кэша;
-- на несколько ядер стоит ставить только те драйверы, которым это реально выгодно (GPU, сеть, диск под нагрузкой).
-
-DEVICE TWEAKER использует основной метод — фиксированные физические ядра.
-
-## Ядро 0
-
-На ядре 0 больше прерываний системного таймера (именно оно обновляет системное время), там же всегда выполняются TIMER DPC NDIS, DXGMMS2, CLASSPNP, KBDHID, а DPC SYMCRYPTK пропорциональны числу прерываний. АВТООПТИМИЗАЦИЯ по возможности не ставит туда драйвера; если физических ядер не хватает, ядро 0 используется последним.
-
-**Вывод:** политика `SpecCPU` с маской на конкретное физическое ядро, High priority, NVMe не трогать, результат проверять трейсом.
+AUTO leaves storage-device affinity to Windows. Manual changes should be recoverable experiments with boot, I/O and stability checks; another device's profile is not a universal setting.
 
 ---
 
-[← Глава 02](./02-msi.md) · [Оглавление](./README.md) · [Глава 04 →](./04-gpu.md)
+[Previous: MSI and MSI-X](./02-msi.md) · [Guide](./README.md) · [Next: Graphics card](./04-gpu.md)

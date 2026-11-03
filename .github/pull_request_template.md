@@ -1,11 +1,9 @@
-## Что изменено / What changed
+## Change / Изменение
 
+Describe the problem and resulting behavior. / Опишите проблему и результат для пользователя.
 
+## Verification / Проверка
 
-## Как проверено / How it was tested
+Describe the checks you ran and their results. Include the relevant configuration, log or before/after screenshots. State any limitations. / Укажите выполненные проверки и результаты, конфигурацию, лог или снимки до/после. Отметьте ограничения.
 
-- [ ] `dotnet build src/DeviceTweakerCS.csproj -c Release -p:TreatWarningsAsErrors=true`
-- [ ] `dotnet test dev/qa/tests/DeviceTweaker.Tests/DeviceTweaker.Tests.csproj -c Release`
-- [ ] Железо и сборка Windows / hardware and Windows build:
-- [ ] Для записи в регистры, IMOD/ITR и восстановления проверен отказ записи или чтения / register, IMOD/ITR and restore changes: write and read failures checked
-- [ ] Для интерфейса: RU и EN, масштаб 100 / 125 / 150 % / UI: RU and EN, 100 / 125 / 150 % scaling
+Code: build and checks for the affected behavior. UI: both languages and relevant scaling. Documentation: content, links and rendering. Hardware: device, Windows build, driver and readback. / Код: сборка и проверки затронутого поведения. Интерфейс: оба языка и нужные масштабы. Документация: содержание, ссылки и отображение. Аппаратные изменения: устройство, сборка Windows, драйвер и readback.

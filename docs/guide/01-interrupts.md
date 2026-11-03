@@ -1,69 +1,35 @@
-# Прерывания: ISR, DPC и ядра
+# Interrupts: ISR, DPC and cores
 
-## Путь данных от устройства до игры
+[Documentation](../README.md) / [Guide](./README.md) / 01 · [Русский](./01-interrupts.ru.md)
 
-Любое устройство сообщает о новых данных прерыванием (IRQ). Дальше всегда одна и та же цепочка:
+## From device to application
 
-```text
-IRQ → ISR драйвера → DPC драйвера → поток, который обрабатывает данные → поток приложения
-```
-
-- **ISR** (Interrupt Service Routine) — обработчик прерывания. Выполняется на IRQL устройства (3–12), максимально короткий: забрать данные у железа и запросить DPC.
-- **DPC** (Deferred Procedure Call) — отложенный вызов процедуры на DISPATCH_LEVEL (IRQL 2). Здесь драйвер делает основную работу и сигнализирует потокам, что данные готовы.
-- **Поток** — обычный поток Windows (приоритет 0–31), который продолжает обработку. Если он запускается на другом ядре, для сигнала нужен IPI.
-
-На примере ввода (WDF01000 отвечает за все устройства ввода):
+An interrupt notifies a processor of a device event. A typical driver handles it briefly in an ISR and defers some work to a DPC; the application receives data later. The processing path depends on the driver, input API and Windows version.
 
 ```text
-Мышь, Windows 10        WDF01000 ISR → WDF01000 DPC → CSRSS (Win32k Raw Input Thread)        → поток ввода игры
-Мышь, Windows 11        WDF01000 ISR → WDF01000 DPC → DWM KERNEL SENSOR THREAD               → поток ввода игры
-Клавиатура, 10 / 11     WDF01000 ISR → WDF01000 DPC → CSRSS (winsrvext.dll)                  → поток ввода игры
-Контроллер, Windows 11  WDF01000 ISR → WDF01000 DPC → DWM MASTER INPUT THREAD                → поток ввода игры
+device event → ISR → deferred driver processing → application
 ```
 
-Чем больше потоков получают сигнал от одного DPC, тем дольше длится сам DPC (особенно у WDF01000) и потоки, которые этот сигнал получают.
+A driver can use several DPCs and worker threads. See [Introduction to DPC objects](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/introduction-to-dpc-objects).
 
-## Почему ISR / DPC важнее любого потока
+## IRQL and thread priority
 
-1. Прерывание системного таймера, ISR и DPC (в порядке убывания) выполняются **выше любого потока**, даже с приоритетом 31.
-2. **ISR / DPC не знают, какие ядра заняты потоками.** Пример на 4 ядрах:
+IRQL controls which interrupts are permitted on the current processor; it differs from Windows thread priority. A conventional ISR runs at the device's DIRQL and an ordinary DPC at DISPATCH_LEVEL. Interrupts at the current or a lower level are masked; a higher level can interrupt processing. See [Managing hardware priorities](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/managing-hardware-priorities).
 
-   ```text
-   0 ядро - поток с приоритетом 6
-   1 ядро - поток с приоритетом 6
-   2 ядро - поток с приоритетом 6
-   3 ядро - свободно
-   ```
+[Threaded DPCs](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/introduction-to-threaded-dpcs) can run at PASSIVE_LEVEL. Use event details in the trace to identify the execution context.
 
-   Пришедший ISR или DPC вполне может прервать поток на ядре 0–2 вместо того, чтобы занять свободное ядро 3. Правила планировщика для ISR / DPC не действуют.
-3. **Прерванный поток ждёт на том же ядре.** Он не переходит на освободившееся ядро, а стоит, пока не закончатся ISR + DPC + переключения контекста (одно переключение — порядка 3–5 мкс).
-4. **DPC, прерванный ISR, тоже ждёт на своём ядре.** Любой ISR может прервать любой другой ISR и любой DPC, независимо от приоритета IRQ.
-5. **Правила SMT для ISR / DPC не действуют.** Два драйвера на одном SMT-SET (два логических ядра одного физического) делят кэш и EXECUTION-UNITS, и это замедляет оба.
+## Which CPU performs the work
 
-## Что это значит для игры
+Interrupt Affinity controls device interrupt assignment, not the affinity of every driver thread. A DPC has a target processor: by default, the CPU on which it was queued, although the driver can choose another. See [Organization of DPC queues](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/organization-of-dpc-queues).
 
-У игры несколько важных потоков: GAME (main), RENDER, на Unreal Engine ещё RHI. Если драйвер стоит на ядре, где выполняется такой поток:
+Moving an ISR and moving all device processing are different outcomes. Actual work placement, handler duration and competition with the application matter.
 
-- поток прерывается → растёт время его выполнения → растёт время кадра;
-- или поток не может запуститься на своём IDEAL PROCESSOR (это мягкая маска) и уходит на другое ядро → теряет свой L1 / L2 и загрязняет кэш чужого ядра → снова дольше;
-- если на одном ядре много драйверов, это почти гарантированный статтер в момент, когда туда попадёт важный поток.
+## What to verify
 
-Показательный тест: 7800X3D + RTX 5070, нагрузка CPU 30–36 % (нет CPU-BOUND), GPU 60–70 %, фон полностью настроен, HT включён. Когда драйвера разнесены по ядрам и main поток игры стоит на ядре без драйверов (даже его SMT-SET свободен), результаты прогонов почти одинаковые. Когда все драйвера на ядре 0 и туда же попадает IDEAL PROCESSOR main потока, результаты случайные, а в среднем на **40–60 FPS ниже**, и это без CPU-BOUND. Под CPU-BOUND и с фоном влияние только растёт.
+DEVICE TWEAKER shows the saved policy and available current interrupt information. ISR/DPC placement requires a separate ETW trace. A displayed mask, one FPS measurement or one maximum DPC duration does not establish better input latency.
 
-При этом DEVICE TWEAKER не всегда меняет FPS: если игра в GPU-BOUND, если её важные потоки случайно не попадают на ядра с драйверами или если процессору хватает кэша. Цель — убрать саму возможность таких попаданий, а не надеяться на удачу.
-
-## ISR и DPC на одном ядре
-
-DPC обычно запускается в конце ISR или сразу после него. Если DPC выполняется на другом ядре, нужен IPI (его цена примерно равна межъядерной задержке), а данные из кэша ядра ISR приходится тянуть заново. Выигрыша от разнесения ISR и DPC одного драйвера по разным ядрам нет. ISR / DPC тоже получают преимущество от кэша, если всегда выполняются на одном ядре и между их запусками на нём мало другой работы.
-
-## Что делает DEVICE TWEAKER
-
-- Показывает для каждого устройства IRQ Mode, режим MSI, приоритет и маску, а для каждого логического процессора — физическое ядро, P / E-core, CCD и CPPC-рейтинг.
-- **АВТООПТИМИЗАЦИЯ** разносит драйвера по физическим ядрам так, чтобы они не делили ядра и SMT-SET, и по возможности не использует ядро 0.
-- Перед записью сохраняет проверенный бекап, после записи пишет в лог, что применилось, что пропущено и почему.
-
-**Вывод:** драйвера должны стоять на своих физических ядрах, отдельно друг от друга и от важных потоков игры. Остальные главы разбирают, как этого добиться для каждого типа устройства. Как проверить результат трейсом — в главе [10](./10-verification.md).
+Record the original conditions and compare the same workload before and after a change. See [chapter 10](./10-verification.md).
 
 ---
 
-[Оглавление](./README.md) · [Глава 02 →](./02-msi.md)
+[Guide](./README.md) · [Next: MSI and MSI-X](./02-msi.md)

@@ -1,120 +1,82 @@
-# История изменений
+# Changelog
 
-[English](./CHANGELOG.en.md) · [Главная](./README.md)
+[DEVICE TWEAKER](./README.md) / Changelog · [Русский](./CHANGELOG.ru.md)
 
-Заметные изменения DEVICE TWEAKER по версиям. Подробности о каждой настройке — в [описании настроек](./docs/SETTINGS.md).
+## [0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4) - 2026-10-31
 
-## [0.0.4] — 31 октября 2026
+Source comparison: [v0.0.3 → v0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/compare/b82e8d095ac3303e0bcd8607ac291f0d3dc29bc1...v0.0.4).
 
-Изменения относительно 0.0.3.
+### Changed
 
-### Главное
+- Moved IMOD/NIC ITR startup to Task Scheduler, adding resume and USB-device connection events alongside logon.
 
-- Автозапуск IMOD / NIC ITR через Планировщик заданий: применяется при входе в Windows, после выхода из сна и при подключении USB. Открытый скрипт работает без EXE.
-- DTIMOD.sys пишет только в память, которую Windows выделила выбранному устройству.
-- RSS распределяется по физическим ядрам, NIC ITR отключает собственную модерацию драйвера.
-- Программа и автозапуск используют один код записи регистров и одну карту interrupter'ов.
-- Новый режим IRQ Mode, кнопка СЧИТАТЬ IRQ и проверенный бекап перед применением настроек.
+### Added
 
-### Режимы прерываний
+- The application and startup script share register-access code. Profile file hashes are checked with SHA-256 before application.
+- Added IRQ Mode and a command to read IRQ information for all PCI devices. The active interrupt mode and PCI capabilities are displayed separately from the MSI registry setting.
+- RSS allocation selects one logical processor per physical core. Available queue counts account for driver and device limits.
+- Saving NIC ITR disables supported driver moderation settings; deleting the profile can restore their INF defaults.
+- Added diagnostics for HVCI, Vulnerable Driver Blocklist, Microsoft Defender and FACEIT/Vanguard services before driver operations.
 
-- Добавлен IRQ Mode. Настройка MSI Mode из реестра, текущий режим прерываний и поддерживаемые устройством режимы в HW показаны отдельно.
-- При открытии программы режим определяется по выделенным ресурсам Windows или через уже загруженный DTIMOD.sys. Открытие и обычное обновление списка не загружают драйвер. Если данных для различения MSI / MSI-X недостаточно, это указано в интерфейсе.
-- Добавлена общая кнопка **СЧИТАТЬ IRQ** для всех PCI-устройств из списка. Она уточняет режим по MSI / MSI-X Enable через DTIMOD.sys и загружает драйвер, если он ещё не загружен.
-- Чтение IRQ Mode выполняется в фоне. После обновления списка результаты предыдущего запроса отбрасываются.
+### Fixed
 
-### IMOD и NIC ITR
+- Removed the general physical-memory write command from DTIMOD.sys. Its replacement validates the write range against the selected device resources.
+- USB Selective Suspend restore uses Windows Power API for AC and DC values and verifies the result.
+- The mouse display shows the measured event rate, including when it is below the USB descriptor maximum.
+- Automatic backup cleanup no longer deletes the selected restore file or the rollback copy during restoration. Device power-restore errors are reported separately.
+- The application no longer overwrites a startup profile when reading or parsing it fails.
+- After a driver-loading attempt with an uncertain outcome, the application and startup script block loading through the fallback mechanism.
+- DTIMOD.sys rejects incomplete hardware-resource lists, including malformed data after a valid write range.
 
-- **ПРОВЕРИТЬ** в блоке IMOD раскрывает считанные значения и таблицу. Для просмотра результата больше не нужно включать галочку применения IMOD.
-- Фоновое чтение IMOD больше не подготавливает и не заменяет файл драйвера. Используется уже загруженный DTIMOD.sys.
-- Автозапуск IMOD / NIC ITR переведён в Планировщик заданий: задача `\DEVICE TWEAKER\IMOD` работает от SYSTEM и применяет настройки при входе в Windows, после выхода из сна и при подключении USB/HID-устройства. Раньше автозапуск срабатывал только при входе в Windows.
-- Файлы автозапуска лежат в `%ProgramData%\DEVICE TWEAKER\Startup`, изменять их могут только администраторы и SYSTEM. Скрипт `ApplyIMOD.ps1` остаётся открытым и работает без EXE; значения хранятся в `profile.json`, перед запуском сверяются SHA-256 runtime, драйвера и загрузчика, журналы хранятся 14 дней. Прежний автозапуск из AppData и ключа Run переносится автоматически.
-- Программа и автозапуск используют один код записи регистров и чтения карты interrupter'ов. Исправлено расхождение: автозапуск брал interrupter устройства из Slot Context, а не из TRB его кольца передачи, и после перезагрузки мог раскладывать роли иначе, чем показывала программа.
-- Рядом с текущими значениями IMOD показано время чтения; после подключения или отключения устройства карта помечается «устройства изменились».
-- **СОХРАНИТЬ** для NIC ITR выключает в реестре собственную адаптивную модерацию драйвера (`*InterruptModeration`, у Intel также `ITR`), которая иначе перезаписывала значение регистра. **УДАЛИТЬ** возвращает значение драйвера. Состояние видно в строке Interrupt Moderation.
-- Программа и автозапуск больше не загружают DTIMOD.sys одновременно.
-- Бекапы сохраняют профиль автозапуска; бекапы со старым скриптом при восстановлении переводятся в новый формат без потери значений.
+### Interface
 
-### Бекапы и восстановление
+- Dual-CCD status is displayed as On/Off.
+- Apply, save, restore and reset run long operations in the background. Refresh preserves pending edits and scroll position; a failed device scan keeps the previous cards on screen.
+- RSS settings, power settings and driver details are read in the background. Failed or timed-out reads preserve the previous device list; late results are ignored.
+- Layout changes preserve card state, focus and the text caret. After a partial apply, unconfirmed settings remain marked as pending.
+- Moved English and Russian strings to resource files. Clarified messages for failed settings reads, corrupt profiles and invalid MSI Limit values.
 
-- Исправлено восстановление USB Selective Suspend из бекапа: вместо прямой записи в реестр используется Windows Power API. Питание от сети и батареи восстанавливается отдельно, в план питания из бекапа.
-- Параметры плана питания проверяются повторным чтением после восстановления; текущий план не переключается.
-- В диалогах бекапов имя файла отделено от сообщения. Полный путь можно открыть и скопировать, папку с бекапами можно открыть отдельной кнопкой.
-- Удаление бекапа больше не закрывает меню восстановления и не открывает отдельное окно с результатом.
+### Build
 
-### Энергосбережение
+- Moved application sources to src and QA tools to dev/qa. The test panel is included only in DeveloperQa builds and excluded from the normal EXE.
+- Updated the application and build tools to .NET 10. The framework-dependent build requires .NET 10 Desktop Runtime x64; the self-contained build includes the runtime.
+- The release workflow builds a selected source commit without publishing by default. Replacing 0.0.4 is a separate action with backup and download verification.
 
-- Добавлено повторное чтение энергосбережения из WMI после записи. Неподдерживаемая функция, ошибки запроса / записи и несовпадение значений выводятся отдельно.
+## [0.0.3](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.3) - 2026-10-01
 
-### Отображение устройств
+Source comparison: [v0.0.2 → v0.0.3](https://github.com/arsenzaaa/DEVICE-TWEAKER/compare/39f016b6ab5e5edda4fbb83c115aae6cff2ee4c7...b82e8d095ac3303e0bcd8607ac291f0d3dc29bc1).
 
-- Исправлен Polling Rate мыши: после подтверждённого замера Raw Input в интерфейсе показывается измеренная частота, даже если она ниже максимума USB endpoint. У клавиатуры низкая активность нажатий не подменяет частоту устройства.
-- Убраны повторяющиеся подписи polling. USB-роли выводятся в порядке: мышь, клавиатура, геймпад, микрофон, аудио, камера.
+### Added
 
-### RSS
+- Replaced WinIO with DTIMOD.sys loaded through KDU.
+- Added NIC ITR readback, writes and saved profiles for supported Intel and Realtek adapters.
+- Expanded RSS controls with queue counts and runtime state from Get-NetAdapterRss.
+- Added mouse event-rate measurement through Raw Input and Mouse Throttle for supported Windows 11 builds.
+- Added USB and network-adapter power-saving controls.
+- Added CPPC and AMD CCD/CCX information to CPU topology and AUTO planning.
+- Added RU/EN switching without restart, backup selection for restore and operation-result reports.
 
-- Диагностика RSS различает неподдерживаемую функцию, отсутствие данных, ошибку чтения, ошибку применения и пропуск настройки. Совпадение сохранённых и активных параметров отмечается только после подтверждённого чтения.
-- Убраны необоснованные предупреждения для Wi-Fi и адаптеров, у которых CPU для RSS выбирает Windows. Настройки Wi-Fi по-прежнему пропускаются. Увеличено время ожидания запроса активного RSS.
-- Исправлен выбор CPU для RSS: процессоры берутся по одному на физическое ядро, SMT-соседи пропускаются, вместе с базовым CPU записываются `*MaxRssProcessors` и `*RssMaxProcNumber`.
-- Число очередей RSS ограничено значениями, которые предлагает драйвер, и числом векторов MSI-X.
+### Fixed
 
-### Интерфейс / навигация
+- Corrected AllClose and All mappings to Windows policy values; added Unlimited and capability-aware validation for MSI Limit.
 
-- Переработаны диалоги результатов, подтверждений, выбора папки бекапа и проверки системы. Основное сообщение отделено от технических подробностей.
-- Исправлены обрезка текста в полях, переносы в диалогах и компоновка блоков. Уточнены подписи текущих и сохранённых значений.
-- Доработаны выпадающие списки и навигация с клавиатуры. Home / End / Page Up / Page Down и Ctrl+Z в поле ввода обрабатываются самим полем.
-- Убрана белая вспышка блоков при чтении IRQ Mode. Исправлен порядок освобождения ресурсов при закрытии окна.
-- Обновлены формулировки RU/EN, подписи причин создания бекапов и индикатор изменённых настроек. Исправлено переключение языка у динамических строк и Power Saving.
-- Обновлены цвета категорий устройств: GPU и сеть легче различать.
-- Кнопки фильтров на русском больше не теряют пробелы после смены языка («[ ВСЕ ]» вместо «[ВСЕ]»).
+## [0.0.2](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.2) - 2026-01-15
 
-### Диагностика
+Source comparison: [v0.0.1 → v0.0.2](https://github.com/arsenzaaa/DEVICE-TWEAKER/compare/7e003dcf55e843881372c3308b5df7032c049295...39f016b6ab5e5edda4fbb83c115aae6cff2ee4c7).
 
-- Добавлен идентификатор сборки приложения при сохранении номера 0.0.4. По логу можно различить разные EXE одной версии.
-- В логи добавлены источник и время чтения IRQ Mode, длительность запросов RSS и подробные статусы чтения / применения.
-- Добавлена проверка системы перед настройкой USB IMOD: состояние Blocklist / HVCI / Microsoft Defender и служб FACEIT / Vanguard.
-- Ошибки чтения реестра, WMI и топологии USB записываются в лог как предупреждения, а не пропускаются молча. Числа, даты и значения регистров в логах форматируются одинаково при любой локали Windows.
+### Changed
 
-### Разработка и проверки
+- Added UI scaling based on Windows DPI.
+- P/E-core classification for the CPU list and AUTO now combines EfficiencyClass with SMT availability.
+- Changed the order in which AUTO allocates CPUs to devices.
 
-- Из MainForm вынесены планировщик CPU, запись MSI / affinity, восстановление, NIC ITR и polling. Существующие правила распределения CPU сохранены.
-- Проверки и тест-панель перенесены в dev/qa. Панель входит только в отдельную разработческую сборку, обычный EXE её не содержит.
-- Расширен стенд разработки: воспроизводимые сценарии, снимки GUI и переходов, RU/EN, модели масштабирования, тестовые файлы и сравнение кадров. Автономный прогон работает на невидимом рабочем столе без применения настроек Windows.
-- Добавлены проверки чувствительности тестов к намеренным поломкам и сверка исходников / готовых компонентов по SHA-256. Обновлены документация сборки, описание программы и скриншоты.
-- DTIMOD.sys записывает только в память, которую Windows выделила указанному PCI-устройству; прежняя общая запись в физическую память удалена. Проверка диапазона выполняется на модели драйвера вместе с намеренной поломкой.
+### Fixed
 
-## [0.0.3] — 1 октября 2026
+- Removed duplicate USB-role log entries for alternative keys of the same controller.
 
-Большое обновление после 0.0.2:
+## [0.0.1](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.1) - 2026-01-14
 
-- Управление xHCI IMOD переведено с WinIO на DTIMOD.sys и KDU. Добавлены значения по interrupter, настройка всего контроллера или отдельных индексов, сопоставление USB-устройств и чтение регистров после записи. Сохранённый профиль также переведён на новый драйвер.
-- Добавлен NIC ITR для распознанных Intel и Realtek: чтение и запись регистров, данные по очередям и профиль для следующего входа в Windows. Для неизвестного PCI ID запись недоступна.
-- Переработана интеллектуальная авто-оптимизация с учётом физических ядер, P/E-cores, SMT/HT, CPPC и AMD CCD/CCX. Для дискретной GPU выбираются два разных физических ядра. Если роль устройства или топология CPU определены ненадёжно, назначение пропускается с указанием причины.
-- К выбору базового CPU добавлено число RSS-очередей. Сохранённые настройки и активное состояние Get-NetAdapterRss показаны отдельно.
-- Разделены настройка MSI Mode, оценка режима по выделенным IRQ и аппаратные возможности устройства. Оценка по IRQ остаётся подсказкой: отличить MSI от MSI-X по ней нельзя.
-- Для MSI Limit добавлены Unlimited и проверка числового значения по возможностям устройства, если их удалось определить. Пустая маска обычного устройства возвращает MachineDefault и удаляет AssignmentSetOverride.
-- Исправлено соответствие AllClose и All значениям DevicePolicy: 1 и 3. В 0.0.2 подписи были перепутаны.
-- Добавлены оценка частоты событий мыши и клавиатуры по Raw Input и настройка RawMouseThrottleDuration на поддерживаемых сборках Windows 11. Настройка относится к фоновым обработчикам Raw Input, а не к USB polling rate.
-- Добавлены настройки энергосбережения USB-контроллера и корневых хабов. Для проводной сети доступно управление разрешением Windows отключать адаптер ради экономии энергии.
-- Исправлено распознавание HDMI/DisplayPort и S/PDIF-аудио. USB-контроллер с собственной политикой Interrupt Affinity остаётся в списке, даже если роль HID не определилась.
-- Добавлено переключение RU/EN без перезапуска, переработаны отображение устройств, блоки IMOD/ITR и переходы по категориям.
-- Переработаны резервные копии: выбор папки, восстановление конкретной копии, удаление старых копий и сброс настроек. Перед ручным применением, записью IMOD/ITR и сбросом нужна проверенная копия; интеллектуальная авто-оптимизация сначала сохраняет исходные настройки.
-- В отчёте теперь видно, что применилось, что пропущено и где возникла ошибка. Обычное обновление списка не загружает драйвер; кнопка ПРОВЕРИТЬ перечитывает регистры.
+Initial release. Sources: [v0.0.1](https://github.com/arsenzaaa/DEVICE-TWEAKER/tree/7e003dcf55e843881372c3308b5df7032c049295).
 
-## [0.0.2] — 15 января 2026
-
-После 0.0.1:
-
-- Добавлено масштабирование интерфейса по DPI Windows.
-- Исправлено определение P/E-ядер по EfficiencyClass и SMT для списка CPU и интеллектуальной авто-оптимизации.
-- Изменён порядок распределения CPU между устройствами при интеллектуальной авто-оптимизации.
-- Убраны повторяющиеся строки об USB-ролях одного контроллера из лога.
-
-## [0.0.1] — 14 января 2026
-
-Первый публичный выпуск для Windows 10/11 x64: MSI Mode и Limit, IRQ Priority, Interrupt Affinity, ReservedCpuSets, базовый CPU для RSS и xHCI IMOD через WinIO. Тёмный интерфейс показывает список устройств и позволяет искать по нему.
-
-[0.0.4]: https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4
-[0.0.3]: https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.3
-[0.0.2]: https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.2
-[0.0.1]: https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.1
+- MSI Mode and Limit, IRQ Priority, Interrupt Affinity and ReservedCpuSets controls.
+- RSS base CPU selection and xHCI IMOD configuration through WinIO.
