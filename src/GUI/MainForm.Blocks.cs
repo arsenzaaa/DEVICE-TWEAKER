@@ -662,18 +662,18 @@ public sealed partial class MainForm
         };
         StyleDarkTextBox(txtNicItr);
 
-        Button btnNicItr = NewCardButton("SET", new Size(nicSetButtonWidth, UiScale(24)));
+        Button btnNicItr = NewCardButton(UiText.Set, new Size(nicSetButtonWidth, UiScale(24)));
         btnNicItr.Location = nicButtonsInline
             ? new Point(txtNicItr.Right + nicInlineGap, txtNicItr.Top)
             : new Point(valueX, txtNicItr.Bottom + UiScale(6));
         btnNicItr.Visible = showNicItr;
 
-        Button btnNicItrSave = NewCardButton("SAVE", new Size(nicSaveButtonWidth, UiScale(24)));
+        Button btnNicItrSave = NewCardButton(UiText.Save, new Size(nicSaveButtonWidth, UiScale(24)));
         btnNicItrSave.Location = new Point(btnNicItr.Right + nicButtonGap, btnNicItr.Top);
         btnNicItrSave.Visible = showNicItr;
 
         int nicCheckButtonWidth = UiScale(76);
-        Button btnNicItrCheck = NewCardButton("CHECK", new Size(nicCheckButtonWidth, UiScale(24)));
+        Button btnNicItrCheck = NewCardButton(UiText.Check, new Size(nicCheckButtonWidth, UiScale(24)));
         btnNicItrCheck.Location = new Point(btnNicItrSave.Right + nicButtonGap, btnNicItr.Top);
         btnNicItrCheck.Visible = showNicItr;
 
@@ -964,7 +964,8 @@ public sealed partial class MainForm
         };
         lblImodDefault.Click += (_, _) =>
         {
-            if (lblImodDefault.Tag is string value && !string.IsNullOrWhiteSpace(value))
+            if (lblImodDefault.Tag is string value && !string.IsNullOrWhiteSpace(value)
+                && TryParseImodInterval(value, ImodDefaultInterval, out _))
             {
                 txtImod.Text = value;
             }
@@ -1031,13 +1032,13 @@ public sealed partial class MainForm
         IReadOnlyList<string> imodDeviceEditorRoles = GetImodDeviceEditorRoles(device);
         ImodRoleEditor imodRoleEditor = new(this, imodDeviceEditorRoles, txtImod, chkImod, cmbImodMode);
 
-        Button btnImodApply = NewCardButton("SET", UiScale(54, 24));
+        Button btnImodApply = NewCardButton(UiText.Set, UiScale(54, 24));
         btnImodApply.Click += async (_, _) => await ApplyImodFromBlock(createdBlock);
 
-        Button btnImodDelete = NewCardButton("DELETE", UiScale(76, 24));
+        Button btnImodDelete = NewCardButton(UiText.Delete, UiScale(76, 24));
         btnImodDelete.Click += async (_, _) => await DeleteImodFromBlock(createdBlock);
 
-        Button btnImodCheck = NewCardButton("CHECK", UiScale(76, 24));
+        Button btnImodCheck = NewCardButton(UiText.Check, UiScale(76, 24));
         btnImodCheck.Click += async (_, _) =>
         {
             if (createdBlock is not null)
@@ -1050,7 +1051,7 @@ public sealed partial class MainForm
         int imodReadbackTopInSettings = -1;
         int imodReadbackBottomInSettings = -1;
         int imodReadbackInset = UiScale(48);
-        Button btnImodDetails = NewCardButton("DETAILS", UiScale(112, 26));
+        Button btnImodDetails = NewCardButton(UiText.Details, UiScale(112, 26));
         btnImodDetails.Name = "IMOD_DETAILS";
         btnImodDetails.Visible = false;
         btnImodDetails.TabStop = false;

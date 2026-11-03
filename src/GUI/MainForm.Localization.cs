@@ -193,7 +193,7 @@ public sealed partial class MainForm
         {
             if (block.ModifiedBadge is not null)
             {
-                block.ModifiedBadge.Text = UiLanguage.Text("Changed");
+                block.ModifiedBadge.Text = UiResources.Get(UiText.Changed);
             }
             if (block.Kind == DeviceKind.STOR)
             {

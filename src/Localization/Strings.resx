@@ -1,0 +1,831 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="Action.Apply" xml:space="preserve"><value>APPLY</value></data>
+  <data name="Action.Auto" xml:space="preserve"><value>AUTO-OPTIMIZATION</value></data>
+  <data name="Action.Check" xml:space="preserve"><value>CHECK</value></data>
+  <data name="Action.Delete" xml:space="preserve"><value>DELETE</value></data>
+  <data name="Action.Details" xml:space="preserve"><value>DETAILS</value></data>
+  <data name="Action.ReadIrq" xml:space="preserve"><value>READ IRQ MODE</value></data>
+  <data name="Action.Refresh" xml:space="preserve"><value>REFRESH</value></data>
+  <data name="Action.Restore" xml:space="preserve"><value>RESTORE</value></data>
+  <data name="Action.Save" xml:space="preserve"><value>SAVE</value></data>
+  <data name="Action.Set" xml:space="preserve"><value>SET</value></data>
+  <data name="Inline.0000.devices.changed" xml:space="preserve"><value>devices changed</value></data>
+  <data name="Inline.0001.Power.Saving.Enabled" xml:space="preserve"><value>Power Saving=Enabled</value></data>
+  <data name="Inline.0002.Power.Saving.Disabled" xml:space="preserve"><value>Power Saving=Disabled</value></data>
+  <data name="Inline.0003.Hybrid.CPU" xml:space="preserve"><value>Hybrid CPU</value></data>
+  <data name="Inline.0004.Dual.CCD" xml:space="preserve"><value>Dual-CCD</value></data>
+  <data name="Inline.0005.Class" xml:space="preserve"><value>Class:</value></data>
+  <data name="Inline.0006.Registry" xml:space="preserve"><value>Registry:</value></data>
+  <data name="Inline.0007.Polling" xml:space="preserve"><value>Polling:</value></data>
+  <data name="Inline.0008.Net.type" xml:space="preserve"><value>Net type:</value></data>
+  <data name="Inline.0009.Type" xml:space="preserve"><value>Type:</value></data>
+  <data name="Inline.0010.Audio.endpoints" xml:space="preserve"><value>Audio endpoints:</value></data>
+  <data name="Inline.0011.Path" xml:space="preserve"><value>Path:</value></data>
+  <data name="Inline.0012.Topology" xml:space="preserve"><value>Topology:</value></data>
+  <data name="Inline.0013.Estimated.topology" xml:space="preserve"><value>Estimated topology:</value></data>
+  <data name="Inline.0014.Controller" xml:space="preserve"><value>Controller:</value></data>
+  <data name="Inline.0015.Platform" xml:space="preserve"><value>Platform:</value></data>
+  <data name="Inline.0016.PCI.ID" xml:space="preserve"><value>PCI ID:</value></data>
+  <data name="Inline.0017.Controller.capability" xml:space="preserve"><value>Controller capability:</value></data>
+  <data name="Inline.0018.Power.Saving" xml:space="preserve"><value>Power Saving:</value></data>
+  <data name="Inline.0019.USB.selective.suspend" xml:space="preserve"><value>USB selective suspend:</value></data>
+  <data name="Inline.0020.Raw.input.throttle" xml:space="preserve"><value>Raw input throttle:</value></data>
+  <data name="Inline.0021.locked" xml:space="preserve"><value>(locked)</value></data>
+  <data name="Inline.0022.test.profile" xml:space="preserve"><value>test profile </value></data>
+  <data name="Inline.0023.preview" xml:space="preserve"><value>preview </value></data>
+  <data name="Inline.0024.all.queues" xml:space="preserve"><value>all queues</value></data>
+  <data name="Inline.0025.Delay" xml:space="preserve"><value>Delay </value></data>
+  <data name="Inline.0026.active" xml:space="preserve"><value> active</value></data>
+  <data name="Inline.0027.invalid" xml:space="preserve"><value>invalid</value></data>
+  <data name="Inline.0028.Unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="Inline.0029.Protection" xml:space="preserve"><value>Protection:</value></data>
+  <data name="Inline.0030.Backup.files.deleted" xml:space="preserve"><value>Backup files deleted:</value></data>
+  <data name="Inline.0031.Preparing.RESET.WINDOWS.DEFAULT" xml:space="preserve"><value>Preparing RESET WINDOWS DEFAULT...</value></data>
+  <data name="Inline.0032.Previewing.RESET.WINDOWS.DEFAULT" xml:space="preserve"><value>Previewing RESET WINDOWS DEFAULT...</value></data>
+  <data name="Inline.0033.Running.RESET.WINDOWS.DEFAULT" xml:space="preserve"><value>Running RESET WINDOWS DEFAULT...</value></data>
+  <data name="Inline.0034.Resetting.device.settings" xml:space="preserve"><value>Resetting device settings</value></data>
+  <data name="Inline.0035.Resetting.reserved.CPU.sets" xml:space="preserve"><value>Resetting reserved CPU sets...</value></data>
+  <data name="Inline.0036.Removing.IMOD.persistence" xml:space="preserve"><value>Removing IMOD persistence...</value></data>
+  <data name="Inline.0037.Updating.IRQ.counts" xml:space="preserve"><value>Updating IRQ counts...</value></data>
+  <data name="Inline.0038.Ready" xml:space="preserve"><value>Ready</value></data>
+  <data name="Inline.0039.MSI.Enabled" xml:space="preserve"><value>MSI: Enabled</value></data>
+  <data name="Inline.0040.MSI.Disabled" xml:space="preserve"><value>MSI: Disabled</value></data>
+  <data name="Inline.0041.MSI.Unknown" xml:space="preserve"><value>MSI: Unknown</value></data>
+  <data name="Inline.0042.Current" xml:space="preserve"><value>Current: </value></data>
+  <data name="Inline.0043.Default" xml:space="preserve"><value>Default: </value></data>
+  <data name="Inline.0044.not.available" xml:space="preserve"><value>not available</value></data>
+  <data name="Inline.0045.not.detected" xml:space="preserve"><value>not detected</value></data>
+  <data name="Inline.0046.no.devices" xml:space="preserve"><value>no devices</value></data>
+  <data name="Inline.0047.no.changes" xml:space="preserve"><value>no changes</value></data>
+  <data name="Inline.0048.processed" xml:space="preserve"><value>processed</value></data>
+  <data name="Inline.0049.reading" xml:space="preserve"><value>reading...</value></data>
+  <data name="Inline.0050.Windows.Default" xml:space="preserve"><value>Windows Default</value></data>
+  <data name="Inline.0051.NVMe.storage.controller" xml:space="preserve"><value>NVMe storage controller</value></data>
+  <data name="Inline.0052.SATA.AHCI.controller" xml:space="preserve"><value>SATA/AHCI controller</value></data>
+  <data name="Inline.0053.Storage.controller" xml:space="preserve"><value>Storage controller</value></data>
+  <data name="Inline.0054.Mouse" xml:space="preserve"><value>Mouse:</value></data>
+  <data name="Inline.0055.Keyboard" xml:space="preserve"><value>Keyboard:</value></data>
+  <data name="Inline.0056.set.affinity" xml:space="preserve"><value>: set affinity</value></data>
+  <data name="Inline.0057.clear.RSS.IRQ.policy" xml:space="preserve"><value>: clear RSS IRQ policy</value></data>
+  <data name="Inline.0058.set.RSS.base.CPU" xml:space="preserve"><value>: set RSS base CPU</value></data>
+  <data name="Inline.0059.set.RSS.queue.count" xml:space="preserve"><value>: set RSS queue count</value></data>
+  <data name="Inline.0060.set.extended.RSS.values" xml:space="preserve"><value>: set extended RSS values</value></data>
+  <data name="Inline.0061.clear.RSS.base.CPU" xml:space="preserve"><value>: clear RSS base CPU</value></data>
+  <data name="Inline.0062.clear.RSS.queue.count" xml:space="preserve"><value>: clear RSS queue count</value></data>
+  <data name="Inline.0063.clear.extended.RSS.values" xml:space="preserve"><value>: clear extended RSS values</value></data>
+  <data name="Inline.0064.reset" xml:space="preserve"><value>: reset</value></data>
+  <data name="Message.0.unlocked" xml:space="preserve"><value>0 = unlocked</value></data>
+  <data name="Message.0.unlocked.138da12d" xml:space="preserve"><value>(0 = unlocked)</value></data>
+  <data name="Message.0x0.Windows.Default" xml:space="preserve"><value>0x0 (Windows Default)</value></data>
+  <data name="Message.A.crash.report.is.saved.in.logs.No" xml:space="preserve"><value>A crash report is saved in logs. No further settings will be applied.</value></data>
+  <data name="Message.A.deliberately.long.summary.verifies.wrapping.without.exposing" xml:space="preserve"><value>A deliberately long summary verifies wrapping without exposing raw diagnostics in the main result.</value></data>
+  <data name="Message.A.larger.value.requests.a.longer.throttle.interval" xml:space="preserve"><value>A larger value requests a longer throttle interval for background listeners.</value></data>
+  <data name="Message.ADD.FAKE.DEVICE" xml:space="preserve"><value>ADD FAKE DEVICE</value></data>
+  <data name="Message.ADD.PRESET" xml:space="preserve"><value>ADD PRESET</value></data>
+  <data name="Message.ALL" xml:space="preserve"><value>ALL</value></data>
+  <data name="Message.ALL.48332faf" xml:space="preserve"><value>[ ALL ]</value></data>
+  <data name="Message.APPDATA" xml:space="preserve"><value>APPDATA</value></data>
+  <data name="Message.APPDATA.user.profile.backup.that.survives.app.folder" xml:space="preserve"><value>APPDATA = user profile backup that survives app folder cleanup.</value></data>
+  <data name="Message.APPLIED.WITH.WARNINGS" xml:space="preserve"><value>APPLIED WITH WARNINGS</value></data>
+  <data name="Message.APPLY.CPU.TOPOLOGY" xml:space="preserve"><value>APPLY CPU TOPOLOGY</value></data>
+  <data name="Message.APPLY.INITIAL.STATE" xml:space="preserve"><value>APPLY INITIAL STATE</value></data>
+  <data name="Message.APPLY.PREVIEW" xml:space="preserve"><value>APPLY PREVIEW</value></data>
+  <data name="Message.APPLY.TEST" xml:space="preserve"><value>APPLY TEST</value></data>
+  <data name="Message.APPLY.includes.USB.IMOD.SKIP.continues.auto.optimization" xml:space="preserve"><value>APPLY includes USB IMOD. SKIP continues auto-optimization without it.</value></data>
+  <data name="Message.APPLY.preview.completed" xml:space="preserve"><value>APPLY preview completed.</value></data>
+  <data name="Message.APPLY.was.cancelled.because.the.automatic.backup.failed" xml:space="preserve"><value>APPLY was cancelled because the automatic backup failed.</value></data>
+  <data name="Message.AUDIO" xml:space="preserve"><value>AUDIO</value></data>
+  <data name="Message.AUDIO.cffa9655" xml:space="preserve"><value>[ AUDIO ]</value></data>
+  <data name="Message.AUTO.BACKUP" xml:space="preserve"><value>AUTO BACKUP</value></data>
+  <data name="Message.AUTO.OPTIMIZATION.was.cancelled.because.the.automatic.backup" xml:space="preserve"><value>AUTO-OPTIMIZATION was cancelled because the automatic backup failed.</value></data>
+  <data name="Message.AUTO.OPTIMIZATION.was.cancelled.because.the.original.state" xml:space="preserve"><value>AUTO-OPTIMIZATION was cancelled because the original-state backup failed.</value></data>
+  <data name="Message.AUTO.PLAN" xml:space="preserve"><value>AUTO PLAN</value></data>
+  <data name="Message.AUTO.profile.Mouse.IMOD.0.interrupt.moderation.off" xml:space="preserve"><value>AUTO profile: Mouse IMOD = 0 (interrupt moderation off). Manual IMOD is set separately.</value></data>
+  <data name="Message.AUTOMATIC.BACKUP" xml:space="preserve"><value>AUTOMATIC BACKUP</value></data>
+  <data name="Message.Accepted.values.DWORD.1.20.ms" xml:space="preserve"><value>Accepted values: DWORD 1–20 ms.</value></data>
+  <data name="Message.Add.fake.device.276f977a" xml:space="preserve"><value>Add fake device</value></data>
+  <data name="Message.Affinity.mask.must.be.hexadecimal.for.example.0x3" xml:space="preserve"><value>Affinity mask must be hexadecimal, for example 0x3.</value></data>
+  <data name="Message.After.reboot.run.CHECK.or.AUTO.OPTIMIZATION.again" xml:space="preserve"><value>After reboot, run CHECK or AUTO-OPTIMIZATION again to apply IMOD.</value></data>
+  <data name="Message.AllCloseProcessors" xml:space="preserve"><value>AllCloseProcessors</value></data>
+  <data name="Message.AllProcessorsInMachine" xml:space="preserve"><value>AllProcessorsInMachine</value></data>
+  <data name="Message.An.older.DTIMOD.driver.is.loaded.Restart.Windows" xml:space="preserve"><value>An older DTIMOD driver is loaded. Restart Windows, then press CHECK again.</value></data>
+  <data name="Message.Anti.cheat.components.were.found.Compatibility.with.DTIMOD" xml:space="preserve"><value>Anti-cheat components were found. Compatibility with DTIMOD/KDU is not confirmed; a conflict is possible, not detected.</value></data>
+  <data name="Message.AppData.keeps.it.in.your.user.profile" xml:space="preserve"><value>AppData keeps it in your user profile.</value></data>
+  <data name="Message.Applied" xml:space="preserve"><value>Applied</value></data>
+  <data name="Message.Applied.steps.were.saved" xml:space="preserve"><value>Applied steps were saved.</value></data>
+  <data name="Message.Applied.steps.were.saved.One.optional.step.was" xml:space="preserve"><value>Applied steps were saved. One optional step was not completed.</value></data>
+  <data name="Message.Applied.steps.were.saved.One.or.more.steps" xml:space="preserve"><value>Applied steps were saved. One or more steps were not completed.</value></data>
+  <data name="Message.Applied.with.APPLY.AUTO.A.reboot.may.be" xml:space="preserve"><value>Applied with APPLY / AUTO. A reboot may be required.</value></data>
+  <data name="Message.Applied.with.warnings.Core.settings.were.successfully.configured" xml:space="preserve"><value>Applied with warnings. Core settings were successfully configured.</value></data>
+  <data name="Message.Apply" xml:space="preserve"><value>Apply</value></data>
+  <data name="Message.Apply.IMOD.and.re.read.the.values.to" xml:space="preserve"><value>Apply IMOD and re-read the values to check the write.</value></data>
+  <data name="Message.Apply.USB.IMOD.during.AUTO.OPTIMIZATION" xml:space="preserve"><value>Apply USB IMOD during AUTO-OPTIMIZATION?</value></data>
+  <data name="Message.Apply.changes.Ctrl.S" xml:space="preserve"><value>Apply changes (Ctrl+S)</value></data>
+  <data name="Message.Apply.it.during.AUTO.OPTIMIZATION" xml:space="preserve"><value>Apply it during AUTO-OPTIMIZATION?</value></data>
+  <data name="Message.Applying.USB.IMOD" xml:space="preserve"><value>Applying USB IMOD...</value></data>
+  <data name="Message.Applying.USB.selective.suspend" xml:space="preserve"><value>Applying USB selective suspend...</value></data>
+  <data name="Message.Applying.changes" xml:space="preserve"><value>Applying changes...</value></data>
+  <data name="Message.AssignmentSetOverride.selects.CPUs.for.device.interrupts.The.driver" xml:space="preserve"><value>AssignmentSetOverride selects CPUs for device interrupts. The driver can send DPCs to other CPUs; check actual ISR / DPC placement with a trace.</value></data>
+  <data name="Message.Audio.8a2b9bff" xml:space="preserve"><value>Audio:</value></data>
+  <data name="Message.Auto" xml:space="preserve"><value>Auto</value></data>
+  <data name="Message.Auto.optimization.Ctrl.O" xml:space="preserve"><value>Auto-optimization (Ctrl+O)</value></data>
+  <data name="Message.Automatic.backup.3dadeedf" xml:space="preserve"><value>Automatic backup</value></data>
+  <data name="Message.BACKUP" xml:space="preserve"><value>BACKUP</value></data>
+  <data name="Message.BACKUP.FILE" xml:space="preserve"><value>BACKUP FILE</value></data>
+  <data name="Message.BACKUP.RESTORE" xml:space="preserve"><value>BACKUP RESTORE</value></data>
+  <data name="Message.BACKUPS" xml:space="preserve"><value>BACKUPS</value></data>
+  <data name="Message.BOTH" xml:space="preserve"><value>BOTH</value></data>
+  <data name="Message.Background.raw.input.throttling.appeared.in.the.Windows" xml:space="preserve"><value>Background raw input throttling appeared in the Windows 11 22H2 preview update KB5027303.</value></data>
+  <data name="Message.Backup.83855792" xml:space="preserve"><value>Backup</value></data>
+  <data name="Message.Backup.deleted.No.backups.remain" xml:space="preserve"><value>Backup deleted. No backups remain.</value></data>
+  <data name="Message.Backup.deleted.Select.another.backup.or.close.this" xml:space="preserve"><value>Backup deleted. Select another backup or close this window.</value></data>
+  <data name="Message.Backup.restored" xml:space="preserve"><value>Backup restored.</value></data>
+  <data name="Message.Backup.saved" xml:space="preserve"><value>Backup saved.</value></data>
+  <data name="Message.BackupAccessDenied" xml:space="preserve"><value>BackupAccessDenied</value></data>
+  <data name="Message.Base.absent.int" xml:space="preserve"><value>Base (absent/int):</value></data>
+  <data name="Message.Blocklist.registry" xml:space="preserve"><value>Blocklist (registry)</value></data>
+  <data name="Message.Building.device.list.0.0" xml:space="preserve"><value>Building device list (0/0)</value></data>
+  <data name="Message.Building.reserved.CPU.sets" xml:space="preserve"><value>Building reserved CPU sets...</value></data>
+  <data name="Message.Built" xml:space="preserve"><value>Built</value></data>
+  <data name="Message.CANCEL" xml:space="preserve"><value>CANCEL</value></data>
+  <data name="Message.CCD.group" xml:space="preserve"><value>CCD group</value></data>
+  <data name="Message.CCD.groups" xml:space="preserve"><value>CCD groups:</value></data>
+  <data name="Message.CCD0" xml:space="preserve"><value>[ CCD0 ]</value></data>
+  <data name="Message.CCD1" xml:space="preserve"><value>[ CCD1 ]</value></data>
+  <data name="Message.CCX.group" xml:space="preserve"><value>CCX group</value></data>
+  <data name="Message.CCX.groups" xml:space="preserve"><value>CCX groups:</value></data>
+  <data name="Message.CHANGES.APPLIED" xml:space="preserve"><value>CHANGES APPLIED</value></data>
+  <data name="Message.CLEAR.ALL" xml:space="preserve"><value>CLEAR ALL</value></data>
+  <data name="Message.CLEAR.HIDDEN" xml:space="preserve"><value>CLEAR HIDDEN</value></data>
+  <data name="Message.CLOSE" xml:space="preserve"><value>CLOSE</value></data>
+  <data name="Message.COMPLETED" xml:space="preserve"><value>COMPLETED</value></data>
+  <data name="Message.CONFIRMATION" xml:space="preserve"><value>CONFIRMATION</value></data>
+  <data name="Message.CONTINUE" xml:space="preserve"><value>CONTINUE</value></data>
+  <data name="Message.COPIED" xml:space="preserve"><value>COPIED</value></data>
+  <data name="Message.COPY" xml:space="preserve"><value>COPY</value></data>
+  <data name="Message.COPY.REGISTRY" xml:space="preserve"><value>[ COPY REGISTRY ]</value></data>
+  <data name="Message.COPY.REGISTRY.94d5d02f" xml:space="preserve"><value>COPY REGISTRY</value></data>
+  <data name="Message.CPPC.ratings" xml:space="preserve"><value>CPPC ratings:</value></data>
+  <data name="Message.CPPC.ratings.are.invalid" xml:space="preserve"><value>CPPC ratings are invalid.</value></data>
+  <data name="Message.CPU.Affinity" xml:space="preserve"><value>CPU Affinity</value></data>
+  <data name="Message.CPU.Affinity.state" xml:space="preserve"><value>CPU Affinity state:</value></data>
+  <data name="Message.CPU.TOPOLOGY" xml:space="preserve"><value>CPU TOPOLOGY</value></data>
+  <data name="Message.CPU.map.unavailable.affinity.plan.was.not.built" xml:space="preserve"><value>CPU map unavailable; affinity plan was not built</value></data>
+  <data name="Message.CPU.name" xml:space="preserve"><value>CPU name:</value></data>
+  <data name="Message.CPU.preset" xml:space="preserve"><value>CPU preset:</value></data>
+  <data name="Message.Can.reduce.the.message.load.from.background.listeners" xml:space="preserve"><value>Can reduce the message load from background listeners.</value></data>
+  <data name="Message.Change.the.explicit.Vulnerable.Driver.Blocklist.setting.to" xml:space="preserve"><value>Change the explicit Vulnerable Driver Blocklist setting to off? This does not guarantee that DTIMOD will load.</value></data>
+  <data name="Message.Choose.how.to.restore.DEVICE.TWEAKER.settings" xml:space="preserve"><value>Choose how to restore DEVICE TWEAKER settings.</value></data>
+  <data name="Message.Clear.all.cores" xml:space="preserve"><value>Clear all cores</value></data>
+  <data name="Message.Clearing.device.list" xml:space="preserve"><value>Clearing device list...</value></data>
+  <data name="Message.Click.READ.IRQ.MODE.at.the.top.to" xml:space="preserve"><value>Click READ IRQ MODE at the top to read interrupt modes for all PCI devices. Loads DTIMOD.sys if needed. Device settings are not changed.</value></data>
+  <data name="Message.Click.to.copy.the.registry.path" xml:space="preserve"><value>Click to copy the registry path.</value></data>
+  <data name="Message.Click.to.use.the.default.IMOD.interval" xml:space="preserve"><value>Click to use the default IMOD interval.</value></data>
+  <data name="Message.Close.X.cancel.AUTO.OPTIMIZATION" xml:space="preserve"><value>Close (X) = cancel AUTO-OPTIMIZATION.</value></data>
+  <data name="Message.Continuing" xml:space="preserve"><value>Continuing</value></data>
+  <data name="Message.Copied.8d525e5f" xml:space="preserve"><value>Copied</value></data>
+  <data name="Message.Core.group" xml:space="preserve"><value>Core group</value></data>
+  <data name="Message.Core.groups" xml:space="preserve"><value>Core groups:</value></data>
+  <data name="Message.CorruptBackup" xml:space="preserve"><value>CorruptBackup</value></data>
+  <data name="Message.Could.not.read" xml:space="preserve"><value>Could not read</value></data>
+  <data name="Message.CpuMapUnavailable" xml:space="preserve"><value>CpuMapUnavailable</value></data>
+  <data name="Message.CpuTopologyUnavailable" xml:space="preserve"><value>CpuTopologyUnavailable</value></data>
+  <data name="Message.Current" xml:space="preserve"><value>Current</value></data>
+  <data name="Message.Current.section" xml:space="preserve"><value>Current section</value></data>
+  <data name="Message.DELAY" xml:space="preserve"><value>DELAY</value></data>
+  <data name="Message.DELETE.SELECTED" xml:space="preserve"><value>DELETE SELECTED</value></data>
+  <data name="Message.DEVICE" xml:space="preserve"><value>DEVICE</value></data>
+  <data name="Message.DEVICE.SETTINGS" xml:space="preserve"><value>DEVICE SETTINGS</value></data>
+  <data name="Message.DEVICE.TWEAKER" xml:space="preserve"><value>DEVICE TWEAKER</value></data>
+  <data name="Message.DEVICE.TWEAKER.CRITICAL.ERROR" xml:space="preserve"><value>DEVICE TWEAKER: CRITICAL ERROR</value></data>
+  <data name="Message.DEVICE.TWEAKER.accepts.DWORD.values.from.1.to" xml:space="preserve"><value>DEVICE TWEAKER accepts DWORD values from 1 to 20 milliseconds.</value></data>
+  <data name="Message.DEVICE.TWEAKER.does.not.offer.this.setting.on" xml:space="preserve"><value>DEVICE TWEAKER does not offer this setting on Windows 10 or an older unpatched Windows 11 22H2 build.</value></data>
+  <data name="Message.DEVICE.TWEAKER.has.crashed.and.will.close" xml:space="preserve"><value>DEVICE TWEAKER has crashed and will close.</value></data>
+  <data name="Message.DEVICE.TWEAKER.has.crashed.and.will.close.A" xml:space="preserve"><value>DEVICE TWEAKER has crashed and will close.
+
+A crash report is saved in logs. No further settings will be applied.</value></data>
+  <data name="Message.DEVICE.TWEAKER.is.running.in.TEST.ADMIN.mode" xml:space="preserve"><value>DEVICE TWEAKER is running in TEST ADMIN mode.
+
+All hardware adjustments and registry modifications are simulated and completely safe.</value></data>
+  <data name="Message.DEVICES" xml:space="preserve"><value>DEVICES</value></data>
+  <data name="Message.DIAGNOSTIC.LOGGING.IS.UNAVAILABLE" xml:space="preserve"><value>DIAGNOSTIC LOGGING IS UNAVAILABLE</value></data>
+  <data name="Message.DIAGNOSTICS.SYSTEM.LOG" xml:space="preserve"><value>DIAGNOSTICS &amp; SYSTEM LOG</value></data>
+  <data name="Message.DISABLE" xml:space="preserve"><value>DISABLE</value></data>
+  <data name="Message.DISABLE.TEST.MODE" xml:space="preserve"><value>DISABLE TEST MODE</value></data>
+  <data name="Message.DTIMOD.can.be.blocked.by.Vulnerable.Driver.Blocklist" xml:space="preserve"><value>DTIMOD can be blocked by Vulnerable Driver Blocklist, Windows driver signature protection, antivirus, or anti-cheats.</value></data>
+  <data name="Message.DTIMOD.driver.access.can.be.blocked.by.Windows" xml:space="preserve"><value>DTIMOD driver access can be blocked by Windows security features, antivirus software, or anti-cheats.</value></data>
+  <data name="Message.DTIMOD.driver.unavailable.Open.the.session.log.for" xml:space="preserve"><value>DTIMOD driver unavailable. Open the session log for diagnostics.</value></data>
+  <data name="Message.DTIMOD.driver.was.unavailable" xml:space="preserve"><value>DTIMOD driver was unavailable.</value></data>
+  <data name="Message.DTIMOD.driver.was.unavailable.USB.IMOD.was.not" xml:space="preserve"><value>DTIMOD driver was unavailable. USB IMOD was not changed.</value></data>
+  <data name="Message.DTIMOD.is.unavailable.Restart.Windows.then.press.CHECK" xml:space="preserve"><value>DTIMOD is unavailable.
+Restart Windows, then press CHECK.</value></data>
+  <data name="Message.DTIMOD.loading.did.not.finish.normally.Restart.Windows" xml:space="preserve"><value>DTIMOD loading did not finish normally.
+Restart Windows, then press CHECK.</value></data>
+  <data name="Message.DTIMOD.sys.blocked.by.Vulnerable.Driver.Blocklist" xml:space="preserve"><value>DTIMOD.sys blocked by Vulnerable Driver Blocklist</value></data>
+  <data name="Message.DTIMOD.sys.blocked.by.Windows.Defender" xml:space="preserve"><value>DTIMOD.sys blocked by Windows Defender</value></data>
+  <data name="Message.DTIMOD.sys.loader.blocked.by.Vulnerable.Driver.Blocklist" xml:space="preserve"><value>DTIMOD.sys loader blocked by Vulnerable Driver Blocklist</value></data>
+  <data name="Message.DTIMOD.sys.loader.rejected.by.Windows" xml:space="preserve"><value>DTIMOD.sys loader rejected by Windows</value></data>
+  <data name="Message.DTIMOD.sys.rejected.by.Windows" xml:space="preserve"><value>DTIMOD.sys rejected by Windows</value></data>
+  <data name="Message.DTIMOD.sys.rejected.by.Windows.or.antivirus" xml:space="preserve"><value>DTIMOD.sys rejected by Windows or antivirus</value></data>
+  <data name="Message.DTIMOD.was.rejected.by.Windows.or.antivirus" xml:space="preserve"><value>DTIMOD was rejected by Windows or antivirus.</value></data>
+  <data name="Message.DTIMOD.was.rejected.by.Windows.or.antivirus.USB" xml:space="preserve"><value>DTIMOD was rejected by Windows or antivirus. USB IMOD was not changed.</value></data>
+  <data name="Message.DTIMOD.was.unavailable.USB.IMOD.was.not.changed" xml:space="preserve"><value>DTIMOD was unavailable. USB IMOD was not changed.</value></data>
+  <data name="Message.Default" xml:space="preserve"><value>Default</value></data>
+  <data name="Message.Device.Manager.Power.Management.Allow.the.computer.to" xml:space="preserve"><value>Device Manager → Power Management → 'Allow the computer to turn off this device to save power'.</value></data>
+  <data name="Message.Device.preset" xml:space="preserve"><value>Device preset:</value></data>
+  <data name="Message.DevicePolicy.requests.how.Windows.assigns.processors.to.device" xml:space="preserve"><value>DevicePolicy requests how Windows assigns processors to device interrupts:
+• SpecCPU uses the selected Affinity Mask
+• MachineDefault leaves placement to Windows
+• AllClose / Single request nearby or one processor
+• SpreadMessages may distribute multiple MSI-X messages when the device and driver use them.
+A driver can target DPCs separately.</value></data>
+  <data name="Message.DevicePriority.requests.interrupt.priority.High.applies.to.interrupts" xml:space="preserve"><value>DevicePriority requests interrupt priority. High applies to interrupts, not game or DPC priority; actual scheduling depends on Windows / the driver.</value></data>
+  <data name="Message.Devices.4ba5121d" xml:space="preserve"><value>Devices</value></data>
+  <data name="Message.Devices.were.added.or.removed.after.this.read" xml:space="preserve"><value>Devices were added or removed after this read. A USB device may now use another interrupter; press CHECK to read again.</value></data>
+  <data name="Message.Disable.Vulnerable.Driver.Blocklist" xml:space="preserve"><value>Disable Vulnerable Driver Blocklist?</value></data>
+  <data name="Message.Disabled" xml:space="preserve"><value>Disabled</value></data>
+  <data name="Message.Display.HDMI.audio.shares.PCIe.bus.with.the" xml:space="preserve"><value>Display/HDMI audio shares PCIe bus with the GPU and uses Windows default interrupt steering (0x0).</value></data>
+  <data name="Message.Driver.loading.and.anti.cheat.compatibility.are.not" xml:space="preserve"><value>Driver loading and anti-cheat compatibility are not checked here.</value></data>
+  <data name="Message.Driver.preflight.read.only" xml:space="preserve"><value>Driver preflight (read-only):</value></data>
+  <data name="Message.Driver.state" xml:space="preserve"><value>Driver state:</value></data>
+  <data name="Message.Dry.run.reset.complete.UI.only" xml:space="preserve"><value>Dry-run reset complete (UI only).</value></data>
+  <data name="Message.Dual.CCD" xml:space="preserve"><value>Dual-CCD</value></data>
+  <data name="Message.E.Core" xml:space="preserve"><value>E-Core</value></data>
+  <data name="Message.E.core.60fad41b" xml:space="preserve"><value>E-core</value></data>
+  <data name="Message.ERROR" xml:space="preserve"><value>ERROR</value></data>
+  <data name="Message.EXE.FOLDER" xml:space="preserve"><value>EXE FOLDER</value></data>
+  <data name="Message.EXE.FOLDER.portable.backup.next.to.the.app" xml:space="preserve"><value>EXE FOLDER = portable backup next to the app.</value></data>
+  <data name="Message.Empty.group.is.not.allowed" xml:space="preserve"><value>Empty group is not allowed.</value></data>
+  <data name="Message.Enable.test.devices" xml:space="preserve"><value>Enable test devices</value></data>
+  <data name="Message.Enabled" xml:space="preserve"><value>Enabled</value></data>
+  <data name="Message.Enumerating.devices" xml:space="preserve"><value>Enumerating devices...</value></data>
+  <data name="Message.FACEIT.and.Vanguard.components.found.A.conflict.with" xml:space="preserve"><value>FACEIT and Vanguard components found. A conflict with DTIMOD/KDU is possible.</value></data>
+  <data name="Message.FACEIT.and.Vanguard.components.found.Compatibility.with.DTIMOD" xml:space="preserve"><value>FACEIT and Vanguard components found. Compatibility with DTIMOD/KDU is untested; a conflict is possible.</value></data>
+  <data name="Message.FACEIT.and.Vanguard.detected" xml:space="preserve"><value>FACEIT and Vanguard detected.</value></data>
+  <data name="Message.FACEIT.components.found.A.conflict.with.DTIMOD.KDU" xml:space="preserve"><value>FACEIT components found. A conflict with DTIMOD/KDU is possible.</value></data>
+  <data name="Message.FACEIT.components.found.Compatibility.with.DTIMOD.KDU.is" xml:space="preserve"><value>FACEIT components found. Compatibility with DTIMOD/KDU is untested; a conflict is possible.</value></data>
+  <data name="Message.FACEIT.detected" xml:space="preserve"><value>FACEIT detected.</value></data>
+  <data name="Message.FAILED" xml:space="preserve"><value>FAILED</value></data>
+  <data name="Message.Failed.to.disable.Vulnerable.Driver.Blocklist" xml:space="preserve"><value>Failed to disable Vulnerable Driver Blocklist.</value></data>
+  <data name="Message.Failed.to.disable.Vulnerable.Driver.Blocklist.See.the" xml:space="preserve"><value>Failed to disable Vulnerable Driver Blocklist.
+See the session log for details.</value></data>
+  <data name="Message.Failed.to.write.ReservedCpuSets" xml:space="preserve"><value>Failed to write ReservedCpuSets.</value></data>
+  <data name="Message.Failure.injection" xml:space="preserve"><value>Failure injection:</value></data>
+  <data name="Message.Fake.SelectiveSuspendEnabled.for.USB.test.devices.Selective.Suspend" xml:space="preserve"><value>Fake SelectiveSuspendEnabled for USB test devices (Selective Suspend picker).</value></data>
+  <data name="Message.False" xml:space="preserve"><value>False</value></data>
+  <data name="Message.Filter.devices.Ctrl.F" xml:space="preserve"><value>Filter devices... (Ctrl+F)</value></data>
+  <data name="Message.For.USB.controller.root.hubs.power.plan.Selective" xml:space="preserve"><value>For USB: controller / root hubs / power-plan Selective Suspend.</value></data>
+  <data name="Message.For.USB.this.disables.Selective.Suspend.on.the" xml:space="preserve"><value>For USB this disables Selective Suspend on the controller + root hubs and the power-plan USB SS setting.</value></data>
+  <data name="Message.Full.path.select.to.copy" xml:space="preserve"><value>Full path (select to copy):</value></data>
+  <data name="Message.Full.results.warnings.are.in.DETAILS" xml:space="preserve"><value>Full results / warnings are in DETAILS.</value></data>
+  <data name="Message.GAMEPAD" xml:space="preserve"><value>GAMEPAD</value></data>
+  <data name="Message.GAMEPAD.408bdc4e" xml:space="preserve"><value>[ GAMEPAD ]</value></data>
+  <data name="Message.GPU" xml:space="preserve"><value>[ GPU ]</value></data>
+  <data name="Message.Gamepad.7c1b940b" xml:space="preserve"><value>Gamepad:</value></data>
+  <data name="Message.Group.counts" xml:space="preserve"><value>Group counts:</value></data>
+  <data name="Message.HIDE" xml:space="preserve"><value>HIDE</value></data>
+  <data name="Message.HIDE.DETAILS" xml:space="preserve"><value>HIDE DETAILS</value></data>
+  <data name="Message.HIDE.SELECTED" xml:space="preserve"><value>HIDE SELECTED</value></data>
+  <data name="Message.HVCI.registry" xml:space="preserve"><value>HVCI (registry)</value></data>
+  <data name="Message.HVCI.registry.setting" xml:space="preserve"><value>HVCI registry setting</value></data>
+  <data name="Message.HVCI.runtime" xml:space="preserve"><value>HVCI (runtime)</value></data>
+  <data name="Message.Hidden.real.devices" xml:space="preserve"><value>Hidden real devices</value></data>
+  <data name="Message.High" xml:space="preserve"><value>High</value></data>
+  <data name="Message.High.mouse.polling.rates.can.increase.this.load" xml:space="preserve"><value>High mouse polling rates can increase this load.</value></data>
+  <data name="Message.How.to.use.set.group.counts.then.assign" xml:space="preserve"><value>How to use: set group counts, then assign each LP to Core/CCD/CCX groups. Tick E-core where needed.</value></data>
+  <data name="Message.Hybrid.CPU" xml:space="preserve"><value>Hybrid CPU</value></data>
+  <data name="Message.Hyper.Threading" xml:space="preserve"><value>Hyper-Threading</value></data>
+  <data name="Message.Hyper.Threading.status" xml:space="preserve"><value>Hyper-Threading status:</value></data>
+  <data name="Message.IMOD.Value" xml:space="preserve"><value>IMOD Value:</value></data>
+  <data name="Message.IMOD.applied" xml:space="preserve"><value>IMOD applied.</value></data>
+  <data name="Message.IMOD.apply.was.cancelled.because.the.automatic.backup" xml:space="preserve"><value>IMOD apply was cancelled because the automatic backup failed.</value></data>
+  <data name="Message.IMOD.delete" xml:space="preserve"><value>IMOD delete</value></data>
+  <data name="Message.IMOD.delete.finished.with.errors.Some.persistence.files" xml:space="preserve"><value>IMOD delete finished with errors. Some persistence files may still remain. If the driver was loaded, reboot to unload DTIMOD.sys from memory.</value></data>
+  <data name="Message.IMOD.note.high.rate.input.detected.Mouse.AUTO" xml:space="preserve"><value>IMOD note: high-rate input detected; Mouse AUTO uses 0, verify any manual non-zero interval.</value></data>
+  <data name="Message.IMOD.persistence" xml:space="preserve"><value>IMOD persistence</value></data>
+  <data name="Message.IMOD.reset.to.defaults" xml:space="preserve"><value>IMOD reset to defaults.</value></data>
+  <data name="Message.IMOD.startup.script.saved.USB.live.apply.skipped" xml:space="preserve"><value>IMOD startup script saved. USB live apply skipped (no custom USB IMOD config).</value></data>
+  <data name="Message.INFORMATION" xml:space="preserve"><value>INFORMATION</value></data>
+  <data name="Message.IRQ" xml:space="preserve"><value>IRQ</value></data>
+  <data name="Message.IRQ.Mode" xml:space="preserve"><value>IRQ Mode:</value></data>
+  <data name="Message.IRQ.Mode.Windows.allocated.resources.PCI.MSI.Enable" xml:space="preserve"><value>IRQ Mode: Windows allocated resources / PCI MSI Enable and MSI-X Enable bits. HW lists supported modes, not the active mode.</value></data>
+  <data name="Message.IRQ.Priority" xml:space="preserve"><value>IRQ Priority:</value></data>
+  <data name="Message.IRQ.count" xml:space="preserve"><value>IRQ count:</value></data>
+  <data name="Message.IRQ.count.WMI.data.HW.supported.modes.CHECK" xml:space="preserve"><value>IRQ count: WMI data. HW: supported modes. CHECK beside IRQ Mode reads the current mode through DTIMOD.</value></data>
+  <data name="Message.IRQ.count.WMI.data.WMI.hint.MSI.MSI" xml:space="preserve"><value>IRQ count: WMI data. WMI hint: MSI / MSI-X estimate from IRQ numbers above 999, not the active interrupt mode. It cannot tell MSI from MSI-X. HW: device capabilities.</value></data>
+  <data name="Message.IRQ.count.comes.from.WMI.HW.lists.supported" xml:space="preserve"><value>IRQ count comes from WMI. HW lists supported modes. Click READ IRQ MODE at the top to read all PCI interrupt modes through DTIMOD.sys.</value></data>
+  <data name="Message.IRQ.count.comes.from.WMI.IRQ.Mode.uses" xml:space="preserve"><value>IRQ count comes from WMI. IRQ Mode uses Windows allocated resources. HW lists supported modes. Refresh updates the readings without loading a driver.</value></data>
+  <data name="Message.IRQ.count.must.be.Auto.or.a.number" xml:space="preserve"><value>IRQ count must be Auto or a number from 0 to 64.</value></data>
+  <data name="Message.ImodReadFailed" xml:space="preserve"><value>ImodReadFailed</value></data>
+  <data name="Message.ImodVerificationMismatch" xml:space="preserve"><value>ImodVerificationMismatch</value></data>
+  <data name="Message.ImodWriteFailed" xml:space="preserve"><value>ImodWriteFailed</value></data>
+  <data name="Message.Include.USB.IMOD" xml:space="preserve"><value>Include USB IMOD</value></data>
+  <data name="Message.Include.USB.IMOD.in.auto.optimization" xml:space="preserve"><value>Include USB IMOD in auto-optimization?</value></data>
+  <data name="Message.Initial.state.device" xml:space="preserve"><value>Initial state device:</value></data>
+  <data name="Message.Input.format.for.the.selected.IMOD.mode" xml:space="preserve"><value>Input format for the selected IMOD mode.</value></data>
+  <data name="Message.Install.the.GPU.driver.and.press.REFRESH" xml:space="preserve"><value>Install the GPU driver and press REFRESH.</value></data>
+  <data name="Message.Integrated.GPU.iGPU" xml:space="preserve"><value>Integrated GPU (iGPU)</value></data>
+  <data name="Message.Interrupters" xml:space="preserve"><value>Interrupters</value></data>
+  <data name="Message.It.does.not.represent.measured.latency.or.the" xml:space="preserve"><value>It does not represent measured latency or the negotiated device link.</value></data>
+  <data name="Message.It.may.conflict.with.DTIMOD.sys" xml:space="preserve"><value>It may conflict with DTIMOD.sys.</value></data>
+  <data name="Message.Jump.to.section" xml:space="preserve"><value>Jump to section</value></data>
+  <data name="Message.KEEP" xml:space="preserve"><value>KEEP</value></data>
+  <data name="Message.KEYBOARD" xml:space="preserve"><value>KEYBOARD</value></data>
+  <data name="Message.KEYBOARD.c23e7936" xml:space="preserve"><value>[ KEYBOARD ]</value></data>
+  <data name="Message.KduDeviceUnavailable577" xml:space="preserve"><value>KduDeviceUnavailable577</value></data>
+  <data name="Message.KduExitCode" xml:space="preserve"><value>KduExitCode</value></data>
+  <data name="Message.KduMissing" xml:space="preserve"><value>KduMissing</value></data>
+  <data name="Message.KduTimeout" xml:space="preserve"><value>KduTimeout</value></data>
+  <data name="Message.Kernel.CI.blocked.driver.execution.code.577" xml:space="preserve"><value>Kernel CI blocked driver execution (code 577).</value></data>
+  <data name="Message.Keyboard.b0a144f0" xml:space="preserve"><value>Keyboard:</value></data>
+  <data name="Message.Kind" xml:space="preserve"><value>Kind:</value></data>
+  <data name="Message.LOAD" xml:space="preserve"><value>LOAD</value></data>
+  <data name="Message.LOAD.FULL" xml:space="preserve"><value>LOAD FULL</value></data>
+  <data name="Message.LOAD.JSON" xml:space="preserve"><value>LOAD JSON</value></data>
+  <data name="Message.LOGS" xml:space="preserve"><value>LOGS</value></data>
+  <data name="Message.LP.assignments.manual" xml:space="preserve"><value>LP assignments (manual):</value></data>
+  <data name="Message.Larger.values.request.longer.intervals.for.background.listeners" xml:space="preserve"><value>Larger values request longer intervals for background listeners.</value></data>
+  <data name="Message.Laying.out.devices" xml:space="preserve"><value>Laying out devices...</value></data>
+  <data name="Message.Limit.absent.0.2048" xml:space="preserve"><value>Limit (absent/0..2048):</value></data>
+  <data name="Message.Limits.Raw.Input.delivery.to.eligible.background.listeners" xml:space="preserve"><value>Limits Raw Input delivery to eligible background listeners on supported Windows builds.</value></data>
+  <data name="Message.Load.DTIMOD.sys.and.read.current.IMOD.values" xml:space="preserve"><value>Load DTIMOD.sys and read current IMOD values.</value></data>
+  <data name="Message.Load.DTIMOD.sys.and.read.current.NIC.ITR" xml:space="preserve"><value>Load DTIMOD.sys and read current NIC ITR values.</value></data>
+  <data name="Message.Loaded.DTIMOD.does.not.support.PCI.queries.An" xml:space="preserve"><value>Loaded DTIMOD does not support PCI queries. An older driver may still be loaded.</value></data>
+  <data name="Message.Loaded.DTIMOD.does.not.support.PCI.queries.Restart" xml:space="preserve"><value>Loaded DTIMOD does not support PCI queries. Restart Windows, then read IRQ Mode again.</value></data>
+  <data name="Message.Low" xml:space="preserve"><value>Low</value></data>
+  <data name="Message.MODIFIED" xml:space="preserve"><value>MODIFIED</value></data>
+  <data name="Message.MODIFIED.73a59bf1" xml:space="preserve"><value>[ MODIFIED ]</value></data>
+  <data name="Message.MOUSE" xml:space="preserve"><value>MOUSE</value></data>
+  <data name="Message.MOUSE.b42a27cb" xml:space="preserve"><value>[ MOUSE ]</value></data>
+  <data name="Message.MSI.Limit" xml:space="preserve"><value>MSI Limit:</value></data>
+  <data name="Message.MSI.Limit.must.be.absent.0.or.1" xml:space="preserve"><value>MSI Limit must be absent/0 or 1..2048.</value></data>
+  <data name="Message.MSI.Mode" xml:space="preserve"><value>MSI Mode:</value></data>
+  <data name="Message.MSI.state" xml:space="preserve"><value>MSI state:</value></data>
+  <data name="Message.MSI.status" xml:space="preserve"><value>MSI status:</value></data>
+  <data name="Message.MSISupported.requests.MSI.for.the.device.The.active" xml:space="preserve"><value>MSISupported requests MSI for the device. The active MSI / MSI-X mode depends on the hardware / driver.</value></data>
+  <data name="Message.MachineDefault" xml:space="preserve"><value>MachineDefault</value></data>
+  <data name="Message.Manual.current" xml:space="preserve"><value>Manual (current)</value></data>
+  <data name="Message.Manual.current.321f3164" xml:space="preserve"><value>Manual / current</value></data>
+  <data name="Message.Manual.custom" xml:space="preserve"><value>Manual (custom)</value></data>
+  <data name="Message.Manual.custom.c20a02da" xml:space="preserve"><value>Manual / custom</value></data>
+  <data name="Message.Mask" xml:space="preserve"><value>Mask:</value></data>
+  <data name="Message.Memory.integrity.HVCI" xml:space="preserve"><value>Memory integrity (HVCI)</value></data>
+  <data name="Message.MessageNumberLimit.sets.the.requested.message.limit.Unlimited.removes" xml:space="preserve"><value>MessageNumberLimit sets the requested message limit. Unlimited removes this limit (0 is also accepted). Hardware / Windows / the driver determine the actual message count.</value></data>
+  <data name="Message.Mice.with.a.polling.rate.from.1.to" xml:space="preserve"><value>Mice with a polling rate from 1 to 8 kHz can create a high message load.</value></data>
+  <data name="Message.Microphone" xml:space="preserve"><value>Microphone:</value></data>
+  <data name="Message.Mode" xml:space="preserve"><value>Mode:</value></data>
+  <data name="Message.Mouse.f75b476c" xml:space="preserve"><value>Mouse:</value></data>
+  <data name="Message.Mouse.Throttle" xml:space="preserve"><value>Mouse Throttle:</value></data>
+  <data name="Message.NDIS.Mode" xml:space="preserve"><value>NDIS Mode:</value></data>
+  <data name="Message.NDIS.class.key.is.unavailable" xml:space="preserve"><value>NDIS class key is unavailable</value></data>
+  <data name="Message.NDIS.class.key.was.not.found" xml:space="preserve"><value>NDIS class key was not found</value></data>
+  <data name="Message.NETWORK" xml:space="preserve"><value>NETWORK</value></data>
+  <data name="Message.NETWORK.0b779be1" xml:space="preserve"><value>[ NETWORK ]</value></data>
+  <data name="Message.NIC.ITR" xml:space="preserve"><value>NIC ITR:</value></data>
+  <data name="Message.NIC.ITR.CHECK" xml:space="preserve"><value>NIC ITR CHECK</value></data>
+  <data name="Message.NIC.ITR.DRIVER" xml:space="preserve"><value>NIC ITR DRIVER</value></data>
+  <data name="Message.NIC.ITR.was.cancelled.before.any.changes.were" xml:space="preserve"><value>NIC ITR was cancelled before any changes were made.</value></data>
+  <data name="Message.NIC.power.saving" xml:space="preserve"><value>NIC power saving:</value></data>
+  <data name="Message.NO" xml:space="preserve"><value>NO</value></data>
+  <data name="Message.NO.MATCHING.DEVICES" xml:space="preserve"><value>NO MATCHING DEVICES</value></data>
+  <data name="Message.NONE" xml:space="preserve"><value>NONE</value></data>
+  <data name="Message.NONE.87373632" xml:space="preserve"><value>[ NONE ]</value></data>
+  <data name="Message.NOT.APPLIED" xml:space="preserve"><value>NOT APPLIED</value></data>
+  <data name="Message.NVIDIA.AMD.video.driver.not.detected" xml:space="preserve"><value>NVIDIA/AMD video driver not detected.</value></data>
+  <data name="Message.Name" xml:space="preserve"><value>Name:</value></data>
+  <data name="Message.Net.type.NetAdapterCx" xml:space="preserve"><value>Net type: NetAdapterCx</value></data>
+  <data name="Message.NicItrReadFailed" xml:space="preserve"><value>NicItrReadFailed</value></data>
+  <data name="Message.NicItrWriteFailed" xml:space="preserve"><value>NicItrWriteFailed</value></data>
+  <data name="Message.No.HID.roles" xml:space="preserve"><value>No HID roles</value></data>
+  <data name="Message.No.IRQ" xml:space="preserve"><value>No IRQ</value></data>
+  <data name="Message.No.additional.details" xml:space="preserve"><value>No additional details.</value></data>
+  <data name="Message.No.backup.files.were.found.in.the.EXE" xml:space="preserve"><value>No backup files were found in the EXE folder or APPDATA.</value></data>
+  <data name="Message.No.backup.snapshot.was.found" xml:space="preserve"><value>No backup snapshot was found.</value></data>
+  <data name="Message.No.backup.was.created" xml:space="preserve"><value>No backup was created.</value></data>
+  <data name="Message.No.devices.match.this.filter" xml:space="preserve"><value>No devices match this filter.</value></data>
+  <data name="Message.No.eligible.USB.IMOD.target.for.SET" xml:space="preserve"><value>No eligible USB IMOD target for SET.</value></data>
+  <data name="Message.No.eligible.target.was.found" xml:space="preserve"><value>No eligible target was found.</value></data>
+  <data name="Message.No.registry.IMOD.startup.files.were.changed" xml:space="preserve"><value>No registry / IMOD startup files were changed.</value></data>
+  <data name="Message.No.registry.or.driver.writes.are.performed" xml:space="preserve"><value>No registry or driver writes are performed.</value></data>
+  <data name="Message.No.registry.setting" xml:space="preserve"><value>No registry setting</value></data>
+  <data name="Message.No.settings.were.changed" xml:space="preserve"><value>No settings were changed.</value></data>
+  <data name="Message.No.suitable.physical.core.was.found" xml:space="preserve"><value>No suitable physical core was found.</value></data>
+  <data name="Message.Nominal.intervals.20.ms.50.Hz.8.ms" xml:space="preserve"><value>Nominal intervals: 20 ms ≈ 50 Hz, 8 ms ≈ 125 Hz, 1 ms ≈ 1 kHz. Actual event rates also depend on input traffic and leeway.</value></data>
+  <data name="Message.None.dc937b59" xml:space="preserve"><value>None</value></data>
+  <data name="Message.Normal" xml:space="preserve"><value>Normal</value></data>
+  <data name="Message.Not.applied.3de0546b" xml:space="preserve"><value>Not applied</value></data>
+  <data name="Message.Not.configured" xml:space="preserve"><value>Not configured</value></data>
+  <data name="Message.Not.configured.no.registry.value.This.does.not" xml:space="preserve"><value>Not configured = no registry value. This does not mean the feature is disabled.</value></data>
+  <data name="Message.Not.configured.no.registry.value.this.does.not.1bb0fa1a" xml:space="preserve"><value>Not configured: no registry value; this does not mean disabled.</value></data>
+  <data name="Message.Not.found" xml:space="preserve"><value>Not found</value></data>
+  <data name="Message.Not.read" xml:space="preserve"><value>Not read</value></data>
+  <data name="Message.OK" xml:space="preserve"><value>OK</value></data>
+  <data name="Message.OPEN.BACKUP" xml:space="preserve"><value>OPEN BACKUP</value></data>
+  <data name="Message.OPEN.LOG" xml:space="preserve"><value>OPEN LOG</value></data>
+  <data name="Message.ORIGINAL" xml:space="preserve"><value>ORIGINAL</value></data>
+  <data name="Message.ORIGINAL.STATE" xml:space="preserve"><value>ORIGINAL STATE</value></data>
+  <data name="Message.ORIGINAL.STATE.is.protected.and.never.pruned" xml:space="preserve"><value>ORIGINAL STATE is protected and never pruned.</value></data>
+  <data name="Message.Off" xml:space="preserve"><value>Off</value></data>
+  <data name="Message.On" xml:space="preserve"><value>On</value></data>
+  <data name="Message.On.supported.Windows.builds.eligible.background.Raw.Input" xml:space="preserve"><value>On supported Windows builds, eligible background Raw Input listeners can be throttled.</value></data>
+  <data name="Message.One.or.more.sandbox.scenarios.failed" xml:space="preserve"><value>One or more sandbox scenarios failed.</value></data>
+  <data name="Message.OneCloseProcessor" xml:space="preserve"><value>OneCloseProcessor</value></data>
+  <data name="Message.Open.DETAILS.before.rebooting.or.applying.more.changes" xml:space="preserve"><value>Open DETAILS before rebooting or applying more changes.</value></data>
+  <data name="Message.Operation" xml:space="preserve"><value>Operation:</value></data>
+  <data name="Message.Operation.0f044feb" xml:space="preserve"><value>Operation</value></data>
+  <data name="Message.Optional.Format.0.120.1.110.2.100" xml:space="preserve"><value>Optional. Format: 0=120, 1=110, 2=100 or just 120,110,100. Empty = CPPC off in test mode.</value></data>
+  <data name="Message.Optional.fake.IRQ.count.shown.in.device.blocks" xml:space="preserve"><value>Optional fake IRQ count shown in device blocks. Empty/Auto = role-based default.</value></data>
+  <data name="Message.Optional.fake.hardware.ID.Example.PCI.VEN.10EC" xml:space="preserve"><value>Optional fake hardware ID. Example: PCI\VEN_10EC&amp;DEV_8125\TEST for NIC ITR profile preview.</value></data>
+  <data name="Message.Options" xml:space="preserve"><value>Options:</value></data>
+  <data name="Message.Original.baseline.snapshot.is.permanently.protected" xml:space="preserve"><value>Original baseline snapshot is permanently protected.</value></data>
+  <data name="Message.Original.state.backup" xml:space="preserve"><value>Original-state backup</value></data>
+  <data name="Message.P.CORES" xml:space="preserve"><value>P-CORES</value></data>
+  <data name="Message.P.CORES.23e44c04" xml:space="preserve"><value>[ P-CORES ]</value></data>
+  <data name="Message.PARTIALLY.APPLIED" xml:space="preserve"><value>PARTIALLY APPLIED</value></data>
+  <data name="Message.PROMPT.BACKUP" xml:space="preserve"><value>PROMPT: BACKUP</value></data>
+  <data name="Message.PROMPT.CONFIRM" xml:space="preserve"><value>PROMPT: CONFIRM</value></data>
+  <data name="Message.PROMPT.IMOD" xml:space="preserve"><value>PROMPT: IMOD</value></data>
+  <data name="Message.PROMPT.INFO" xml:space="preserve"><value>PROMPT: INFO</value></data>
+  <data name="Message.PROMPT.RESTORE" xml:space="preserve"><value>PROMPT: RESTORE</value></data>
+  <data name="Message.PROMPT.RESTORE.0" xml:space="preserve"><value>PROMPT: RESTORE (0)</value></data>
+  <data name="Message.Partially.applied.5.8.successful.3.skipped.or" xml:space="preserve"><value>Partially applied (5/8 successful, 3 skipped or failed).</value></data>
+  <data name="Message.Paused" xml:space="preserve"><value>Paused</value></data>
+  <data name="Message.Pausing" xml:space="preserve"><value>Pausing</value></data>
+  <data name="Message.Planning.AUTO.OPTIMIZATION" xml:space="preserve"><value>Planning AUTO-OPTIMIZATION...</value></data>
+  <data name="Message.Please.reboot.your.PC.to.finish.applying.restored" xml:space="preserve"><value>Please reboot your PC to finish applying restored settings.</value></data>
+  <data name="Message.Please.reboot.your.PC.to.finish.applying.the" xml:space="preserve"><value>Please reboot your PC to finish applying the changes.</value></data>
+  <data name="Message.Please.reboot.your.PC.to.restore.runtime.hardware" xml:space="preserve"><value>Please reboot your PC to restore runtime hardware defaults.</value></data>
+  <data name="Message.Policy" xml:space="preserve"><value>Policy:</value></data>
+  <data name="Message.Policy.RSS.base" xml:space="preserve"><value>Policy (RSS base)</value></data>
+  <data name="Message.Power" xml:space="preserve"><value>Power:</value></data>
+  <data name="Message.Power.Saving" xml:space="preserve"><value>Power Saving:</value></data>
+  <data name="Message.Preview.completed.with.unconfirmed.steps.No.real.settings" xml:space="preserve"><value>Preview completed with unconfirmed steps. No real settings were changed.</value></data>
+  <data name="Message.Preview.contains.failed.steps.No.real.settings.were" xml:space="preserve"><value>Preview contains failed steps. No real settings were changed.</value></data>
+  <data name="Message.Preview.the.production.result.dialogs.without.running.APPLY" xml:space="preserve"><value>Preview the production result dialogs without running APPLY or AUTO-OPTIMIZATION. Partial also exercises the Vulnerable Driver Blocklist confirm when the blocklist is enabled.</value></data>
+  <data name="Message.Previewing.APPLY" xml:space="preserve"><value>Previewing APPLY...</value></data>
+  <data name="Message.Priority" xml:space="preserve"><value>Priority:</value></data>
+  <data name="Message.Protection.Wi.Fi.settings.preserved.no.changes" xml:space="preserve"><value>Protection: Wi-Fi settings preserved (no changes)</value></data>
+  <data name="Message.QUEUE" xml:space="preserve"><value>QUEUE</value></data>
+  <data name="Message.Queues" xml:space="preserve"><value>Queues:</value></data>
+  <data name="Message.RAW.INPUT.THROTTLE" xml:space="preserve"><value>RAW INPUT THROTTLE</value></data>
+  <data name="Message.REFRESH.UI" xml:space="preserve"><value>REFRESH UI</value></data>
+  <data name="Message.REMOVE.SELECTED" xml:space="preserve"><value>REMOVE SELECTED</value></data>
+  <data name="Message.RESET" xml:space="preserve"><value>RESET</value></data>
+  <data name="Message.RESET.ADAPTER.SETTINGS" xml:space="preserve"><value>RESET ADAPTER SETTINGS</value></data>
+  <data name="Message.RESET.TO.REAL" xml:space="preserve"><value>RESET TO REAL</value></data>
+  <data name="Message.RESET.WINDOWS.DEFAULT" xml:space="preserve"><value>RESET WINDOWS DEFAULT</value></data>
+  <data name="Message.RESET.WINDOWS.DEFAULT.PREVIEW" xml:space="preserve"><value>RESET WINDOWS DEFAULT PREVIEW</value></data>
+  <data name="Message.RESET.WINDOWS.DEFAULT.finished.with.errors.Some.settings" xml:space="preserve"><value>RESET WINDOWS DEFAULT finished with errors. Some settings may still be active.</value></data>
+  <data name="Message.RESET.WINDOWS.DEFAULT.preview.finished.with.errors" xml:space="preserve"><value>RESET WINDOWS DEFAULT preview finished with errors.</value></data>
+  <data name="Message.RESET.WINDOWS.DEFAULT.restores.supported.settings.to.Windows" xml:space="preserve"><value>RESET WINDOWS DEFAULT restores supported settings to Windows defaults.</value></data>
+  <data name="Message.RESET.WINDOWS.DEFAULT.restores.supported.settings.to.their" xml:space="preserve"><value>RESET WINDOWS DEFAULT restores supported settings to their defaults.</value></data>
+  <data name="Message.RESET.WINDOWS.DEFAULT.was.cancelled.because.the.rollback" xml:space="preserve"><value>RESET WINDOWS DEFAULT was cancelled because the rollback backup failed.</value></data>
+  <data name="Message.RESTORE.LAST" xml:space="preserve"><value>RESTORE LAST</value></data>
+  <data name="Message.RESTORE.LAST.uses.the.newest.snapshot.RESTORE.SELECTED" xml:space="preserve"><value>RESTORE LAST uses the newest snapshot. RESTORE SELECTED uses the highlighted snapshot.</value></data>
+  <data name="Message.RESTORE.SELECTED" xml:space="preserve"><value>RESTORE SELECTED</value></data>
+  <data name="Message.RESTORE.SYSTEM.SETTINGS" xml:space="preserve"><value>RESTORE SYSTEM SETTINGS</value></data>
+  <data name="Message.RESULT.DIALOGS" xml:space="preserve"><value>RESULT DIALOGS</value></data>
+  <data name="Message.RESULT.FAILED" xml:space="preserve"><value>RESULT: FAILED</value></data>
+  <data name="Message.RESULT.PARTIAL" xml:space="preserve"><value>RESULT: PARTIAL</value></data>
+  <data name="Message.RESULT.PARTIAL.3x" xml:space="preserve"><value>RESULT: PARTIAL (3x)</value></data>
+  <data name="Message.RESULT.STRESS" xml:space="preserve"><value>RESULT: STRESS</value></data>
+  <data name="Message.RESULT.SUCCESS" xml:space="preserve"><value>RESULT: SUCCESS</value></data>
+  <data name="Message.RESULT.WARNINGS" xml:space="preserve"><value>RESULT: WARNINGS</value></data>
+  <data name="Message.RETRY" xml:space="preserve"><value>RETRY</value></data>
+  <data name="Message.RSS" xml:space="preserve"><value>RSS</value></data>
+  <data name="Message.RSS.Queues" xml:space="preserve"><value>RSS Queues:</value></data>
+  <data name="Message.RSS.power" xml:space="preserve"><value>RSS / power:</value></data>
+  <data name="Message.RSS.receive.queue.count.The.adapter.driver.sets" xml:space="preserve"><value>RSS receive queue count. The adapter / driver sets the supported range. Assignment starts at RSS Base CPU.</value></data>
+  <data name="Message.RSS.receive.queues.CPUs.IRQ.interrupt.affinity.BOTH" xml:space="preserve"><value>RSS: receive queues / CPUs. IRQ: interrupt affinity. BOTH: both settings, if RSS is supported by the adapter / driver.</value></data>
+  <data name="Message.RSS.state" xml:space="preserve"><value>RSS state:</value></data>
+  <data name="Message.RUN.CORE.MATRIX" xml:space="preserve"><value>RUN CORE MATRIX</value></data>
+  <data name="Message.RUN.SCENARIO" xml:space="preserve"><value>RUN SCENARIO</value></data>
+  <data name="Message.Raw.mouse.throttle" xml:space="preserve"><value>Raw mouse throttle</value></data>
+  <data name="Message.RawMouseThrottleDuration.HKCU.Control.Panel.Mouse" xml:space="preserve"><value>RawMouseThrottleDuration: HKCU\Control Panel\Mouse.</value></data>
+  <data name="Message.Read.failed" xml:space="preserve"><value>Read failed</value></data>
+  <data name="Message.Read.interrupt.modes.for.all.PCI.devices" xml:space="preserve"><value>Read interrupt modes for all PCI devices</value></data>
+  <data name="Message.Read.interrupt.modes.for.all.PCI.devices.including" xml:space="preserve"><value>Read interrupt modes for all PCI devices, including hidden cards. Loads DTIMOD.sys if needed. Device settings are not changed.</value></data>
+  <data name="Message.Read.only" xml:space="preserve"><value>Read-only</value></data>
+  <data name="Message.Read.the.current.interrupt.mode.Loads.DTIMOD.if" xml:space="preserve"><value>Read the current interrupt mode. Loads DTIMOD if needed. Device settings are not changed.</value></data>
+  <data name="Message.Reading.Windows.allocated.interrupt.resources.No.driver.is" xml:space="preserve"><value>Reading Windows allocated interrupt resources. No driver is loaded.</value></data>
+  <data name="Message.Reads.HKLM.System.CurrentControlSet.Control.Session.Manager.Kernel" xml:space="preserve"><value>Reads HKLM:\System\CurrentControlSet\Control\Session Manager\Kernel\ReservedCpuSets</value></data>
+  <data name="Message.Real.device.visibility" xml:space="preserve"><value>Real device visibility</value></data>
+  <data name="Message.Refresh.devices.F5.Ctrl.R" xml:space="preserve"><value>Refresh devices (F5 / Ctrl+R)</value></data>
+  <data name="Message.Refresh.interrupt.mode" xml:space="preserve"><value>Refresh interrupt mode</value></data>
+  <data name="Message.Refresh.this.device.s.interrupt.mode.Loads.DTIMOD" xml:space="preserve"><value>Refresh this device's interrupt mode. Loads DTIMOD.sys if needed. Device settings are not changed.</value></data>
+  <data name="Message.RefreshFailed" xml:space="preserve"><value>RefreshFailed</value></data>
+  <data name="Message.Refreshing.devices" xml:space="preserve"><value>Refreshing devices...</value></data>
+  <data name="Message.Registry.HKLM.System.CurrentControlSet.Control.Session.Manager.kernel" xml:space="preserve"><value>Registry: HKLM\System\CurrentControlSet\Control\Session Manager\kernel</value></data>
+  <data name="Message.Registry.configuration.is.not.a.driver.load.verdict" xml:space="preserve"><value>Registry configuration is not a driver-load verdict. Driver loading and anti-cheat compatibility are untested.</value></data>
+  <data name="Message.Registry.path.copied.to.clipboard" xml:space="preserve"><value>Registry path copied to clipboard.</value></data>
+  <data name="Message.Registry.settings.IMOD.startup.profile.from.the.backup" xml:space="preserve"><value>Registry settings / IMOD startup profile from the backup.</value></data>
+  <data name="Message.RegistryWriteDenied" xml:space="preserve"><value>RegistryWriteDenied</value></data>
+  <data name="Message.Release.regression" xml:space="preserve"><value>Release regression</value></data>
+  <data name="Message.Removing.IMOD.persistence" xml:space="preserve"><value>Removing IMOD persistence...</value></data>
+  <data name="Message.Required.while.simulated.devices.are.active" xml:space="preserve"><value>Required while simulated devices are active.</value></data>
+  <data name="Message.Reserved.CPU.Sets" xml:space="preserve"><value>Reserved CPU Sets</value></data>
+  <data name="Message.Reserved.CPU.sets.249ffa27" xml:space="preserve"><value>Reserved CPU sets</value></data>
+  <data name="Message.Reset.all.active.network.tweaks.and.restore.default" xml:space="preserve"><value>Reset all active network tweaks and restore default Windows adapter parameters?</value></data>
+  <data name="Message.Restart.Windows.to.finish.restoring.settings" xml:space="preserve"><value>Restart Windows to finish restoring settings.</value></data>
+  <data name="Message.Restore" xml:space="preserve"><value>Restore</value></data>
+  <data name="Message.Restore.did.not.finish.Any.completed.rollback.steps" xml:space="preserve"><value>Restore did not finish. Any completed rollback steps were preserved.</value></data>
+  <data name="Message.Restore.did.not.finish.Open.DETAILS.before.rebooting" xml:space="preserve"><value>Restore did not finish. Open DETAILS before rebooting.</value></data>
+  <data name="Message.Restore.settings.Ctrl.Z" xml:space="preserve"><value>Restore settings (Ctrl+Z)</value></data>
+  <data name="Message.Restore.the.selected.backup" xml:space="preserve"><value>Restore the selected backup?</value></data>
+  <data name="Message.RestoreWriteFailed" xml:space="preserve"><value>RestoreWriteFailed</value></data>
+  <data name="Message.Result.Dialog.Gallery" xml:space="preserve"><value>Result Dialog Gallery</value></data>
+  <data name="Message.Right.click.the.EXE.and.choose.Run.as" xml:space="preserve"><value>Right-click the EXE and choose 'Run as administrator'.</value></data>
+  <data name="Message.Role.mode.applies.values.to.the.detected.interrupter" xml:space="preserve"><value>Role mode applies values to the detected interrupter for each USB role.</value></data>
+  <data name="Message.RollbackFailed" xml:space="preserve"><value>RollbackFailed</value></data>
+  <data name="Message.Run.DEVICE.TWEAKER.as.administrator.to.apply.settings" xml:space="preserve"><value>Run DEVICE TWEAKER as administrator to apply settings.
+
+Right-click the EXE and choose 'Run as administrator'.</value></data>
+  <data name="Message.Run.DEVICE.TWEAKER.as.administrator.to.apply.settings.0ee6ea2f" xml:space="preserve"><value>Run DEVICE TWEAKER as administrator to apply settings.</value></data>
+  <data name="Message.Running" xml:space="preserve"><value>Running</value></data>
+  <data name="Message.Running.AUTO.OPTIMIZATION" xml:space="preserve"><value>Running AUTO-OPTIMIZATION...</value></data>
+  <data name="Message.SANDBOX.MATRIX" xml:space="preserve"><value>SANDBOX MATRIX</value></data>
+  <data name="Message.SAVE.JSON" xml:space="preserve"><value>SAVE JSON</value></data>
+  <data name="Message.SCENARIO.LAB" xml:space="preserve"><value>SCENARIO LAB</value></data>
+  <data name="Message.SKIP" xml:space="preserve"><value>SKIP</value></data>
+  <data name="Message.SKIP.continues.auto.optimization.without.USB.IMOD" xml:space="preserve"><value>SKIP continues auto-optimization without USB IMOD.</value></data>
+  <data name="Message.SKIP.do.not.create.an.additional.pre.auto" xml:space="preserve"><value>SKIP = do not create an additional pre-auto backup.</value></data>
+  <data name="Message.SKIPPED" xml:space="preserve"><value>SKIPPED</value></data>
+  <data name="Message.SMT.status" xml:space="preserve"><value>SMT status:</value></data>
+  <data name="Message.STORAGE" xml:space="preserve"><value>STORAGE</value></data>
+  <data name="Message.STORAGE.86ce8b07" xml:space="preserve"><value>[ STORAGE ]</value></data>
+  <data name="Message.SUCCESS" xml:space="preserve"><value>SUCCESS</value></data>
+  <data name="Message.SYSTEM.CHECK" xml:space="preserve"><value>SYSTEM CHECK +</value></data>
+  <data name="Message.SYSTEM.CHECK.62a3c379" xml:space="preserve"><value>SYSTEM CHECK</value></data>
+  <data name="Message.SYSTEM.CHECK.Windows.settings.anti.cheat.services" xml:space="preserve"><value>SYSTEM CHECK: Windows settings / anti-cheat services.</value></data>
+  <data name="Message.SYSTEM.CHECK.a9720060" xml:space="preserve"><value>SYSTEM CHECK -</value></data>
+  <data name="Message.SYSTEM.CHECK.shows.the.detected.Windows.settings.and" xml:space="preserve"><value>SYSTEM CHECK shows the detected Windows settings and anti-cheat services.</value></data>
+  <data name="Message.SafeReset" xml:space="preserve"><value>SafeReset</value></data>
+  <data name="Message.Same.idea.as.Device.Manager.Power.Management.Allow" xml:space="preserve"><value>Same idea as Device Manager → Power Management → 'Allow the computer to turn off this device to save power'.</value></data>
+  <data name="Message.Sandbox" xml:space="preserve"><value>Sandbox</value></data>
+  <data name="Message.Sandbox.dry.run.is.ON" xml:space="preserve"><value>Sandbox dry-run is ON.</value></data>
+  <data name="Message.Sandbox.dry.run.is.ON.no.registry.changes" xml:space="preserve"><value>Sandbox dry-run is ON (no registry changes).</value></data>
+  <data name="Message.Sandbox.dry.run.no.registry.writes" xml:space="preserve"><value>Sandbox dry-run (no registry writes)</value></data>
+  <data name="Message.Sandbox.matrix.passed" xml:space="preserve"><value>Sandbox matrix passed.</value></data>
+  <data name="Message.Scanning.devices" xml:space="preserve"><value>Scanning devices...</value></data>
+  <data name="Message.Scenario.Lab.e34739b0" xml:space="preserve"><value>Scenario Lab</value></data>
+  <data name="Message.Scenario.could.not.be.loaded" xml:space="preserve"><value>Scenario could not be loaded.</value></data>
+  <data name="Message.Scenario.name" xml:space="preserve"><value>Scenario name:</value></data>
+  <data name="Message.See.DETAILS.and.LOGS.for.the.error" xml:space="preserve"><value>See DETAILS and LOGS for the error.</value></data>
+  <data name="Message.See.DETAILS.for.applied.skipped.settings.and.their" xml:space="preserve"><value>See DETAILS for applied / skipped settings and their reasons.</value></data>
+  <data name="Message.See.the.log.for.details" xml:space="preserve"><value>See the log for details.</value></data>
+  <data name="Message.Select.CCD0.cores.only" xml:space="preserve"><value>Select CCD0 cores only</value></data>
+  <data name="Message.Select.a.backup.to.restore.settings" xml:space="preserve"><value>Select a backup to restore settings:</value></data>
+  <data name="Message.Select.a.test.device.first" xml:space="preserve"><value>Select a test device first.</value></data>
+  <data name="Message.Select.all.logical.cores" xml:space="preserve"><value>Select all logical cores</value></data>
+  <data name="Message.Select.physical.P.cores.only" xml:space="preserve"><value>Select physical P-cores only</value></data>
+  <data name="Message.Selected.settings.were.applied.and.saved" xml:space="preserve"><value>Selected settings were applied and saved.</value></data>
+  <data name="Message.Service.not.installed" xml:space="preserve"><value>Service not installed</value></data>
+  <data name="Message.Service.running" xml:space="preserve"><value>Service running</value></data>
+  <data name="Message.Service.stopped" xml:space="preserve"><value>Service stopped</value></data>
+  <data name="Message.Services" xml:space="preserve"><value>Services</value></data>
+  <data name="Message.Settings.were.restored.Please.reboot.your.PC" xml:space="preserve"><value>Settings were restored. Please reboot your PC.</value></data>
+  <data name="Message.Show.hide.IMOD.values.by.device.and.interrupter" xml:space="preserve"><value>Show / hide IMOD values by device and interrupter.</value></data>
+  <data name="Message.Show.test.devices.only" xml:space="preserve"><value>Show test devices only</value></data>
+  <data name="Message.Simulated.Windows.allocation" xml:space="preserve"><value>Simulated Windows allocation. </value></data>
+  <data name="Message.Simulated.interrupt.mode.No.hardware.was.queried" xml:space="preserve"><value>Simulated interrupt mode. No hardware was queried.</value></data>
+  <data name="Message.Skipped.12698ce1" xml:space="preserve"><value>Skipped</value></data>
+  <data name="Message.Skipping.USB.IMOD" xml:space="preserve"><value>Skipping USB IMOD...</value></data>
+  <data name="Message.Skipping.USB.selective.suspend" xml:space="preserve"><value>Skipping USB selective suspend...</value></data>
+  <data name="Message.Skipping.this.copy.keeps.the.original.settings.backup" xml:space="preserve"><value>Skipping this copy keeps the original-settings backup.</value></data>
+  <data name="Message.Some.background.listeners.can.bypass.this.limit" xml:space="preserve"><value>Some background listeners can bypass this limit.</value></data>
+  <data name="Message.Some.changes.may.already.have.been.applied" xml:space="preserve"><value>Some changes may already have been applied.</value></data>
+  <data name="Message.Some.power.settings.require.a.device.restart" xml:space="preserve"><value>Some power settings require a device restart.</value></data>
+  <data name="Message.Some.restore.steps.may.already.have.run" xml:space="preserve"><value>Some restore steps may already have run.</value></data>
+  <data name="Message.Some.system.checks.are.unavailable" xml:space="preserve"><value>Some system checks are unavailable.</value></data>
+  <data name="Message.Some.system.checks.are.unavailable.See.details" xml:space="preserve"><value>Some system checks are unavailable. See details.</value></data>
+  <data name="Message.Source.Windows.allocated.resources.Line.based.interrupt.resources" xml:space="preserve"><value>Source: Windows allocated resources. Line-based interrupt resources allocated. PCI Enable bits were not read.</value></data>
+  <data name="Message.Source.Windows.allocated.resources.Message.interrupt.allocated.hardware" xml:space="preserve"><value>Source: Windows allocated resources. Message interrupt allocated; hardware supports MSI, not MSI-X. PCI Enable bits were not read.</value></data>
+  <data name="Message.Source.Windows.allocated.resources.Message.interrupt.allocated.hardware.68f3e6f1" xml:space="preserve"><value>Source: Windows allocated resources. Message interrupt allocated; hardware supports MSI-X, not MSI. PCI Enable bits were not read.</value></data>
+  <data name="Message.Source.Windows.allocated.resources.Message.interrupts.allocated.hardware" xml:space="preserve"><value>Source: Windows allocated resources. Message interrupts allocated; hardware capabilities unavailable. PCI Enable bits were not read.</value></data>
+  <data name="Message.Source.Windows.allocated.resources.No.interrupt.resources.allocated" xml:space="preserve"><value>Source: Windows allocated resources. No interrupt resources allocated. PCI Enable bits were not read.</value></data>
+  <data name="Message.Source.Windows.allocated.resources.One.descriptor.with.multiple" xml:space="preserve"><value>Source: Windows allocated resources. One descriptor with multiple messages allocated. PCI Enable bits were not read.</value></data>
+  <data name="Message.Source.Windows.allocated.resources.One.message.allocated.hardware" xml:space="preserve"><value>Source: Windows allocated resources. One message allocated; hardware supports MSI and MSI-X. These resources cannot distinguish MSI from MSI-X. PCI Enable bits were not read.</value></data>
+  <data name="Message.Source.Windows.allocated.resources.Separate.message.descriptors.allocated" xml:space="preserve"><value>Source: Windows allocated resources. Separate message descriptors allocated. PCI Enable bits were not read.</value></data>
+  <data name="Message.Speakers" xml:space="preserve"><value>Speakers</value></data>
+  <data name="Message.SpecifiedProcessors" xml:space="preserve"><value>SpecifiedProcessors</value></data>
+  <data name="Message.SpreadMessagesAcrossAllProcessors" xml:space="preserve"><value>SpreadMessagesAcrossAllProcessors</value></data>
+  <data name="Message.Starting" xml:space="preserve"><value>Starting</value></data>
+  <data name="Message.Startup.script.removed.Reboot.your.PC.to.unload" xml:space="preserve"><value>Startup script removed. Reboot your PC to unload DTIMOD.sys from memory if it was loaded.</value></data>
+  <data name="Message.State.unavailable" xml:space="preserve"><value>State unavailable</value></data>
+  <data name="Message.Stopped" xml:space="preserve"><value>Stopped</value></data>
+  <data name="Message.Stopping" xml:space="preserve"><value>Stopping</value></data>
+  <data name="Message.Storage.affinity.is.managed.by.Windows.the.storage" xml:space="preserve"><value>Storage affinity is managed by Windows / the storage driver. Editing it here is disabled.</value></data>
+  <data name="Message.Storage.tag" xml:space="preserve"><value>Storage tag:</value></data>
+  <data name="Message.Stress.preview.verify.clipping.wrapping.scrolling.and.DETAILS" xml:space="preserve"><value>Stress preview: verify clipping, wrapping, scrolling and DETAILS.</value></data>
+  <data name="Message.Supported.IMOD.input" xml:space="preserve"><value>Supported IMOD input:</value></data>
+  <data name="Message.Supported.tweaks.were.reset" xml:space="preserve"><value>Supported tweaks were reset.</value></data>
+  <data name="Message.System.preset" xml:space="preserve"><value>System preset:</value></data>
+  <data name="Message.TEST.ADMIN" xml:space="preserve"><value>TEST ADMIN</value></data>
+  <data name="Message.TEST.DEVICE.no.registry.writes" xml:space="preserve"><value>TEST DEVICE (no registry writes)</value></data>
+  <data name="Message.TEST.MODE.INFO" xml:space="preserve"><value>TEST MODE INFO</value></data>
+  <data name="Message.Test.CPU.Topology" xml:space="preserve"><value>Test CPU Topology</value></data>
+  <data name="Message.Test.CPU.mode.ACTIVE" xml:space="preserve"><value>Test CPU mode: ACTIVE</value></data>
+  <data name="Message.Test.CPU.mode.OFF" xml:space="preserve"><value>Test CPU mode: OFF</value></data>
+  <data name="Message.Test.Devices" xml:space="preserve"><value>Test Devices</value></data>
+  <data name="Message.Test.options" xml:space="preserve"><value>Test options</value></data>
+  <data name="Message.The.EXE.folder.keeps.the.backup.next.to" xml:space="preserve"><value>The EXE folder keeps the backup next to the program.</value></data>
+  <data name="Message.The.backup.could.not.be.created.No.changes" xml:space="preserve"><value>The backup could not be created. No changes were made.</value></data>
+  <data name="Message.The.backup.could.not.be.deleted.See.LOGS" xml:space="preserve"><value>The backup could not be deleted. See LOGS for details.</value></data>
+  <data name="Message.The.backup.file.could.not.be.created" xml:space="preserve"><value>The backup file could not be created.</value></data>
+  <data name="Message.The.cause.of.rejection.is.unconfirmed.Other.policies" xml:space="preserve"><value>The cause of rejection is unconfirmed. Other policies or anti-cheats may still block DTIMOD.</value></data>
+  <data name="Message.The.change.was.included.in.the.July.2023" xml:space="preserve"><value>The change was included in the July 2023 update KB5028185.</value></data>
+  <data name="Message.The.driver.check.did.not.complete" xml:space="preserve"><value>The driver check did not complete.</value></data>
+  <data name="Message.The.operation.stopped.before.any.changes.were.made" xml:space="preserve"><value>The operation stopped before any changes were made.</value></data>
+  <data name="Message.The.operation.was.cancelled" xml:space="preserve"><value>The operation was cancelled.</value></data>
+  <data name="Message.The.original.settings.backup.BASELINE.is.protected.from" xml:space="preserve"><value>The original-settings backup (BASELINE) is protected from deletion.</value></data>
+  <data name="Message.The.program.can.continue.but.the.log.may" xml:space="preserve"><value>The program can continue, but the log may be incomplete. Include this message when reporting an issue.</value></data>
+  <data name="Message.The.protected.ORIGINAL.STATE.snapshot.is.always.retained" xml:space="preserve"><value>The protected ORIGINAL STATE snapshot is always retained.</value></data>
+  <data name="Message.The.register.value.could.not.be.verified" xml:space="preserve"><value>The register value could not be verified.</value></data>
+  <data name="Message.The.remaining.results.are.available.in.DETAILS" xml:space="preserve"><value>The remaining results are available in DETAILS.</value></data>
+  <data name="Message.The.selected.backup.is.invalid" xml:space="preserve"><value>The selected backup is invalid.</value></data>
+  <data name="Message.The.setting.could.not.be.updated" xml:space="preserve"><value>The setting could not be updated.</value></data>
+  <data name="Message.The.setting.was.not.changed" xml:space="preserve"><value>The setting was not changed.</value></data>
+  <data name="Message.The.setting.writes.RawMouseThrottleDuration.to.HKCU.Control.Panel" xml:space="preserve"><value>The setting writes RawMouseThrottleDuration to HKCU\Control Panel\Mouse.</value></data>
+  <data name="Message.These.checks.do.not.test.driver.loading.A" xml:space="preserve"><value>These checks do not test driver loading. A missing registry value does not mean the protection is disabled.</value></data>
+  <data name="Message.They.may.conflict.with.DTIMOD.sys" xml:space="preserve"><value>They may conflict with DTIMOD.sys.</value></data>
+  <data name="Message.This.check.reads.settings.and.service.status.It" xml:space="preserve"><value>This check reads settings and service status. It does not test DTIMOD.sys loading.</value></data>
+  <data name="Message.This.developer.build.cannot.apply.settings" xml:space="preserve"><value>This developer build cannot apply settings.</value></data>
+  <data name="Message.This.developer.build.cannot.reset.Windows.settings" xml:space="preserve"><value>This developer build cannot reset Windows settings.</value></data>
+  <data name="Message.This.device.has.no.PCI.interrupt.mode" xml:space="preserve"><value>This device has no PCI interrupt mode.</value></data>
+  <data name="Message.This.does.not.identify.the.cause.of.the" xml:space="preserve"><value>This does not identify the cause of the rejection. Other policies may still prevent loading; anti-cheat compatibility is not confirmed.</value></data>
+  <data name="Message.This.estimate.is.based.on.the.controller.PCI" xml:space="preserve"><value>This estimate is based on the controller PCI ID.</value></data>
+  <data name="Message.This.setting.does.not.target.foreground.apps" xml:space="preserve"><value>This setting does not target foreground apps.</value></data>
+  <data name="Message.This.will.re.enable.interrupt.moderation.and.standard" xml:space="preserve"><value>This will re-enable interrupt moderation and standard RSS ring buffers.</value></data>
+  <data name="Message.Throttling.and.coalescing.can.reduce.the.message.load" xml:space="preserve"><value>Throttling and coalescing can reduce the message load from background listeners.</value></data>
+  <data name="Message.Tip.full.PC.presets.are.above.This.section" xml:space="preserve"><value>Tip: full PC presets are above. This section is for adding/removing individual fake devices and temporarily hiding real devices.</value></data>
+  <data name="Message.Total.logical.processors" xml:space="preserve"><value>Total logical processors:</value></data>
+  <data name="Message.True" xml:space="preserve"><value>True</value></data>
+  <data name="Message.Type.NVMe.storage.controller" xml:space="preserve"><value>Type: NVMe storage controller</value></data>
+  <data name="Message.Type.SATA.AHCI.controller" xml:space="preserve"><value>Type: SATA/AHCI controller</value></data>
+  <data name="Message.Type.Storage.controller" xml:space="preserve"><value>Type: Storage controller</value></data>
+  <data name="Message.UNHIDE.SELECTED" xml:space="preserve"><value>UNHIDE SELECTED</value></data>
+  <data name="Message.UPDATE.SELECTED" xml:space="preserve"><value>UPDATE SELECTED</value></data>
+  <data name="Message.USB" xml:space="preserve"><value>[ USB ]</value></data>
+  <data name="Message.USB.IMOD" xml:space="preserve"><value>USB IMOD</value></data>
+  <data name="Message.USB.IMOD.CHECK" xml:space="preserve"><value>USB IMOD CHECK</value></data>
+  <data name="Message.USB.IMOD.DELETE" xml:space="preserve"><value>USB IMOD DELETE</value></data>
+  <data name="Message.USB.IMOD.TUNING" xml:space="preserve"><value>USB IMOD TUNING</value></data>
+  <data name="Message.USB.IMOD.completed.with.warnings.or.failed.steps" xml:space="preserve"><value>USB IMOD completed with warnings or failed steps.</value></data>
+  <data name="Message.USB.IMOD.is.active.for.this.session.but" xml:space="preserve"><value>USB IMOD is active for this session, but startup persistence was not saved.</value></data>
+  <data name="Message.USB.IMOD.tuning.is.available.for.detected.XHCI" xml:space="preserve"><value>USB IMOD tuning is available for detected XHCI controller(s).</value></data>
+  <data name="Message.USB.IMOD.tuning.is.available.for.detected.XHCI.bbc35c58" xml:space="preserve"><value>USB IMOD tuning is available for detected XHCI controller(s).
+
+DTIMOD can be blocked by Vulnerable Driver Blocklist, Windows driver signature protection, antivirus, or anti-cheats.
+
+Apply it during AUTO-OPTIMIZATION?</value></data>
+  <data name="Message.USB.IMOD.tuning.is.available.for.detected.XHCI.e6f54560" xml:space="preserve"><value>USB IMOD tuning is available for detected XHCI controller(s).
+
+DTIMOD driver access can be blocked by Windows security features, antivirus software, or anti-cheats.
+
+Apply it during AUTO-OPTIMIZATION?</value></data>
+  <data name="Message.USB.IMOD.was.applied.with.warnings" xml:space="preserve"><value>USB IMOD was applied with warnings.</value></data>
+  <data name="Message.USB.IMOD.was.blocked.by.Vulnerable.Driver.Blocklist" xml:space="preserve"><value>USB IMOD was blocked by Vulnerable Driver Blocklist.
+
+Disable Vulnerable Driver Blocklist so DTIMOD can load after reboot?
+
+Warning: this can break Faceit, The Finals, and similar anti-cheats.
+After reboot, run CHECK or AUTO-OPTIMIZATION again to apply IMOD.</value></data>
+  <data name="Message.USB.IMOD.was.not.applied" xml:space="preserve"><value>USB IMOD was not applied.</value></data>
+  <data name="Message.USB.POWER" xml:space="preserve"><value>USB POWER</value></data>
+  <data name="Message.USB.Selective.Suspend" xml:space="preserve"><value>USB Selective Suspend:</value></data>
+  <data name="Message.USB.Selective.Suspend.power.plan" xml:space="preserve"><value>USB Selective Suspend power plan</value></data>
+  <data name="Message.USB.has.devices" xml:space="preserve"><value>USB has devices</value></data>
+  <data name="Message.USB.hubs.connected.downstream.are.not.included" xml:space="preserve"><value>USB hubs connected downstream are not included.</value></data>
+  <data name="Message.USB.roles" xml:space="preserve"><value>USB roles:</value></data>
+  <data name="Message.Unavailable" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="Message.Unchecked.Disabled.Applied.with.APPLY.AUTO.A.reboot" xml:space="preserve"><value>Unchecked = Disabled. Applied with APPLY / AUTO. A reboot may be required.</value></data>
+  <data name="Message.Unchecked.sets.PnPCapabilities.bit.0x08.do.not.turn" xml:space="preserve"><value>Unchecked sets PnPCapabilities bit 0x08 (do-not-turn-off) and clears MSPower_DeviceEnable on the wired NIC.</value></data>
+  <data name="Message.Undefined" xml:space="preserve"><value>Undefined</value></data>
+  <data name="Message.Unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="Message.Unknown.DTIMOD.driver.load.error" xml:space="preserve"><value>Unknown DTIMOD driver load error.</value></data>
+  <data name="Message.Updating.IMOD.IRQ.display" xml:space="preserve"><value>Updating IMOD / IRQ display...</value></data>
+  <data name="Message.Updating.IMOD.display" xml:space="preserve"><value>Updating IMOD display...</value></data>
+  <data name="Message.Updating.IRQ.counts" xml:space="preserve"><value>Updating IRQ counts...</value></data>
+  <data name="Message.UsbPowerWriteFailed" xml:space="preserve"><value>UsbPowerWriteFailed</value></data>
+  <data name="Message.VALUE" xml:space="preserve"><value>VALUE</value></data>
+  <data name="Message.VULNERABLE.DRIVER.BLOCKLIST" xml:space="preserve"><value>VULNERABLE DRIVER BLOCKLIST</value></data>
+  <data name="Message.Value.ReservedCpuSets.not.set" xml:space="preserve"><value>Value: ReservedCpuSets = not set</value></data>
+  <data name="Message.Vanguard.components.found.A.conflict.with.DTIMOD.KDU" xml:space="preserve"><value>Vanguard components found. A conflict with DTIMOD/KDU is possible.</value></data>
+  <data name="Message.Vanguard.components.found.Compatibility.with.DTIMOD.KDU.is" xml:space="preserve"><value>Vanguard components found. Compatibility with DTIMOD/KDU is untested; a conflict is possible.</value></data>
+  <data name="Message.Vanguard.detected" xml:space="preserve"><value>Vanguard detected.</value></data>
+  <data name="Message.Visible.real.devices" xml:space="preserve"><value>Visible real devices</value></data>
+  <data name="Message.Vulnerable.Driver.Blocklist.was.disabled.Please.reboot.your" xml:space="preserve"><value>Vulnerable Driver Blocklist was disabled.
+
+Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IMOD.</value></data>
+  <data name="Message.Vulnerable.driver.blocklist.2f4a22f8" xml:space="preserve"><value>Vulnerable driver blocklist</value></data>
+  <data name="Message.WARNING" xml:space="preserve"><value>WARNING</value></data>
+  <data name="Message.Warning.e981ddae" xml:space="preserve"><value>Warning</value></data>
+  <data name="Message.Where.should.DEVICE.TWEAKER.save.the.pre.auto" xml:space="preserve"><value>Where should DEVICE TWEAKER save the pre-auto backup?</value></data>
+  <data name="Message.Where.should.the.additional.backup.be.saved" xml:space="preserve"><value>Where should the additional backup be saved?</value></data>
+  <data name="Message.Wi.Fi.settings.are.preserved.by.DEVICE.TWEAKER" xml:space="preserve"><value>Wi-Fi settings are preserved by DEVICE TWEAKER.</value></data>
+  <data name="Message.Windows.CPU.topology.APIs.failed.no.affinity.changes" xml:space="preserve"><value>Windows CPU topology APIs failed; no affinity changes were applied</value></data>
+  <data name="Message.Windows.Default" xml:space="preserve"><value>Windows Default</value></data>
+  <data name="Message.Windows.Defender.blocked.DTIMOD" xml:space="preserve"><value>Windows Defender blocked DTIMOD.</value></data>
+  <data name="Message.Windows.Defender.blocked.DTIMOD.USB.IMOD.was.not" xml:space="preserve"><value>Windows Defender blocked DTIMOD. USB IMOD was not changed.</value></data>
+  <data name="Message.Windows.blocked.DTIMOD.via.Vulnerable.Driver.Blocklist" xml:space="preserve"><value>Windows blocked DTIMOD via Vulnerable Driver Blocklist.</value></data>
+  <data name="Message.Windows.blocked.DTIMOD.via.Vulnerable.Driver.Blocklist.USB" xml:space="preserve"><value>Windows blocked DTIMOD via Vulnerable Driver Blocklist. USB IMOD was not changed.</value></data>
+  <data name="Message.Windows.has.allocated.no.interrupt.resources.to.this" xml:space="preserve"><value>Windows has allocated no interrupt resources to this device.</value></data>
+  <data name="Message.Windows.rejected.DTIMOD.Vulnerable.Driver.Blocklist.is.configured" xml:space="preserve"><value>Windows rejected DTIMOD. Vulnerable Driver Blocklist is configured as enabled.</value></data>
+  <data name="Message.Windows.rejected.DTIMOD.Vulnerable.Driver.Blocklist.is.enabled" xml:space="preserve"><value>Windows rejected DTIMOD. Vulnerable Driver Blocklist is enabled in the registry.</value></data>
+  <data name="Message.Windows.rejected.DTIMOD.due.to.code.integrity.signature" xml:space="preserve"><value>Windows rejected DTIMOD due to code integrity/signature checks. USB IMOD was not changed.</value></data>
+  <data name="Message.Windows.rejected.DTIMOD.due.to.code.integrity.signature.d38bd65b" xml:space="preserve"><value>Windows rejected DTIMOD due to code integrity/signature checks.</value></data>
+  <data name="Message.Windows.settings" xml:space="preserve"><value>Windows settings</value></data>
+  <data name="Message.Windows.settings.may.prevent.DTIMOD.loading.See.the" xml:space="preserve"><value>Windows settings may prevent DTIMOD loading. See the system check for details.</value></data>
+  <data name="Message.Windows.settings.may.prevent.DTIMOD.sys.from.loading" xml:space="preserve"><value>Windows settings may prevent DTIMOD.sys from loading.</value></data>
+  <data name="Message.Windows.settings.service.status.This.check.does.not" xml:space="preserve"><value>Windows settings / service status. This check does not test driver loading or anti-cheat compatibility.</value></data>
+  <data name="Message.WmiTimeout" xml:space="preserve"><value>WmiTimeout</value></data>
+  <data name="Message.XHCI.one.value.for.all.controller.interrupters.Device" xml:space="preserve"><value>XHCI: one value for all controller interrupters. Device mapping: values by device role; uses one controller-wide value if mapping is uncertain. Interrupter: values by index.</value></data>
+  <data name="Message.YES" xml:space="preserve"><value>YES</value></data>
+  <data name="Message.You.can.skip.this.copy.The.original.settings" xml:space="preserve"><value>You can skip this copy. The original-settings backup is kept either way.</value></data>
+  <data name="Message.absent" xml:space="preserve"><value>absent</value></data>
+  <data name="Message.admin.required" xml:space="preserve"><value>admin required</value></data>
+  <data name="Message.affinity.masks.not.supported.on.SSD.HDD" xml:space="preserve"><value>(affinity masks not supported on SSD/HDD)</value></data>
+  <data name="Message.applying" xml:space="preserve"><value>applying...</value></data>
+  <data name="Message.backup.54d00d86" xml:space="preserve"><value>backup</value></data>
+  <data name="Message.backup.could.not.be.created.changes.were.not" xml:space="preserve"><value>backup could not be created; changes were not applied</value></data>
+  <data name="Message.backup.could.not.be.created.no.settings.were" xml:space="preserve"><value>backup could not be created; no settings were changed</value></data>
+  <data name="Message.backup.failed" xml:space="preserve"><value>backup failed</value></data>
+  <data name="Message.current.driver.check.skipped.test" xml:space="preserve"><value>current: driver check skipped (test)</value></data>
+  <data name="Message.current.loading.driver" xml:space="preserve"><value>current: loading driver...</value></data>
+  <data name="Message.current.read.successfully" xml:space="preserve"><value>current: read successfully</value></data>
+  <data name="Message.current.reading" xml:space="preserve"><value>current: reading...</value></data>
+  <data name="Message.current.test.profile" xml:space="preserve"><value>current: test profile</value></data>
+  <data name="Message.current.unavailable" xml:space="preserve"><value>current: unavailable</value></data>
+  <data name="Message.current.unavailable.Windows.11.22H2" xml:space="preserve"><value>current: unavailable (Windows 11 22H2+)</value></data>
+  <data name="Message.current.values.shown.below" xml:space="preserve"><value>current: values shown below</value></data>
+  <data name="Message.current.varies.by.interrupter" xml:space="preserve"><value>current: varies by interrupter</value></data>
+  <data name="Message.detected.USB.device.roles" xml:space="preserve"><value>detected USB device roles</value></data>
+  <data name="Message.devices.driver.unavailable" xml:space="preserve"><value>devices: driver unavailable</value></data>
+  <data name="Message.devices.invalid.IMOD.input" xml:space="preserve"><value>devices: invalid IMOD input</value></data>
+  <data name="Message.devices.reading" xml:space="preserve"><value>devices: reading...</value></data>
+  <data name="Message.devices.unavailable" xml:space="preserve"><value>devices: unavailable</value></data>
+  <data name="Message.driver.blocked" xml:space="preserve"><value>driver blocked</value></data>
+  <data name="Message.driver.check.skipped.test" xml:space="preserve"><value>driver check skipped (test)</value></data>
+  <data name="Message.driver.default" xml:space="preserve"><value>(driver default)</value></data>
+  <data name="Message.driver.load.failed" xml:space="preserve"><value>driver load failed</value></data>
+  <data name="Message.driver.not.loaded.press.CHECK" xml:space="preserve"><value>driver not loaded — press CHECK</value></data>
+  <data name="Message.driver.unavailable" xml:space="preserve"><value>driver unavailable</value></data>
+  <data name="Message.failed.to.clear.ReservedCpuSets.in.registry" xml:space="preserve"><value>failed to clear ReservedCpuSets in registry</value></data>
+  <data name="Message.failed.to.write.the.staged.ReservedCpuSets.value" xml:space="preserve"><value>failed to write the staged ReservedCpuSets value</value></data>
+  <data name="Message.input.hex.list.roles" xml:space="preserve"><value>input: hex / list / roles</value></data>
+  <data name="Message.invalid.input" xml:space="preserve"><value>invalid input</value></data>
+  <data name="Message.kernel.CI.blocked" xml:space="preserve"><value>kernel CI blocked</value></data>
+  <data name="Message.likely.Line" xml:space="preserve"><value>likely Line</value></data>
+  <data name="Message.likely.MSI.MSI.X" xml:space="preserve"><value>likely MSI/MSI-X</value></data>
+  <data name="Message.loading.driver" xml:space="preserve"><value>loading driver...</value></data>
+  <data name="Message.no.IRQ.a56d0ff8" xml:space="preserve"><value>no IRQ</value></data>
+  <data name="Message.no.devices.to.optimize" xml:space="preserve"><value>no devices to optimize</value></data>
+  <data name="Message.no.performance.P.cores.available.for.affinity.plan" xml:space="preserve"><value>no performance P-cores available for affinity plan</value></data>
+  <data name="Message.not.PCI" xml:space="preserve"><value>not PCI</value></data>
+  <data name="Message.not.read.a1ff022a" xml:space="preserve"><value>not read</value></data>
+  <data name="Message.not.set" xml:space="preserve"><value>not set</value></data>
+  <data name="Message.off.b4dc66dd" xml:space="preserve"><value>off</value></data>
+  <data name="Message.on.b8d31e85" xml:space="preserve"><value>on</value></data>
+  <data name="Message.pre.apply" xml:space="preserve"><value>pre-apply</value></data>
+  <data name="Message.pre.auto" xml:space="preserve"><value>pre-auto</value></data>
+  <data name="Message.pre.imod" xml:space="preserve"><value>pre-imod</value></data>
+  <data name="Message.pre.nic.itr" xml:space="preserve"><value>pre-nic-itr</value></data>
+  <data name="Message.pre.nic.itr.save" xml:space="preserve"><value>pre-nic-itr-save</value></data>
+  <data name="Message.pre.release" xml:space="preserve"><value>pre-release</value></data>
+  <data name="Message.pre.reset" xml:space="preserve"><value>pre-reset</value></data>
+  <data name="Message.pre.reset.tweaks" xml:space="preserve"><value>pre-reset-tweaks</value></data>
+  <data name="Message.pre.restore" xml:space="preserve"><value>pre-restore</value></data>
+  <data name="Message.preserve" xml:space="preserve"><value>preserve</value></data>
+  <data name="Message.read.failed.8b7a2d80" xml:space="preserve"><value>read failed</value></data>
+  <data name="Message.read.successfully" xml:space="preserve"><value>read successfully</value></data>
+  <data name="Message.reading" xml:space="preserve"><value>reading...</value></data>
+  <data name="Message.refresh" xml:space="preserve"><value>refresh</value></data>
+  <data name="Message.registry.key.is.unavailable" xml:space="preserve"><value>registry key is unavailable</value></data>
+  <data name="Message.save.failed" xml:space="preserve"><value>save failed</value></data>
+  <data name="Message.saved.driver.moderation.unchanged" xml:space="preserve"><value>saved; driver moderation unchanged</value></data>
+  <data name="Message.saved.for.startup" xml:space="preserve"><value>saved for startup</value></data>
+  <data name="Message.signature.blocked" xml:space="preserve"><value>signature blocked</value></data>
+  <data name="Message.single.value.for.controller" xml:space="preserve"><value>single value for controller</value></data>
+  <data name="Message.test.preview" xml:space="preserve"><value>test preview</value></data>
+  <data name="Message.test.profile" xml:space="preserve"><value>test profile</value></data>
+  <data name="Message.the.initial.recovery.snapshot.could.not.be.created" xml:space="preserve"><value>the initial recovery snapshot could not be created; changes were not applied</value></data>
+  <data name="Message.time.reading" xml:space="preserve"><value>time: reading...</value></data>
+  <data name="Message.time.unavailable" xml:space="preserve"><value>time: unavailable</value></data>
+  <data name="Message.unavailable.ba691ba0" xml:space="preserve"><value>unavailable</value></data>
+  <data name="Message.unknown.b23a6a84" xml:space="preserve"><value>unknown</value></data>
+  <data name="Message.unknown.registry.disabled" xml:space="preserve"><value>unknown (registry disabled)</value></data>
+  <data name="Message.unknown.registry.enabled" xml:space="preserve"><value>unknown (registry enabled)</value></data>
+  <data name="Message.unlocked" xml:space="preserve"><value>unlocked</value></data>
+  <data name="Message.unset" xml:space="preserve"><value>unset</value></data>
+  <data name="Message.unsupported" xml:space="preserve"><value>unsupported</value></data>
+  <data name="Message.values.by.interrupter.index" xml:space="preserve"><value>values by interrupter index</value></data>
+  <data name="Message.varies.by.interrupter" xml:space="preserve"><value>varies by interrupter</value></data>
+  <data name="Message.write.failed" xml:space="preserve"><value>write failed</value></data>
+  <data name="State.Changed" xml:space="preserve"><value>Changed</value></data>
+  <data name="State.ProfileUnreadable" xml:space="preserve"><value>profile: unreadable</value></data>
+</root>

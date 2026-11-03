@@ -64,7 +64,7 @@ internal sealed class DeviceCard : UserControl
         };
         ModifiedBadge = new Label
         {
-            Text = UiLanguage.Text("Changed"), Font = style.BodyFont, ForeColor = style.Muted,
+            Text = UiResources.Get(UiText.Changed), Font = style.BodyFont, ForeColor = style.Muted,
             AutoSize = true, Visible = false, Margin = new Padding(S(12), S(1), 0, 0),
         };
         Header.Controls.AddRange([_kind, TitleLabel, ModifiedBadge]);

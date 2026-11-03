@@ -156,7 +156,8 @@ public sealed partial class MainForm
                 "title" => b.TitleLabel,
                 "msi" => b.MsiCombo, "limit" => b.LimitBox, "priority" => b.PrioCombo, "policy" => b.PolicyCombo,
                 "imod" => b.ImodBox, "imod-toggle" => b.ImodAutoCheck, "imod-check" => b.ImodCheckButton!,
-                "imod-current" => b.ImodCurrentLabel, "imod-map" => b.ImodMapLabel!, "mode" => b.InterruptModeLabel!,
+                "imod-current" => b.ImodCurrentLabel, "imod-default" => b.ImodDefaultLabel,
+                "imod-map" => b.ImodMapLabel!, "mode" => b.InterruptModeLabel!,
                 "irq" => b.IrqLabel,
                 "nic-itr" => b.NicItrBox!, "rss-queues" => b.RssQueueBox!,
                 "affinity" => b.AffinityLabel,
@@ -292,6 +293,23 @@ public sealed partial class MainForm
         }
         switch (step.Action)
         {
+            case "unreadable-profile":
+                DeviceBlock profileBlock = DevBlock(step.Device);
+                if (!QaRun.IsReadOnly || !profileBlock.Device.IsTestDevice)
+                    throw new InvalidOperationException("Profile fixture requires a synthetic read-only card.");
+                string profileArtifact = "state/unreadable-startup-profile.json";
+                string profilePath = DevArtifact(profileArtifact);
+                Directory.CreateDirectory(Path.GetDirectoryName(profilePath)!);
+                File.WriteAllText(profilePath, "{ invalid JSON");
+                var profileResult = StartupConfigReader.Read(profilePath, [],
+                    path => ConvertStartupProfile(StartupProfile.FromJson(File.ReadAllText(path))),
+                    _ => throw new InvalidOperationException("A corrupt profile must not fall back."));
+                if (profileResult.State != StartupConfigReadState.Error || profileResult.Error is null)
+                    throw new InvalidOperationException("Expected the real reader to reject the corrupt artifact.");
+                RenderImodProfileStatus(profileBlock, new ImodConfig { StartupReadError = profileResult.Error.Message });
+                profileBlock.RelayoutAction?.Invoke();
+                DevRecordState(profileArtifact);
+                break;
             case "capture": DevCaptureWindow(step.Id, step.Target, false, step.Device); break;
             case "reveal": DevReveal(DevTarget(step)); break;
             case "language": UiLanguage.Set(step.Value == "RU" ? UiLanguageCode.Russian : step.Value == "EN" ? UiLanguageCode.English : throw new InvalidDataException("Language must be RU / EN"), persist: false); break;

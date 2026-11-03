@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "unreadable-profile",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    { "id": "show-details", "action": "reveal", "target": "id:IMOD_DETAILS", "device": "DEV_461E" },
+    { "id": "open-details", "action": "click", "target": "id:IMOD_DETAILS", "device": "DEV_461E" },
+    { "id": "known-editor-value", "action": "text", "target": "role:imod", "device": "DEV_461E", "value": "0xC8" },
+    { "id": "reject-corrupt-artifact", "action": "unreadable-profile", "device": "DEV_461E" },
+    { "id": "error-visible", "action": "assert", "target": "role:imod-default", "device": "DEV_461E", "value": "profile: unreadable" },
+    { "id": "show-error", "action": "reveal", "target": "role:imod-default", "device": "DEV_461E" },
+    { "id": "unreadable-en", "action": "capture" },
+    { "id": "click-error", "action": "click", "target": "role:imod-default", "device": "DEV_461E" },
+    { "id": "diagnostic-is-not-a-value", "action": "assert", "target": "role:imod", "device": "DEV_461E", "value": "0xC8" },
+    { "id": "russian", "action": "language", "value": "RU" },
+    { "id": "error-ru", "action": "assert", "target": "role:imod-default", "device": "DEV_461E", "value": "профиль: ошибка чтения" },
+    { "id": "unreadable-ru", "action": "capture" },
+    { "id": "scale-model", "action": "layout-rebind", "value": "120" },
+    { "id": "error-preserved", "action": "assert", "target": "role:imod-default", "device": "DEV_461E", "value": "профиль: ошибка чтения" },
+    { "id": "show-scaled-error", "action": "reveal", "target": "role:imod-default", "device": "DEV_461E" },
+    { "id": "unreadable-125", "action": "capture" },
+    { "id": "scale-back", "action": "layout-rebind", "value": "96" },
+    { "id": "english", "action": "language", "value": "EN" },
+    { "id": "error-en-restored", "action": "assert", "target": "role:imod-default", "device": "DEV_461E", "value": "profile: unreadable" },
+    { "id": "show-restored-error", "action": "reveal", "target": "role:imod-default", "device": "DEV_461E" },
+    { "id": "unreadable-restored", "action": "capture" }
+  ]
+}

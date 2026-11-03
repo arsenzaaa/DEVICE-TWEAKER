@@ -230,11 +230,11 @@ public sealed partial class MainForm
             Margin = Padding.Empty,
         };
 
-        Button btnScan = NewTopButton("REFRESH");
-        Button btnApply = NewTopButton("APPLY");
-        Button btnAuto = NewTopButton("AUTO-OPTIMIZATION");
-        Button btnRestore = NewTopButton("RESTORE");
-        _interruptModesReadButton = NewTopButton("READ IRQ MODE");
+        Button btnScan = NewTopButton("REFRESH", UiText.Refresh);
+        Button btnApply = NewTopButton("APPLY", UiText.Apply);
+        Button btnAuto = NewTopButton("AUTO-OPTIMIZATION", UiText.Auto);
+        Button btnRestore = NewTopButton("RESTORE", UiText.Restore);
+        _interruptModesReadButton = NewTopButton("READ IRQ MODE", UiText.ReadIrq);
         _interruptModesReadButton.Name = "IRQ_MODE_CHECK";
         _interruptModesReadButton.TabStop = true;
         _interruptModesReadButton.Click += async (_, _) => await CheckInterruptModeAsync();
@@ -1133,12 +1133,12 @@ public sealed partial class MainForm
         return p.X >= 0 && p.Y >= 0 && p.X < _devicesHost.ClientSize.Width && p.Y < _devicesHost.ClientSize.Height;
     }
 
-    private Button NewTopButton(string text)
+    private Button NewTopButton(string id, string resourceKey)
     {
         return new ThemedButton
         {
-            Name = text,
-            Text = text,
+            Name = id,
+            Text = UiResources.English(resourceKey),
             Size = UiScale(178, 36),
             Margin = new Padding(UiScale(8), UiScale(4), UiScale(8), UiScale(4)),
             FlatStyle = FlatStyle.Flat,

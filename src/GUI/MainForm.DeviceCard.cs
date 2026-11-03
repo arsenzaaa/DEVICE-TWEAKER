@@ -174,11 +174,11 @@ public sealed partial class MainForm
     }
 
     // Flat card button with the same hover style as the top bar.
-    private Button NewCardButton(string text, Size size)
+    private Button NewCardButton(string resourceKey, Size size)
     {
         Button button = new()
         {
-            Text = text,
+            Text = UiResources.English(resourceKey),
             Size = size,
             FlatStyle = FlatStyle.Flat,
             Font = _blockFont,

@@ -733,16 +733,7 @@ public sealed partial class MainForm
             {
                 EnsureImodConfigLoaded();
                 ImodConfig config = _imodConfigCache ?? new ImodConfig();
-                string defaultText = FormatImodValue(config.GlobalInterval);
-                block.ImodDefaultLabel.Text = $"default: {defaultText}";
-                block.ImodDefaultLabel.Tag = defaultText;
-                if (config.StartupReadError is not null)
-                {
-                    block.ImodDefaultLabel.Text = "profile: unreadable";
-                    block.ImodDefaultLabel.Tag = config.StartupReadError;
-                    block.ImodDefaultLabel.ForeColor = _statusDanger;
-                    SetImodStatusTooltip(block.ImodDefaultLabel);
-                }
+                RenderImodProfileStatus(block, config);
                 string currentText = GetSourceControlText(block.ImodCurrentLabel);
                 if (string.IsNullOrWhiteSpace(currentText)
                     || currentText.Equals("current: -", StringComparison.OrdinalIgnoreCase)
@@ -1046,6 +1037,16 @@ public sealed partial class MainForm
         UpdateBlockInfoText(block);
         if (report is null && result.Report.Errors.Count > 0)
             ShowOperationResult(result.Report, string.Empty, "Some device settings could not be applied.", operationName: "DEVICE SETTINGS");
+    }
+
+    private void RenderImodProfileStatus(DeviceBlock block, ImodConfig config)
+    {
+        string defaultText = FormatImodValue(config.GlobalInterval);
+        block.ImodDefaultLabel.Text = config.StartupReadError is null
+            ? $"default: {defaultText}" : UiResources.English(UiText.ProfileUnreadable);
+        block.ImodDefaultLabel.Tag = config.StartupReadError ?? defaultText;
+        block.ImodDefaultLabel.ForeColor = config.StartupReadError is null ? _mutedText : _statusDanger;
+        if (config.StartupReadError is not null) SetImodStatusTooltip(block.ImodDefaultLabel);
     }
 
     internal static bool TryParseMsiLimitInput(string? input, out bool isUnlocked, out int value)
