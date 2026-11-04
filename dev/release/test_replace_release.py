@@ -285,6 +285,13 @@ class LocalGitTests(unittest.TestCase):
         self.assertIn('[Section](#fixed)', result)
         self.assertIn('[Download](https://example.invalid/file.exe)', result)
 
+    def test_release_body_uses_native_title_and_keeps_sections(self):
+        text = '# DEVICE TWEAKER 0.0.4\n\n[Русский](./v0.0.4.ru.md)\n\n## Fixed\n\n- Preserved change.\n'
+        result = release.release_notes(text, 'example/project', SOURCE)
+        self.assertFalse(result.startswith('# DEVICE TWEAKER'))
+        self.assertTrue(result.startswith('[Русский]('))
+        self.assertIn('## Fixed\n\n- Preserved change.', result)
+
     def test_native_git_accepts_tag_bytes_and_rejects_stale_lease(self):
         # Real Git, entirely local: Windows newline handling and tag-object leases.
         with tempfile.TemporaryDirectory() as folder:

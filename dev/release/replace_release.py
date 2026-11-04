@@ -76,6 +76,8 @@ def verify_sources(package, source):
 
 def release_notes(text, repository, source):
     """Resolve repository links before using a document as a GitHub release body."""
+    # GitHub already displays the release title above the Markdown body.
+    text = re.sub(r'\A# DEVICE TWEAKER [^\n]+\n+', '', text, count=1)
     def resolve(match):
         url = urllib.parse.urlsplit(match[2])
         if url.scheme or url.netloc or not url.path:
