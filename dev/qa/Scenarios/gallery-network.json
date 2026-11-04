@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "gallery-network",
+  "preset": "NicItr",
+  "language": "EN",
+  "filter": "NETWORK",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "home",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "en",
+      "action": "capture"
+    },
+    {
+      "id": "russian",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "home-ru",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "ru",
+      "action": "capture"
+    }
+  ]
+}

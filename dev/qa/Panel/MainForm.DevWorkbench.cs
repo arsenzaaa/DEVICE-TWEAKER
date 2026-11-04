@@ -157,6 +157,7 @@ public sealed partial class MainForm
                 "msi" => b.MsiCombo, "limit" => b.LimitBox, "priority" => b.PrioCombo, "policy" => b.PolicyCombo,
                 "imod" => b.ImodBox, "imod-toggle" => b.ImodAutoCheck, "imod-check" => b.ImodCheckButton!,
                 "imod-current" => b.ImodCurrentLabel, "imod-default" => b.ImodDefaultLabel,
+                "imod-mode" => b.ImodModeCombo!,
                 "imod-map" => b.ImodMapLabel!, "mode" => b.InterruptModeLabel!,
                 "irq" => b.IrqLabel,
                 "nic-itr" => b.NicItrBox!, "rss-queues" => b.RssQueueBox!,

@@ -1042,19 +1042,19 @@ public sealed partial class MainForm
 
                 e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
                 bool selected = (e.State & DrawItemState.Selected) != 0;
-                Color bg = selected ? Color.FromArgb(20, 30, 46) : Color.FromArgb(12, 13, 18);
+                Color bg = selected ? Color.FromArgb(26, 26, 26) : _bgGroup;
                 using SolidBrush bgBrush = new(bg);
                 e.Graphics.FillRectangle(bgBrush, e.Bounds);
 
-                using Pen rowSepPen = new(Color.FromArgb(26, 28, 38), 1);
+                using Pen rowSepPen = new(Color.FromArgb(38, 38, 38), 1);
                 e.Graphics.DrawLine(rowSepPen, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
 
                 if (selected)
                 {
-                    using SolidBrush barBrush = new(Color.FromArgb(90, 165, 255));
+                    using SolidBrush barBrush = new(_fgMain);
                     e.Graphics.FillRectangle(barBrush, e.Bounds.X, e.Bounds.Y, UiScale(3), e.Bounds.Height);
 
-                    using Pen borderPen = new(Color.FromArgb(56, 84, 122), 1);
+                    using Pen borderPen = new(_border, 1);
                     e.Graphics.DrawRectangle(borderPen, e.Bounds.X, e.Bounds.Y, e.Bounds.Width - 1, e.Bounds.Height - 1);
                 }
 
@@ -1066,17 +1066,16 @@ public sealed partial class MainForm
                 // Column 1: Date & Time
                 DateTime stamp = info.CreatedAt ?? info.LastWriteUtc.ToLocalTime();
                 string dateStr = stamp.ToString("yyyy-MM-dd  HH:mm:ss", CultureInfo.InvariantCulture);
-                Color dateColor = selected ? Color.FromArgb(248, 250, 255) : Color.FromArgb(175, 182, 196);
+                Color dateColor = selected ? _fgMain : _mutedText;
                 TextRenderer.DrawText(e.Graphics, dateStr, _dialogFont, new Point(x, textY), dateColor, TextFormatFlags.NoPadding);
                 x += UiScale(205);
 
                 // Column 2: Location Badge
                 int locBadgeW = UiScale(68);
                 Rectangle locRect = new(x, badgeY, locBadgeW, badgeH);
-                bool isLocalExe = info.Location.Contains("EXE", StringComparison.OrdinalIgnoreCase);
-                Color locBgColor = isLocalExe ? Color.FromArgb(18, 38, 62) : Color.FromArgb(24, 32, 46);
-                Color locBorderColor = isLocalExe ? Color.FromArgb(50, 96, 150) : Color.FromArgb(65, 85, 115);
-                Color locTextColor = isLocalExe ? Color.FromArgb(140, 205, 255) : Color.FromArgb(190, 210, 235);
+                Color locBgColor = Color.FromArgb(18, 18, 18);
+                Color locBorderColor = Color.FromArgb(66, 66, 66);
+                Color locTextColor = _mutedText;
                 using SolidBrush locBg = new(locBgColor);
                 using Pen locBorder = new(locBorderColor, 1);
                 e.Graphics.FillRectangle(locBg, locRect);
@@ -1084,22 +1083,22 @@ public sealed partial class MainForm
                 TextRenderer.DrawText(e.Graphics, info.Location, _blockTitleFont, locRect, locTextColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                 x += locBadgeW + UiScale(14);
 
-                // Column 3: Type & Description (clean semantic contrast, no emoji shields)
+                // Column 3: Backup type and description.
                 if (info.IsOriginal)
                 {
                     string origText = UiLanguage.Text("ORIGINAL");
                     Size origSz = TextRenderer.MeasureText(e.Graphics, origText, _blockTitleFont, Size.Empty, TextFormatFlags.NoPadding);
                     int origW = origSz.Width + UiScale(14);
                     Rectangle origRect = new(x, badgeY, origW, badgeH);
-                    using SolidBrush origBg = new(Color.FromArgb(42, 32, 14));
-                    using Pen origBorder = new(Color.FromArgb(135, 95, 30), 1);
+                    using SolidBrush origBg = new(Color.FromArgb(24, 24, 24));
+                    using Pen origBorder = new(_border, 1);
                     e.Graphics.FillRectangle(origBg, origRect);
                     e.Graphics.DrawRectangle(origBorder, origRect);
-                    TextRenderer.DrawText(e.Graphics, origText, _blockTitleFont, origRect, Color.FromArgb(255, 195, 70), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                    TextRenderer.DrawText(e.Graphics, origText, _blockTitleFont, origRect, _fgMain, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                     x += origW + UiScale(12);
 
                     string desc = UiLanguage.IsRussian ? "Исходные настройки устройств (защищены)" : "Original device settings (protected)";
-                    TextRenderer.DrawText(e.Graphics, desc, _technicalFont, new Point(x, textY + UiScale(1)), Color.FromArgb(215, 220, 230), TextFormatFlags.NoPadding);
+                    TextRenderer.DrawText(e.Graphics, desc, _technicalFont, new Point(x, textY + UiScale(1)), _fgMain, TextFormatFlags.NoPadding);
                 }
                 else
                 {
@@ -1107,14 +1106,14 @@ public sealed partial class MainForm
                     Size snapSz = TextRenderer.MeasureText(e.Graphics, snapText, _blockTitleFont, Size.Empty, TextFormatFlags.NoPadding);
                     int snapW = snapSz.Width + UiScale(14);
                     Rectangle snapRect = new(x, badgeY, snapW, badgeH);
-                    using SolidBrush snapBg = new(Color.FromArgb(26, 28, 36));
-                    using Pen snapBorder = new(Color.FromArgb(65, 70, 85), 1);
+                    using SolidBrush snapBg = new(Color.FromArgb(18, 18, 18));
+                    using Pen snapBorder = new(Color.FromArgb(66, 66, 66), 1);
                     e.Graphics.FillRectangle(snapBg, snapRect);
                     e.Graphics.DrawRectangle(snapBorder, snapRect);
-                    TextRenderer.DrawText(e.Graphics, snapText, _blockTitleFont, snapRect, Color.FromArgb(180, 185, 200), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                    TextRenderer.DrawText(e.Graphics, snapText, _blockTitleFont, snapRect, _mutedText, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                     x += snapW + UiScale(12);
 
-                    TextRenderer.DrawText(e.Graphics, UiLanguage.Text(info.Reason), _dialogFont, new Point(x, textY), Color.FromArgb(240, 244, 252), TextFormatFlags.NoPadding);
+                    TextRenderer.DrawText(e.Graphics, UiLanguage.Text(info.Reason), _dialogFont, new Point(x, textY), _fgMain, TextFormatFlags.NoPadding);
                 }
             };
 

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "gallery-intel-gpu",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "GPU",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "gpu",
+      "action": "click",
+      "target": "id:FILTER_GPU"
+    },
+    {
+      "id": "gpu-heading",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_2684",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "en",
+      "action": "capture"
+    },
+    {
+      "id": "russian",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "gpu-ru",
+      "action": "click",
+      "target": "id:FILTER_GPU"
+    },
+    {
+      "id": "ru",
+      "action": "capture"
+    }
+  ]
+}

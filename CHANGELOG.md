@@ -30,6 +30,7 @@ Source comparison: [v0.0.3 → v0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAK
 
 ### Interface
 
+- Backup selection uses neutral colors for the selected row, file locations and protected original settings.
 - IMOD readback includes the last read time in the current value's tooltip and marks the device map as stale after device changes.
 - Dual-CCD status is displayed as On/Off.
 - Apply, save, restore and reset run long operations in the background. Refresh preserves pending edits and scroll position; a failed device scan keeps the previous cards on screen.

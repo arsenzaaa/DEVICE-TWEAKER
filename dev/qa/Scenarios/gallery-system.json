@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "id": "gallery-system",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "en-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en-open",
+      "action": "dialog",
+      "value": "system"
+    },
+    {
+      "id": "en-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "en-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru-open",
+      "action": "dialog",
+      "value": "system"
+    },
+    {
+      "id": "ru-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "ru-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    }
+  ]
+}

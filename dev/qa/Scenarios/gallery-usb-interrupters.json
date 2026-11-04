@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "gallery-usb-interrupters",
+  "preset": "Imod",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "home",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "interrupters",
+      "action": "select",
+      "target": "role:imod-mode",
+      "device": "DEV_15B6",
+      "value": "Interrupters"
+    },
+    {
+      "id": "en",
+      "action": "capture"
+    },
+    {
+      "id": "russian",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "home-ru",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "ru",
+      "action": "capture"
+    }
+  ]
+}
