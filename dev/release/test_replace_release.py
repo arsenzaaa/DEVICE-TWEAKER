@@ -44,6 +44,8 @@ class Remote:
 
     def snapshot(self):
         data = copy.deepcopy(self.metadata)
+        if data['draft']:
+            data['html_url'] = 'https://github.com/example/project/releases/tag/untagged-draft'
         data['assets'] = [{'id': i, 'name': name, 'label': '', 'size': 1,
                            'digest': 'sha256:' + value, 'state': 'uploaded', 'updated_at': 'before'}
                           for i, (name, value) in enumerate(self.hashes.items())]
@@ -55,6 +57,16 @@ class Remote:
             raise RuntimeError('Injected ' + point)
 
     def api(self, route, method='GET', payload=None):
+        if route == 'git/ref/heads/main':
+            return {'object': {'sha': self.main}}
+        if route == f'git/ref/tags/{release.TAG}':
+            return {'object': {'sha': self.tag, 'type': 'tag'}}
+        if route == f'releases/tags/{release.TAG}':
+            if self.metadata['draft']:
+                raise RuntimeError('gh: Not Found (HTTP 404): draft releases are not returned by tag')
+            return self.snapshot()['release']
+        if route != 'releases/42':
+            raise AssertionError(route)
         if method == 'PATCH':
             self.writes.append(('metadata', copy.deepcopy(payload)))
             self.metadata.update(payload)
@@ -106,8 +118,8 @@ class ReplacementTests(unittest.TestCase):
             package=str(candidate), backup=str(self.root / 'backup'))
         self.remote = Remote(self.args, old, old_hashes)
         self.subject = release.Release(self.args)
-        for name in ('state', 'api', 'push_tag', 'upload', 'download'):
-            replacement = self.remote.snapshot if name == 'state' else getattr(self.remote, name)
+        for name in ('api', 'push_tag', 'upload', 'download'):
+            replacement = getattr(self.remote, name)
             self.addCleanup(patch.stopall)
             patch.object(self.subject, name, replacement).start()
         self.backup = self.subject.backup
@@ -127,6 +139,23 @@ class ReplacementTests(unittest.TestCase):
                 return f'{OLD} refs/tags/{release.TAG}'
             return SOURCE
         patch.object(release, 'run', side_effect=git_result).start()
+
+    def test_draft_state_uses_archived_release_identity(self):
+        self.remote.metadata['draft'] = True
+        with self.assertRaisesRegex(RuntimeError, 'HTTP 404'):
+            self.remote.api(f'releases/tags/{release.TAG}')
+        state = self.subject.state()
+        self.assertEqual(42, state['release']['id'])
+        self.assertTrue(state['release']['draft'])
+        self.assertIn('untagged-', state['release']['html_url'])
+        self.assertEqual(OLD, state['tag']['sha'])
+
+    def test_initial_state_finds_public_release_before_backup_exists(self):
+        args = copy.copy(self.args)
+        args.backup = str(self.root / 'not-yet-prepared')
+        subject = release.Release(args)
+        with patch.object(subject, 'api', self.remote.api):
+            self.assertEqual(self.remote.snapshot(), subject.state())
 
     def test_success_preserves_identity_and_publishes_verified_package(self):
         self.subject.apply()

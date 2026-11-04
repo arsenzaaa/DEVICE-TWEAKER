@@ -107,9 +107,17 @@ class Release:
         return json.loads(text) if text else None
 
     def state(self):
+        archived = self.backup / 'remote-before.json'
+        if archived.exists():
+            # Tag lookup only returns published releases. Keep using the saved
+            # identity while replacing or recovering a temporary draft.
+            release_id = json.loads(archived.read_text(encoding='utf-8'))['release']['id']
+            route = f'releases/{release_id}'
+        else:
+            route = f'releases/tags/{TAG}'
         return {'main': self.api('git/ref/heads/main')['object']['sha'],
                 'tag': self.api(f'git/ref/tags/{TAG}')['object'],
-                'release': self.api(f'releases/tags/{TAG}')}
+                'release': self.api(route)}
 
     @staticmethod
     def fingerprint(state):
