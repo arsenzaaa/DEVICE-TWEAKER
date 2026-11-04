@@ -22,6 +22,14 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Set up Python for release checks
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Check release recovery without network access
+        run: python -m unittest discover -s dev/release -p test_replace_release.py -v
+
       - name: Restore
         run: dotnet restore DeviceTweaker.sln
 

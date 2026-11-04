@@ -3,47 +3,64 @@ name: Release package
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: Existing version tag to package
+      source_sha:
+        description: Exact reviewed source commit (40-character SHA)
         required: true
+        type: string
+      action:
+        description: Build only, or explicitly replace the existing 0.0.4
+        type: choice
+        options: [build, replace-0.0.4]
+        default: build
+      expected_tag_object:
+        description: Replacement only - reviewed current v0.0.4 tag object SHA
+        type: string
+      expected_release_updated_at:
+        description: Replacement only - reviewed release updated_at from the API
+        type: string
+      verified_run_id:
+        description: Replacement only - successful build run containing the accepted files
+        type: string
+      expected_exe_sums_sha256:
+        description: Replacement only - SHA-256 of SHA256SUMS.txt from the accepted package
         type: string
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-package
+  cancel-in-progress: false
 
 jobs:
   package:
+    if: inputs.action == 'build'
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
-      - name: Check out the tagged source
+      - name: Check out the selected source
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ inputs.source_sha }}
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Set up .NET 8
+      - name: Set up .NET 10
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 10.0.x
 
-      - name: Verify tag and project version
+      - name: Verify source and version
         shell: pwsh
         env:
-          RELEASE_TAG: ${{ inputs.tag }}
+          SELECTED_SHA: ${{ inputs.source_sha }}
         run: |
-          $tag = $env:RELEASE_TAG
-          if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw "Invalid release tag: $tag" }
-          $tagCommit = (git rev-list -n 1 "refs/tags/$tag").Trim()
+          if ($env:SELECTED_SHA -cnotmatch '^[0-9a-f]{40}$') { throw 'Use the exact source SHA' }
           $head = (git rev-parse HEAD).Trim()
-          if ($LASTEXITCODE -ne 0 -or $tagCommit -ne $head) { throw "Checkout does not match $tag" }
+          if ($LASTEXITCODE -ne 0 -or $head -cne $env:SELECTED_SHA) { throw 'Checkout differs from selected source' }
           [xml]$project = Get-Content -LiteralPath 'src/DeviceTweakerCS.csproj'
-          $version = [string]$project.Project.PropertyGroup.Version
-          if ($tag -ne "v$version") { throw "Tag $tag differs from project version $version" }
-          $notes = "docs/releases/$tag.md"
-          if (-not (Test-Path -LiteralPath $notes)) { throw "Release notes missing: $notes" }
-          "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
-          "SOURCE_COMMIT=$head" >> $env:GITHUB_ENV
+          if ([string]$project.Project.PropertyGroup.Version -ne '0.0.4') { throw 'Expected version 0.0.4' }
+          if (git status --porcelain) { throw 'Source checkout is dirty' }
 
       - name: Restore and test
         shell: pwsh
@@ -55,46 +72,104 @@ jobs:
           dotnet test 'dev/qa/tests/DeviceTweaker.Tests/DeviceTweaker.Tests.csproj' -c Release --no-restore
           if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
 
-      - name: Build both release EXEs
+      - name: Build and inspect both EXEs
         shell: pwsh
         run: |
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'src/build.ps1' -Flavor both -Configuration Release -SkipImodDriverBuild
-          if ($LASTEXITCODE -ne 0) { throw 'Release package build failed' }
+          if ($LASTEXITCODE -ne 0) { throw 'Release build failed' }
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'dev/qa/Test-ReleasePackage.ps1' -PackageDirectory 'src/bin/ReleasePackages/v0.0.4'
+          if ($LASTEXITCODE -ne 0) { throw 'Package inspection failed' }
 
-      - name: Verify package and prepare notes
+      - name: Archive exact sources
         shell: pwsh
         run: |
-          $package = "src/bin/ReleasePackages/$env:RELEASE_TAG"
-          $expectedNames = @('DEVICE.TWEAKER.exe', 'DEVICE.TWEAKER.SelfContained.exe')
-          $sumLines = @(Get-Content -LiteralPath "$package/SHA256SUMS.txt")
-          if ($sumLines.Count -ne 2) { throw 'Expected two checksum lines' }
-          foreach ($name in $expectedNames) {
-            $line = @($sumLines | Where-Object { $_ -match "^[0-9A-Fa-f]{64}  $([regex]::Escape($name))$" })
-            if ($line.Count -ne 1) { throw "Missing or duplicate checksum for $name" }
-            $actual = (Get-FileHash -LiteralPath "$package/$name" -Algorithm SHA256).Hash
-            if ($actual -ne $line[0].Substring(0, 64)) { throw "Checksum mismatch: $name" }
-          }
-          $sourceName = "DEVICE.TWEAKER.Source.$env:RELEASE_TAG.zip"
+          $package = 'src/bin/ReleasePackages/v0.0.4'
+          $sourceName = 'DEVICE.TWEAKER.Source.v0.0.4.zip'
           git archive --format=zip --output="$package/$sourceName" HEAD
           if ($LASTEXITCODE -ne 0) { throw 'Source archive failed' }
-          $sourceHash = (Get-FileHash -LiteralPath "$package/$sourceName" -Algorithm SHA256).Hash
-          "$sourceHash  $sourceName" | Set-Content -LiteralPath "$package/SOURCE-SHA256SUMS.txt" -Encoding ascii
-          $notes = Get-Content -LiteralPath "docs/releases/$env:RELEASE_TAG.md" -Raw
-          $notes += "`n`nSource commit: ``$env:SOURCE_COMMIT``.`n"
-          Set-Content -LiteralPath "$env:RUNNER_TEMP/release-notes.md" -Value $notes -Encoding utf8
+          $hash = (Get-FileHash -LiteralPath "$package/$sourceName" -Algorithm SHA256).Hash
+          "$hash  $sourceName" | Set-Content -LiteralPath "$package/SOURCE-SHA256SUMS.txt" -Encoding ascii
 
-      - name: Save build for inspection
+      - name: Save package for inspection
         uses: actions/upload-artifact@v7
         with:
-          name: DEVICE-TWEAKER-${{ env.RELEASE_TAG }}-${{ env.SOURCE_COMMIT }}
-          path: src/bin/ReleasePackages/${{ env.RELEASE_TAG }}/
+          name: DEVICE-TWEAKER-v0.0.4-${{ inputs.source_sha }}
+          path: src/bin/ReleasePackages/v0.0.4/
           if-no-files-found: error
 
-      - name: Create draft release
+  replace:
+    if: inputs.action == 'replace-0.0.4' && github.repository == 'arsenzaaa/DEVICE-TWEAKER' && github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Check out reviewed sources
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Download the verified package
+        uses: actions/download-artifact@v8
+        with:
+          name: DEVICE-TWEAKER-v0.0.4-${{ inputs.source_sha }}
+          path: release-package
+          run-id: ${{ inputs.verified_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Verify the selected build run
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          BUILD_RUN: ${{ inputs.verified_run_id }}
         run: |
-          $package = "src/bin/ReleasePackages/$env:RELEASE_TAG"
-          gh release create $env:RELEASE_TAG "$package/DEVICE.TWEAKER.exe" "$package/DEVICE.TWEAKER.SelfContained.exe" "$package/SHA256SUMS.txt" "$package/DEVICE.TWEAKER.Source.$env:RELEASE_TAG.zip" "$package/SOURCE-SHA256SUMS.txt" --draft --verify-tag --title "DEVICE TWEAKER $env:RELEASE_TAG" --notes-file "$env:RUNNER_TEMP/release-notes.md"
-          if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed; an existing release is never overwritten' }
+          if ($env:BUILD_RUN -notmatch '^\d+$') { throw 'A successful build run ID is required' }
+          $run = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:BUILD_RUN" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $run.conclusion -ne 'success' -or $run.event -ne 'workflow_dispatch' -or $run.path -ne '.github/workflows/release-package.yml') { throw 'Expected a successful Release package build run' }
+
+      - name: Validate remote state and archive the old release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          OLD_TAG: ${{ inputs.expected_tag_object }}
+          OLD_RELEASE_UPDATED: ${{ inputs.expected_release_updated_at }}
+          ACCEPTED_SUMS: ${{ inputs.expected_exe_sums_sha256 }}
+        run: |
+          python dev/release/replace_release.py --source-sha $env:SOURCE_SHA --expected-main $env:SOURCE_SHA --expected-tag-object $env:OLD_TAG --expected-release-updated-at $env:OLD_RELEASE_UPDATED --expected-exe-sums-sha256 $env:ACCEPTED_SUMS --package release-package --backup release-backup
+          if ($LASTEXITCODE -ne 0) { throw 'Replacement preflight failed; no release changes made' }
+
+      - name: Preserve recovery files before changing GitHub
+        uses: actions/upload-artifact@v7
+        with:
+          name: previous-v0.0.4-${{ github.run_id }}
+          path: release-backup/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Replace and verify existing 0.0.4
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          OLD_TAG: ${{ inputs.expected_tag_object }}
+          OLD_RELEASE_UPDATED: ${{ inputs.expected_release_updated_at }}
+          ACCEPTED_SUMS: ${{ inputs.expected_exe_sums_sha256 }}
+        run: |
+          python dev/release/replace_release.py --source-sha $env:SOURCE_SHA --expected-main $env:SOURCE_SHA --expected-tag-object $env:OLD_TAG --expected-release-updated-at $env:OLD_RELEASE_UPDATED --expected-exe-sums-sha256 $env:ACCEPTED_SUMS --package release-package --backup release-backup --apply
+          if ($LASTEXITCODE -ne 0) { throw 'Replacement failed; inspect recovery report' }
+
+      - name: Save replacement and recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: replacement-v0.0.4-${{ github.run_id }}
+          path: release-backup/
+          if-no-files-found: warn
+          retention-days: 90
