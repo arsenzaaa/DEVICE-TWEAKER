@@ -18,7 +18,7 @@ IMODI specifies a minimum inter-interrupt interval in 250 ns units. `0x0` disabl
 | Devices | Recognized role values using the current mapping. |
 | Interrupters | Values by interrupter index. |
 
-Device mappings can change after reconnect, sleep or reboot. The application rereads available xHCI information and shows read time, mapping and diagnostics. With incomplete information, inspect the applied common value and limitation rather than assuming an old index remains exact.
+Device mappings can change after reconnect, sleep or reboot. The application rereads available xHCI information and shows mapping and diagnostics. The current value tooltip includes the last read time. With incomplete information, inspect the applied common value and limitation rather than assuming an old index remains exact.
 
 **CHECK** reads the registers. **SET** applies values and saves the startup profile. **DELETE** removes the shared IMOD/NIC ITR startup profile and restores network-driver moderation. It resets USB controls to `0xC8`; live writes require an already loaded DTIMOD and are skipped while the configuration contains only saved NIC ITR entries. Restart Windows to complete the reset. Deletion does not create a separate automatic backup.
 

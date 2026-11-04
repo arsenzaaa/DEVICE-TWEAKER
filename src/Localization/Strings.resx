@@ -107,7 +107,7 @@
   <data name="Message.AUTO.PLAN" xml:space="preserve"><value>AUTO PLAN</value></data>
   <data name="Message.AUTO.profile.Mouse.IMOD.0.interrupt.moderation.off" xml:space="preserve"><value>AUTO profile: Mouse IMOD = 0 (interrupt moderation off). Manual IMOD is set separately.</value></data>
   <data name="Message.AUTOMATIC.BACKUP" xml:space="preserve"><value>AUTOMATIC BACKUP</value></data>
-  <data name="Message.Accepted.values.DWORD.1.20.ms" xml:space="preserve"><value>Accepted values: DWORD 1–20 ms.</value></data>
+  <data name="Message.Accepted.values.DWORD.1.20.ms" xml:space="preserve"><value>Custom interval: DWORD 1–20 ms.</value></data>
   <data name="Message.Add.fake.device.276f977a" xml:space="preserve"><value>Add fake device</value></data>
   <data name="Message.Affinity.mask.must.be.hexadecimal.for.example.0x3" xml:space="preserve"><value>Affinity mask must be hexadecimal, for example 0x3.</value></data>
   <data name="Message.After.reboot.run.CHECK.or.AUTO.OPTIMIZATION.again" xml:space="preserve"><value>After reboot, run CHECK or AUTO-OPTIMIZATION again to apply IMOD.</value></data>
@@ -415,7 +415,7 @@ See the session log for details.</value></data>
   <data name="Message.No.registry.setting" xml:space="preserve"><value>No registry setting</value></data>
   <data name="Message.No.settings.were.changed" xml:space="preserve"><value>No settings were changed.</value></data>
   <data name="Message.No.suitable.physical.core.was.found" xml:space="preserve"><value>No suitable physical core was found.</value></data>
-  <data name="Message.Nominal.intervals.20.ms.50.Hz.8.ms" xml:space="preserve"><value>Nominal intervals: 20 ms ≈ 50 Hz, 8 ms ≈ 125 Hz, 1 ms ≈ 1 kHz. Actual event rates also depend on input traffic and leeway.</value></data>
+  <data name="Message.Nominal.intervals.20.ms.50.Hz.8.ms" xml:space="preserve"><value>Calculated rates: 20 ms ≈ 50 Hz, 8 ms ≈ 125 Hz, 1 ms ≈ 1 kHz. These are requested intervals; actual delivery depends on Windows and the listener.</value></data>
   <data name="Message.None.dc937b59" xml:space="preserve"><value>None</value></data>
   <data name="Message.Normal" xml:space="preserve"><value>Normal</value></data>
   <data name="Message.Not.applied.3de0546b" xml:space="preserve"><value>Not applied</value></data>
@@ -836,4 +836,5 @@ Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IM
   <data name="Read.DeviceStateReading" xml:space="preserve"><value>Reading device state...</value></data>
   <data name="Read.DeviceStateFailed" xml:space="preserve"><value>Device data could not be refreshed. The current list was preserved.</value></data>
   <data name="Read.DeviceReadback" xml:space="preserve"><value>Device readback</value></data>
+  <data name="Inline.Imod.LastRead" xml:space="preserve"><value>Last read:</value></data>
 </root>

@@ -23,7 +23,7 @@ HKCU\Control Panel\Mouse
   RawMouseThrottleDuration  REG_DWORD
 ```
 
-The UI offers intervals from 1 to 20 ms. Its 1 kHz, 125 Hz and 50 Hz labels use the nominal `1000 / interval` calculation; they do not promise the actual delivery rate of all events.
+The UI accepts custom intervals from 1 to 20 ms. Its 1 kHz, 125 Hz and 50 Hz labels use the `1000 / interval` calculation. These are requested values; actual event delivery depends on Windows and the listener.
 
 The setting concerns background Raw Input, not USB polling rate. The application exposes it only for a supported OS. Its version check accounts for high-report-rate input improvements introduced in Windows 11 22H2 with [KB5027303](https://support.microsoft.com/en-us/servicing/os/windows-11/2023/06/june-27-2023-kb5027303-os-build-22621-1928-preview).
 

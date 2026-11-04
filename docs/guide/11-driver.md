@@ -29,7 +29,7 @@ The `\DEVICE TWEAKER\IMOD` SYSTEM task has logon, resume and relevant PnP trigge
   logs\
 ```
 
-The runtime is shared with Windows PowerShell 5.1. File hashes are checked before application; a shared mutex prevents simultaneous loading by the application and startup script. Administrator/SYSTEM permissions protect the directory. Startup logs retain the latest 14 files.
+The runtime is shared with Windows PowerShell 5.1. Its SHA-256 is checked before compilation; DTIMOD and loader files are checked when loading the driver. A shared mutex prevents simultaneous loading by the application and startup script. Administrator/SYSTEM permissions protect the directory. Startup logs retain the latest 14 files.
 
 The task runs independently of the EXE. Profile read or parse errors stop changes to the profile. **DELETE** in the IMOD block removes the shared startup configuration for USB IMOD and NIC ITR, including the scheduled task.
 

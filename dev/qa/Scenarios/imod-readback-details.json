@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "id": "imod-readback-details",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    {
+      "id": "show",
+      "action": "reveal",
+      "target": "role:imod-current",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "current-without-clock",
+      "action": "assert",
+      "target": "role:imod-current",
+      "device": "DEV_461E",
+      "value": "current: 0x0 x8"
+    },
+    {
+      "id": "read-time-and-raw",
+      "action": "assert",
+      "target": "role:imod-current",
+      "device": "DEV_461E",
+      "property": "tooltip",
+      "value": "Last read: 12:00\r\ntest preview raw: 0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000"
+    },
+    {
+      "id": "russian-readback",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "read-time-russian",
+      "action": "assert",
+      "property": "tooltip",
+      "value": "Считано: 12:00\r\ntest предпросмотр raw: 0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000",
+      "target": "role:imod-current",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "english-readback",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "mark-stale",
+      "action": "imod-map-stale",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "stale-warning",
+      "action": "assert",
+      "target": "role:imod-current",
+      "device": "DEV_461E",
+      "value": "current: 0x0 x8 · devices changed"
+    },
+    {
+      "id": "stale-tooltip",
+      "action": "assert",
+      "property": "tooltip",
+      "value": "Devices were added or removed after this read. A USB device may now use another interrupter; press CHECK to read again.\r\nLast read: 12:00",
+      "target": "role:imod-current",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "stale-en",
+      "action": "capture"
+    },
+    {
+      "id": "russian",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "stale-ru",
+      "action": "capture"
+    }
+  ]
+}

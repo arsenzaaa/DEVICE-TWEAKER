@@ -12,7 +12,7 @@ Source comparison: [v0.0.3 → v0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAK
 
 ### Added
 
-- The application and startup script share register-access code. Profile file hashes are checked with SHA-256 before application.
+- The application and startup script share register-access code. The runtime SHA-256 is checked before compilation; driver and loader files are checked when loading DTIMOD.
 - Added IRQ Mode and a command to read IRQ information for all PCI devices. The active interrupt mode and PCI capabilities are displayed separately from the MSI registry setting.
 - RSS allocation selects one logical processor per physical core. Available queue counts account for driver and device limits.
 - Saving NIC ITR disables supported driver moderation settings; deleting the profile can restore their INF defaults.
@@ -30,6 +30,7 @@ Source comparison: [v0.0.3 → v0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAK
 
 ### Interface
 
+- IMOD readback includes the last read time in the current value's tooltip and marks the device map as stale after device changes.
 - Dual-CCD status is displayed as On/Off.
 - Apply, save, restore and reset run long operations in the background. Refresh preserves pending edits and scroll position; a failed device scan keeps the previous cards on screen.
 - RSS settings, power settings and driver details are read in the background. Failed or timed-out reads preserve the previous device list; late results are ignored.

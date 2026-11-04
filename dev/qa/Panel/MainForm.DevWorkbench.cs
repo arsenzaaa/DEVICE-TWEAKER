@@ -265,6 +265,7 @@ public sealed partial class MainForm
         "readAt" => _blocks.Single(block => block.InterruptModeLabel == control).InterruptMode.ReadAt?.ToString("O") ?? "",
         "queried" => _devIrqReadInstances.Contains(_blocks.Single(block => block.InterruptModeLabel == control).Device.InstanceId).ToString().ToLowerInvariant(),
         "reading" when control == _interruptModesReadButton => _interruptModeCheckRunning.ToString().ToLowerInvariant(),
+        "tooltip" => UiLanguage.Text(_copyToolTip.GetToolTip(control) ?? string.Empty),
         "text" => control.Text, "visible" => control.Visible.ToString().ToLowerInvariant(), "enabled" => control.Enabled.ToString().ToLowerInvariant(),
         "focused" => control.Focused.ToString().ToLowerInvariant(), "viewport" => DevInViewport(control).ToString().ToLowerInvariant(),
         "checked" when control is CheckBox check => check.Checked.ToString().ToLowerInvariant(),
@@ -314,6 +315,11 @@ public sealed partial class MainForm
                 RenderImodProfileStatus(profileBlock, new ImodConfig { StartupReadError = profileResult.Error.Message });
                 profileBlock.RelayoutAction?.Invoke();
                 DevRecordState(profileArtifact);
+                break;
+            case "imod-map-stale":
+                if (!QaRun.IsReadOnly || !DevBlock(step.Device).Device.IsTestDevice)
+                    throw new InvalidOperationException("Stale-map fixture requires a synthetic read-only card.");
+                MarkImodMapsStale();
                 break;
             case "capture": DevCaptureWindow(step.Id, step.Target, false, step.Device); break;
             case "reveal": DevReveal(DevTarget(step)); break;

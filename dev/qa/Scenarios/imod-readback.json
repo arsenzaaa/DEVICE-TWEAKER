@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1, "id": "imod-readback", "preset": "Intel14900K", "language": "EN", "filter": "USB", "width": 1200, "height": 900,
+  "steps": [
+    { "id": "show-current", "action": "reveal", "target": "role:imod-current", "device": "DEV_461E" },
+    { "id": "current-visible", "action": "assert", "target": "role:imod-current", "device": "DEV_461E", "property": "visible", "value": "true" },
+    { "id": "readback-en", "action": "capture" },
+    { "id": "russian", "action": "language", "value": "RU" },
+    { "id": "readback-ru", "action": "capture" },
+    { "id": "english", "action": "language", "value": "EN" },
+    { "id": "readback-en-return", "action": "capture" }
+  ]
+}

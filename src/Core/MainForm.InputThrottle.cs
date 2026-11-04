@@ -88,9 +88,9 @@ public sealed partial class MainForm
 
         const string how =
             "RawMouseThrottleDuration: HKCU\\Control Panel\\Mouse.\n"
-            + "Accepted values: DWORD 1–20 ms.\n"
+            + "Custom interval: DWORD 1–20 ms.\n"
             + "Larger values request longer intervals for background listeners.\n"
-            + "Nominal intervals: 20 ms ≈ 50 Hz, 8 ms ≈ 125 Hz, 1 ms ≈ 1 kHz. Actual event rates also depend on input traffic and leeway.";
+            + "Calculated rates: 20 ms ≈ 50 Hz, 8 ms ≈ 125 Hz, 1 ms ≈ 1 kHz. These are requested intervals; actual delivery depends on Windows and the listener.";
 
         const string when =
             "Background raw input throttling appeared in the Windows 11 22H2 preview update KB5027303.\n"

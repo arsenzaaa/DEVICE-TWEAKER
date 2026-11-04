@@ -107,7 +107,7 @@
   <data name="Message.AUTO.PLAN" xml:space="preserve"><value>ПЛАН АВТООПТИМИЗАЦИИ</value></data>
   <data name="Message.AUTO.profile.Mouse.IMOD.0.interrupt.moderation.off" xml:space="preserve"><value>Профиль AUTO: IMOD для мыши = 0 (модерация прерываний отключена). Ручное значение IMOD задаётся отдельно.</value></data>
   <data name="Message.AUTOMATIC.BACKUP" xml:space="preserve"><value>АВТОМАТИЧЕСКИЙ БЕКАП</value></data>
-  <data name="Message.Accepted.values.DWORD.1.20.ms" xml:space="preserve"><value>Допустимые значения: DWORD 1–20 мс.</value></data>
+  <data name="Message.Accepted.values.DWORD.1.20.ms" xml:space="preserve"><value>Пользовательский интервал: DWORD 1–20 мс.</value></data>
   <data name="Message.Add.fake.device.276f977a" xml:space="preserve"><value>Добавление тестового устройства</value></data>
   <data name="Message.Affinity.mask.must.be.hexadecimal.for.example.0x3" xml:space="preserve"><value>Affinity mask должна быть шестнадцатеричной, например 0x3.</value></data>
   <data name="Message.After.reboot.run.CHECK.or.AUTO.OPTIMIZATION.again" xml:space="preserve"><value>После перезагрузки снова нажмите ПРОВЕРИТЬ или АВТООПТИМИЗАЦИЮ, чтобы применить IMOD.</value></data>
@@ -415,7 +415,7 @@
   <data name="Message.No.registry.setting" xml:space="preserve"><value>Нет параметра</value></data>
   <data name="Message.No.settings.were.changed" xml:space="preserve"><value>Настройки не изменены.</value></data>
   <data name="Message.No.suitable.physical.core.was.found" xml:space="preserve"><value>Подходящее физическое ядро не найдено.</value></data>
-  <data name="Message.Nominal.intervals.20.ms.50.Hz.8.ms" xml:space="preserve"><value>Номинальные интервалы: 20 мс ≈ 50 Гц, 8 мс ≈ 125 Гц, 1 мс ≈ 1 кГц. Фактическая частота событий также зависит от входного потока и leeway.</value></data>
+  <data name="Message.Nominal.intervals.20.ms.50.Hz.8.ms" xml:space="preserve"><value>Расчётная частота: 20 мс ≈ 50 Гц, 8 мс ≈ 125 Гц, 1 мс ≈ 1 кГц. Это запрашиваемые интервалы; фактическая доставка зависит от Windows и получателя.</value></data>
   <data name="Message.None.dc937b59" xml:space="preserve"><value>Нет</value></data>
   <data name="Message.Normal" xml:space="preserve"><value>Обычный</value></data>
   <data name="Message.Not.applied.3de0546b" xml:space="preserve"><value>не выполнено</value></data>
@@ -836,4 +836,5 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
   <data name="Read.DeviceStateReading" xml:space="preserve"><value>Чтение состояния устройств...</value></data>
   <data name="Read.DeviceStateFailed" xml:space="preserve"><value>Не удалось обновить данные устройств. Текущий список сохранен.</value></data>
   <data name="Read.DeviceReadback" xml:space="preserve"><value>Чтение состояния устройств</value></data>
+  <data name="Inline.Imod.LastRead" xml:space="preserve"><value>Считано:</value></data>
 </root>

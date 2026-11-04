@@ -598,8 +598,8 @@ public sealed partial class MainForm
 
             block.ImodMapReadAt = DateTime.Now;
             block.ImodMapStale = false;
-            block.ImodCurrentLabel.Text = $"current: {FormatImodValueList(values)} · {FormatImodReadTime(block.ImodMapReadAt.Value)}";
-            block.ImodCurrentLabel.Tag = $"current raw: {FormatImodValueListForLog(values)}";
+            block.ImodCurrentLabel.Text = $"current: {FormatImodValueList(values)}";
+            block.ImodCurrentLabel.Tag = FormatImodReadbackTooltip($"current raw: {FormatImodValueListForLog(values)}", block.ImodMapReadAt.Value);
             block.ImodCurrentLabel.ForeColor = _statusActive;
             SetImodStatusTooltip(block.ImodCurrentLabel);
             if (block.ImodMapLabel is not null)
@@ -674,6 +674,9 @@ public sealed partial class MainForm
     private static string FormatImodReadTime(DateTime readAt)
         => readAt.ToString("HH:mm", CultureInfo.InvariantCulture);
 
+    private static string FormatImodReadbackTooltip(string rawValues, DateTime readAt)
+        => $"Last read: {FormatImodReadTime(readAt)}\r\n{rawValues}";
+
     // Called after Windows reports added or removed devices: a re-plugged USB
     // device may now use another interrupter, so the shown map is outdated.
     private void MarkImodMapsStale()
@@ -683,9 +686,10 @@ public sealed partial class MainForm
             block.ImodMapStale = true;
             string text = block.ImodCurrentLabel.Text ?? string.Empty;
             block.ImodCurrentLabel.Text = $"{text} · {ImodMapStaleSuffix}";
-            block.ImodCurrentLabel.Tag = ImodMapStaleHint;
+            block.ImodCurrentLabel.Tag = $"{ImodMapStaleHint}\r\nLast read: {FormatImodReadTime(block.ImodMapReadAt!.Value)}";
             block.ImodCurrentLabel.ForeColor = _statusWarn;
             SetImodStatusTooltip(block.ImodCurrentLabel);
+            block.RelayoutAction?.Invoke();
             WriteLog($"IMOD.MAP.STALE: {block.Device.InstanceId} readAt={FormatImodReadTime(block.ImodMapReadAt!.Value)}");
         }
     }

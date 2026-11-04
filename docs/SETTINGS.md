@@ -60,12 +60,12 @@ The AUTO profile sets mouse IMOD to 0 regardless of polling rate, disabling inte
 
 **Devices** builds a profile for detected mice, keyboards, gamepads, and USB audio, then attempts to map them to interrupters through the xHCI topology. If a reliable map is unavailable, it applies one controller-wide value. **XHCI** writes one value to all interrupters; **Interrupters** opens per-index control. The details show the controller's first 64 interrupters.
 
-The device map is read from the xHCI contexts in memory: for each attached device, the interrupter named in the TRBs of its transfer ring is used, or the Slot Context target if the ring cannot be read. The read time is shown next to the current value. After a device is attached or removed, the map is marked "devices changed"; **CHECK** reads it again.
+The device map is read from the xHCI contexts in memory: for each attached device, the interrupter named in the TRBs of its transfer ring is used, or the Slot Context target if the ring cannot be read. The last read time is shown in the current value's tooltip. After a device is attached or removed, the map is marked "devices changed"; **CHECK** reads it again.
 
 The buttons have different jobs:
 
 - **SET** writes the selected configuration and reads the registers back. The program saves custom values to the startup task (see below).
-- **CHECK** rereads the registers. **REFRESH** only updates the device list.
+- **CHECK** rereads the registers and loads DTIMOD if needed. **REFRESH** updates the device list and available current state; hardware reads use an already loaded DTIMOD.
 - **DELETE** removes the shared startup configuration for IMOD and saved NIC ITR profiles and restores the network driver's moderation that **SAVE** turned off. The UI switches to the default IMOD value (0xC8). With the driver loaded, the program can also reset IMOD registers. USB IMOD writes are skipped when only saved NIC ITR profiles remain in the configuration. Restart Windows to finish resetting.
 
 **DELETE** does not create a separate automatic backup.
@@ -78,8 +78,8 @@ The IMOD interval is not added to every USB report. An event after the interrupt
 
 Register values last until a restart, sleep, or controller reset, so a separate open script applies the saved settings. It works without `DEVICE TWEAKER.exe`: the program can be removed and the startup task keeps working.
 
-- Folder `%ProgramData%\DEVICE TWEAKER\Startup`: `ApplyIMOD.ps1` (a readable PowerShell script), `DeviceTweakerImodRuntime.cs` (register code shared with the program, compiled at run time), `profile.json` (saved values and SHA-256 of every file), `Loader\` (KDU for loading DTIMOD.sys), and `logs\` (the latest 14 log files). Only administrators and SYSTEM can modify the folder.
-- The Task Scheduler task `\DEVICE TWEAKER\IMOD` runs the script as SYSTEM at sign-in, after resume from sleep, and when a USB/HID device is attached. Before running, the script checks the runtime, driver, and loader hashes against `profile.json`; a mismatch stops it.
+- Folder `%ProgramData%\DEVICE TWEAKER\Startup`: `ApplyIMOD.ps1` (a readable PowerShell script), `DeviceTweakerImodRuntime.cs` (register code shared with the program, compiled at run time), `profile.json` (saved values and SHA-256 of the runtime, DTIMOD and loader files), `Loader\` (KDU for loading DTIMOD.sys), and `logs\` (the latest 14 log files). Only administrators and SYSTEM can modify the folder.
+- The Task Scheduler task `\DEVICE TWEAKER\IMOD` runs the script as SYSTEM at sign-in, after resume and when a USB/HID device is attached. Before compiling the runtime, it checks its SHA-256 against `profile.json`. Loading DTIMOD also checks the driver, `kdu.exe` and `drv64.dll`; a mismatch stops the operation.
 - The script and the program share one DTIMOD load mutex, so they never load the driver at the same time.
 - The previous startup entry in `%AppData%` and the `Run` key is migrated automatically the first time the program starts, keeping the saved values.
 
