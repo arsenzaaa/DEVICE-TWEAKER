@@ -272,6 +272,19 @@
       "durationMs": 3000
     },
     {
+      "id": "path-home",
+      "action": "key",
+      "target": "id:BACKUP_FULL_PATH",
+      "value": "Home"
+    },
+    {
+      "id": "path-start",
+      "action": "assert",
+      "target": "id:BACKUP_FULL_PATH",
+      "property": "caret",
+      "value": "0"
+    },
+    {
       "id": "path",
       "action": "capture",
       "target": "@active"
