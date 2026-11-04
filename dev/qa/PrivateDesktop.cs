@@ -149,24 +149,35 @@ public static class DeviceTweakerQaDesktop
             uint exit;
             if (!GetExitCodeProcess(info.process, out exit)) throw Error("GetExitCodeProcess");
             result.exitCode = exit;
-            if (!TerminateJobObject(job, 1)) throw Error("TerminateJobObject");
-            var cleanup = Stopwatch.StartNew();
-            do {
-                JobAccounting counts;
-                if (!QueryInformationJobObject(job, 1, out counts, Marshal.SizeOf(typeof(JobAccounting)), IntPtr.Zero))
-                    throw Error("QueryInformationJobObject");
-                if (counts.active == 0) { result.cleanupConfirmed = true; break; }
-                System.Threading.Thread.Sleep(25);
-            } while (cleanup.Elapsed.TotalSeconds < 5);
-            if (!result.cleanupConfirmed) throw new InvalidOperationException("QA descendants did not stop.");
-            result.inputAfter = InputDesktop();
             return result;
         } finally {
-            if (info.process != IntPtr.Zero && !assigned) TerminateProcess(info.process, 1);
-            if (job != IntPtr.Zero) CloseHandle(job);
-            if (info.thread != IntPtr.Zero) CloseHandle(info.thread);
-            if (info.process != IntPtr.Zero) CloseHandle(info.process);
-            CloseDesktop(desktop);
+            try {
+                // Closing a kill-on-close job starts termination but does not wait.
+                // Confirm cleanup on timeout and exceptions as well as normal exit.
+                if (assigned) {
+                    if (!TerminateJobObject(job, 1)) throw Error("TerminateJobObject");
+                    var cleanup = Stopwatch.StartNew();
+                    do {
+                        JobAccounting counts;
+                        if (!QueryInformationJobObject(job, 1, out counts, Marshal.SizeOf(typeof(JobAccounting)), IntPtr.Zero))
+                            throw Error("QueryInformationJobObject");
+                        if (counts.active == 0) { result.cleanupConfirmed = true; break; }
+                        System.Threading.Thread.Sleep(25);
+                    } while (cleanup.Elapsed.TotalSeconds < 5);
+                    if (!result.cleanupConfirmed) throw new InvalidOperationException("QA descendants did not stop.");
+                } else if (info.process != IntPtr.Zero) {
+                    if (!TerminateProcess(info.process, 1)) throw Error("TerminateProcess");
+                    uint wait = WaitForSingleObject(info.process, 5000);
+                    if (wait == 258) throw new InvalidOperationException("Unassigned QA worker did not stop.");
+                    if (wait != 0) throw Error("WaitForSingleObject");
+                }
+                result.inputAfter = InputDesktop();
+            } finally {
+                if (job != IntPtr.Zero) CloseHandle(job);
+                if (info.thread != IntPtr.Zero) CloseHandle(info.thread);
+                if (info.process != IntPtr.Zero) CloseHandle(info.process);
+                CloseDesktop(desktop);
+            }
         }
     }
 }
