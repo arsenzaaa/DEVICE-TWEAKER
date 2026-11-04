@@ -20,7 +20,7 @@ function Test-QaEvidence([string]$RunDirectory) {
     foreach ($file in (Get-ChildItem -LiteralPath (Join-Path $manifest.snapshot 'dev\qa\tests\DeviceTweaker.Tests') -Filter '*Tests.cs' -File)) {
         $source = [IO.File]::ReadAllText($file.FullName)
         $namespace = [regex]::Match($source, 'namespace\s+([\w.]+)\s*[;{]')
-        $testClasses = [regex]::Matches($source, 'public\s+(?:sealed\s+)?class\s+(\w+Tests)\b')
+        $testClasses = [regex]::Matches($source, 'public\s+(?:(?:sealed|abstract|partial)\s+)*class\s+(\w+Tests)\b')
         if (-not $namespace.Success -or $testClasses.Count -eq 0) { throw "Could not discover test classes: $($file.Name)" }
         foreach ($class in $testClasses) {
             $expected = $namespace.Groups[1].Value + '.' + $class.Groups[1].Value
