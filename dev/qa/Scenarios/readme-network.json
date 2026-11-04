@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "readme-network",
+  "preset": "NicItr",
+  "language": "EN",
+  "filter": "NETWORK",
+  "width": 1360,
+  "height": 900,
+  "steps": [
+    { "id": "queues", "action": "assert", "target": "role:rss-queues", "device": "DEV_125C", "property": "value", "value": "4" },
+    { "id": "en", "action": "capture" },
+    { "id": "ru", "action": "language", "value": "RU" },
+    { "id": "russian", "action": "capture" }
+  ]
+}

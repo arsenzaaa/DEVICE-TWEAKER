@@ -729,6 +729,17 @@ public sealed partial class MainForm
             usbIsXhci: false, usbHasDevices: false, integratedGpu: false,
             testIrqCount: 4, testMsiStatus: "Enabled", nicPowerSaving: "off"));
 
+        // Seed the displayed runtime from the same saved example as the editors.
+        // Otherwise the information panel retains the default one-queue state.
+        foreach (DeviceInfo device in _testDevices)
+        {
+            bool intel = device.InstanceId.Contains("8086", StringComparison.OrdinalIgnoreCase);
+            TestDeviceState state = EnsureTestDeviceState(device);
+            state.RssBaseCore = intel ? 8 : 4;
+            state.RssQueues = intel ? 4 : 2;
+            state.NdisMode = "RSS";
+        }
+
         RefreshBlocks(preserveEdits: false);
 
         foreach (DeviceBlock netBlock in _blocks.Where(b => b.Kind == DeviceKind.NET_NDIS))
@@ -738,16 +749,6 @@ public sealed partial class MainForm
             // stay inside CCD0 (Intel 8/10/12/14, Realtek 4/6).
             int targetLp = isIntel ? 8 : 4;
 
-            netBlock.SuppressCpuEvents++;
-            try
-            {
-                for (int i = 0; i < netBlock.CpuBoxes.Count; i++)
-                {
-                    netBlock.CpuBoxes[i].Checked = i == targetLp;
-                }
-            }
-            finally { netBlock.SuppressCpuEvents--; }
-
             netBlock.MsiCombo.SelectedItem = "Enabled";
             netBlock.LimitBox.Text = "Unlimited";
             netBlock.PrioCombo.SelectedItem = "High";
@@ -756,6 +757,7 @@ public sealed partial class MainForm
             {
                 netBlock.RssQueueBox.Value = isIntel ? 4 : 2;
             }
+            ApplyNdisSelection(netBlock, targetLp, isIntel ? 4 : 2);
 
             if (isIntel)
             {

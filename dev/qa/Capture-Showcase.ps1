@@ -4,6 +4,7 @@
     [switch]$FullBlock,
     [switch]$ImodOnly,
     [switch]$ReadmeOnly,
+    [switch]$DetailView,
     [switch]$AllowForeground,
     [string]$ExePath,
     [string]$OutputDirectory
@@ -36,6 +37,7 @@ public static class SmokeNative {
     [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint nFlags);
     [DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr hWnd, int x, int y, int width, int height, bool repaint);
+    [DllImport("gdi32.dll")] public static extern bool BitBlt(IntPtr destination, int x, int y, int width, int height, IntPtr source, int sourceX, int sourceY, uint operation);
     public const int SW_RESTORE = 9;
     public const uint BM_CLICK = 0x00F5;
     public const uint WM_KEYDOWN = 0x0100;
@@ -185,23 +187,41 @@ function Send-WindowKey(
     Start-Sleep -Milliseconds 250
 }
 
-function Capture-Window([string]$path, [System.Windows.Automation.AutomationElement]$window) {
+function Capture-Window([string]$path, [System.Windows.Automation.AutomationElement]$window, $region = $null) {
     $r = $window.Current.BoundingRectangle
     $width = [Math]::Max(1, [int][Math]::Ceiling($r.Width))
     $height = [Math]::Max(1, [int][Math]::Ceiling($r.Height))
+    $whole = New-Object System.Drawing.Rectangle(0, 0, $width, $height)
+    if ($region -and -not $whole.Contains([System.Drawing.Rectangle]$region)) {
+        throw "Requested native capture region lies outside the window: $path"
+    }
     $hwnd = [IntPtr]$window.Current.NativeWindowHandle
     if ($hwnd -eq [IntPtr]::Zero) { throw "Window has no native handle: $path" }
 
     $bmp = New-Object System.Drawing.Bitmap($width, $height)
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $hdc = $g.GetHdc()
+    $detail = $null
     try {
-        [SmokeNative]::PrintWindow($hwnd, $hdc, [SmokeNative]::PW_RENDERFULLCONTENT) | Out-Null
+        if (-not [SmokeNative]::PrintWindow($hwnd, $hdc, [SmokeNative]::PW_RENDERFULLCONTENT)) {
+            throw "Native window capture failed: $path"
+        }
+        if ($region) {
+            $detail = New-Object System.Drawing.Bitmap($region.Width, $region.Height)
+            $detailGraphics = [System.Drawing.Graphics]::FromImage($detail)
+            $detailDc = $detailGraphics.GetHdc()
+            try {
+                if (-not [SmokeNative]::BitBlt($detailDc, 0, 0, $region.Width, $region.Height, $hdc, $region.X, $region.Y, 0x00CC0020)) {
+                    throw "Native region capture failed: $path"
+                }
+            } finally { $detailGraphics.ReleaseHdc($detailDc); $detailGraphics.Dispose() }
+        }
     } finally {
         $g.ReleaseHdc($hdc)
         $g.Dispose()
     }
-    $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
+    if ($detail) { $detail.Save($path, [System.Drawing.Imaging.ImageFormat]::Png); $detail.Dispose() }
+    else { $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png) }
     $bmp.Dispose()
     Write-Host "Captured: $path"
 }
@@ -269,6 +289,7 @@ function Capture-Scenario(
                 elseif ($preset -eq 'Intel14900K' -and $deviceTarget -eq '461E') { 1300 }
                 elseif ($preset -eq 'NicItr') { 1080 }
                 else { 1000 }
+            $captureHeight = [Math]::Min($captureHeight, $targetArea.Height - 40)
             if (-not [SmokeNative]::MoveWindow($handle, $targetX, $targetArea.Y, $targetWidth, $captureHeight, $true)) {
                 throw "Could not resize showcase window for $outputFilename"
             }
@@ -291,8 +312,37 @@ function Capture-Scenario(
             Start-Sleep -Milliseconds 600
         }
 
+        if ($DetailView -and ($preset -eq 'Imod' -or ($preset -eq 'Intel14900K' -and $deviceTarget -eq '461E'))) {
+            Send-WindowKey $main 0x23 'Show the complete IMOD readback'
+            Start-Sleep -Milliseconds 400
+        }
+
         $outPath = Join-Path $assetsScreenshots $outputFilename
         Capture-Window $outPath $main
+        if ($DetailView -and $outputFilename -match '^showcase_amd_imod_full_(ru|en)\.png$') {
+            # Copy an exact region from the native PrintWindow DC. No compositing,
+            # recreated controls, rescaling or text replacement.
+            if ([int]$main.Current.BoundingRectangle.Width -ne 1360) {
+                throw 'USB detail capture requires a 1360px window at the default layout scale'
+            }
+            $detailLanguage = $Matches[1]
+            $modeCaption = if ($lang -eq 'RU') { 'Режим:' } else { 'Mode:' }
+            $mode = Find-Desc $main $modeCaption $null 5
+            $details = Find-AutomationId $main 'IMOD_DETAILS' 5
+            if (-not $mode -or -not $details -or $mode.Current.IsOffscreen -or $details.Current.IsOffscreen) {
+                throw 'IMOD controls are not visible for a native detail capture'
+            }
+            $windowBounds = $main.Current.BoundingRectangle
+            $left = [int]($mode.Current.BoundingRectangle.Left - $windowBounds.Left) - 8
+            $top = [int]($mode.Current.BoundingRectangle.Top - $windowBounds.Top) - 8
+            $bottom = [Math]::Min([int]$windowBounds.Height - 32, [int]($details.Current.BoundingRectangle.Bottom - $windowBounds.Top) + 190)
+            $region = New-Object System.Drawing.Rectangle($left, $top, ([int]$windowBounds.Width - $left - 40), ($bottom - $top))
+            $detail = Join-Path $assetsScreenshots ("readme_usb_detail_" + $detailLanguage + '.png')
+            Capture-Window $detail $main $region
+            [ordered]@{ method='PrintWindow/BitBlt'; fullWindow=$outputFilename;
+                x=$region.X; y=$region.Y; width=$region.Width; height=$region.Height } |
+                ConvertTo-Json | Set-Content -LiteralPath ($detail + '.json') -Encoding UTF8
+        }
     } finally {
         Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
         Start-Sleep -Milliseconds 400

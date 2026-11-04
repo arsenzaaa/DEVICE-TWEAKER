@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "readme-usb",
+  "preset": "Imod",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1360,
+  "height": 900,
+  "steps": [
+    { "id": "show-details", "action": "reveal", "target": "id:IMOD_DETAILS", "device": "DEV_15B6" },
+    { "id": "details", "action": "click", "target": "id:IMOD_DETAILS", "device": "DEV_15B6" },
+    { "id": "en", "action": "capture" },
+    { "id": "ru", "action": "language", "value": "RU" },
+    { "id": "russian", "action": "capture" }
+  ]
+}

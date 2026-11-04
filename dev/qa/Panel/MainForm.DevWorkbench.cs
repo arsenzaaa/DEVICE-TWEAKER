@@ -69,7 +69,7 @@ public sealed partial class MainForm
     {
         DevScenario scene = DevFiles.Read<DevScenario>(path);
         _devRun = new() { ScenarioId = scene.Id, ScenarioSha256 = DevFiles.Hash(path), ReadOnly = QaRun.IsReadOnly,
-            Desktop = QaDesktop.CurrentName(), Environment = $"{Environment.OSVersion.Version}|dpi={DeviceDpi}|font={_blockFont.Name}/{_blockFont.Size}|{scene.Width}x{scene.Height}" };
+            Desktop = QaDesktop.CurrentName(), Environment = $"{Environment.OSVersion.Version}|dpi={DeviceDpi}|font={_blockFont.Name}/{_blockFont.Size.ToString(System.Globalization.CultureInfo.InvariantCulture)}|{scene.Width}x{scene.Height}" };
         _devClock.Restart();
         if (Math.Abs(_uiScale - 1f) > .01f) _devRun.Environment += "|layoutScale=" + _uiScale.ToString(System.Globalization.CultureInfo.InvariantCulture);
         try
