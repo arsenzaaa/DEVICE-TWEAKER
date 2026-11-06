@@ -71,7 +71,9 @@ Keep the recovery artifact outside its 90-day Actions retention window in the ma
 The README uses the theme-aware wordmark and text navigation. Full application windows belong in the [gallery](./SCREENSHOTS.md). Capture them from the read-only developer build on a hidden desktop:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Capture-Showcase.ps1 -ReadmeOnly -ExePath ".\src\bin\DeveloperQa\Release\net10.0-windows\win-x64\DEVICE TWEAKER QA.exe" -OutputDirectory ".\local\screenshots"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-DevSession.ps1 -Scenario .\dev\qa\Scenarios\gallery-intel-gpu.json -OutputRoot .\local\screenshots
 ```
+
+The `gallery-*` scenarios cover Intel/AMD affinity, USB roles/interrupters, networking, restore, operation reports and system checks. Each records EN/RU captures. Select the reviewed `images/en.png` and `images/ru.png` for the matching gallery asset; keep the session and build reference locally. `Capture-Showcase.ps1 -ReadmeOnly` produces older capture names and does not regenerate this gallery.
 
 Inspect both languages, label demonstration data and check agreement between controls, summaries and readback. Use the original captures without decorative frames. Keep the GitHub About description aligned with the English overview.

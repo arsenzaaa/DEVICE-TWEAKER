@@ -24,7 +24,21 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-Qa.ps1
 
 Requires Windows, .NET 10 SDK and an available window station for GUI checks. By default, the entire run uses a separate invisible Windows desktop. Windows, dialogs and child processes remain there; there is no desktop switch, physical input or visible fallback. `-Monitor` sets capture geometry on that desktop. `-VisibleGui` is an explicit interactive-debugging option, not part of autonomous QA.
 
-Before building, the runner copies sources, QA scripts, tests and embedded resources. Git supplies tracked and new nonignored files in `src` and `dev/qa`, so new files are included without editing a list. Builds and tests use this copy inside the run directory rather than shared project bin/obj. `inputs.json` records input SHA-256 values, checked before and after execution. The final report includes the hashes of the tested EXEs/DLLs.
+Before building, the runner copies sources, QA scripts, tests and embedded resources. Git supplies tracked and new nonignored files in `src` and `dev/qa`, together with root build configuration, so new source files are included without editing a list. Builds and tests use this copy inside the run directory rather than shared project bin/obj. `inputs.json` records input SHA-256 values, checked before and after execution. The final report includes the hashes of the tested EXEs/DLLs.
+
+## Recovering a development checkout
+
+Clone the repository or extract the source archive, then install the .NET 10 SDK on Windows. From that directory, `Invoke-DevSession.ps1` builds and runs the read-only developer scenario; it does not require old `local` contents, user backups, private certificates or prebuilt application EXEs. The pinned driver and loader artifacts are tracked with their sources and hash manifests. Package restore needs access to NuGet or a populated package cache. The full native model additionally needs C++ Build Tools and the Windows SDK.
+
+`dev/qa`, synthetic fixtures, scenarios and both QA guides belong in source control. Keep `local`, generated bin/obj, run reports, real logs and backups out of commits. Preserve an important run with its referenced shared build, or archive both together. A GitHub checkout restores the revision actually pushed; unpublished local edits are not backed up there.
+
+Run the focused cache integrity checks separately:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Test-QaBuildCache.ps1
+```
+
+These check input/SDK identity and rejection of changed sources, binaries and dependency inventories. They do not launch a GUI or execute the fixture binaries.
 
 ## Two builds
 
@@ -71,7 +85,7 @@ The normal EXE supports `--qa-read-only`. This mode is immutable for the process
 - **Resources:** twenty refreshes in the normal read-only EXE, confirmation of every press and REFRESH.DONE, handle/GDI/USER settling and memory measurements.
 - **Evidence:** recheck TRX, mandatory stages/test classes, nineteen C# regressions, two native regressions, six scaling scenarios, completed cycles and file hashes.
 
-If the local published SELF-CONTAINED directory contains backups, QA reads them through the shared restore component against in-memory storage. Originals are unchanged. Without that directory, synthetic JSON is used; TRX identifies the cases.
+Restore checks use synthetic JSON by default. To additionally inspect your own backup samples against in-memory storage, explicitly pass `-BackupSamples <directory>` to `Invoke-Qa.ps1`. Originals are unchanged. Real backups are not required, bundled or selected automatically; their paths may appear in local TRX reports.
 
 Virtual APPLY/BACKUP/RESTORE actions are labelled as model checks. Actual hardware application, driver readback and live Raw Input measurements remain `SKIPPED`.
 
@@ -83,7 +97,7 @@ A missing result, skipped required tests, changed source snapshot, nonzero worke
 
 Layout `main.png` / `restore.png` captures use native PrintWindow within display geometry. Taller windows are explicitly marked `fullWindow=false` and show only the viewport. The invisible desktop is not displayed. Separate `*.layout.png` images contain full DrawToBitmap diagnostic rendering; native text and DWM frames can differ, so these are not presented as full visual captures. Large white regions fail native-capture validation.
 
-`PASS` applies to the listed checks, not every hardware configuration. `-SkipGui` produces `PARTIAL`; a failed mandatory stage produces `FAIL` and a nonzero exit code. The script closes only its own processes and neither publishes nor runs Git commands.
+`PASS` applies to the listed checks, not every hardware configuration. `-SkipGui` produces `PARTIAL`; a failed mandatory stage produces `FAIL` and a nonzero exit code. The script closes only its own processes and does not commit, push or publish.
 
 Check an existing local EXE package separately:
 

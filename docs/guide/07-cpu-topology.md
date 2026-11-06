@@ -10,7 +10,7 @@ A CPPC rating is relative firmware guidance, not an application benchmark. CCD/C
 
 ## How AUTO uses topology
 
-AUTO selects a target CCD and physical cores using project rules, SMT relationships and available ratings. A GPU receives a physical-core pair; other roles receive their own assignments. Unreliable detection of required topology blocks the relevant automatic write.
+AUTO selects a target CCD and physical cores using project rules, SMT relationships and available ratings. A discrete GPU receives a physical-core pair; integrated-GPU affinity returns to Windows. Other roles receive their own assignments. Unreliable detection of required topology blocks the relevant automatic write.
 
 AUTO changes device settings while leaving SMT, E-cores and game-thread affinity unchanged. Core assignments depend on the detected topology; compare the resulting performance under your workload.
 

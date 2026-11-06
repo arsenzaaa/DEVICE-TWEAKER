@@ -17,6 +17,8 @@ MSI does not automatically guarantee lower latency or uninterrupted DPC executio
 | HW | The PCI device's capabilities and available message maximum. |
 | IRQ Count | Allocated-resource information, not interrupt frequency. |
 
+While a read is in progress, IRQ Mode keeps the last result. The top button shows progress for longer reads; repeated clicks do not queue another request.
+
 **READ IRQ MODE** queries all PCI devices in the list and loads DTIMOD if needed. It reads Windows interrupt resources and PCI configuration. Background reads at startup or refresh use Windows resources or an already loaded driver. If the mode cannot be determined, the result includes the reason; the registry setting remains a separate field.
 
 ## MSI Limit

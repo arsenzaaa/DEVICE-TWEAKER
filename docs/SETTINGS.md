@@ -4,7 +4,13 @@
 
 Settings, stored values and readback for each control.
 
-[Interrupts](#interrupts) · [USB xHCI IMOD](#usb-xhci-imod) · [Network adapters](#network-adapters) · [Additional settings](#additional-settings) · [Intelligent auto-optimization and restore](#intelligent-auto-optimization-and-restore)
+[Interface](#interface) · [Interrupts](#interrupts) · [USB xHCI IMOD](#usb-xhci-imod) · [Network adapters](#network-adapters) · [Additional settings](#additional-settings) · [Intelligent auto-optimization and restore](#intelligent-auto-optimization-and-restore)
+
+## Interface
+
+Toggles, scrolling and button hover use short transitions. Animations work independently of Windows visual effects. High Contrast uses immediate transitions.
+
+The interface language is saved in `%LOCALAPPDATA%\DEVICE TWEAKER\settings.json`.
 
 ## Interrupts
 
@@ -12,7 +18,7 @@ Settings, stored values and readback for each control.
 
 **MSI Mode** writes `MSISupported` for the selected device. [MSI/MSI-X](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/enabling-message-signaled-interrupts-in-the-registry) use messages instead of an interrupt line; MSI-X permits multiple vectors with different CPU affinities. MSI-X capability does not mean the driver uses every available vector.
 
-The **READ IRQ MODE** button at the top reads all PCI devices in the list through DTIMOD.sys, loading the driver if needed. Cards hidden by filters are included. The query reads Windows allocated interrupt resources and the `MSI Enable` / `MSI-X Enable` bits in PCI configuration space. Reading these bits successfully distinguishes MSI from MSI-X even with one IRQ. The query applies no settings.
+The **READ IRQ MODE** button at the top reads all PCI devices in the list through DTIMOD.sys, loading the driver if needed. Cards hidden by filters are included. The query reads Windows allocated interrupt resources and the `MSI Enable` / `MSI-X Enable` bits in PCI configuration space. Reading these bits successfully distinguishes MSI from MSI-X even with one IRQ. The query applies no settings. The button shows progress while reading and the readable/total device count when finished. Hover over it for the summary. Per-device results appear in **IRQ Mode**.
 
 **HW** shows device capability; `MSISupported` is the registry setting.
 
@@ -52,7 +58,7 @@ The current mask covers processor group 0, up to 64 logical processors. It contr
 
 ## USB xHCI IMOD
 
-Before including USB IMOD, the program reads Windows settings and the status of Defender, FACEIT and Vanguard services. A detected anti-cheat or a possible restriction on loading DTIMOD.sys appears beside the apply question. **SYSTEM CHECK** opens two sections: Windows settings and services. "No registry setting" means the registry value is absent, rather than that the feature is off. This check does not load the driver.
+Before including USB IMOD, the program reads Windows settings and the status of Defender, FACEIT and Vanguard services. Enabled HVCI and an explicitly enabled driver blocklist are listed beside the apply question. **SYSTEM CHECK** displays Windows settings, registry values and service states together. "Not configured" means the registry value is absent, rather than that the feature is off. Service presence does not determine compatibility. This check does not load the driver.
 
 The AUTO profile sets mouse IMOD to 0 regardless of polling rate, disabling interrupt moderation. This is a profile rule, not a latency measurement or a change to USB polling frequency. Manual IMOD is configured separately.
 

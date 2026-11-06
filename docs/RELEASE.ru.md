@@ -71,7 +71,9 @@ GitHub CLI [удаляет прежний файл перед загрузкой
 На главной используются wordmark для обеих тем и текстовая навигация. Полные окна находятся в [галерее](./SCREENSHOTS.ru.md). Снимайте read-only разработческую сборку на скрытом desktop:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Capture-Showcase.ps1 -ReadmeOnly -ExePath ".\src\bin\DeveloperQa\Release\net10.0-windows\win-x64\DEVICE TWEAKER QA.exe" -OutputDirectory ".\local\screenshots"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-DevSession.ps1 -Scenario .\dev\qa\Scenarios\gallery-intel-gpu.json -OutputRoot .\local\screenshots
 ```
+
+Сценарии `gallery-*` охватывают affinity Intel/AMD, роли и interrupters USB, сеть, восстановление, отчёты операций и проверку системы. Каждый сохраняет снимки EN/RU. После просмотра выберите `images/en.png` и `images/ru.png` для соответствующих файлов галереи; сессию и ссылку на сборку оставьте локально. `Capture-Showcase.ps1 -ReadmeOnly` создаёт снимки с прежними именами и не пересоздаёт эту галерею.
 
 Просмотрите оба языка, подпишите демонстрационные данные и проверьте согласованность контролов, сводок и readback. Используйте исходные снимки без декоративных рамок. Описание About должно соответствовать английской главной странице.
