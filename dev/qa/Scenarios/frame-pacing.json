@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "frame-pacing",
+  "preset": "DevicePalette",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "cadence",
+      "action": "measure-frame-pacing",
+      "value": "budget"
+    }
+  ]
+}

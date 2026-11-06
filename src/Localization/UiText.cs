@@ -6,11 +6,16 @@ internal static class UiText
     internal const string DeviceStateReading = "Read.DeviceStateReading";
     internal const string DeviceStateFailed = "Read.DeviceStateFailed";
     internal const string DeviceReadback = "Read.DeviceReadback";
+    internal const string IrqReadCount = "Status.IrqReadCount";
     internal const string Refresh = "Action.Refresh";
     internal const string Apply = "Action.Apply";
     internal const string Auto = "Action.Auto";
     internal const string Restore = "Action.Restore";
     internal const string ReadIrq = "Action.ReadIrq";
+    internal const string IrqReading = "Status.IrqReading";
+    internal const string IrqPreparing = "Status.IrqPreparing";
+    internal const string IrqCompleted = "Status.IrqCompleted";
+    internal const string ReadingIrq = "Action.ReadingIrq";
     internal const string Set = "Action.Set";
     internal const string Save = "Action.Save";
     internal const string Check = "Action.Check";

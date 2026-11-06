@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "id": "dialog-contrast",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "en-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en-restore-many-open",
+      "action": "dialog",
+      "value": "restore-many"
+    },
+    {
+      "id": "en-restore-many-ready",
+      "action": "wait",
+      "target": "id:CANCEL",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en-restore-many",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en-restore-many-hover",
+      "action": "hover",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "en-restore-many-hovered",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en-restore-many-leave",
+      "action": "leave",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "en-restore-many-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "en-restore-many-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en-warnings-open",
+      "action": "dialog",
+      "value": "warnings"
+    },
+    {
+      "id": "en-warnings-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en-warnings",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en-warnings-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "en-warnings-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru-restore-many-open",
+      "action": "dialog",
+      "value": "restore-many"
+    },
+    {
+      "id": "ru-restore-many-ready",
+      "action": "wait",
+      "target": "id:CANCEL",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru-restore-many",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru-restore-many-hover",
+      "action": "hover",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "ru-restore-many-hovered",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru-restore-many-leave",
+      "action": "leave",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "ru-restore-many-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "ru-restore-many-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru-warnings-open",
+      "action": "dialog",
+      "value": "warnings"
+    },
+    {
+      "id": "ru-warnings-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru-warnings",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru-warnings-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "ru-warnings-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    }
+  ]
+}

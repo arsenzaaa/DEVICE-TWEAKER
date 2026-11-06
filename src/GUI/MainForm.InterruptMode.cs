@@ -4,6 +4,33 @@ public sealed partial class MainForm
 {
     private bool _interruptModeCheckRunning;
     private Button _interruptModesReadButton = null!;
+    private string? _interruptModeStatusKey;
+    private object[] _interruptModeStatusArgs = [];
+
+    private void SetInterruptModeStatus(string? key, params object[] args)
+    {
+        _interruptModeStatusKey = key;
+        _interruptModeStatusArgs = args;
+        RenderInterruptModeButton();
+    }
+
+    private void RenderInterruptModeButton()
+    {
+        if (_interruptModesReadButton is null || _interruptModesReadButton.IsDisposed) return;
+        string caption = UiResources.Get(_interruptModeCheckRunning ? UiText.ReadingIrq : UiText.ReadIrq);
+        if (_interruptModeCheckRunning && _interruptModeStatusKey == UiText.IrqPreparing) caption = "IRQ: DTIMOD...";
+        else if (!_interruptModeCheckRunning && _interruptModeStatusKey == UiText.IrqCompleted
+            && _interruptModeStatusArgs.Length == 2 && _interruptModeStatusArgs[0] is int total
+            && _interruptModeStatusArgs[1] is int unavailable)
+            caption = string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                UiResources.Get(UiText.IrqReadCount), total - unavailable, total);
+        _interruptModesReadButton.Text = caption;
+        ((ThemedButton)_interruptModesReadButton).DisabledForeColor = _interruptModeCheckRunning ? _fgMain : Color.FromArgb(125, 125, 132);
+        if (_interruptModeStatusKey is not null)
+            _copyToolTip.SetToolTip(_interruptModesReadButton, string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                UiResources.Get(_interruptModeStatusKey), _interruptModeStatusArgs));
+        else _copyToolTip?.SetToolTip(_interruptModesReadButton, string.Empty);
+    }
 
     private void UpdateInterruptModesStatus()
     {
@@ -11,6 +38,7 @@ public sealed partial class MainForm
         if (!_interruptModeCheckRunning)
             _interruptModesReadButton.Enabled = _devicesBusyDepth == 0 && !_operations.IsBusy && _blocks.Any(block =>
                 block.Device.InstanceId.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase));
+        SetInterruptModeStatus(_interruptModeStatusKey, _interruptModeStatusArgs);
         _interruptModesReadButton.AccessibleName = UiLanguage.Text("Read interrupt modes for all PCI devices");
     }
 
@@ -43,13 +71,17 @@ public sealed partial class MainForm
         Button[] actions = InterruptModeActionButtons(this).Where(button => button.Enabled).ToArray();
         _devicesBusyDepth++;
         int generation = _irqRefreshGeneration;
+        SetInterruptModeStatus(UiText.IrqReading, snapshot.Length);
+        IProgress<string> progress = new Progress<string>(key =>
+        {
+            if (_interruptModeCheckRunning && !IsDisposed && !Disposing)
+                SetInterruptModeStatus(key, snapshot.Length);
+        });
         try
         {
             foreach (Button button in actions) button.Enabled = false;
             UpdateInterruptModesStatus();
-            foreach (DeviceBlock block in snapshot)
-                if (block.InterruptModeLabel is { IsDisposed: false } label)
-                    label.Text = UiLanguage.Text("reading...");
+            // Keep the last result readable while its replacement is being queried.
             WriteLog($"IRQ.MODE.BEGIN: scope=all-pci devices={snapshot.Length} simulated={simulated}");
             var results = await Task.Run(() =>
             {
@@ -64,10 +96,12 @@ public sealed partial class MainForm
 #endif
                 }
                 if (!IsAdministrator()) return Failed("administrator privileges required");
+                progress.Report(UiText.IrqPreparing);
                 // An explicit refresh prepares the current payload if it has not been staged yet.
                 if (!EnsureImodDriverOnDisk(persistDriver: true, out string driverPath, out string? error)
                     || !ImodDriverContext.TryInitialize(driverPath, WriteLog, out ImodDriverContext? context, out error))
                     return Failed(error ?? "DTIMOD load failed");
+                progress.Report(UiText.IrqReading);
                 using (context)
                     return snapshot.Select(block =>
                     {
@@ -80,16 +114,23 @@ public sealed partial class MainForm
                     }).ToArray();
             });
             if (!IsDisposed && generation == _irqRefreshGeneration)
+            {
                 foreach (var (block, result) in results)
                     if (_blocks.Contains(block)) SetInterruptModeResult(block, result);
+                SetInterruptModeStatus(UiText.IrqCompleted, results.Length,
+                    results.Count(item => item.Item2.Mode == InterruptMode.Unavailable));
+            }
             WriteLog($"IRQ.MODE.END: scope=all-pci devices={results.Length}");
         }
         catch (Exception ex)
         {
             WriteLog($"IRQ.MODE.ERROR: {ex}");
             if (!IsDisposed && generation == _irqRefreshGeneration)
+            {
                 foreach (DeviceBlock block in snapshot)
                     if (_blocks.Contains(block)) SetInterruptModeResult(block, new(InterruptMode.Unavailable, ex.Message, DateTimeOffset.Now));
+                SetInterruptModeStatus(UiText.IrqCompleted, snapshot.Length, snapshot.Length);
+            }
         }
         finally
         {

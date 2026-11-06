@@ -139,6 +139,16 @@ public sealed partial class MainForm
                 storageTag: storageTag, wifi: false, usbIsXhci: false, usbHasDevices: false,
                 integratedGpu: false, testIrqCount: 1, testMsiStatus: "Enabled"));
 
+        // Mixed vendors on one CPU platform: colour must follow the controller.
+        _testDevices.Add(CreateTestDevice(DeviceKind.USB, "AMD USB 3.20 eXtensible Host Controller",
+            @"PCI\VEN_1022&DEV_15B6\PALETTE_USB_AMD", usbRoles: "Mouse 1K", audioEndpoints: "",
+            storageTag: "", wifi: false, usbIsXhci: true, usbHasDevices: true,
+            integratedGpu: false, testIrqCount: 2, testMsiStatus: "Enabled"));
+        _testDevices.Add(CreateTestDevice(DeviceKind.USB, "ASMedia USB 3.1 eXtensible Host Controller",
+            @"PCI\VEN_1B21&DEV_1242\PALETTE_USB_OTHER", usbRoles: "Gamepad", audioEndpoints: "",
+            storageTag: "", wifi: false, usbIsXhci: true, usbHasDevices: true,
+            integratedGpu: false, testIrqCount: 2, testMsiStatus: "Enabled"));
+
         Add(DeviceKind.GPU, "AMD Radeon RX 9070 XT", "GPU_AMD");
         Add(DeviceKind.GPU, "Intel Arc B580", "GPU_INTEL");
         Add(DeviceKind.GPU, "Generic display adapter", "GPU_OTHER");

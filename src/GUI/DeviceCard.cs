@@ -53,13 +53,22 @@ internal sealed class DeviceCard : UserControl
         };
         _kind = new Label
         {
-            Text = kind, Font = style.TitleFont, ForeColor = kindColor, AutoSize = true,
-            Margin = new Padding(0, 0, S(6), 0),
+            Text = kind.Trim('[', ']'), Font = style.TitleFont, ForeColor = kindColor, AutoSize = true,
+            Padding = new Padding(S(4), S(1), S(4), S(1)), Margin = new Padding(0, 0, S(8), 0),
+            TextAlign = ContentAlignment.MiddleCenter, BackColor = style.Background,
+        };
+        _kind.Paint += (_, e) =>
+        {
+            Rectangle bounds = _kind.ClientRectangle;
+            if (bounds.Width <= 1 || bounds.Height <= 1) return;
+            using Pen border = new(Color.FromArgb(127, 132, 140));
+            e.Graphics.DrawRectangle(border, 0, 0, bounds.Width - 1, bounds.Height - 1);
         };
         TitleLabel = new HighlightLabel
         {
             Text = title, Font = style.TitleFont, ForeColor = style.Foreground,
-            AutoSize = false, AutoEllipsis = true, UseMnemonic = false, Margin = Padding.Empty,
+            AutoSize = false, AutoEllipsis = true, UseMnemonic = false,
+            Margin = new Padding(0, S(1), 0, 0),
             HighlightText = "Mouse scanning", HighlightColor = Color.FromArgb(120, 120, 120),
         };
         ModifiedBadge = new Label
@@ -74,6 +83,7 @@ internal sealed class DeviceCard : UserControl
             Location = new Point(S(16), S(36)), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
         };
         Controls.AddRange([Header, Divider]);
+        _kind.SizeChanged += (_, _) => ArrangeHeader();
         TitleLabel.TextChanged += (_, _) => ArrangeHeader();
         TitleLabel.FontChanged += (_, _) => ArrangeHeader();
         ModifiedBadge.TextChanged += (_, _) => ArrangeHeader();

@@ -837,4 +837,32 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
   <data name="Read.DeviceStateFailed" xml:space="preserve"><value>Не удалось обновить данные устройств. Текущий список сохранен.</value></data>
   <data name="Read.DeviceReadback" xml:space="preserve"><value>Чтение состояния устройств</value></data>
   <data name="Inline.Imod.LastRead" xml:space="preserve"><value>Считано:</value></data>
+  <data name="Action.ReadingIrq" xml:space="preserve"><value>СЧИТЫВАНИЕ...</value></data>
+  <data name="Status.IrqReading" xml:space="preserve"><value>Чтение режимов IRQ: PCI-устройств - {0}...</value></data>
+  <data name="Status.IrqPreparing" xml:space="preserve"><value>Подготовка DTIMOD для чтения режимов IRQ...</value></data>
+  <data name="Status.IrqCompleted" xml:space="preserve"><value>Проверено PCI-устройств: {0} · недоступно: {1} · результаты в IRQ Mode</value></data>
+  <data name="Status.IrqReadCount" xml:space="preserve"><value>СЧИТАТЬ IRQ: {0}/{1}</value></data>
+  <data name="Operation.CheckBusy" xml:space="preserve"><value>ЧТЕНИЕ…</value></data>
+  <data name="Operation.SaveBusy" xml:space="preserve"><value>СОХРАНЕНИЕ</value></data>
+  <data name="Operation.SetBusy" xml:space="preserve"><value>ЗАПИСЬ</value></data>
+  <data name="Operation.DeleteBusy" xml:space="preserve"><value>СБРОС…</value></data>
+  <data name="Operation.ApplyBusy" xml:space="preserve"><value>ПРИМЕНЕНИЕ…</value></data>
+  <data name="Operation.AutoBusy" xml:space="preserve"><value>ОПТИМИЗАЦИЯ…</value></data>
+  <data name="Operation.RestoreBusy" xml:space="preserve"><value>ВОССТАНОВЛЕНИЕ…</value></data>
+  <data name="SystemCheck.NotInstalled" xml:space="preserve"><value>Не установлена</value></data>
+  <data name="SystemCheck.BlocklistRegistry" xml:space="preserve"><value>Блокировка драйверов (реестр)</value></data>
+  <data name="SystemCheck.RegistryValues" xml:space="preserve"><value>Значения реестра</value></data>
+  <data name="SystemCheck.Scope" xml:space="preserve"><value>Загрузка драйвера и совместимость с античитами не проверялись.</value></data>
+  <data name="SystemCheck.AntiCheatScope" xml:space="preserve"><value>Эта проверка не определяет совместимость с античитами.</value></data>
+  <data name="SystemCheck.BlocklistConfigured" xml:space="preserve"><value>В реестре включён список блокировки драйверов.</value></data>
+  <data name="SystemCheck.HvciEnabled" xml:space="preserve"><value>Целостность памяти (HVCI) включена.</value></data>
+  <data name="BackupReason.BeforeAuto" xml:space="preserve"><value>До автооптимизации</value></data>
+  <data name="BackupReason.BeforeApply" xml:space="preserve"><value>До применения настроек</value></data>
+  <data name="BackupReason.BeforeImod" xml:space="preserve"><value>До изменения USB IMOD</value></data>
+  <data name="BackupReason.BeforeNic" xml:space="preserve"><value>До изменения NIC ITR</value></data>
+  <data name="BackupReason.BeforeNicSave" xml:space="preserve"><value>До сохранения профиля NIC ITR</value></data>
+  <data name="BackupReason.BeforeRestore" xml:space="preserve"><value>До восстановления из бекапа</value></data>
+  <data name="BackupReason.BeforeReset" xml:space="preserve"><value>До сброса настроек</value></data>
+  <data name="BackupReason.Original" xml:space="preserve"><value>Исходные настройки устройств</value></data>
+  <data name="BackupReason.Generic" xml:space="preserve"><value>Бекап настроек устройств</value></data>
 </root>

@@ -751,16 +751,9 @@ internal static partial class UiLanguage
             string path = GetSettingsFilePath();
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             tempPath = path + ".tmp-" + Guid.NewGuid().ToString("N");
-            UiSettings settings = new()
-            {
-                Language = language == UiLanguageCode.Russian ? "ru" : "en",
-            };
-            JsonSerializerOptions options = new()
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                WriteIndented = true,
-            };
-            string json = JsonSerializer.Serialize(settings, options) + Environment.NewLine;
+            string? existing = File.Exists(path) ? File.ReadAllText(path) : null;
+            string selectedLanguage = language == UiLanguageCode.Russian ? "ru" : "en";
+            string json = UiPreferenceSettings.Update(existing, selectedLanguage) + Environment.NewLine;
             File.WriteAllText(tempPath, json, new UTF8Encoding(false));
             File.Move(tempPath, path, overwrite: true);
             return true;
@@ -799,7 +792,7 @@ internal static partial class UiLanguage
         }
 
         string json = File.ReadAllText(path);
-        UiSettings? settings = JsonSerializer.Deserialize<UiSettings>(
+        UiPreferenceSettings? settings = JsonSerializer.Deserialize<UiPreferenceSettings>(
             json,
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         if (settings is null || !TryParse(settings.Language, out language))
@@ -878,11 +871,6 @@ internal static partial class UiLanguage
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             SettingsApplicationDirectory,
             LegacyLanguageFileName);
-
-    private sealed class UiSettings
-    {
-        public string Language { get; set; } = "en";
-    }
 
     private static readonly IReadOnlyDictionary<string, string> Russian = UiResources.LoadRussianPhrases();
 

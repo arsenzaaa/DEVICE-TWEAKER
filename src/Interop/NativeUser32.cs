@@ -7,6 +7,14 @@ internal static class NativeUser32
 {
     internal delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
+    [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ReadUiPreference(uint action, uint parameter,
+        [MarshalAs(UnmanagedType.Bool)] out bool enabled, uint flags);
+
+    internal static bool ClientAreaAnimationsEnabled()
+        => ReadUiPreference(0x1042 /* SPI_GETCLIENTAREAANIMATION */, 0, out bool enabled, 0) && enabled;
+
     internal const int SwRestore = 9;
     internal const int SbHorz = 0;
     internal const int SbVert = 1;

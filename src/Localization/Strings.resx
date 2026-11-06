@@ -837,4 +837,32 @@ Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IM
   <data name="Read.DeviceStateFailed" xml:space="preserve"><value>Device data could not be refreshed. The current list was preserved.</value></data>
   <data name="Read.DeviceReadback" xml:space="preserve"><value>Device readback</value></data>
   <data name="Inline.Imod.LastRead" xml:space="preserve"><value>Last read:</value></data>
+  <data name="Action.ReadingIrq" xml:space="preserve"><value>READING IRQ...</value></data>
+  <data name="Status.IrqReading" xml:space="preserve"><value>Reading IRQ modes: {0} PCI devices...</value></data>
+  <data name="Status.IrqPreparing" xml:space="preserve"><value>Preparing DTIMOD to read IRQ modes...</value></data>
+  <data name="Status.IrqCompleted" xml:space="preserve"><value>PCI devices checked: {0} · unavailable: {1} · results in IRQ Mode</value></data>
+  <data name="Status.IrqReadCount" xml:space="preserve"><value>READ IRQ: {0}/{1}</value></data>
+  <data name="Operation.CheckBusy" xml:space="preserve"><value>CHECK…</value></data>
+  <data name="Operation.SaveBusy" xml:space="preserve"><value>SAVE…</value></data>
+  <data name="Operation.SetBusy" xml:space="preserve"><value>SET…</value></data>
+  <data name="Operation.DeleteBusy" xml:space="preserve"><value>DELETE…</value></data>
+  <data name="Operation.ApplyBusy" xml:space="preserve"><value>APPLY…</value></data>
+  <data name="Operation.AutoBusy" xml:space="preserve"><value>AUTO…</value></data>
+  <data name="Operation.RestoreBusy" xml:space="preserve"><value>RESTORING…</value></data>
+  <data name="SystemCheck.NotInstalled" xml:space="preserve"><value>Not installed</value></data>
+  <data name="SystemCheck.BlocklistRegistry" xml:space="preserve"><value>Driver blocklist (registry)</value></data>
+  <data name="SystemCheck.RegistryValues" xml:space="preserve"><value>Registry values</value></data>
+  <data name="SystemCheck.Scope" xml:space="preserve"><value>Driver loading and anti-cheat compatibility are not tested.</value></data>
+  <data name="SystemCheck.AntiCheatScope" xml:space="preserve"><value>Anti-cheat compatibility is not tested by this check.</value></data>
+  <data name="SystemCheck.BlocklistConfigured" xml:space="preserve"><value>Driver blocklist is configured on.</value></data>
+  <data name="SystemCheck.HvciEnabled" xml:space="preserve"><value>Memory integrity (HVCI) is enabled.</value></data>
+  <data name="BackupReason.BeforeAuto" xml:space="preserve"><value>Before auto-optimization</value></data>
+  <data name="BackupReason.BeforeApply" xml:space="preserve"><value>Before applying settings</value></data>
+  <data name="BackupReason.BeforeImod" xml:space="preserve"><value>Before USB IMOD changes</value></data>
+  <data name="BackupReason.BeforeNic" xml:space="preserve"><value>Before NIC ITR changes</value></data>
+  <data name="BackupReason.BeforeNicSave" xml:space="preserve"><value>Before saving NIC ITR profile</value></data>
+  <data name="BackupReason.BeforeRestore" xml:space="preserve"><value>Before restoring a backup</value></data>
+  <data name="BackupReason.BeforeReset" xml:space="preserve"><value>Before resetting tweaks</value></data>
+  <data name="BackupReason.Original" xml:space="preserve"><value>Original device settings</value></data>
+  <data name="BackupReason.Generic" xml:space="preserve"><value>Device settings backup</value></data>
 </root>

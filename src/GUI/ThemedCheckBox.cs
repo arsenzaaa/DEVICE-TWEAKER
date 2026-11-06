@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing.Drawing2D;
 
 namespace DeviceTweakerCS;
@@ -8,6 +9,49 @@ internal sealed class ThemedCheckBox : CheckBox
     private bool _hovered;
     private bool _pressed;
     private bool _syncCheckedStateText;
+    private readonly ToggleTransition _motion = new();
+    private UiFrameClock.Subscription? _motionFrames;
+    private static double MotionNow => Stopwatch.GetTimestamp() * 1000.0 / Stopwatch.Frequency;
+#if DEVELOPER_QA
+    // Only the hidden component audit may model disabled local motion.
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    internal bool? QaAnimationPreference { get; set; }
+    internal event EventHandler? QaFramePainted;
+    internal float QaKnobPosition => _motion.Position(MotionNow);
+    internal bool QaAnimationTimerRunning => _motionFrames?.IsActive == true;
+#endif
+
+    private bool CanAnimate => UiMotion.CanAnimate(this) && !DesignMode
+#if DEVELOPER_QA
+        && (QaAnimationPreference ?? true)
+#endif
+        ;
+
+    private void StopMotion()
+    {
+        _motionFrames?.Dispose(); _motionFrames = null;
+        _motion.Complete();
+    }
+
+    private void InvalidateTrack() => Invalidate(new Rectangle(0, 0, Math.Min(Width, 40), Height));
+
+    protected override void OnVisibleChanged(EventArgs e)
+    {
+        if (!Visible) StopMotion();
+        base.OnVisibleChanged(e);
+    }
+
+    protected override void OnHandleDestroyed(EventArgs e)
+    {
+        StopMotion();
+        base.OnHandleDestroyed(e);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) { _motionFrames?.Dispose(); _motionFrames = null; }
+        base.Dispose(disposing);
+    }
 
     [DefaultValue(typeof(Color), "150, 150, 150")]
     public Color BorderColor { get; set; } = Color.FromArgb(150, 150, 150);
@@ -97,12 +141,29 @@ internal sealed class ThemedCheckBox : CheckBox
     protected override void OnCheckedChanged(EventArgs e)
     {
         SyncTextFromChecked();
+        _motion.SetTarget(Checked, MotionNow, CanAnimate);
+        if (_motion.IsRunning)
+        {
+            if (_motionFrames?.IsActive != true)
+            {
+                _motionFrames = UiFrameClock.Start(this, finish =>
+                {
+                    if (finish || !CanAnimate) _motion.Complete();
+                    _motion.Position(MotionNow);
+                    InvalidateTrack(); Update();
+                    return _motion.IsRunning;
+                });
+                if (_motionFrames is null) _motion.Complete();
+            }
+        }
+        else { _motionFrames?.Dispose(); _motionFrames = null; }
         Invalidate();
         base.OnCheckedChanged(e);
     }
 
     protected override void OnEnabledChanged(EventArgs e)
     {
+        if (!Enabled) StopMotion();
         Invalidate();
         base.OnEnabledChanged(e);
     }
@@ -155,9 +216,9 @@ internal sealed class ThemedCheckBox : CheckBox
 
         float knobSize = Math.Max(8f, trackRect.Height - 6f);
         float knobPad = Math.Max(2f, (trackRect.Height - knobSize) / 2f);
-        float knobLeft = Checked
-            ? trackRect.Right - knobSize - knobPad
-            : trackRect.Left + knobPad;
+        float position = _motion.Position(MotionNow);
+        float knobLeft = trackRect.Left + knobPad
+            + position * (trackRect.Width - knobSize - 2 * knobPad);
         RectangleF knobRect = new(knobLeft, trackRect.Top + knobPad, knobSize, knobSize);
         using SolidBrush knobBrush = new(Enabled ? CheckColor : Color.FromArgb(120, 120, 125));
         g.FillEllipse(knobBrush, knobRect);
@@ -181,6 +242,9 @@ internal sealed class ThemedCheckBox : CheckBox
             | TextFormatFlags.NoPadding
             | TextFormatFlags.EndEllipsis);
 
+#if DEVELOPER_QA
+        QaFramePainted?.Invoke(this, EventArgs.Empty);
+#endif
         if (Focused && ShowFocusCues && Enabled)
             ControlPaint.DrawFocusRectangle(g, Rectangle.Inflate(ClientRectangle, -1, -1), ForeColor, BackColor);
     }

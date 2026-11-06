@@ -1,0 +1,35 @@
+﻿{
+  "schemaVersion": 1,
+  "id": "motion-lifecycle",
+  "preset": "DevicePalette",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "en",
+      "action": "audit-motion-lifecycle"
+    },
+    {
+      "id": "ru-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru-size",
+      "action": "resize",
+      "width": 1000,
+      "height": 760
+    },
+    {
+      "id": "ru-scale",
+      "action": "layout-rebind",
+      "value": "144"
+    },
+    {
+      "id": "ru",
+      "action": "audit-motion-lifecycle"
+    }
+  ]
+}

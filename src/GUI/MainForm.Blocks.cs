@@ -187,7 +187,7 @@ public sealed partial class MainForm
             || name.Contains("RTX", StringComparison.OrdinalIgnoreCase)
             || name.Contains("GTX", StringComparison.OrdinalIgnoreCase))
         {
-            return ("[GPU]", Color.FromArgb(118, 185, 0));
+            return ("[GPU]", DeviceBadgePalette.Nvidia);
         }
 
         // AMD: VEN_1002 or AMD/Radeon -> signature red
@@ -195,7 +195,7 @@ public sealed partial class MainForm
             || name.Contains("AMD", StringComparison.OrdinalIgnoreCase)
             || name.Contains("Radeon", StringComparison.OrdinalIgnoreCase))
         {
-            return ("[GPU]", Color.FromArgb(235, 60, 60));
+            return ("[GPU]", DeviceBadgePalette.Amd);
         }
 
         // Intel: VEN_8086 or Intel/Arc -> signature blue
@@ -203,10 +203,10 @@ public sealed partial class MainForm
             || name.Contains("Intel", StringComparison.OrdinalIgnoreCase)
             || name.Contains("Arc", StringComparison.OrdinalIgnoreCase))
         {
-            return ("[GPU]", Color.FromArgb(45, 155, 255));
+            return ("[GPU]", DeviceBadgePalette.Intel);
         }
 
-        return ("[GPU]", DeviceBadgePalette.Unknown);
+        return ("[GPU]", DeviceBadgePalette.Neutral);
     }
 
     private void NewDeviceBlock(
@@ -214,6 +214,9 @@ public sealed partial class MainForm
         int index,
         IReadOnlyDictionary<string, string>? priorImodStatuses = null, CardPresentation? presentation = null)
     {
+#if DEVELOPER_QA
+        long cardStarted = Stopwatch.GetTimestamp();
+#endif
         DeviceBlock? createdBlock = null;
         string title = BuildDeviceBlockTitle(device);
         DeviceCard grp = NewDeviceCard(device, title);
@@ -222,7 +225,7 @@ public sealed partial class MainForm
         WriteLog(
             $"UI.BLOCK: idx={index} title=\"{logTitle}\" kind={device.Kind} id={device.InstanceId} roles=\"{device.UsbRoles}\" audio=\"{device.AudioEndpoints}\" storage=\"{device.StorageTag}\"");
 
-        grp.Width = GetDevicesViewportWidth() - UiScale(40);
+        grp.Width = Math.Max(UiScale(360), GetDevicesViewportWidth() - UiScale(36));
         grp.Height = _grpHeight;
         grp.BackColor = _bgGroup;
         grp.ForeColor = _fgMain;
@@ -273,7 +276,13 @@ public sealed partial class MainForm
             e.Graphics.DrawRectangle(pen, rect);
         };
 
+#if DEVELOPER_QA
+        long gridStarted = Stopwatch.GetTimestamp();
+#endif
         (List<CheckBox> cpuBoxes, int cpuContentRight, int requiredWidth, int cpuContentHeight) = BuildAffinityCheckboxes(device, cpuPanel);
+#if DEVELOPER_QA
+        _devCpuGridTimes.Add(Stopwatch.GetElapsedTime(gridStarted).TotalMilliseconds);
+#endif
         int settingsX = UiScale(18);
         int availableSettingsWidth = Math.Max(UiScale(260), grp.Width - settingsX - UiScale(24));
         void UpdateResponsivePlacement()
@@ -1033,16 +1042,25 @@ public sealed partial class MainForm
         ImodRoleEditor imodRoleEditor = new(this, imodDeviceEditorRoles, txtImod, chkImod, cmbImodMode);
 
         Button btnImodApply = NewCardButton(UiText.Set, UiScale(54, 24));
-        btnImodApply.Click += async (_, _) => await ApplyImodFromBlock(createdBlock);
+        btnImodApply.Click += async (_, _) =>
+        {
+            using IDisposable feedback = BeginButtonFeedback(btnImodApply, "SET…");
+            await ApplyImodFromBlock(createdBlock);
+        };
 
         Button btnImodDelete = NewCardButton(UiText.Delete, UiScale(76, 24));
-        btnImodDelete.Click += async (_, _) => await DeleteImodFromBlock(createdBlock);
+        btnImodDelete.Click += async (_, _) =>
+        {
+            using IDisposable feedback = BeginButtonFeedback(btnImodDelete, "DELETE…");
+            await DeleteImodFromBlock(createdBlock);
+        };
 
         Button btnImodCheck = NewCardButton(UiText.Check, UiScale(76, 24));
         btnImodCheck.Click += async (_, _) =>
         {
             if (createdBlock is not null)
             {
+                using IDisposable feedback = BeginButtonFeedback(btnImodCheck, "CHECK…");
                 await CheckImodDriverFromBlock(createdBlock);
             }
         };
@@ -1663,16 +1681,43 @@ public sealed partial class MainForm
         if (presentation is null) block.CaptureInitialState();
         else block.RestoreInitialState(presentation.Baseline);
 
+        // Place a new native card before parenting it. Otherwise every card is
+        // temporarily painted at (0,0) while a cooperative refresh yields.
+        int provisionalTop = _blocks.Count == 0 ? UiScale(18) : _blocks[^1].Group.Bottom + UiScale(18);
+        grp.Location = new Point(UiScale(24), provisionalTop);
         _devicesPanel.Controls.Add(grp);
         _blocks.Add(block);
+#if DEVELOPER_QA
+        _devCardTimes.Add(Stopwatch.GetElapsedTime(cardStarted).TotalMilliseconds);
+#endif
         if (showImod && block.Device.IsTestDevice && presentation is null)
         {
             RefreshTestImodPreview(block, "test-block-init");
         }
     }
 
-    private void LayoutBlocks()
+    private int _deviceBuildLayoutDepth;
+
+    private sealed class DeviceLayoutBatch : IDisposable
     {
+        private MainForm? _owner;
+        internal DeviceLayoutBatch(MainForm owner) { _owner = owner; owner._deviceBuildLayoutDepth++; }
+        public void Dispose()
+        {
+            if (_owner is not { } owner) return;
+            _owner = null;
+            owner._deviceBuildLayoutDepth--;
+        }
+    }
+
+    private void LayoutBlocks(bool relayoutCards = true)
+    {
+        // Loading individual controls can fire change events. Reflow the list
+        // once after a batch rather than once for every intermediate value.
+        if (_deviceBuildLayoutDepth > 0) return;
+#if DEVELOPER_QA
+        _devLayoutCalls++;
+#endif
         if (_uiDisposing || IsDisposed || Disposing) return;
         int paddingX = UiScale(24);
         int gapY = UiScale(18);
@@ -1724,12 +1769,14 @@ public sealed partial class MainForm
                 width = UiScale(360);
             }
 
-            b.Group.Width = width;
-            RelayoutDeviceBlockChrome(b);
-
-            int currentHeight = b.InfoLabel.Height > 0 ? b.InfoLabel.Height : UiScale(60);
-            int infoWidth = Math.Max(UiScale(140), b.Group.Width - b.InfoLabel.Left - UiScale(24));
-            b.InfoLabel.Size = new Size(infoWidth, currentHeight);
+            if (relayoutCards || b.Group.Width != width)
+            {
+                b.Group.Width = width;
+                RelayoutDeviceBlockChrome(b);
+                int currentHeight = b.InfoLabel.Height > 0 ? b.InfoLabel.Height : UiScale(60);
+                int infoWidth = Math.Max(UiScale(140), b.Group.Width - b.InfoLabel.Left - UiScale(24));
+                b.InfoLabel.Size = new Size(infoWidth, currentHeight);
+            }
 
             PlaceControl(b.Group);
 
@@ -2043,11 +2090,12 @@ public sealed partial class MainForm
     private readonly DeviceDiscovery _deviceDiscovery = new();
 
 #if DEVELOPER_QA
-    // Existing fixture editors are synchronous. Pure model readbacks complete inline;
-    // mixed/native developer views keep an observed task rather than block the UI.
+    // Legacy fixture editors seed controls synchronously. Their pure model refresh
+    // skips only cooperative UI yields; asynchronous readers remain asynchronous.
+    // Workbench REFRESH and performance actions use the regular yielding path.
     private void RefreshBlocks(bool includeImodReadback = true, bool preserveEdits = true)
     {
-        Task<OperationReport> refresh = RefreshBlocksAsync(includeImodReadback, preserveEdits);
+        Task<OperationReport> refresh = _lastDeviceRefresh = RefreshBlocksCoreAsync(includeImodReadback, preserveEdits, yieldUi: false);
         if (refresh.IsCompleted) refresh.GetAwaiter().GetResult();
         else _ = ObserveDeviceRefreshAsync(refresh);
     }
@@ -2062,10 +2110,11 @@ public sealed partial class MainForm
     private Task<OperationReport> RefreshBlocksAsync(bool includeImodReadback = true, bool preserveEdits = true)
         => _lastDeviceRefresh = RefreshBlocksCoreAsync(includeImodReadback, preserveEdits);
 
-    private async Task<OperationReport> RefreshBlocksCoreAsync(bool includeImodReadback, bool preserveEdits)
+    private async Task<OperationReport> RefreshBlocksCoreAsync(bool includeImodReadback, bool preserveEdits, bool yieldUi = true)
     {
         OperationReport refreshReport = new();
         long refreshStarted = Stopwatch.GetTimestamp();
+        SetInterruptModeStatus(null);
         WriteLog($"REFRESH.START: includeImodReadback={includeImodReadback} previousBlocks={_blocks.Count}");
         bool ownsBusy = _devicesBusyDepth == 0;
         // Temporary budget until device count is known after enumeration.
@@ -2080,7 +2129,11 @@ public sealed partial class MainForm
 
         try
         {
+#if DEVELOPER_QA
+            DevMarkUiStage("refresh-start");
+#endif
             DiscoveryInput input = CaptureDiscoveryInput();
+            Task<SnapshotReadResult<DriverMetadata>>? metadataRead = BeginDriverMetadataRead();
             DeviceDiscoveryResult discovery = await _deviceDiscovery.ReadAsync(
                 () => DiscoverDevicesAsync(input),
                 TimeSpan.FromSeconds(30), error => AppDiagnostics.Warn("SCAN.LATE", error));
@@ -2094,7 +2147,7 @@ public sealed partial class MainForm
             }
             IReadOnlyList<DeviceInfo> devs = discovery.Devices;
             SetDevicesBusyStage(UiResources.English(UiText.DeviceStateReading));
-            SnapshotReadResult<DisplaySnapshot> display = await ReadDisplaySnapshotAsync(devs);
+            SnapshotReadResult<DisplaySnapshot> display = await ReadDisplaySnapshotAsync(devs, metadataRead);
             if (_uiDisposing || IsDisposed || Disposing) return refreshReport;
             if (display.Snapshot is null)
             {
@@ -2136,14 +2189,21 @@ public sealed partial class MainForm
                 priorImodStatuses[NormalizeInstanceId(block.Device.InstanceId)] = statusText;
             }
 
+#if DEVELOPER_QA
+            DevMarkUiStage("before-dispose");
+#endif
             TickDevicesBusy("Clearing device list...", ownsBusy ? 1 : 0);
             int tooltipRegistrationsBeforeClear = _copyToolTip.RegistrationCount;
+            using DeviceLayoutBatch layoutBatch = new(this);
             _devicesPanel.SuspendLayout();
             try
             {
                 DisposeDeviceBlocks();
                 WriteLog($"REFRESH.TOOLTIPS: before={tooltipRegistrationsBeforeClear} after={_copyToolTip.RegistrationCount}");
 
+#if DEVELOPER_QA
+            DevMarkUiStage("after-dispose");
+#endif
                 TickDevicesBusy("Enumerating devices...", ownsBusy ? 1 : 0);
                 WarnIfMissingGpuDriver(devs);
 
@@ -2163,8 +2223,10 @@ public sealed partial class MainForm
                     SetDevicesBusyStage("Building device list (0/0)");
                 }
 
+                long uiSliceStarted = Stopwatch.GetTimestamp();
                 foreach (DeviceInfo d in devs)
                 {
+                    if (_uiDisposing || IsDisposed || Disposing) return refreshReport;
                     if (ownsBusy)
                     {
                         TickDevicesBusy($"Building device list ({index + 1}/{total})", 1);
@@ -2176,8 +2238,18 @@ public sealed partial class MainForm
 
                     NewDeviceBlock(d, index, priorImodStatuses);
                     index++;
+                    if (yieldUi && index < devs.Count && Stopwatch.GetElapsedTime(uiSliceStarted).TotalMilliseconds >= 20)
+                    {
+                        // Yield to input/paint between UI-owned control batches.
+                        // Task.Yield alone can keep posting ahead of WM_PAINT/WM_TIMER.
+                        await YieldDeviceUiAsync();
+                        if (_uiDisposing || IsDisposed || Disposing) return refreshReport;
+                        uiSliceStarted = Stopwatch.GetTimestamp();
+                    }
                 }
 
+                if (yieldUi) await YieldDeviceUiAsync();
+                if (_uiDisposing || IsDisposed || Disposing) return refreshReport;
                 if (ownsBusy)
                 {
                     TickDevicesBusy("Building reserved CPU sets...", 1);
@@ -2187,6 +2259,9 @@ public sealed partial class MainForm
                     SetDevicesBusyStage("Building reserved CPU sets...");
                 }
 
+#if DEVELOPER_QA
+            DevMarkUiStage("after-cards");
+#endif
                 _reservedCpuPanel = NewReservedCpuSetsPanel();
                 if (_reservedCpuPanel is not null)
                 {
@@ -2206,9 +2281,12 @@ public sealed partial class MainForm
             }
             finally
             {
-                _devicesPanel.ResumeLayout();
+                _devicesPanel.ResumeLayout(false);
             }
 
+#if DEVELOPER_QA
+            DevMarkUiStage("after-card-batch");
+#endif
             ApplyRawPollingOverridesToBlocks();
             AdjustInitialDeviceViewportHeight();
             _devicesPanel.Invalidate(true);
@@ -2227,21 +2305,58 @@ public sealed partial class MainForm
             await AwaitBackgroundUiTasksAsync(refreshReport, readbacks.ToArray());
             if (_uiDisposing || IsDisposed || Disposing) return refreshReport;
             if (ownsBusy) TickDevicesBusy("Finalizing device display...", includeImodReadback ? 2 : 1);
+#if DEVELOPER_QA
+            DevMarkUiStage("before-finalize");
+#endif
+
+#if DEVELOPER_QA
+            DevMarkUiStage("before-drafts");
+#endif
+            UpdateAllBlocksInitialState();
+#if DEVELOPER_QA
+            DevMarkUiStage("after-baselines");
+#endif
+            if (preserveEdits) RestoreEditorDrafts(drafts);
+#if DEVELOPER_QA
+            DevMarkUiStage("after-drafts");
+#endif
+            RebuildFilterCategoryButtons();
+#if DEVELOPER_QA
+            DevMarkUiStage("after-categories");
+#endif
+            ApplyDeviceFilter();
+#if DEVELOPER_QA
+            DevMarkUiStage("after-filter");
+#endif
+            layoutBatch.Dispose();
+#if DEVELOPER_QA
+            DevMarkUiStage("after-layout-scope");
+#endif
+            LayoutBlocks();
+            if (preserveEdits) RestoreDeviceViewport(viewport);
+#if DEVELOPER_QA
+            DevMarkUiStage("after-layout");
+#endif
+            UpdateApplyButtonDirtyCount();
+
+#if DEVELOPER_QA
+            DevMarkUiStage("after-final-filter");
+#endif
+            UpdateInterruptModesStatus();
+            if (yieldUi) await YieldDeviceUiAsync();
+            if (_uiDisposing || IsDisposed || Disposing) return refreshReport;
+#if DEVELOPER_QA
+            DevMarkUiStage("before-diagnostics");
+#endif
             LogGuiSnapshot("refresh");
+#if DEVELOPER_QA
+            DevMarkUiStage("after-diagnostics");
+#endif
             if (ownsBusy)
             {
                 _devicesBusyDone = _devicesBusyTotal;
                 UpdateDevicesBusy("Ready", 100);
             }
-
-            UpdateAllBlocksInitialState();
-            if (preserveEdits) RestoreEditorDrafts(drafts);
-            RebuildFilterCategoryButtons();
-            ApplyDeviceFilter();
-            if (preserveEdits) RestoreDeviceViewport(viewport);
-            UpdateApplyButtonDirtyCount();
-
-            UpdateInterruptModesStatus();
 
             WriteLog(
                 $"REFRESH.DONE: includeImodReadback={includeImodReadback} blocks={_blocks.Count} " +
@@ -2529,7 +2644,8 @@ public sealed partial class MainForm
             UpdateRssQueueOptions(b);
         }
 
-        LogGuiSnapshot("irq-refresh");
+        // REFRESH writes one full snapshot after drafts and final layout settle.
+        if (!reason.Equals("refresh-blocks", StringComparison.OrdinalIgnoreCase)) LogGuiSnapshot("irq-refresh");
     }
 
     private Dictionary<string, PciInterruptCapabilities> ReadInterruptCapabilities(IEnumerable<DeviceInfo> devices)

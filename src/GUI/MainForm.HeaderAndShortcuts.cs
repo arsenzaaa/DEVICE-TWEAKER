@@ -10,7 +10,7 @@ public sealed partial class MainForm
             && !HasActiveInputControl()
             && (keyData is Keys.Home or Keys.End or Keys.PageUp or Keys.PageDown))
         {
-            int before = _devicesScroll.Value;
+            int before = _devicesScroll.TargetValue;
             int page = Math.Max(_devicesScroll.SmallChange, _devicesScroll.ViewportSize - UiScale(40));
             int target = (keyData & Keys.KeyCode) switch
             {
@@ -21,7 +21,7 @@ public sealed partial class MainForm
                 _ => before
             };
 
-            _devicesScroll.Value = target;
+            _devicesScroll.ScrollTo(target);
             WriteLog(
                 $"TEST.QA.SCROLL: key={keyData & Keys.KeyCode} before={before} after={_devicesScroll.Value} " +
                 $"page={page} maximum={_devicesScroll.Maximum} viewport={_devicesScroll.ViewportSize}");
@@ -47,7 +47,7 @@ public sealed partial class MainForm
             && e.Modifiers == Keys.None
             && e.KeyCode is Keys.Home or Keys.End or Keys.PageUp or Keys.PageDown)
         {
-            int before = _devicesScroll.Value;
+            int before = _devicesScroll.TargetValue;
             int page = Math.Max(_devicesScroll.SmallChange, _devicesScroll.ViewportSize - UiScale(40));
             int target = e.KeyCode switch
             {
@@ -58,7 +58,7 @@ public sealed partial class MainForm
                 _ => before
             };
 
-            _devicesScroll.Value = target;
+            _devicesScroll.ScrollTo(target);
             e.Handled = true;
             e.SuppressKeyPress = true;
             if (_testDevicesOnly && _testAutoDryRun)

@@ -91,7 +91,7 @@ internal static class DriverEnvironment
             $"Vanguard: vgk {ServiceText(snapshot.VanguardDriver)}, vgc {ServiceText(snapshot.VanguardService)}",
         ];
         if (snapshot.AntiCheatDetected)
-            lines.Add("Anti-cheat components were found. Compatibility with DTIMOD/KDU is not confirmed; a conflict is possible, not detected.");
+            lines.Add("Anti-cheat compatibility is not tested by this check.");
         lines.Add("These checks do not test driver loading. A missing registry value does not mean the protection is disabled.");
         return string.Join("\n", lines);
     }
@@ -99,18 +99,10 @@ internal static class DriverEnvironment
     internal static string BuildCompactConfirmation(DriverEnvironmentSnapshot snapshot)
     {
         List<string> notes = [];
-        bool faceit = snapshot.Faceit.Exists == true;
-        bool vanguard = snapshot.VanguardDriver.Exists == true || snapshot.VanguardService.Exists == true;
-        if (faceit || vanguard)
-        {
-            notes.Add(faceit && vanguard
-                ? "FACEIT and Vanguard detected.\nThey may conflict with DTIMOD.sys."
-                : faceit
-                    ? "FACEIT detected.\nIt may conflict with DTIMOD.sys."
-                    : "Vanguard detected.\nIt may conflict with DTIMOD.sys.");
-        }
-        if (snapshot.Blocklist.Enabled == true || snapshot.HvciRunning == true)
-            notes.Add("Windows settings may prevent DTIMOD.sys from loading.");
+        if (snapshot.Blocklist.Enabled == true)
+            notes.Add("Driver blocklist is configured on.");
+        if (snapshot.HvciRunning == true)
+            notes.Add("Memory integrity (HVCI) is enabled.");
         if (snapshot.HvciRunning is null || snapshot.Blocklist.Evidence.StartsWith("unavailable", StringComparison.Ordinal)
             || snapshot.Blocklist.Evidence == "invalid value type" || snapshot.HvciConfigured.Evidence.StartsWith("unavailable", StringComparison.Ordinal)
             || snapshot.Faceit.Exists is null || snapshot.VanguardDriver.Exists is null || snapshot.VanguardService.Exists is null)

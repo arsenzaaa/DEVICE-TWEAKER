@@ -296,7 +296,6 @@ public sealed partial class MainForm
 
         buttonsHost.Controls.Add(buttonsGrid, 1, 0);
         buttonPanel.Controls.Add(buttonsHost);
-
         Panel accentStrip = new()
         {
             Dock = DockStyle.Top,
@@ -396,6 +395,7 @@ public sealed partial class MainForm
 
         ApplyDarkScrollBarTheme(_devicesPanel);
         SyncDevicesScrollBar();
+        _devicesScroll.SmallChange = UiScale(120);
         UpdateDevicesScrollLayout();
         UpdateDevicesHostLayout();
 
@@ -443,6 +443,7 @@ public sealed partial class MainForm
 
             using IDisposable? operation = TryBeginDeviceOperation("APPLY");
             if (operation is null) return;
+            using IDisposable feedback = BeginButtonFeedback(btnApply, "APPLY…", UpdateApplyButtonDirtyCount);
             WriteLog("UI: APPLY button clicked");
             bool sandboxDryRun = IsSandboxDryRunActive();
             OperationReport report = CreateApplyReport(sandboxDryRun);
@@ -591,6 +592,7 @@ public sealed partial class MainForm
 
             using IDisposable? operation = TryBeginDeviceOperation("AUTO-OPTIMIZATION");
             if (operation is null) return;
+            using IDisposable feedback = BeginButtonFeedback(btnAuto, "AUTO…");
             WriteLog("UI: AUTO-OPTIMIZATION button clicked");
             bool hasUsbImodTarget = _blocks.Any(b => IsUsbImodTarget(b.Device));
             bool optimizeUsbImod = false;
@@ -791,6 +793,7 @@ public sealed partial class MainForm
 
             using IDisposable? operation = TryBeginDeviceOperation("RESTORE");
             if (operation is null) return;
+            using IDisposable feedback = BeginButtonFeedback(btnRestore, "RESTORING…");
             WriteLog("UI: RESTORE button clicked");
             await RestoreLatestDeviceTweakerBackup();
         };
@@ -1071,6 +1074,7 @@ public sealed partial class MainForm
             return;
         }
 
+        _devicesScroll?.StopScrolling();
         _devicesPanel.Location = new Point(0, 0);
         if (_devicesScroll is not null)
         {
@@ -1086,6 +1090,7 @@ public sealed partial class MainForm
 
     private void HandleDevicesMouseWheel(MouseEventArgs e)
     {
+        if (e is HandledMouseEventArgs { Handled: true }) return;
         if (_devicesScroll is null || !_devicesScroll.Visible)
         {
             return;
@@ -1096,22 +1101,12 @@ public sealed partial class MainForm
             return;
         }
 
-        int delta = e.Delta > 0 ? -_devicesScroll.SmallChange : _devicesScroll.SmallChange;
-        _devicesScroll.Value += delta;
+        _devicesScroll.ScrollWheel(e.Delta);
+        if (e is HandledMouseEventArgs handled) handled.Handled = true;
     }
 
     private void ForwardDevicesMouseWheel(object? sender, MouseEventArgs e)
-    {
-        int before = _devicesScroll is null ? 0 : _devicesScroll.Value;
-        HandleDevicesMouseWheel(e);
-
-        if (_devicesScroll is not null
-            && _devicesScroll.Value != before
-            && e is HandledMouseEventArgs handled)
-        {
-            handled.Handled = true;
-        }
-    }
+        => HandleDevicesMouseWheel(e);
 
     private void WireDevicesMouseWheelForwarding(Control root)
     {
@@ -1183,8 +1178,8 @@ public sealed partial class MainForm
 
     private void SetTopButtonHoverStyle(Button btn)
     {
-        btn.BackColor = _accent;
-        btn.ForeColor = Color.FromArgb(15, 15, 15);
+        btn.BackColor = Color.FromArgb(28, 28, 32);
+        btn.ForeColor = _fgMain;
     }
 
     private void ShowCopiedToolTip(Control target)
@@ -1234,8 +1229,8 @@ public sealed partial class MainForm
 
         FlowLayoutPanel searchHost = new()
         {
-            Dock = DockStyle.Left,
-            AutoSize = true,
+            Dock = DockStyle.None,
+            AutoSize = false,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = false,
@@ -1264,7 +1259,6 @@ public sealed partial class MainForm
 
             _searchFilterText = newQuery;
             _btnFilterClear.Visible = !string.IsNullOrEmpty(_searchFilterText);
-            ResetDevicesScroll();
             ApplyDeviceFilter();
             int visibleCount = _blocks.Count(b => b.Group.Visible);
             WriteLog($"UI: Filter search text=\"{_searchFilterText}\" visibleDevices={visibleCount}/{_blocks.Count}");
@@ -1285,17 +1279,18 @@ public sealed partial class MainForm
         };
         _btnFilterClear.FlatAppearance.BorderSize = 0;
         _btnFilterClear.Click += (_, _) => ClearFilterBox();
+        _btnFilterClear.VisibleChanged += (_, _) => _filterPanel.PerformLayout();
 
         searchHost.Controls.Add(_searchFilterBox);
         searchHost.Controls.Add(_btnFilterClear);
 
         _filterCategoriesHost = new FlowLayoutPanel
         {
-            Dock = DockStyle.Right,
-            AutoSize = true,
+            Dock = DockStyle.None,
+            AutoSize = false,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = false,
+            WrapContents = true,
             BackColor = _bgPanel,
             Margin = Padding.Empty,
             Padding = Padding.Empty,
@@ -1307,21 +1302,47 @@ public sealed partial class MainForm
         bool arranging = false;
         _filterPanel.Layout += (_, _) =>
         {
-            if (arranging) return;
+            if (arranging || _uiDisposing || IsDisposed || Disposing) return;
             arranging = true;
             try
             {
-                int categoriesWidth = _filterCategoriesHost.PreferredSize.Width;
-                const int actionWidth = 0;
+                _filterPanel.Padding = new Padding(UiScale(24), UiScale(12), UiScale(24), UiScale(12));
+                int available = Math.Max(1, _filterPanel.ClientSize.Width - _filterPanel.Padding.Horizontal);
+                int controlHeight = UiScale(30), gap = UiScale(6);
+                _searchFilterBox.Height = controlHeight;
+                _btnFilterClear.Size = new Size(UiScale(24), controlHeight);
+                _btnFilterClear.Margin = new Padding(UiScale(2), 0, 0, 0);
                 int clearWidth = _btnFilterClear.Visible ? _btnFilterClear.Width + _btnFilterClear.Margin.Horizontal : 0;
-                int available = _filterPanel.ClientSize.Width - _filterPanel.Padding.Horizontal;
-                bool stacked = available < categoriesWidth + actionWidth + clearWidth + UiScale(120);
-                int desiredHeight = UiScale(stacked ? 88 : 54);
+                foreach (Button button in _filterCategoryButtons)
+                    button.Margin = new Padding(UiScale(4), 0, 0, gap);
+                int categoriesWidth = _filterCategoryButtons.Sum(button => button.Width + button.Margin.Horizontal);
+                int horizontalGap = UiScale(8);
+                bool singleRow = available >= categoriesWidth + clearWidth + horizontalGap + UiScale(120);
+                int searchWidth = singleRow
+                    ? Math.Clamp(available - categoriesWidth - clearWidth - horizontalGap, UiScale(120), UiScale(240))
+                    : Math.Min(UiScale(240), Math.Max(UiScale(120), (available - clearWidth - horizontalGap) / 3));
+                int categoryViewport = singleRow ? categoriesWidth
+                    : Math.Max(1, available - searchWidth - clearWidth - horizontalGap);
+                _searchFilterBox.Width = searchWidth;
+                searchHost.Bounds = new Rectangle(_filterPanel.Padding.Left, _filterPanel.Padding.Top,
+                    searchWidth + clearWidth, controlHeight);
+
+                // Measure wrapped rows from actual localized button sizes, not a
+                // fixed toolbar height. The FlowLayoutPanel performs the wrapping.
+                int rowWidth = 0, rows = 1;
+                foreach (Button button in _filterCategoryButtons)
+                {
+                    int width = button.Width + button.Margin.Horizontal;
+                    if (rowWidth > 0 && rowWidth + width > categoryViewport) { rows++; rowWidth = 0; }
+                    rowWidth += width;
+                }
+                int categoriesHeight = rows * (controlHeight + gap) - gap;
+                int categoriesTop = _filterPanel.Padding.Top;
+                int categoriesLeft = _filterPanel.Padding.Left + available - categoryViewport;
+                _filterCategoriesHost.Bounds = new Rectangle(categoriesLeft, categoriesTop,
+                    categoryViewport, categoriesHeight);
+                int desiredHeight = _filterPanel.Padding.Vertical + Math.Max(controlHeight, categoriesHeight);
                 if (_filterPanel.Height != desiredHeight) _filterPanel.Height = desiredHeight;
-                searchHost.Dock = stacked ? DockStyle.Top : DockStyle.Left;
-                _filterCategoriesHost.Dock = stacked ? DockStyle.Bottom : DockStyle.Right;
-                _searchFilterBox.Width = stacked ? UiScale(240)
-                    : Math.Clamp(available - categoriesWidth - actionWidth - clearWidth - UiScale(8), UiScale(120), UiScale(240));
             }
             finally { arranging = false; }
         };
@@ -1387,9 +1408,9 @@ public sealed partial class MainForm
             {
                 if (!string.Equals(btnCat.Tag as string, _activeCategoryFilter, StringComparison.OrdinalIgnoreCase))
                 {
-                    btnCat.BackColor = Color.FromArgb(28, 30, 38);
+                    btnCat.BackColor = _bgGroup;
                     btnCat.ForeColor = _fgMain;
-                    btnCat.FlatAppearance.BorderColor = Color.FromArgb(105, 105, 112);
+                    btnCat.FlatAppearance.BorderColor = _border;
                 }
             };
             btnCat.MouseLeave += (_, _) =>
@@ -1397,8 +1418,8 @@ public sealed partial class MainForm
                 if (!string.Equals(btnCat.Tag as string, _activeCategoryFilter, StringComparison.OrdinalIgnoreCase))
                 {
                     btnCat.BackColor = _bgPanel;
-                    btnCat.ForeColor = Color.FromArgb(140, 145, 155);
-                    btnCat.FlatAppearance.BorderColor = Color.FromArgb(50, 52, 62);
+                    btnCat.ForeColor = _mutedText;
+                    btnCat.FlatAppearance.BorderColor = _statusSeparator;
                 }
             };
             UpdateCategoryButtonSize(btnCat);
@@ -1408,6 +1429,7 @@ public sealed partial class MainForm
         }
 
         _filterCategoriesHost.ResumeLayout(true);
+        _filterPanel.PerformLayout();
         UpdateCategoryButtonsStyle();
         WriteLog($"UI: Filter categories available=[{string.Join(", ", availableCategories)}] active=\"{_activeCategoryFilter}\"");
     }
@@ -1424,7 +1446,7 @@ public sealed partial class MainForm
         int targetOffset = target is null ? 0 : Math.Max(0, target.Group.Top - UiScale(12));
         if (_devicesScroll is not null)
         {
-            _devicesScroll.Value = targetOffset;
+            _devicesScroll.ScrollTo(targetOffset);
         }
         else
         {
@@ -1447,16 +1469,16 @@ public sealed partial class MainForm
 
             if (isActive)
             {
-                btn.BackColor = Color.FromArgb(24, 24, 29);
+                btn.BackColor = _bgForm;
                 btn.ForeColor = _accent;
-                btn.FlatAppearance.BorderColor = _accentDark;
+                btn.FlatAppearance.BorderColor = _fgMain;
                 btn.FlatAppearance.BorderSize = 1;
             }
             else
             {
                 btn.BackColor = _bgPanel;
-                btn.ForeColor = Color.FromArgb(140, 145, 155);
-                btn.FlatAppearance.BorderColor = Color.FromArgb(50, 52, 62);
+                btn.ForeColor = _mutedText;
+                btn.FlatAppearance.BorderColor = _statusSeparator;
                 btn.FlatAppearance.BorderSize = 1;
             }
         }
@@ -1467,12 +1489,14 @@ public sealed partial class MainForm
         ResetDevicesScroll();
 
         bool anyVisible = false;
+        bool revealingCards = false;
         foreach (DeviceBlock b in _blocks)
         {
             bool searchMatch = MatchesSearchText(b, _searchFilterText);
             // Category buttons are navigation anchors. Only text search hides
             // cards from the complete device list.
             bool visible = searchMatch;
+            revealingCards |= visible && !b.Group.Visible;
             b.Group.Visible = visible;
             if (visible)
             {
@@ -1489,7 +1513,8 @@ public sealed partial class MainForm
             }
         }
 
-        LayoutBlocks();
+        // Revealed cards may have changed language/content while hidden.
+        LayoutBlocks(relayoutCards: revealingCards);
     }
 
     private static bool MatchesCategory(DeviceBlock b, string cat)
@@ -1642,6 +1667,7 @@ public sealed partial class MainForm
                 UpdateCategoryButtonSize(btn);
             }
         }
+        _filterPanel?.PerformLayout();
         if (_noMatchesLabel != null)
         {
             _noMatchesLabel.Text = $"{UiLanguage.Text("NO MATCHING DEVICES")}\n{UiLanguage.Text("No devices match this filter.")}";

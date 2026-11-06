@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "ui-motion",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "en",
+      "action": "audit-ui-motion"
+    },
+    {
+      "id": "ru-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru",
+      "action": "audit-ui-motion"
+    }
+  ]
+}

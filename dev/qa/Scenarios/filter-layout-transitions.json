@@ -1,0 +1,219 @@
+{
+  "schemaVersion": 1,
+  "id": "filter-layout-transitions",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "en-filter",
+      "action": "text",
+      "target": "@search",
+      "value": "NVIDIA"
+    },
+    {
+      "id": "en-one",
+      "action": "assert",
+      "target": "@main",
+      "property": "visibleDevices",
+      "value": "1"
+    },
+    {
+      "id": "en-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en-resize",
+      "action": "resize",
+      "width": 1320,
+      "height": 940
+    },
+    {
+      "id": "en-scale",
+      "action": "layout-rebind",
+      "value": "96"
+    },
+    {
+      "id": "en-clear",
+      "action": "text",
+      "target": "@search",
+      "value": ""
+    },
+    {
+      "id": "en-show-usb",
+      "action": "click",
+      "target": "id:FILTER_USB"
+    },
+    {
+      "id": "en-usb-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_461E",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "en-capture",
+      "action": "capture"
+    },
+    {
+      "id": "ru125-filter",
+      "action": "text",
+      "target": "@search",
+      "value": "NVIDIA"
+    },
+    {
+      "id": "ru125-one",
+      "action": "assert",
+      "target": "@main",
+      "property": "visibleDevices",
+      "value": "1"
+    },
+    {
+      "id": "ru125-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru125-resize",
+      "action": "resize",
+      "width": 1100,
+      "height": 820
+    },
+    {
+      "id": "ru125-scale",
+      "action": "layout-rebind",
+      "value": "120"
+    },
+    {
+      "id": "ru125-clear",
+      "action": "text",
+      "target": "@search",
+      "value": ""
+    },
+    {
+      "id": "ru125-show-usb",
+      "action": "click",
+      "target": "id:FILTER_USB"
+    },
+    {
+      "id": "ru125-usb-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_461E",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "ru125-capture",
+      "action": "capture"
+    },
+    {
+      "id": "ru150-filter",
+      "action": "text",
+      "target": "@search",
+      "value": "NVIDIA"
+    },
+    {
+      "id": "ru150-one",
+      "action": "assert",
+      "target": "@main",
+      "property": "visibleDevices",
+      "value": "1"
+    },
+    {
+      "id": "ru150-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru150-resize",
+      "action": "resize",
+      "width": 1000,
+      "height": 760
+    },
+    {
+      "id": "ru150-scale",
+      "action": "layout-rebind",
+      "value": "144"
+    },
+    {
+      "id": "ru150-clear",
+      "action": "text",
+      "target": "@search",
+      "value": ""
+    },
+    {
+      "id": "ru150-show-usb",
+      "action": "click",
+      "target": "id:FILTER_USB"
+    },
+    {
+      "id": "ru150-usb-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_461E",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "ru150-capture",
+      "action": "capture"
+    },
+    {
+      "id": "en100-filter",
+      "action": "text",
+      "target": "@search",
+      "value": "NVIDIA"
+    },
+    {
+      "id": "en100-one",
+      "action": "assert",
+      "target": "@main",
+      "property": "visibleDevices",
+      "value": "1"
+    },
+    {
+      "id": "en100-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en100-resize",
+      "action": "resize",
+      "width": 1320,
+      "height": 940
+    },
+    {
+      "id": "en100-scale",
+      "action": "layout-rebind",
+      "value": "96"
+    },
+    {
+      "id": "en100-clear",
+      "action": "text",
+      "target": "@search",
+      "value": ""
+    },
+    {
+      "id": "en100-show-usb",
+      "action": "click",
+      "target": "id:FILTER_USB"
+    },
+    {
+      "id": "en100-usb-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_461E",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "en100-capture",
+      "action": "capture"
+    }
+  ]
+}

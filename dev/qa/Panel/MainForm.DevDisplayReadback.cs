@@ -53,4 +53,38 @@ public sealed partial class MainForm
             _devQueuedErrors.Add(error);
         }
     }
+
+    private async Task DevAuditSnapshotOverlapAsync(string id)
+    {
+        if (!QaRun.IsReadOnly || !_testDevicesOnly)
+            throw new InvalidOperationException("Snapshot overlap requires a synthetic read-only session.");
+        int uiThread = Environment.CurrentManagedThreadId, workerThread = 0;
+        TaskCompletionSource stateStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<SnapshotReadResult<DriverMetadata>> metadata = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<SnapshotReadResult<DisplaySnapshot>> combined = _displayReader.ReadTaskAsync(
+            () => CompleteDisplaySnapshotAsync(() =>
+            {
+                workerThread = Environment.CurrentManagedThreadId;
+                stateStarted.SetResult();
+                return new DisplaySnapshot([], null, null);
+            }, metadata.Task), TimeSpan.FromSeconds(5), error => throw new InvalidOperationException("Unexpected late fault", error));
+        try
+        {
+            await stateStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            if (combined.IsCompleted || workerThread == uiThread)
+                throw new InvalidOperationException("State read was blocked by metadata or ran on the UI thread.");
+        }
+        finally
+        {
+            metadata.TrySetResult(new(new(new() { ["QA_OVERLAP"] = new() { DeviceId = "QA_OVERLAP" } }, null), null));
+        }
+        var result = await combined;
+        if (result.Snapshot?.Drivers?.ContainsKey("QA_OVERLAP") != true || result.Error is not null)
+            throw new InvalidOperationException("The combined snapshot lost its diagnostic metadata.");
+        string relative = "state/" + id + ".json";
+        DeviceTweakerQa.DevFiles.Write(DevArtifact(relative), new { workerOffUi = true,
+            stateStartedBeforeMetadataCompleted = true, fullSnapshotJoined = true, hostReads = false });
+        DevRecordState(relative);
+        DevCaptureWindow(id, "@main", false);
+    }
 }

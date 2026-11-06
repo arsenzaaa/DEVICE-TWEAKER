@@ -1,0 +1,419 @@
+{
+  "schemaVersion": 1,
+  "id": "hardware-accents",
+  "preset": "DevicePalette",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "en-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "usb-intel-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "usb-intel-en-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_461E",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "usb-intel-en",
+      "action": "capture"
+    },
+    {
+      "id": "usb-amd-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "PALETTE_USB_AMD"
+    },
+    {
+      "id": "usb-amd-en-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "PALETTE_USB_AMD",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "usb-amd-en",
+      "action": "capture"
+    },
+    {
+      "id": "usb-other-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "PALETTE_USB_OTHER"
+    },
+    {
+      "id": "usb-other-en-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "PALETTE_USB_OTHER",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "usb-other-en",
+      "action": "capture"
+    },
+    {
+      "id": "gpu-nvidia-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "gpu-nvidia-en-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_2684",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "gpu-nvidia-en",
+      "action": "capture"
+    },
+    {
+      "id": "gpu-amd-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "GPU_AMD"
+    },
+    {
+      "id": "gpu-amd-en-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "GPU_AMD",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "gpu-amd-en",
+      "action": "capture"
+    },
+    {
+      "id": "gpu-intel-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "GPU_INTEL"
+    },
+    {
+      "id": "gpu-intel-en-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "GPU_INTEL",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "gpu-intel-en",
+      "action": "capture"
+    },
+    {
+      "id": "gpu-other-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "GPU_OTHER"
+    },
+    {
+      "id": "gpu-other-en-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "GPU_OTHER",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "gpu-other-en",
+      "action": "capture"
+    },
+    {
+      "id": "network-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DEV_125C"
+    },
+    {
+      "id": "network-en-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_125C",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "network-en",
+      "action": "capture"
+    },
+    {
+      "id": "audio-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "PALETTE\\AUDIO"
+    },
+    {
+      "id": "audio-en-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "PALETTE\\AUDIO",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "audio-en",
+      "action": "capture"
+    },
+    {
+      "id": "storage-en-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DEV_A80C"
+    },
+    {
+      "id": "storage-en-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_A80C",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "storage-en",
+      "action": "capture"
+    },
+    {
+      "id": "nav-en",
+      "action": "click",
+      "target": "id:FILTER_USB"
+    },
+    {
+      "id": "nav-hover-en",
+      "action": "hover",
+      "target": "id:FILTER_GPU"
+    },
+    {
+      "id": "nav-state-en",
+      "action": "capture"
+    },
+    {
+      "id": "nav-leave-en",
+      "action": "leave",
+      "target": "id:FILTER_GPU"
+    },
+    {
+      "id": "ru-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "usb-intel-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DEV_461E"
+    },
+    {
+      "id": "usb-intel-ru-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_461E",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "usb-intel-ru",
+      "action": "capture"
+    },
+    {
+      "id": "usb-amd-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "PALETTE_USB_AMD"
+    },
+    {
+      "id": "usb-amd-ru-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "PALETTE_USB_AMD",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "usb-amd-ru",
+      "action": "capture"
+    },
+    {
+      "id": "usb-other-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "PALETTE_USB_OTHER"
+    },
+    {
+      "id": "usb-other-ru-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "PALETTE_USB_OTHER",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "usb-other-ru",
+      "action": "capture"
+    },
+    {
+      "id": "gpu-nvidia-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DEV_2684"
+    },
+    {
+      "id": "gpu-nvidia-ru-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_2684",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "gpu-nvidia-ru",
+      "action": "capture"
+    },
+    {
+      "id": "gpu-amd-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "GPU_AMD"
+    },
+    {
+      "id": "gpu-amd-ru-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "GPU_AMD",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "gpu-amd-ru",
+      "action": "capture"
+    },
+    {
+      "id": "gpu-intel-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "GPU_INTEL"
+    },
+    {
+      "id": "gpu-intel-ru-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "GPU_INTEL",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "gpu-intel-ru",
+      "action": "capture"
+    },
+    {
+      "id": "gpu-other-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "GPU_OTHER"
+    },
+    {
+      "id": "gpu-other-ru-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "GPU_OTHER",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "gpu-other-ru",
+      "action": "capture"
+    },
+    {
+      "id": "network-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DEV_125C"
+    },
+    {
+      "id": "network-ru-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_125C",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "network-ru",
+      "action": "capture"
+    },
+    {
+      "id": "audio-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "PALETTE\\AUDIO"
+    },
+    {
+      "id": "audio-ru-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "PALETTE\\AUDIO",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "audio-ru",
+      "action": "capture"
+    },
+    {
+      "id": "storage-ru-reveal",
+      "action": "reveal",
+      "target": "role:title",
+      "device": "DEV_A80C"
+    },
+    {
+      "id": "storage-ru-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_A80C",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "storage-ru",
+      "action": "capture"
+    },
+    {
+      "id": "nav-ru",
+      "action": "click",
+      "target": "id:FILTER_USB"
+    },
+    {
+      "id": "nav-hover-ru",
+      "action": "hover",
+      "target": "id:FILTER_GPU"
+    },
+    {
+      "id": "nav-state-ru",
+      "action": "capture"
+    },
+    {
+      "id": "nav-leave-ru",
+      "action": "leave",
+      "target": "id:FILTER_GPU"
+    }
+  ]
+}

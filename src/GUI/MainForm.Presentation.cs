@@ -89,6 +89,15 @@ public sealed partial class MainForm
     // registry/WMI reads, polling refresh or native readback belongs here.
     private void RebuildDevicePresentation()
     {
+        // Width-only changes can reuse every editor, focus and draft. Recreate
+        // controls only when the scale changes and their fonts/CPU grid need it.
+        if (_blocks.Count > 0 && _blocks.All(b => b.Group is DeviceCard card && card.LayoutScale == _uiScale))
+        {
+            DeviceViewport retainedViewport = CaptureDeviceViewport();
+            LayoutBlocks();
+            RestoreDeviceViewport(retainedViewport);
+            return;
+        }
         FocusedEditor? focus = CaptureFocusedDeviceEditor();
         CardPresentation[] cards = _blocks.Select(CaptureCardPresentation).ToArray();
         DeviceViewport viewport = CaptureDeviceViewport();

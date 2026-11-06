@@ -1,0 +1,419 @@
+{
+  "schemaVersion": 1,
+  "id": "filter-toolbar-scaling",
+  "preset": "DevicePalette",
+  "language": "RU",
+  "filter": "ALL",
+  "width": 1000,
+  "height": 760,
+  "steps": [
+    {
+      "id": "ru150-narrow-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru150-narrow-size",
+      "action": "resize",
+      "width": 1000,
+      "height": 760
+    },
+    {
+      "id": "ru150-narrow-scale",
+      "action": "layout-rebind",
+      "value": "144"
+    },
+    {
+      "id": "ru150-narrow-query",
+      "action": "text",
+      "target": "@search",
+      "value": ""
+    },
+    {
+      "id": "ru150-narrow-home",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "ru150-narrow",
+      "action": "capture"
+    },
+    {
+      "id": "ru150-narrow-fits",
+      "action": "assert",
+      "target": "@main",
+      "property": "filter-toolbar-fits",
+      "value": "true"
+    },
+    {
+      "id": "ru150-narrow-storage",
+      "action": "click",
+      "target": "id:FILTER_STORAGE"
+    },
+    {
+      "id": "ru150-narrow-reached",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DISK_OTHER",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "en150-narrow-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en150-narrow-size",
+      "action": "resize",
+      "width": 1000,
+      "height": 760
+    },
+    {
+      "id": "en150-narrow-scale",
+      "action": "layout-rebind",
+      "value": "144"
+    },
+    {
+      "id": "en150-narrow-query",
+      "action": "text",
+      "target": "@search",
+      "value": ""
+    },
+    {
+      "id": "en150-narrow-home",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "en150-narrow",
+      "action": "capture"
+    },
+    {
+      "id": "en150-narrow-fits",
+      "action": "assert",
+      "target": "@main",
+      "property": "filter-toolbar-fits",
+      "value": "true"
+    },
+    {
+      "id": "en150-narrow-storage",
+      "action": "click",
+      "target": "id:FILTER_STORAGE"
+    },
+    {
+      "id": "en150-narrow-reached",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DISK_OTHER",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "ru125-query-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru125-query-size",
+      "action": "resize",
+      "width": 1000,
+      "height": 820
+    },
+    {
+      "id": "ru125-query-scale",
+      "action": "layout-rebind",
+      "value": "120"
+    },
+    {
+      "id": "ru125-query-query",
+      "action": "text",
+      "target": "@search",
+      "value": "NVMe"
+    },
+    {
+      "id": "ru125-query-home",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "ru125-query",
+      "action": "capture"
+    },
+    {
+      "id": "ru125-query-fits",
+      "action": "assert",
+      "target": "@main",
+      "property": "filter-toolbar-fits",
+      "value": "true"
+    },
+    {
+      "id": "ru125-query-storage",
+      "action": "click",
+      "target": "id:FILTER_STORAGE"
+    },
+    {
+      "id": "ru125-query-reached",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_A80C",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "en100-wide-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en100-wide-size",
+      "action": "resize",
+      "width": 1320,
+      "height": 940
+    },
+    {
+      "id": "en100-wide-scale",
+      "action": "layout-rebind",
+      "value": "96"
+    },
+    {
+      "id": "en100-wide-query",
+      "action": "text",
+      "target": "@search",
+      "value": ""
+    },
+    {
+      "id": "en100-wide-home",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "en100-wide",
+      "action": "capture"
+    },
+    {
+      "id": "en100-wide-fits",
+      "action": "assert",
+      "target": "@main",
+      "property": "filter-toolbar-fits",
+      "value": "true"
+    },
+    {
+      "id": "en100-wide-storage",
+      "action": "click",
+      "target": "id:FILTER_STORAGE"
+    },
+    {
+      "id": "en100-wide-reached",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DISK_OTHER",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "ru100-wide-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru100-wide-size",
+      "action": "resize",
+      "width": 1320,
+      "height": 940
+    },
+    {
+      "id": "ru100-wide-scale",
+      "action": "layout-rebind",
+      "value": "96"
+    },
+    {
+      "id": "ru100-wide-query",
+      "action": "text",
+      "target": "@search",
+      "value": ""
+    },
+    {
+      "id": "ru100-wide-home",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "ru100-wide",
+      "action": "capture"
+    },
+    {
+      "id": "ru100-wide-fits",
+      "action": "assert",
+      "target": "@main",
+      "property": "filter-toolbar-fits",
+      "value": "true"
+    },
+    {
+      "id": "ru100-wide-storage",
+      "action": "click",
+      "target": "id:FILTER_STORAGE"
+    },
+    {
+      "id": "ru100-wide-reached",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DISK_OTHER",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "en125-narrow-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en125-narrow-size",
+      "action": "resize",
+      "width": 900,
+      "height": 820
+    },
+    {
+      "id": "en125-narrow-scale",
+      "action": "layout-rebind",
+      "value": "120"
+    },
+    {
+      "id": "en125-narrow-query",
+      "action": "text",
+      "target": "@search",
+      "value": ""
+    },
+    {
+      "id": "en125-narrow-home",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "en125-narrow",
+      "action": "capture"
+    },
+    {
+      "id": "en125-narrow-fits",
+      "action": "assert",
+      "target": "@main",
+      "property": "filter-toolbar-fits",
+      "value": "true"
+    },
+    {
+      "id": "en125-narrow-storage",
+      "action": "click",
+      "target": "id:FILTER_STORAGE"
+    },
+    {
+      "id": "en125-narrow-reached",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DISK_OTHER",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "ru150-wide-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru150-wide-size",
+      "action": "resize",
+      "width": 1600,
+      "height": 940
+    },
+    {
+      "id": "ru150-wide-scale",
+      "action": "layout-rebind",
+      "value": "144"
+    },
+    {
+      "id": "ru150-wide-query",
+      "action": "text",
+      "target": "@search",
+      "value": ""
+    },
+    {
+      "id": "ru150-wide-home",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "ru150-wide",
+      "action": "capture"
+    },
+    {
+      "id": "ru150-wide-fits",
+      "action": "assert",
+      "target": "@main",
+      "property": "filter-toolbar-fits",
+      "value": "true"
+    },
+    {
+      "id": "ru150-wide-storage",
+      "action": "click",
+      "target": "id:FILTER_STORAGE"
+    },
+    {
+      "id": "ru150-wide-reached",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DISK_OTHER",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "ru150-back-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru150-back-size",
+      "action": "resize",
+      "width": 1000,
+      "height": 760
+    },
+    {
+      "id": "ru150-back-scale",
+      "action": "layout-rebind",
+      "value": "144"
+    },
+    {
+      "id": "ru150-back-query",
+      "action": "text",
+      "target": "@search",
+      "value": ""
+    },
+    {
+      "id": "ru150-back-home",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "ru150-back",
+      "action": "capture"
+    },
+    {
+      "id": "ru150-back-fits",
+      "action": "assert",
+      "target": "@main",
+      "property": "filter-toolbar-fits",
+      "value": "true"
+    },
+    {
+      "id": "ru150-back-storage",
+      "action": "click",
+      "target": "id:FILTER_STORAGE"
+    },
+    {
+      "id": "ru150-back-reached",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DISK_OTHER",
+      "property": "viewport",
+      "value": "true"
+    }
+  ]
+}

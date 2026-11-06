@@ -52,7 +52,7 @@ public sealed partial class MainForm
                 List<BackupSnapshotInfo> backups = Enumerable.Range(0, name == "restore-many" ? 9 : 2).Select(i => new BackupSnapshotInfo
                 {
                     Path = i == 1 ? DevBackupPath.Replace("20261024_204041_097_pre-auto", "ORIGINAL") : DevBackupPath.Replace("097_pre-auto", $"{i:000}_pre-auto"),
-                    Location = i % 2 == 0 ? "EXE" : "APPDATA", Reason = i == 1 ? "original-state" : "pre-auto",
+                    Location = i % 2 == 0 ? "EXE" : "APPDATA", Reason = i == 1 ? "original-state" : new[] { "pre-auto", "original-state", "pre-apply", "pre-imod", "pre-nic-itr", "pre-nic-itr-save", "pre-restore", "pre-reset-tweaks", "future-reason" }[i],
                     IsOriginal = i == 1, CreatedAt = new DateTime(2026, 10, 24, 20, 40, 41).AddMinutes(-i),
                     LastWriteUtc = new DateTime(2026, 10, 24, 17, 40, 41, DateTimeKind.Utc).AddMinutes(-i),
                 }).ToList();

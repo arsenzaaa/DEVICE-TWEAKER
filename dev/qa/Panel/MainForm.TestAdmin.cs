@@ -2529,8 +2529,9 @@ public sealed partial class MainForm
             List<Button> inactive = _filterCategoryButtons.Except(active).ToList();
             bool passed = active.Count == 1
                 && active[0].ForeColor == _accent
-                && active[0].FlatAppearance.BorderColor == _accentDark
-                && inactive.All(button => button.ForeColor == Color.FromArgb(140, 145, 155))
+                && active[0].FlatAppearance.BorderColor == _fgMain
+                && inactive.All(button => button.ForeColor == _mutedText
+                    && button.FlatAppearance.BorderColor == _statusSeparator)
                 && inactive.Select(button => button.ForeColor.ToArgb()).Distinct().Count() <= 1
                 && inactive.Select(button => button.FlatAppearance.BorderColor.ToArgb()).Distinct().Count() <= 1;
             WriteLog(
@@ -2563,15 +2564,16 @@ public sealed partial class MainForm
             SetCategoryFilter(category);
             bool visibilityPreserved = visibilityBefore.All(pair => pair.Key.Group.Visible == pair.Value);
             int actualOffset = _devicesScroll?.Value ?? Math.Max(0, -_devicesPanel.Top);
+            int requestedTarget = _devicesScroll?.TargetValue ?? actualOffset;
             bool passed = visibilityPreserved
                 && target.Group.Visible
-                && actualOffset == expectedOffset
+                && requestedTarget == expectedOffset
                 && string.Equals(_activeCategoryFilter, category, StringComparison.OrdinalIgnoreCase);
 
             SetCategoryFilter("ALL");
             WriteLog(
                 $"TEST.QA.FILTER.NAVIGATION: status={(passed ? "PASS" : "FAIL")} category={category} " +
-                $"target={target.Device.InstanceId} expectedOffset={expectedOffset} actualOffset={actualOffset} " +
+                $"scope=scroll-request target={target.Device.InstanceId} expectedOffset={expectedOffset} actualOffset={actualOffset} requestedTarget={requestedTarget} " +
                 $"visibilityPreserved={visibilityPreserved} visible={_blocks.Count(block => block.Group.Visible)}/{_blocks.Count}");
             return passed;
         }
@@ -3471,7 +3473,7 @@ public sealed partial class MainForm
         loadSystemPresetButton.Click += (_, _) => LoadSystemPreset();
         systemPresetCombo.SelectedIndexChanged += (_, _) =>
         {
-            if (systemPresetCombo.SelectedIndex > 0)
+            if (systemPresetCombo.SelectedIndex > 0 && !_devMatrixSelecting)
             {
                 LoadSystemPreset();
             }
@@ -4705,10 +4707,39 @@ public sealed partial class MainForm
         cpuPresetButton.Click += (_, _) => ApplySelectedCpuPreset();
         cpuPresetCombo.SelectedIndexChanged += (_, _) =>
         {
-            if (cpuPresetCombo.SelectedIndex > 0)
+            if (cpuPresetCombo.SelectedIndex > 0 && !_devMatrixSelecting)
             {
                 ApplySelectedCpuPreset();
             }
+        };
+
+        _devMatrixSystems = systemPresetCombo.Items.Cast<string>().Skip(1).ToArray();
+        _devMatrixCpus = cpuPresetCombo.Items.Cast<string>().Skip(1).ToArray();
+        _devMatrixLoadSystem = name =>
+        {
+            _devMatrixSelecting = true;
+            try { systemPresetCombo.SelectedItem = name; }
+            finally { _devMatrixSelecting = false; }
+            return LoadSystemPreset();
+        };
+        _devMatrixLoadCpu = name =>
+        {
+            _devMatrixSelecting = true;
+            try { cpuPresetCombo.SelectedItem = name; }
+            finally { _devMatrixSelecting = false; }
+            ApplySelectedCpuPreset();
+            if (!TryParseTestCppcRatings(cppcRatingsBox.Text, (int)logicalUpDown.Value, out Dictionary<int, int> ratings, out string ratingsError))
+                throw new InvalidOperationException("Matrix CPPC preset is invalid: " + ratingsError);
+            if (!TryParseCcdL3Sizes(ccdL3Box.Text, (int)ccdGroupCountUpDown.Value, out Dictionary<int, int> cache, out string cacheError))
+                throw new InvalidOperationException("Matrix CCD cache preset is invalid: " + cacheError);
+            TestCpuConfig config = BuildConfigFromAssignments(ratings, cache);
+            ApplyTestCpuConfig(config);
+            return config;
+        };
+        dialog.FormClosed += (_, _) =>
+        {
+            _devMatrixLoadSystem = null;
+            _devMatrixLoadCpu = null;
         };
 
         BuildAssignmentRows();

@@ -23,7 +23,7 @@ public sealed class DriverEnvironmentTests
     [InlineData("FACEIT", "running")]
     [InlineData("vgk", "running")]
     [InlineData("vgc", "stopped")]
-    public void PresentAntiCheatWarnsWithoutClaimingAnActualConflict(string name, string state)
+    public void PresentAntiCheatReportsPresenceWithoutClaimingAConflict(string name, string state)
     {
         var snapshot = Snapshot();
         var service = new DriverServiceState(name, true, state);
@@ -31,7 +31,8 @@ public sealed class DriverEnvironmentTests
         string text = DriverEnvironment.BuildConfirmation(snapshot);
         Assert.True(snapshot.AntiCheatDetected);
         Assert.Contains($"found ({state})", text);
-        Assert.Contains("a conflict is possible, not detected", text);
+        Assert.Contains("Anti-cheat compatibility is not tested", text);
+        Assert.DoesNotContain("conflict", text);
         Assert.DoesNotContain("blocked by", text);
     }
     [Fact] public void UnreadableServiceDoesNotBecomeAbsent()
@@ -64,7 +65,7 @@ public sealed class DriverEnvironmentTests
         Assert.Contains("сейчас включена, в реестре 0 (задано выкл)", text);
         Assert.Contains("Служба FACEIT: найдена (работает)", text);
         Assert.Contains("Vanguard: vgk не найдена, vgc не найдена", text);
-        Assert.Contains("конфликт возможен, но не обнаружен", text);
+        Assert.Contains("не определяет совместимость с античитами", text);
         Assert.DoesNotContain("found (", text);
     }
 
@@ -84,14 +85,15 @@ public sealed class DriverEnvironmentTests
     [InlineData("FACEIT", "running")]
     [InlineData("vgk", "running")]
     [InlineData("vgc", "stopped")]
-    public void CompactPromptKeepsAntiCheatConcernVisibleWithoutDumpingServiceStates(string name, string state)
+    public void InstalledServicesDoNotCreateASpeculativeConflictInThePrompt(string name, string state)
     {
         var snapshot = Snapshot();
         var service = new DriverServiceState(name, true, state);
         snapshot = name switch { "FACEIT" => snapshot with { Faceit = service }, "vgk" => snapshot with { VanguardDriver = service }, _ => snapshot with { VanguardService = service } };
         string text = DriverEnvironment.BuildCompactConfirmation(snapshot);
-        Assert.Contains(name == "FACEIT" ? "FACEIT" : "Vanguard", text);
-        Assert.Contains("may conflict with DTIMOD.sys", text);
+        Assert.DoesNotContain("FACEIT", text);
+        Assert.DoesNotContain("Vanguard", text);
+        Assert.DoesNotContain("conflict", text);
         Assert.DoesNotContain("KDU", text);
         Assert.DoesNotContain($"({state})", text);
         Assert.DoesNotContain("registry", text);
@@ -102,7 +104,9 @@ public sealed class DriverEnvironmentTests
     [InlineData(0u, true)]
     public void CompactPromptKeepsObservedWindowsRestrictionVisible(uint blocklist, bool hvci)
     {
-        Assert.Contains("Windows settings may prevent DTIMOD.sys from loading", DriverEnvironment.BuildCompactConfirmation(Snapshot(blocklist, hvci)));
+        string text = DriverEnvironment.BuildCompactConfirmation(Snapshot(blocklist, hvci));
+        Assert.Contains(blocklist != 0 ? "Driver blocklist is configured on." : "Memory integrity (HVCI) is enabled.", text);
+        Assert.DoesNotContain("prevent", text);
     }
 
     [Fact] public void CompactPromptDoesNotHideFailedReads()

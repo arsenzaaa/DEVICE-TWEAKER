@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "ui-latency",
+  "preset": "DevicePalette",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "before",
+      "action": "capture"
+    },
+    {
+      "id": "handlers",
+      "action": "measure-ui-latency"
+    },
+    {
+      "id": "after",
+      "action": "capture"
+    }
+  ]
+}

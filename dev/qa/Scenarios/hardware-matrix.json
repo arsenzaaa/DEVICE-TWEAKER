@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "hardware-matrix",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1440,
+  "height": 900,
+  "steps": [
+    {
+      "id": "matrix",
+      "action": "audit-hardware-matrix"
+    }
+  ]
+}

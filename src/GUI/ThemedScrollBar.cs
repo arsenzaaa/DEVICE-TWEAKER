@@ -12,6 +12,34 @@ internal sealed class ThemedScrollBar : Control
     private int _viewport = 1;
     private bool _dragging;
     private int _dragOffset;
+    private double _wheelRemainder;
+    private ControlAnimation? _scrollMotion;
+    internal bool IsScrolling => _scrollMotion?.IsRunning == true;
+    internal int TargetValue => IsScrolling ? (int)Math.Round(_scrollMotion!.Target) : _value;
+
+    private ControlAnimation ScrollMotion => _scrollMotion ??= new(this, 80,
+        position => SetValue((int)Math.Round(position), true));
+
+    internal void StopScrolling()
+    { _wheelRemainder = 0; _scrollMotion?.MoveTo(_value, animate: false); }
+
+    internal void ScrollTo(int value)
+    {
+        int target = Math.Clamp(value, 0, GetRange());
+        if (target == TargetValue && IsScrolling) return;
+        if (!IsScrolling) ScrollMotion.MoveTo(_value, animate: false);
+        ScrollMotion.MoveTo(target);
+    }
+
+    internal void ScrollWheel(int delta)
+    {
+        if (delta == 0) return;
+        // Fractional deltas survive even when one event is less than one pixel.
+        _wheelRemainder -= (double)delta / SystemInformation.MouseWheelScrollDelta * SmallChange;
+        int change = (int)_wheelRemainder;
+        _wheelRemainder -= change;
+        if (change != 0) ScrollTo(TargetValue + change);
+    }
 
     public event EventHandler? ValueChanged;
 
@@ -25,6 +53,7 @@ internal sealed class ThemedScrollBar : Control
             if (_maximum != next)
             {
                 _maximum = next;
+                _scrollMotion?.MoveTo(Math.Clamp(_value, 0, GetRange()), animate: false);
                 Invalidate();
                 SetValue(_value, false);
             }
@@ -41,6 +70,7 @@ internal sealed class ThemedScrollBar : Control
             if (_viewport != next)
             {
                 _viewport = next;
+                _scrollMotion?.MoveTo(Math.Clamp(_value, 0, GetRange()), animate: false);
                 Invalidate();
                 SetValue(_value, false);
             }
@@ -51,7 +81,15 @@ internal sealed class ThemedScrollBar : Control
     public int Value
     {
         get => _value;
-        set => SetValue(value, true);
+        set
+        {
+            // A consumer may mirror Value back while handling ValueChanged.
+            // Equal-value synchronization must not cancel the active gesture.
+            int next = Math.Clamp(value, 0, GetRange());
+            if (next == _value) return;
+            _scrollMotion?.MoveTo(next, animate: false);
+            SetValue(next, true);
+        }
     }
 
     [DefaultValue(40)]
@@ -157,6 +195,7 @@ internal sealed class ThemedScrollBar : Control
             return;
         }
 
+        _scrollMotion?.MoveTo(_value, animate: false);
         Rectangle thumb = GetThumbRect();
         if (thumb.Contains(e.Location))
         {
@@ -168,7 +207,7 @@ internal sealed class ThemedScrollBar : Control
         }
 
         int direction = e.Y < thumb.Top ? -1 : 1;
-        SetValue(_value + (direction * LargeChange), true);
+        ScrollTo(TargetValue + (direction * LargeChange));
     }
 
     protected override void OnMouseMove(MouseEventArgs e)
@@ -212,8 +251,14 @@ internal sealed class ThemedScrollBar : Control
     protected override void OnMouseWheel(MouseEventArgs e)
     {
         base.OnMouseWheel(e);
-        int delta = e.Delta > 0 ? -SmallChange : SmallChange;
-        SetValue(_value + delta, true);
+        ScrollWheel(e.Delta);
+        if (e is HandledMouseEventArgs handled) handled.Handled = true;
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) _scrollMotion?.Dispose();
+        base.Dispose(disposing);
     }
 
     private int GetRange()

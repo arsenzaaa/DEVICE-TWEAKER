@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "toggle-motion",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "en-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en",
+      "action": "audit-toggle-motion"
+    },
+    {
+      "id": "ru-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru",
+      "action": "audit-toggle-motion"
+    }
+  ]
+}

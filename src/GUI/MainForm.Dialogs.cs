@@ -626,19 +626,19 @@ public sealed partial class MainForm
         button.Cursor = Cursors.Hand;
         button.UseVisualStyleBackColor = false;
 
-        Color baseBg = isPrimary ? Color.FromArgb(18, 18, 22) : Color.FromArgb(12, 12, 16);
-        Color baseFg = isPrimary ? Color.FromArgb(245, 245, 245) : Color.FromArgb(180, 180, 190);
-        Color baseBorder = isPrimary ? Color.FromArgb(215, 215, 222) : Color.FromArgb(75, 75, 84);
+        Color baseBg = _bgForm;
+        Color baseFg = _fgMain;
+        Color baseBorder = isPrimary ? _fgMain : _border;
 
-        Color hoverBg = isPrimary ? Color.FromArgb(34, 34, 40) : Color.FromArgb(24, 24, 30);
+        Color hoverBg = _bgPanel;
         Color hoverFg = Color.White;
-        Color hoverBorder = isPrimary ? Color.FromArgb(255, 255, 255) : Color.FromArgb(135, 135, 145);
+        Color hoverBorder = _fgMain;
         button.FlatAppearance.MouseOverBackColor = hoverBg;
-        button.FlatAppearance.MouseDownBackColor = Color.FromArgb(38, 38, 44);
+        button.FlatAppearance.MouseDownBackColor = _bgGroup;
 
-        Color disabledBg = Color.FromArgb(10, 10, 13);
-        Color disabledFg = Color.FromArgb(85, 85, 92);
-        Color disabledBorder = Color.FromArgb(36, 36, 42);
+        Color disabledBg = _bgForm;
+        Color disabledFg = Color.FromArgb(85, 85, 85);
+        Color disabledBorder = Color.FromArgb(36, 36, 36);
 
         void ApplyState(bool isHover = false)
         {
@@ -793,69 +793,72 @@ public sealed partial class MainForm
             AutoScaleMode = AutoScaleMode.None, Font = _dialogFont, Icon = Icon,
             BackColor = _bgForm, ForeColor = _fgMain,
         };
+        StyleThemedDialogSurface(dialog);
         WireThemedTitleBar(dialog);
-        int padding = UiScale(24), width = UiScale(740), inner = width - padding * 2;
+        int padding = UiScale(20), width = UiScale(620), inner = width - padding * 2;
         int y = padding;
         string RegistryState(DriverRegistryState state) => state.Value is uint value
             ? UiLanguage.Text(value == 0 ? "Off" : "On") + $" ({value})"
-            : UiLanguage.Text(state.Evidence == "missing" ? "No registry setting" : "Could not read");
+            : UiLanguage.Text(state.Evidence == "missing" ? "Not configured" : "Could not read");
         string ServiceState(DriverServiceState service) => UiLanguage.Text(service.Exists switch
         {
-            false => "Service not installed", null => "Could not read",
+            false => "Not installed", null => "Could not read",
             _ => service.State switch
             {
-                "running" => "Service running", "stopped" => "Service stopped", "starting" => "Starting", "stopping" => "Stopping",
+                "running" => "Running", "stopped" => "Stopped", "starting" => "Starting", "stopping" => "Stopping",
                 "continuing" => "Continuing", "pausing" => "Pausing", "paused" => "Paused", _ => "Could not read",
             },
         });
-        (string Label, string Value)[] rows =
-        [
-            ("Vulnerable driver blocklist", RegistryState(snapshot.Blocklist)),
+        Panel AddSection(string title, params (string Name, string Value)[] rows)
+        {
+            int inset = UiScale(12), rowHeight = UiScale(28);
+            Panel panel = new() { BackColor = _bgPanel, Location = new Point(padding, y), Width = inner };
+            panel.Paint += (_, e) =>
+            {
+                using Pen pen = new(_border);
+                e.Graphics.DrawRectangle(pen, 0, 0, panel.Width - 1, panel.Height - 1);
+            };
+            Label heading = new() { Text = UiLanguage.Text(title), AutoSize = true,
+                Font = _blockTitleFont, ForeColor = _fgMain, Location = new Point(inset, inset) };
+            panel.Controls.Add(heading);
+            int rowY = heading.Bottom + UiScale(10);
+            int valueWidth = Math.Max(UiScale(130), rows.Max(row =>
+                TextRenderer.MeasureText(row.Value, _dialogFont, Size.Empty, TextFormatFlags.NoPadding).Width) + UiScale(12));
+            int nameWidth = inner - inset * 2 - valueWidth - UiScale(12);
+            foreach ((string nameText, string valueText) in rows)
+            {
+                Label name = new() { Text = UiLanguage.Text(nameText), Font = _dialogFont, ForeColor = _mutedText,
+                    UseMnemonic = false, Location = new Point(inset, rowY), Size = new Size(nameWidth, rowHeight) };
+                Label value = new() { Text = valueText, Font = _dialogFont, ForeColor = _fgMain,
+                    UseMnemonic = false, TextAlign = ContentAlignment.TopRight,
+                    Location = new Point(inner - inset - valueWidth, rowY), Size = new Size(valueWidth, rowHeight) };
+                panel.Controls.Add(name); panel.Controls.Add(value);
+                rowY += rowHeight;
+            }
+            panel.Height = rowY + UiScale(6);
+            dialog.Controls.Add(panel);
+            y = panel.Bottom + UiScale(12);
+            return panel;
+        }
+        AddSection("Windows settings",
+            ("Driver blocklist (registry)", RegistryState(snapshot.Blocklist)),
             ("Memory integrity (HVCI)", UiLanguage.Text(snapshot.HvciRunning switch { true => "On", false => "Off", _ => "Could not read" })),
-            ("HVCI registry setting", RegistryState(snapshot.HvciConfigured)),
+            ("HVCI registry setting", RegistryState(snapshot.HvciConfigured)));
+        AddSection("Services",
             ("Microsoft Defender", ServiceState(snapshot.Defender)),
             ("FACEIT", ServiceState(snapshot.Faceit)),
             ("Vanguard (vgk)", ServiceState(snapshot.VanguardDriver)),
-            ("Vanguard (vgc)", ServiceState(snapshot.VanguardService)),
-        ];
-        for (int i = 0; i < rows.Length; i++)
-        {
-            if (i is 0 or 3)
-            {
-                if (i == 3) y += UiScale(12);
-                Label section = new() { Text = UiLanguage.Text(i == 0 ? "Windows settings" : "Services"),
-                    Font = _blockTitleFont, ForeColor = _mutedText, BackColor = _bgForm,
-                    AutoSize = true, Location = new Point(padding, y) };
-                dialog.Controls.Add(section);
-                y += section.Height + UiScale(12);
-            }
-            Label name = new() { Name = $"SYSTEM_CHECK_NAME_{i}", Text = UiLanguage.Text(rows[i].Label), Font = _dialogFont,
-                ForeColor = _fgMain, BackColor = _bgForm, UseMnemonic = false, Location = new Point(padding, y), Size = new Size(UiScale(390), UiScale(26)) };
-            Label value = new() { Name = $"SYSTEM_CHECK_VALUE_{i}", Text = rows[i].Value, Font = _dialogFont,
-                ForeColor = _mutedText, BackColor = _bgForm, UseMnemonic = false, Location = new Point(padding + UiScale(390), y), Size = new Size(inner - UiScale(390), UiScale(26)) };
-            dialog.Controls.Add(name); dialog.Controls.Add(value);
-            y += UiScale(28);
-        }
-        y += UiScale(12);
-        foreach (string text in new[]
-        {
-            "This check reads settings and service status. It does not test DTIMOD.sys loading.",
-        })
-        {
-            Label note = new()
-            {
-                Name = "SYSTEM_CHECK_NOTE_" + y, Text = NormalizeDialogMessage(UiLanguage.Text(text)),
-                Font = _technicalFont, ForeColor = _mutedText, BackColor = _bgForm, UseMnemonic = false,
-                Location = new Point(padding, y), MaximumSize = new Size(inner, 0),
-            };
-            note.Size = new Size(inner, note.GetPreferredSize(new Size(inner, 0)).Height);
-            dialog.Controls.Add(note);
-            y = note.Bottom + UiScale(12);
-        }
+            ("Vanguard (vgc)", ServiceState(snapshot.VanguardService)));
+        Label note = new() { Text = UiLanguage.Text("Driver loading and anti-cheat compatibility are not tested."),
+            Font = _technicalFont, ForeColor = _mutedText, UseMnemonic = false,
+            Location = new Point(padding, y), Width = inner };
+        note.Height = note.GetPreferredSize(new Size(inner, 0)).Height;
+        dialog.Controls.Add(note);
+        y = note.Bottom + UiScale(12);
         Button closeButton = NewDialogButton(UiLanguage.Text("OK"), UiScale(32), UiScale(96), isPrimary: true);
         closeButton.Name = "OK"; closeButton.DialogResult = DialogResult.OK;
         AttachThemedDialogFooter(dialog, [closeButton]);
-        dialog.ClientSize = new Size(width, y + UiScale(6) + UiScale(50));
+        dialog.ClientSize = new Size(width, y + UiScale(50));
         dialog.AcceptButton = closeButton; dialog.CancelButton = closeButton;
         LocalizeControlTree(dialog);
         WriteLog("UI.IMOD.PREFLIGHT.DETAILS: opened separate system check");
@@ -946,7 +949,7 @@ public sealed partial class MainForm
             MaximumSize = new Size(innerWidth, 0),
             Text = subText,
             Font = _technicalFont,
-            ForeColor = Color.FromArgb(145, 150, 165),
+            ForeColor = _mutedText,
             BackColor = _bgForm,
             TextAlign = ContentAlignment.MiddleLeft,
             UseMnemonic = false,
@@ -966,14 +969,14 @@ public sealed partial class MainForm
 
             Panel listPanel = new()
             {
-                BackColor = Color.FromArgb(10, 10, 14),
+                BackColor = _bgForm,
                 Location = new Point(padding, currentY),
                 Size = new Size(innerWidth, listHeight),
                 Padding = Padding.Empty,
             };
             listPanel.Paint += (_, e) =>
             {
-                using Pen pen = new(Color.FromArgb(38, 38, 50), 1);
+                using Pen pen = new(_statusSeparator, 1);
                 e.Graphics.DrawRectangle(pen, 0, 0, listPanel.Width - 1, listPanel.Height - 1);
             };
 
@@ -983,12 +986,12 @@ public sealed partial class MainForm
                 {
                     Width = scrollWidth,
                     Dock = DockStyle.Right,
-                    BackColor = Color.FromArgb(10, 10, 14),
-                    TrackColor = Color.FromArgb(10, 10, 14),
-                    RailColor = Color.FromArgb(10, 10, 14),
-                    ThumbColor = Color.FromArgb(48, 48, 56),
-                    ThumbHoverColor = Color.FromArgb(80, 80, 92),
-                    ThumbDragColor = Color.FromArgb(120, 120, 135),
+                    BackColor = _bgForm,
+                    TrackColor = _bgForm,
+                    RailColor = _bgForm,
+                    ThumbColor = Color.FromArgb(70, 70, 70),
+                    ThumbHoverColor = _border,
+                    ThumbDragColor = _fgMain,
                     ThumbWidth = UiScale(8),
                     RailWidth = 0,
                     ThumbCornerRadius = UiScale(6),
@@ -1007,14 +1010,14 @@ public sealed partial class MainForm
             {
                 Location = new Point(1, 1),
                 Size = new Size(contentAreaWidth, listHeight - 2),
-                BackColor = Color.FromArgb(10, 10, 14),
+                BackColor = _bgForm,
             };
 
             backupList = new ListBox
             {
                 Name = "BACKUP_LIST",
                 BorderStyle = BorderStyle.None,
-                BackColor = Color.FromArgb(10, 10, 14),
+                BackColor = _bgForm,
                 ForeColor = _fgMain,
                 Font = _dialogFont,
                 IntegralHeight = false,
@@ -1042,7 +1045,7 @@ public sealed partial class MainForm
 
                 e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
                 bool selected = (e.State & DrawItemState.Selected) != 0;
-                Color bg = selected ? Color.FromArgb(26, 26, 26) : _bgGroup;
+                Color bg = _bgForm;
                 using SolidBrush bgBrush = new(bg);
                 e.Graphics.FillRectangle(bgBrush, e.Bounds);
 
@@ -1054,7 +1057,7 @@ public sealed partial class MainForm
                     using SolidBrush barBrush = new(_fgMain);
                     e.Graphics.FillRectangle(barBrush, e.Bounds.X, e.Bounds.Y, UiScale(3), e.Bounds.Height);
 
-                    using Pen borderPen = new(_border, 1);
+                    using Pen borderPen = new(_fgMain, 1);
                     e.Graphics.DrawRectangle(borderPen, e.Bounds.X, e.Bounds.Y, e.Bounds.Width - 1, e.Bounds.Height - 1);
                 }
 
@@ -1066,16 +1069,16 @@ public sealed partial class MainForm
                 // Column 1: Date & Time
                 DateTime stamp = info.CreatedAt ?? info.LastWriteUtc.ToLocalTime();
                 string dateStr = stamp.ToString("yyyy-MM-dd  HH:mm:ss", CultureInfo.InvariantCulture);
-                Color dateColor = selected ? _fgMain : _mutedText;
+                Color dateColor = _fgMain;
                 TextRenderer.DrawText(e.Graphics, dateStr, _dialogFont, new Point(x, textY), dateColor, TextFormatFlags.NoPadding);
                 x += UiScale(205);
 
                 // Column 2: Location Badge
                 int locBadgeW = UiScale(68);
                 Rectangle locRect = new(x, badgeY, locBadgeW, badgeH);
-                Color locBgColor = Color.FromArgb(18, 18, 18);
-                Color locBorderColor = Color.FromArgb(66, 66, 66);
-                Color locTextColor = _mutedText;
+                Color locBgColor = bg;
+                Color locBorderColor = _border;
+                Color locTextColor = _fgMain;
                 using SolidBrush locBg = new(locBgColor);
                 using Pen locBorder = new(locBorderColor, 1);
                 e.Graphics.FillRectangle(locBg, locRect);
@@ -1090,7 +1093,7 @@ public sealed partial class MainForm
                     Size origSz = TextRenderer.MeasureText(e.Graphics, origText, _blockTitleFont, Size.Empty, TextFormatFlags.NoPadding);
                     int origW = origSz.Width + UiScale(14);
                     Rectangle origRect = new(x, badgeY, origW, badgeH);
-                    using SolidBrush origBg = new(Color.FromArgb(24, 24, 24));
+                    using SolidBrush origBg = new(bg);
                     using Pen origBorder = new(_border, 1);
                     e.Graphics.FillRectangle(origBg, origRect);
                     e.Graphics.DrawRectangle(origBorder, origRect);
@@ -1106,14 +1109,14 @@ public sealed partial class MainForm
                     Size snapSz = TextRenderer.MeasureText(e.Graphics, snapText, _blockTitleFont, Size.Empty, TextFormatFlags.NoPadding);
                     int snapW = snapSz.Width + UiScale(14);
                     Rectangle snapRect = new(x, badgeY, snapW, badgeH);
-                    using SolidBrush snapBg = new(Color.FromArgb(18, 18, 18));
-                    using Pen snapBorder = new(Color.FromArgb(66, 66, 66), 1);
+                    using SolidBrush snapBg = new(bg);
+                    using Pen snapBorder = new(_border, 1);
                     e.Graphics.FillRectangle(snapBg, snapRect);
                     e.Graphics.DrawRectangle(snapBorder, snapRect);
-                    TextRenderer.DrawText(e.Graphics, snapText, _blockTitleFont, snapRect, _mutedText, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                    TextRenderer.DrawText(e.Graphics, snapText, _blockTitleFont, snapRect, _fgMain, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                     x += snapW + UiScale(12);
 
-                    TextRenderer.DrawText(e.Graphics, UiLanguage.Text(info.Reason), _dialogFont, new Point(x, textY), _fgMain, TextFormatFlags.NoPadding);
+                    TextRenderer.DrawText(e.Graphics, BackupReasonLabel.Get(info.Reason), _dialogFont, new Point(x, textY), _fgMain, TextFormatFlags.NoPadding);
                 }
             };
 
@@ -1172,7 +1175,7 @@ public sealed partial class MainForm
                     ? "Бекап исходных настроек защищён от удаления."
                     : "The original-settings backup is protected from deletion.",
                 Font = _technicalFont,
-                ForeColor = _statusInactive,
+                ForeColor = _mutedText,
                 BackColor = _bgForm,
                 TextAlign = ContentAlignment.MiddleLeft,
                 UseMnemonic = false,

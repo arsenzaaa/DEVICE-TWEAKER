@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "id": "category-accents",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "en-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "network-en-navigate",
+      "action": "click",
+      "target": "id:FILTER_NETWORK"
+    },
+    {
+      "id": "network-en-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_125C",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "network-en",
+      "action": "capture"
+    },
+    {
+      "id": "storage-en-navigate",
+      "action": "click",
+      "target": "id:FILTER_STORAGE"
+    },
+    {
+      "id": "storage-en-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_A80C",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "storage-en",
+      "action": "capture"
+    },
+    {
+      "id": "ru-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "network-ru-navigate",
+      "action": "click",
+      "target": "id:FILTER_NETWORK"
+    },
+    {
+      "id": "network-ru-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_125C",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "network-ru",
+      "action": "capture"
+    },
+    {
+      "id": "storage-ru-navigate",
+      "action": "click",
+      "target": "id:FILTER_STORAGE"
+    },
+    {
+      "id": "storage-ru-visible",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_A80C",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "storage-ru",
+      "action": "capture"
+    }
+  ]
+}

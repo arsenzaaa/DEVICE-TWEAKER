@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "snapshot-overlap",
+  "preset": "DevicePalette",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "overlap",
+      "action": "audit-snapshot-overlap"
+    }
+  ]
+}

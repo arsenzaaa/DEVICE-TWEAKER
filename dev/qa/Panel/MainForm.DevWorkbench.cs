@@ -233,6 +233,7 @@ public sealed partial class MainForm
             && topButtons.Select(button => button.Height).Distinct().Count() == 1
             && topButtons.All(button => TextRenderer.MeasureText(button.Text, button.Font).Width <= button.ClientSize.Width))
             .ToString().ToLowerInvariant(),
+        "irq-status" when control == this => _interruptModeStatusKey ?? string.Empty,
         "irq-all-pci-queried-once" when control == this => (_devIrqReadInstances.Count == _blocks.Count(block =>
             block.Device.InstanceId.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase)) && _blocks
             .Where(block => block.Device.InstanceId.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase))
@@ -240,6 +241,7 @@ public sealed partial class MainForm
             .ToString().ToLowerInvariant(),
         "filter-toolbar-fits" when control == this => (_filterCategoriesHost is not null && DevInViewport(_searchFilterBox)
             && !_searchFilterBox.Parent!.Bounds.IntersectsWith(_filterCategoriesHost.Bounds)
+            && (!_btnFilterClear.Visible || DevInViewport(_btnFilterClear))
             && _filterCategoryButtons.All(DevInViewport)).ToString().ToLowerInvariant(),
         "last-apply-errors" when control == this => (_devLastApplyReport?.Errors.Count ?? -1).ToString(),
         "map-rows" when control is ImodMapTextBox map => map.DisplayRowCount.ToString(),
@@ -278,7 +280,7 @@ public sealed partial class MainForm
         "rss-base" when control is NumericUpDown => _blocks.Single(block => block.RssQueueBox == control).RssBaseCore?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "",
         _ => throw new InvalidDataException("Unsupported assertion property: " + property),
     };
-    private async Task DevExecute(DevStep step)
+    private async Task DevExecute(DevStep step, bool observeTransition = false)
     {
         QaDesktop.DemandAssignedDesktop();
         if (!QaRun.IsReadOnly) throw new InvalidOperationException("Read-only policy lost");
@@ -322,6 +324,15 @@ public sealed partial class MainForm
                     throw new InvalidOperationException("Stale-map fixture requires a synthetic read-only card.");
                 MarkImodMapsStale();
                 break;
+            case "audit-toggle-motion": await DevAuditToggleMotionAsync(step.Id); break;
+            case "audit-ui-motion": await DevAuditUiMotionAsync(step.Id); break;
+            case "audit-hardware-matrix": await DevAuditHardwareMatrixAsync(step.Id, step.Value); break;
+            case "audit-snapshot-overlap": await DevAuditSnapshotOverlapAsync(step.Id); break;
+            case "audit-operation-feedback": await DevAuditOperationFeedbackAsync(step.Id); break;
+            case "audit-motion-lifecycle": await DevAuditMotionLifecycleAsync(step.Id); break;
+            case "irq-click-burst": await DevIrqClickBurstAsync(step.Id); break;
+            case "measure-ui-latency": await DevMeasureUiLatencyAsync(step.Id); break;
+            case "measure-frame-pacing": await DevMeasureFramePacingAsync(step.Id, step.Value == "budget"); break;
             case "capture": DevCaptureWindow(step.Id, step.Target, false, step.Device); break;
             case "reveal": DevReveal(DevTarget(step)); break;
             case "language": UiLanguage.Set(step.Value == "RU" ? UiLanguageCode.Russian : step.Value == "EN" ? UiLanguageCode.English : throw new InvalidDataException("Language must be RU / EN"), persist: false); break;
@@ -484,7 +495,7 @@ public sealed partial class MainForm
                 }
                 CheckObservedState();
                 DevCaptureWindow(step.Id + "-frame-000", step.Target, true, step.Device);
-                await DevExecute(step.Trigger!);
+                await DevExecute(step.Trigger!, observeTransition: true);
                 Stopwatch interval = Stopwatch.StartNew(); int count = 1;
                 // Native snapshots can take longer than the requested observation window on a busy desktop.
                 // Always retain enough real samples to check change and settling; timestamps expose that overhead.
@@ -503,7 +514,17 @@ public sealed partial class MainForm
                 DevCaptureWindow(step.Id + "-settled", step.Target, false, step.Device); break;
             default: throw new InvalidDataException("Unsupported action: " + step.Action);
         }
+        // Let queued clicks begin before checking their presentation motion.
+        // Modal dialogs still run in DevQueue so opening one cannot block the script.
         await Task.Delay(70);
+        // Ordinary steps assert settled UI state. Transition triggers explicitly
+        // opt out so their native frames can observe the movement itself.
+        if (!observeTransition && step.Action is "click" or "scroll" or "key")
+        {
+            Stopwatch settling = Stopwatch.StartNew();
+            while (_devicesScroll.IsScrolling && settling.ElapsedMilliseconds < 2000) await Task.Delay(15);
+            if (_devicesScroll.IsScrolling) throw new TimeoutException("Viewport motion did not settle.");
+        }
     }
     private IDisposable DevSandboxScope()
     { _testSandbox.Begin(TestSandboxFault.None); return new DevScope(() => _testSandbox.End()); }
@@ -636,7 +657,11 @@ public sealed partial class MainForm
             editorMetrics = c is ThemedTextBox field ? new { bounds=field.Inner.Bounds.ToString(),
                 field.Inner.PreferredHeight, fontHeight=field.Inner.Font.Height } : null,
             selected = c is ThemedDropDownPicker picker ? picker.SelectedItem?.ToString() : null }).ToArray();
-        DevFiles.Write(DevArtifact(tree), new { method = "WinForms control tree", uiState, client = window.ClientSize.ToString(), nodes });
+        DevFiles.Write(DevArtifact(tree), new { method = "WinForms control tree", uiState, client = window.ClientSize.ToString(),
+            scrolling = new { value = _devicesScroll.Value, target = _devicesScroll.TargetValue,
+                maximum = _devicesScroll.Maximum, viewport = _devicesScroll.ViewportSize,
+                running = _devicesScroll.IsScrolling, panelTop = _devicesPanel.Top,
+                contentHeight = _devicesPanel.Height, hostHeight = _devicesHost.ClientSize.Height }, nodes });
         if (DevIsBlankCapture(bitmap))
             throw new InvalidDataException("Native capture is blank / mostly white; retained for diagnosis");
         _devRun!.Captures.Add(new(id, png, DevFiles.Hash(DevArtifact(png)), bitmap.Width, bitmap.Height, captureTime,

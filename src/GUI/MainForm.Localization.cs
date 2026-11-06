@@ -81,7 +81,6 @@ public sealed partial class MainForm
     private bool _applyingLocalization;
     private Button? _englishLanguageButton;
     private Button? _russianLanguageButton;
-
     private void AddLanguageSelector(Panel brandPanel)
     {
         Size languagePanelSize = UiScale(91, 28);
@@ -127,13 +126,9 @@ public sealed partial class MainForm
         languagePanel.Controls.Add(_englishLanguageButton);
         languagePanel.Controls.Add(_russianLanguageButton);
 
-        void PositionLanguagePanel()
-        {
-            languagePanel.Location = new Point(
-                Math.Max(UiScale(8), brandPanel.ClientSize.Width - languagePanel.Width - UiScale(18)),
-                UiScale(14));
-        }
-
+        void PositionLanguagePanel() => languagePanel.Location = new Point(
+            Math.Max(UiScale(8), brandPanel.ClientSize.Width - UiScale(18) - languagePanel.Width), UiScale(14));
+        brandPanel.SizeChanged += (_, _) => PositionLanguagePanel();
         brandPanel.Controls.Add(languagePanel);
         languagePanel.BringToFront();
         PositionLanguagePanel();
@@ -189,6 +184,7 @@ public sealed partial class MainForm
         UpdateFilterToolbarLocalization();
         UpdateApplyButtonDirtyCount();
         UpdateInterruptModesStatus();
+        RefreshButtonFeedbackCaptions();
         foreach (DeviceBlock block in _blocks)
         {
             if (block.ModifiedBadge is not null)

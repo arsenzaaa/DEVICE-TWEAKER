@@ -1,0 +1,321 @@
+{
+  "schemaVersion": 1,
+  "id": "system-restore",
+  "preset": "DevicePalette",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "en96-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en96-scale",
+      "action": "layout-rebind",
+      "value": "96"
+    },
+    {
+      "id": "en96-system-open",
+      "action": "dialog",
+      "value": "system"
+    },
+    {
+      "id": "en96-system-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en96-system",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en96-system-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en96-system-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "en96-system-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en96-system-unknown-open",
+      "action": "dialog",
+      "value": "system-unknown"
+    },
+    {
+      "id": "en96-system-unknown-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en96-system-unknown",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en96-system-unknown-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en96-system-unknown-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "en96-system-unknown-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en96-restore-many-open",
+      "action": "dialog",
+      "value": "restore-many"
+    },
+    {
+      "id": "en96-restore-many-ready",
+      "action": "wait",
+      "target": "id:CANCEL",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en96-restore-many",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en96-restore-many-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en96-restore-many-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "en96-restore-many-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru96-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru96-scale",
+      "action": "layout-rebind",
+      "value": "96"
+    },
+    {
+      "id": "ru96-system-open",
+      "action": "dialog",
+      "value": "system"
+    },
+    {
+      "id": "ru96-system-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru96-system",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru96-system-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru96-system-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "ru96-system-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru96-system-unknown-open",
+      "action": "dialog",
+      "value": "system-unknown"
+    },
+    {
+      "id": "ru96-system-unknown-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru96-system-unknown",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru96-system-unknown-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru96-system-unknown-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "ru96-system-unknown-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru96-restore-many-open",
+      "action": "dialog",
+      "value": "restore-many"
+    },
+    {
+      "id": "ru96-restore-many-ready",
+      "action": "wait",
+      "target": "id:CANCEL",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru96-restore-many",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru96-restore-many-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru96-restore-many-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "ru96-restore-many-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru144-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru144-scale",
+      "action": "layout-rebind",
+      "value": "144"
+    },
+    {
+      "id": "ru144-system-unknown-open",
+      "action": "dialog",
+      "value": "system-unknown"
+    },
+    {
+      "id": "ru144-system-unknown-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru144-system-unknown",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru144-system-unknown-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru144-system-unknown-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "ru144-system-unknown-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru144-restore-many-open",
+      "action": "dialog",
+      "value": "restore-many"
+    },
+    {
+      "id": "ru144-restore-many-ready",
+      "action": "wait",
+      "target": "id:CANCEL",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru144-restore-many",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru144-restore-many-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru144-restore-many-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "ru144-restore-many-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    }
+  ]
+}
