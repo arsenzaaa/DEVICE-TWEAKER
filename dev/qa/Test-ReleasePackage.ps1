@@ -1,6 +1,7 @@
 param([Parameter(Mandatory = $true)][string]$PackageDirectory, [string]$OutputDirectory)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Read-QaJson.ps1')
+. (Join-Path $PSScriptRoot 'Package-Identity.ps1')
 $package = (Resolve-Path -LiteralPath $PackageDirectory).Path
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $package '..\validation' }
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
@@ -50,6 +51,7 @@ try {
         }
     }
     if ($results.Count -ne 2 -or $results[0].driverSha256 -ne $results[1].driverSha256) { throw 'Expected two production EXEs with identical driver payloads' }
+    Assert-QaPackageBuildIdentity $results
     $sourceDriver = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..\src\IMOD\DTIMOD.sys')).Path
     if ($results[0].driverSha256 -ne (Get-FileHash -LiteralPath $sourceDriver -Algorithm SHA256).Hash) { throw 'Embedded driver differs from the source build artifact' }
     foreach ($file in $results) {

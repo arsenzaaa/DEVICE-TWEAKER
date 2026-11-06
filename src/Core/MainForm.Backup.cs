@@ -49,10 +49,8 @@ public sealed partial class MainForm
         public override string ToString()
         {
             DateTime stamp = CreatedAt ?? LastWriteUtc.ToLocalTime();
-            string reason = IsOriginal
-                ? "ORIGINAL STATE"
-                : string.IsNullOrWhiteSpace(Reason) ? "backup" : Reason;
-            return $"{stamp:yyyy-MM-dd HH:mm:ss} [{Location}] {UiLanguage.Text(reason)}";
+            string reason = BackupReasonLabel.Get(IsOriginal ? "original-state" : Reason);
+            return $"{stamp:yyyy-MM-dd HH:mm:ss} [{Location}] {reason}";
         }
     }
 
@@ -72,6 +70,11 @@ public sealed partial class MainForm
 
     private string GetBackupDirectory(BackupLocation location)
     {
+        if (QaRun.IsReadOnly)
+        {
+            return Path.Combine(QaRun.OutputDirectory, "Backups", location.ToString());
+        }
+
         if (location == BackupLocation.Roaming)
         {
             string root = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
