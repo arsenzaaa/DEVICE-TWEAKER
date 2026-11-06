@@ -7,6 +7,7 @@ param(
     [switch]$Worker,
     [string]$RunDirectory,
     [string]$SourceWorkspace,
+    [string]$BackupSamples,
     [ValidateSet('Secondary', 'Primary')]
     [string]$Monitor = 'Secondary'
 )
@@ -31,10 +32,11 @@ $runDir = if ($RunDirectory) { [IO.Path]::GetFullPath($RunDirectory) } else {
 New-Item -ItemType Directory -Path $runDir -Force | Out-Null
 if (-not $Worker) {
     $workspace = Split-Path $root
+    if ($BackupSamples) { $BackupSamples = (Resolve-Path -LiteralPath $BackupSamples).Path; if (-not (Test-Path -LiteralPath $BackupSamples -PathType Container)) { throw 'BackupSamples must be a directory' } }
     try {
         $snapshot = New-QaInputSnapshot $workspace $runDir
         $parameters = @{ Worker = $true; RunDirectory = $runDir; SourceWorkspace = $workspace;
-            SkipGui = [bool]$SkipGui; VisibleGui = [bool]$VisibleGui; Monitor = $Monitor }
+            SkipGui = [bool]$SkipGui; VisibleGui = [bool]$VisibleGui; Monitor = $Monitor; BackupSamples = $BackupSamples }
         $script = Join-Path $snapshot 'dev\qa\Invoke-Qa.ps1'
         if ($VisibleGui) {
             & $script @parameters
@@ -70,8 +72,11 @@ Test-QaInputSnapshot $runDir
 $savedReadOnly = $env:DEVICE_TWEAKER_QA_READ_ONLY
 $savedOutput = $env:DEVICE_TWEAKER_QA_OUTPUT
 $savedBackups = $env:DEVICE_TWEAKER_QA_BACKUPS
-$backupDirectory = Join-Path $SourceWorkspace 'src\bin\Publish\DEVICE TWEAKER (SELF-CONTAINED)\Backups'
-if (Test-Path -LiteralPath $backupDirectory) { $env:DEVICE_TWEAKER_QA_BACKUPS = $backupDirectory }
+$env:DEVICE_TWEAKER_QA_BACKUPS = $null
+if ($BackupSamples) {
+    if (-not (Test-Path -LiteralPath $BackupSamples -PathType Container)) { throw 'BackupSamples must be an existing directory' }
+    $env:DEVICE_TWEAKER_QA_BACKUPS = [IO.Path]::GetFullPath($BackupSamples)
+}
 $env:DEVICE_TWEAKER_QA_READ_ONLY = '1'
 $env:DEVICE_TWEAKER_QA_OUTPUT = Join-Path $runDir 'unit-processes'
 $steps = New-Object 'System.Collections.Generic.List[object]'

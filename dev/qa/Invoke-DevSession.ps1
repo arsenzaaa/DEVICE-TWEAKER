@@ -4,15 +4,18 @@ param(
     [string]$Scenario,
     [string]$OutputRoot,
     [string]$CompareWith,
+    [switch]$FreshBuild,
     [switch]$Worker,
     [string]$RunDirectory,
-    [string]$ExePath
+    [string]$ExePath,
+    [ValidateRange(1,1800)][int]$ScenarioTimeoutSeconds = 120
 )
 $ErrorActionPreference = 'Stop'
 if (-not $Scenario) { $Scenario = Join-Path $PSScriptRoot 'Scenarios\device-flow.json' }
 . (Join-Path $PSScriptRoot 'Private-Desktop.ps1')
 . (Join-Path $PSScriptRoot 'Input-Snapshot.ps1')
 . (Join-Path $PSScriptRoot 'Read-QaJson.ps1')
+. (Join-Path $PSScriptRoot 'Build-Cache.ps1')
 if (-not $Worker) {
     $workspace = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
     if (-not $OutputRoot) { $OutputRoot = Join-Path $workspace 'local\dev-sessions' }
@@ -24,14 +27,17 @@ if (-not $Worker) {
     $run = Join-Path ([IO.Path]::GetFullPath($OutputRoot)) ('dev_{0}_{1}' -f (Get-Date -Format 'yyyyMMdd_HHmmss'),[Guid]::NewGuid().ToString('N').Substring(0,8))
     New-Item -ItemType Directory -Path $run | Out-Null
     Copy-Item -LiteralPath (Resolve-Path -LiteralPath $Scenario).Path -Destination (Join-Path $run 'scenario.json')
-    $snapshot = New-QaInputSnapshot $workspace $run
-    & dotnet build (Join-Path $snapshot 'src\DeviceTweakerCS.csproj') -c Release -p:DeveloperQa=true -p:BuildImodDriver=false -p:TreatWarningsAsErrors=true --nologo *> (Join-Path $run 'build.log')
-    if ($LASTEXITCODE -ne 0) { throw "Developer build failed; see $run\build.log" }
-    $parameters = @{ Worker = $true; RunDirectory = $run; Scenario = (Join-Path $run 'scenario.json');
+    $build = Get-QaDevBuild $workspace -FreshBuild:$FreshBuild
+    $snapshot = $build.snapshot
+    Copy-Item -LiteralPath (Join-Path $build.directory 'inputs.json') -Destination (Join-Path $run 'inputs.json')
+    $build | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $run 'build-reference.json') -Encoding UTF8
+    Write-Output ('QA build: {0}; reused={1}' -f $build.key, $build.reused)
+    $parameters = @{ Worker = $true; RunDirectory = $run; Scenario = (Join-Path $run 'scenario.json'); ScenarioTimeoutSeconds = $ScenarioTimeoutSeconds;
         ExePath = (Join-Path $snapshot 'src\bin\DeveloperQa\Release\net10.0-windows\win-x64\DEVICE TWEAKER QA.exe') }
     if ($CompareWith) { $parameters.CompareWith = [IO.Path]::GetFullPath($CompareWith) }
-    $code = Invoke-QaPrivateDesktop -ScriptPath (Join-Path $snapshot 'dev\qa\Invoke-DevSession.ps1') -Parameters $parameters -ReportDirectory (Join-Path $run 'isolation') -TimeoutSeconds 240
+    $code = Invoke-QaPrivateDesktop -ScriptPath (Join-Path $snapshot 'dev\qa\Invoke-DevSession.ps1') -Parameters $parameters -ReportDirectory (Join-Path $run 'isolation') -TimeoutSeconds ($ScenarioTimeoutSeconds + 120)
     Test-QaInputSnapshot $run
+    $null = Get-QaSessionInspector $run
     Write-Output $run
     exit $code
 }
@@ -44,8 +50,9 @@ if ([IO.Path]::GetFullPath($Scenario) -ne (Join-Path $RunDirectory 'scenario.jso
     $Scenario = Join-Path $RunDirectory 'scenario.json'
 }
 $scene = Get-Content -LiteralPath $Scenario -Raw | ConvertFrom-Json
-$inspector = Join-Path $PSScriptRoot 'Inspect\Inspect.csproj'
-& dotnet run --project $inspector -- --dev-validate $Scenario *> (Join-Path $RunDirectory 'scenario-validation.log')
+$compiledInspector = Get-QaSessionInspector $RunDirectory
+[string[]]$inspectorArguments = if ($compiledInspector) { @($compiledInspector) } else { @('run','--project',(Join-Path $PSScriptRoot 'Inspect\Inspect.csproj'),'--') }
+& dotnet @inspectorArguments --dev-validate $Scenario *> (Join-Path $RunDirectory 'scenario-validation.log')
 if ($LASTEXITCODE -ne 0) { throw 'Invalid scenario; see scenario-validation.log' }
 $vars = @('DEVICE_TWEAKER_QA_READ_ONLY','DEVICE_TWEAKER_QA_OUTPUT','DEVICE_TWEAKER_QA_SESSION','DEVICE_TWEAKER_DEV_SCENARIO',
     'DEVICE_TWEAKER_SHOWCASE','DEVICE_TWEAKER_SHOWCASE_FILTER','DEVICE_TWEAKER_QA_TEST_ADMIN','DEVICE_TWEAKER_QA_SANDBOX',
@@ -62,7 +69,7 @@ try {
     $env:DEVICE_TWEAKER_SHOWCASE_FILTER = $scene.filter
     $env:DEVICE_TWEAKER_QA_LAYOUT_DPI = if ($scene.layoutDpi) { [string]$scene.layoutDpi } else { '96' }
     $process = Start-QaOwnedProcess ([IO.Path]::GetFullPath($ExePath)) '--qa-read-only'
-    $deadline = [DateTime]::UtcNow.AddSeconds(120)
+    $deadline = [DateTime]::UtcNow.AddSeconds($ScenarioTimeoutSeconds)
     while (-not $process.WaitForExit(250)) {
         $sessionFile = Join-Path $RunDirectory 'session.json'
         if (Test-Path -LiteralPath $sessionFile) {
@@ -81,14 +88,14 @@ try {
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-QaLogErrors.ps1') `
         -LogPath $logs[0].FullName -ReportPath (Join-Path $RunDirectory 'runtime-errors.json') *> (Join-Path $RunDirectory 'runtime-errors.log')
     if ($LASTEXITCODE -ne 0) { throw 'Unexpected ERROR / FATAL in development session log' }
-    & dotnet run --project $inspector -- --dev-verify $RunDirectory *> (Join-Path $RunDirectory 'evidence.log')
+    & dotnet @inspectorArguments --dev-verify $RunDirectory *> (Join-Path $RunDirectory 'evidence.log')
     if ($LASTEXITCODE -ne 0) { throw 'Development session evidence is incomplete' }
     [ordered]@{ sessionSha256=(Get-FileHash -LiteralPath (Join-Path $RunDirectory 'session.json')).Hash;
         processReport=('process-'+$process.Id+'.json'); processId=$process.Id; exitCode=$process.ExitCode } |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $RunDirectory 'execution.json') -Encoding UTF8
     $comparisonStatus = 'NOT_COMPARED'
     if ($CompareWith) {
-        & dotnet run --project $inspector -- --dev-compare ([IO.Path]::GetFullPath($CompareWith)) $RunDirectory (Join-Path $RunDirectory 'comparison') *> (Join-Path $RunDirectory 'comparison.log')
+        & dotnet @inspectorArguments --dev-compare ([IO.Path]::GetFullPath($CompareWith)) $RunDirectory (Join-Path $RunDirectory 'comparison') *> (Join-Path $RunDirectory 'comparison.log')
         if ($LASTEXITCODE -ne 0) { throw 'Comparison failed / runs are incompatible' }
         $comparisonStatus = (Get-Content -LiteralPath (Join-Path $RunDirectory 'comparison\comparison.json') -Raw | ConvertFrom-Json).status
     }
