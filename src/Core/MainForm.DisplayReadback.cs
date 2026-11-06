@@ -7,6 +7,8 @@ public sealed partial class MainForm
     private sealed record DisplaySnapshot(DeviceDisplayState[] Devices,
         Dictionary<string, SignedDriverInfo>? Drivers, string? DriverError);
 
+    private sealed record DriverMetadata(Dictionary<string, SignedDriverInfo> Drivers, string? Error);
+    private readonly BackgroundSnapshotReader<DriverMetadata> _driverMetadataReader = new();
     private readonly BackgroundSnapshotReader<DisplaySnapshot> _displayReader = new();
     private readonly CancellationTokenSource _displayReadLifetime = new();
     private readonly Dictionary<string, bool> _displayPowerCache = new(StringComparer.OrdinalIgnoreCase);
@@ -14,7 +16,8 @@ public sealed partial class MainForm
 
     private static bool HasDisplayPower(DeviceKind kind) => kind is DeviceKind.USB or DeviceKind.NET_NDIS or DeviceKind.NET_CX;
 
-    private Task<SnapshotReadResult<DisplaySnapshot>> ReadDisplaySnapshotAsync(IEnumerable<DeviceInfo> devices)
+    private Task<SnapshotReadResult<DisplaySnapshot>> ReadDisplaySnapshotAsync(IEnumerable<DeviceInfo> devices,
+        Task<SnapshotReadResult<DriverMetadata>>? metadataRead = null)
     {
         DisplayReadTarget[] targets = devices.Where(device => !device.IsTestDevice)
             .Select(device => new DisplayReadTarget(device.InstanceId, device.Kind, device.Wifi)).ToArray();
@@ -29,11 +32,39 @@ public sealed partial class MainForm
             return Task.FromResult(new SnapshotReadResult<DisplaySnapshot>(new([], null, null), null));
         }
         CancellationToken lifetime = _displayReadLifetime.Token;
-        return _displayReader.ReadAsync(() => ReadDisplaySnapshot(targets, readDrivers,
-            target => { lifetime.ThrowIfCancellationRequested(); return ReadDisplayPower(target); },
-            id => ReadNdisRssRuntimeState(id, lifetime),
-            () => { lifetime.ThrowIfCancellationRequested(); return ReadSignedDriverSnapshot(); }),
+        if (readDrivers) metadataRead ??= BeginDriverMetadataRead();
+        return _displayReader.ReadTaskAsync(() => CompleteDisplaySnapshotAsync(
+            () => ReadDisplaySnapshot(targets, false,
+                target => { lifetime.ThrowIfCancellationRequested(); return ReadDisplayPower(target); },
+                id => ReadNdisRssRuntimeState(id, lifetime), ReadSignedDriverSnapshot),
+            readDrivers ? metadataRead : null),
             TimeSpan.FromSeconds(30), error => AppDiagnostics.Warn("DISPLAY.LATE", error));
+    }
+
+    // Driver metadata is diagnostic data independent of device discovery and RSS.
+    // Start it once per uncached refresh; the reader owns even a timed-out worker.
+    private Task<SnapshotReadResult<DriverMetadata>>? BeginDriverMetadataRead()
+    {
+        if (!_detailedLogEnabled || _signedDriverInfoCache is not null || (_testDevicesEnabled && _testDevicesOnly))
+            return null;
+        CancellationToken lifetime = _displayReadLifetime.Token;
+        return _driverMetadataReader.ReadAsync(() =>
+        {
+            lifetime.ThrowIfCancellationRequested();
+            var result = ReadSignedDriverSnapshot();
+            return new DriverMetadata(result.Item1, result.Item2);
+        }, TimeSpan.FromSeconds(30), error => AppDiagnostics.Warn("DISPLAY.DRIVERS.LATE", error));
+    }
+
+    private static async Task<DisplaySnapshot> CompleteDisplaySnapshotAsync(Func<DisplaySnapshot> readState,
+        Task<SnapshotReadResult<DriverMetadata>>? metadataRead)
+    {
+        DisplaySnapshot state = readState();
+        if (metadataRead is null) return state;
+        SnapshotReadResult<DriverMetadata> metadata = await metadataRead.ConfigureAwait(false);
+        if (metadata.Snapshot is null)
+            throw new IOException(metadata.Error ?? "Driver metadata read failed.");
+        return state with { Drivers = metadata.Snapshot.Drivers, DriverError = metadata.Snapshot.Error };
     }
 
     private static DisplaySnapshot ReadDisplaySnapshot(DisplayReadTarget[] targets, bool readDrivers,

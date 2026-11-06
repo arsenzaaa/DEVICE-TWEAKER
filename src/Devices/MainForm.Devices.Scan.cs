@@ -279,6 +279,14 @@ public sealed partial class MainForm
     private NdisRssRuntimeState ReadNdisRssRuntimeState(string instanceId, CancellationToken cancellation = default)
     {
         string? netCfgInstanceId = GetNdisNetCfgInstanceId(instanceId);
+        Stopwatch directRead = Stopwatch.StartNew();
+        if (NdisRssReader.TryRead(netCfgInstanceId, instanceId, cancellation, out NdisRssRuntimeState? direct, out string? fallback))
+        {
+            WriteLog($"RSS.QUERY: completed durationMs={directRead.ElapsedMilliseconds} provider=cim instance={instanceId}");
+            return direct!;
+        }
+        cancellation.ThrowIfCancellationRequested();
+        WriteLog($"RSS.QUERY.FALLBACK: durationMs={directRead.ElapsedMilliseconds} reason={fallback} instance={instanceId}");
         string script = BuildNdisRssQueryScript(netCfgInstanceId, instanceId);
 
         try

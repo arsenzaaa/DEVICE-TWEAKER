@@ -16,14 +16,27 @@ internal sealed class BackgroundSnapshotReader<T> where T : class
         finally { deadline.Cancel(); }
     }
 
-    internal async Task<SnapshotReadResult<T>> ReadAsync(Func<T> read, Task deadline, Action<Exception> lateError)
+    internal Task<SnapshotReadResult<T>> ReadAsync(Func<T> read, Task deadline, Action<Exception> lateError)
+        => ReadCoreAsync(() => Task.Run(read), deadline, lateError);
+
+    internal async Task<SnapshotReadResult<T>> ReadTaskAsync(Func<Task<T>> read, TimeSpan timeout, Action<Exception> lateError)
+    {
+        using CancellationTokenSource deadline = new();
+        try { return await ReadTaskAsync(read, Task.Delay(timeout, deadline.Token), lateError); }
+        finally { deadline.Cancel(); }
+    }
+
+    internal Task<SnapshotReadResult<T>> ReadTaskAsync(Func<Task<T>> read, Task deadline, Action<Exception> lateError)
+        => ReadCoreAsync(() => Task.Run(read), deadline, lateError);
+
+    private async Task<SnapshotReadResult<T>> ReadCoreAsync(Func<Task<T>> start, Task deadline, Action<Exception> lateError)
     {
         Task<T> work;
         lock (_sync)
         {
             if (_pending is { IsCompleted: false })
                 return new(null, "The previous device state read is still running.");
-            work = _pending = Task.Run(read);
+            work = _pending = start();
         }
         try
         {

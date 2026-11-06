@@ -103,12 +103,19 @@ public sealed partial class MainForm
                 if (!drafts.TryGetValue(block.Device.InstanceId, out EditorDraft? draft)) continue;
                 DeviceEditorState current = CaptureEditorState(block);
                 DeviceEditorState merged = DeviceEditorState.MergeDraft(current, draft.Baseline, draft.Values);
-                ApplyEditorState(block, merged);
+                bool valuesChanged = merged != current;
+                bool expansionChanged = block.ImodDetailsExpanded != draft.DetailsExpanded;
+                // Freshly bound controls already contain current values. Only
+                // reapply an actual draft difference, not every unchanged field.
+                if (valuesChanged) ApplyEditorState(block, merged);
                 block.ImodReadbackRequested = draft.ReadbackRequested;
                 block.ImodDetailsExpanded = draft.DetailsExpanded;
-                block.RestoreImodDetailsExpansion?.Invoke(draft.DetailsExpanded);
-                UpdateBlockInfoText(block);
-                block.RelayoutAction?.Invoke();
+                if (expansionChanged) block.RestoreImodDetailsExpansion?.Invoke(draft.DetailsExpanded);
+                if (valuesChanged || expansionChanged)
+                {
+                    UpdateBlockInfoText(block);
+                    block.RelayoutAction?.Invoke();
+                }
                 block.CheckIsDirty();
             }
         }
