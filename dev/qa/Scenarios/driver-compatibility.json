@@ -1,0 +1,411 @@
+{
+  "schemaVersion": 1,
+  "id": "driver-compatibility",
+  "preset": "DevicePalette",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "en96-lang",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en96-scale",
+      "action": "layout-rebind",
+      "value": "96"
+    },
+    {
+      "id": "en96-open",
+      "action": "dialog",
+      "value": "driver"
+    },
+    {
+      "id": "en96-ready",
+      "action": "wait",
+      "target": "id:CONTINUE",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en96-notice",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en96-notice-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en96-check",
+      "action": "click",
+      "target": "id:SYSTEM_CHECK_TOGGLE"
+    },
+    {
+      "id": "en96-check-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en96-check-view",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en96-check-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en96-check-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "en96-back",
+      "action": "wait",
+      "target": "id:CONTINUE",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en96-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "en96-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru96-lang",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru96-scale",
+      "action": "layout-rebind",
+      "value": "96"
+    },
+    {
+      "id": "ru96-open",
+      "action": "dialog",
+      "value": "driver"
+    },
+    {
+      "id": "ru96-ready",
+      "action": "wait",
+      "target": "id:CONTINUE",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru96-notice",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru96-notice-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru96-check",
+      "action": "click",
+      "target": "id:SYSTEM_CHECK_TOGGLE"
+    },
+    {
+      "id": "ru96-check-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru96-check-view",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru96-check-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru96-check-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "ru96-back",
+      "action": "wait",
+      "target": "id:CONTINUE",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru96-close",
+      "action": "click",
+      "target": "id:CONTINUE"
+    },
+    {
+      "id": "ru96-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru144-lang",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru144-scale",
+      "action": "layout-rebind",
+      "value": "144"
+    },
+    {
+      "id": "ru144-open",
+      "action": "dialog",
+      "value": "driver"
+    },
+    {
+      "id": "ru144-ready",
+      "action": "wait",
+      "target": "id:CONTINUE",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru144-notice",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru144-notice-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru144-check",
+      "action": "click",
+      "target": "id:SYSTEM_CHECK_TOGGLE"
+    },
+    {
+      "id": "ru144-check-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru144-check-view",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru144-check-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru144-check-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "ru144-back",
+      "action": "wait",
+      "target": "id:CONTINUE",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru144-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "ru144-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en120-lang",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en120-scale",
+      "action": "layout-rebind",
+      "value": "120"
+    },
+    {
+      "id": "en120-open",
+      "action": "dialog",
+      "value": "driver"
+    },
+    {
+      "id": "en120-ready",
+      "action": "wait",
+      "target": "id:CONTINUE",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en120-notice",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en120-notice-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en120-check",
+      "action": "click",
+      "target": "id:SYSTEM_CHECK_TOGGLE"
+    },
+    {
+      "id": "en120-check-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en120-check-view",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en120-check-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en120-check-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "en120-back",
+      "action": "wait",
+      "target": "id:CONTINUE",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en120-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "en120-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru120-lang",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru120-scale",
+      "action": "layout-rebind",
+      "value": "120"
+    },
+    {
+      "id": "ru120-open",
+      "action": "dialog",
+      "value": "driver"
+    },
+    {
+      "id": "ru120-ready",
+      "action": "wait",
+      "target": "id:CONTINUE",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru120-notice",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru120-notice-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru120-check",
+      "action": "click",
+      "target": "id:SYSTEM_CHECK_TOGGLE"
+    },
+    {
+      "id": "ru120-check-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru120-check-view",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru120-check-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru120-check-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "ru120-back",
+      "action": "wait",
+      "target": "id:CONTINUE",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru120-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "ru120-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    }
+  ]
+}

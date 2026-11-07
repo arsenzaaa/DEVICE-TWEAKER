@@ -1605,7 +1605,6 @@ public sealed partial class MainForm
                 "Core optimization was saved.",
                 "Applied steps were saved. One optional step was not completed.",
                 operationName: "AUTO-OPTIMIZATION");
-            MaybeOfferVulnerableDriverBlocklistDisable(preview);
         };
 
         Button resultPartialMultiButton = NewDialogButton("RESULT: PARTIAL (3x)");

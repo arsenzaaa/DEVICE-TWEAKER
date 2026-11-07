@@ -12,7 +12,9 @@ MSI, affinity, RSS, ReservedCpuSets, Mouse Throttle and available power settings
 
 DTIMOD has no public Microsoft signature for ordinary loading. The project uses a pinned [KDU](../../src/IMOD/KDU/README.md) version that relies on a vulnerable signed driver. This is a highly privileged hardware tool; antivirus, HVCI, Vulnerable Driver Blocklist and anti-cheat software can prevent it from working.
 
-**SYSTEM CHECK** displays available protection/service information without loading the driver. Failure to find a service is not an anti-cheat compatibility guarantee. Do not disable protections merely to obtain a green status; other features remain available without the loader.
+DTIMOD can conflict with Easy Anti-Cheat, Riot Vanguard, FACEIT Anti-Cheat and other protection software. Successful driver loading does not confirm compatibility: a game may disconnect you while the driver is loaded. EAC disconnects with `Forbidden Tool` have been reproduced with DTIMOD loaded on a tested system. Compatibility with Vanguard and FACEIT has not been established.
+
+The application shows a notice once per session before driver use or saving/restoring a driver profile. AUTO includes the notice in its IMOD question. **CHECK SYSTEM** reads available Windows settings and selected service information without loading DTIMOD. It does not test compatibility, and absence of a registry value or service does not prove that the system permits the driver. Details are written to the log. The application does not offer to disable Windows protections after a loading error.
 
 The application checks pinned file hashes and blocks fallback loading after an uncertain load outcome. Inspect the operation details for the reason. Restart Windows to replace an already loaded older driver or unload DTIMOD; closing the EXE only closes its connection.
 

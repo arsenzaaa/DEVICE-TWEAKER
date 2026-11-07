@@ -447,6 +447,9 @@ public sealed partial class MainForm
             WriteLog("UI: APPLY button clicked");
             bool sandboxDryRun = IsSandboxDryRunActive();
             OperationReport report = CreateApplyReport(sandboxDryRun);
+            if (!sandboxDryRun && _blocks.Any(b => !b.Device.IsTestDevice && b.Kind == DeviceKind.USB
+                && b.Device.UsbIsXhci && b.Device.UsbHasDevices)
+                && !ConfirmDriverUse()) return;
             if (!sandboxDryRun)
             {
                 if (!await CreateDeviceTweakerBackup("pre-apply", showDialog: false))
@@ -579,7 +582,6 @@ public sealed partial class MainForm
                     successMessage: "Please reboot your PC to finish applying the changes.",
                     partialMessage: "Applied steps were saved. One or more steps were not completed.",
                     operationName: "APPLY");
-                MaybeOfferVulnerableDriverBlocklistDisable(report);
             }
         };
         btnAuto.Click += async (_, _) =>
@@ -604,6 +606,7 @@ public sealed partial class MainForm
                     "APPLY",
                     "SKIP",
                     driverEnvironment: imodDetails);
+                if (optimizeUsbImod && !QaRun.IsReadOnly) _driverUseConfirmed = true;
                 WriteLog($"AUTO.IMOD.PROMPT: {(optimizeUsbImod ? "accepted" : "declined")}");
             }
             else
@@ -780,7 +783,6 @@ public sealed partial class MainForm
                     successMessage: "Please reboot your PC to finish applying the changes.",
                     partialMessage: "Applied steps were saved. One or more steps were not completed.",
                     operationName: "AUTO-OPTIMIZATION");
-                MaybeOfferVulnerableDriverBlocklistDisable(report);
             }
         };
         btnRestore.Click += async (_, _) =>

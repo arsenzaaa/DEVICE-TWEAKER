@@ -63,6 +63,7 @@ public sealed partial class MainForm
         SkippedNoUsb,
         SkippedNoController,
         SkippedNoConfig,
+        SkippedByUser,
         Failed,
     }
 
@@ -1094,6 +1095,9 @@ public sealed partial class MainForm
 
         List<DeviceBlock> targetBlocks = xhciBlocks.Where(b => IsUsbImodTarget(b.Device)).ToList();
 
+        if (!ConfirmDriverUse())
+            return new(ImodApplyOutcome.SkippedByUser, "Driver access cancelled.", null);
+
         ImodConfig config = ReadSavedStartupConfig(out _);
         List<string> invalidInputs = [];
 
@@ -1350,6 +1354,7 @@ public sealed partial class MainForm
             case ImodApplyOutcome.SkippedNoUsb:
             case ImodApplyOutcome.SkippedNoController:
             case ImodApplyOutcome.SkippedNoConfig:
+            case ImodApplyOutcome.SkippedByUser:
                 report.AddSkipped(component, userMessage ?? "No eligible target was found.", technicalDetails);
                 break;
             default:
@@ -1374,6 +1379,7 @@ public sealed partial class MainForm
         }
         using IDisposable? operation = TryBeginDeviceOperation("IMOD SET");
         if (operation is null) return;
+        if (!ConfirmDriverUse()) return;
 
         OperationReport report = new();
         if (!await CreateDeviceTweakerBackup("pre-imod", showDialog: false))
@@ -1392,7 +1398,7 @@ public sealed partial class MainForm
 
         (ImodApplyOutcome outcome, string? note, string? technicalDetails) = await ApplyImodSettingsAsync();
         if (_uiDisposing || IsDisposed || Disposing) return;
-        if (outcome is ImodApplyOutcome.SkippedNoUsb or ImodApplyOutcome.SkippedNoController)
+        if (outcome is ImodApplyOutcome.SkippedNoUsb or ImodApplyOutcome.SkippedNoController or ImodApplyOutcome.SkippedByUser)
         {
             ShowThemedInfo(string.IsNullOrWhiteSpace(note)
                 ? "No eligible USB IMOD target for SET."
@@ -1419,7 +1425,6 @@ public sealed partial class MainForm
             successMessage: note ?? "IMOD applied.",
             partialMessage: "USB IMOD completed with warnings or failed steps.",
             operationName: "USB IMOD");
-        MaybeOfferVulnerableDriverBlocklistDisable(report);
     
     }
 

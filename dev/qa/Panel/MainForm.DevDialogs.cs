@@ -38,6 +38,7 @@ public sealed partial class MainForm
         {
             case "backup-restored": ShowBackupFileResult(DevBackupPath, restored: true); break;
             case "backup-saved": ShowBackupFileResult(DevBackupPath, restored: false); break;
+            case "driver": ShowDriverUsePrompt(environment); break;
             case "system": ShowDriverEnvironmentDetails(this, environment); break;
             case "system-unknown": ShowDriverEnvironmentDetails(this, environment with { Blocklist = new(null, "unavailable"), HvciRunning = null, Faceit = new("FACEIT", null, "unavailable") }); break;
             case "imod": ShowThemedConfirm(DriverEnvironment.BuildCompactConfirmation(environment), "USB IMOD TUNING", "APPLY", "SKIP", environment); break;

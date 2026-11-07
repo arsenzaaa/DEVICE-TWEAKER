@@ -30,15 +30,9 @@ public sealed partial class MainForm
 
     private string BuildUsbImodConfirmationMessage(out DriverEnvironmentSnapshot details)
     {
-        bool? hvciRunning = TryQueryImodCodeIntegrityOptions(out uint options)
-            ? (options & ImodCiOptionHvciEnabled) != 0 : null;
-        DriverEnvironmentSnapshot snapshot = DriverEnvironment.Capture(hvciRunning);
-        WriteLog($"DRIVER.PREFLIGHT: blocklist={snapshot.Blocklist.Value?.ToString(CultureInfo.InvariantCulture) ?? snapshot.Blocklist.Evidence} "
-            + $"hvciRegistry={snapshot.HvciConfigured.Value?.ToString(CultureInfo.InvariantCulture) ?? snapshot.HvciConfigured.Evidence} hvciRuntime={snapshot.HvciRunning} "
-            + $"defender={snapshot.Defender} faceit={snapshot.Faceit} vgk={snapshot.VanguardDriver} vgc={snapshot.VanguardService} "
-            + "driverLoad=not-tested compatibility=not-validated");
+        DriverEnvironmentSnapshot snapshot = CaptureDriverEnvironment();
         details = snapshot;
-        return DriverEnvironment.BuildCompactConfirmation(snapshot);
+        return DriverEnvironment.BuildCompactConfirmation(snapshot, includeCompatibilityNotice: !_driverUseConfirmed);
     }
 
     private void LogImodDriverLoadDiagnostics(string driverPath, string? loadError)
@@ -144,7 +138,6 @@ public sealed partial class MainForm
         if (signatureRejected && hasCiOptions && !testSigning && !testBuild)
         {
             WriteLog("IMOD.CI.HINT: test-signing is off; Windows can reject self-signed or test-signed kernel drivers even when Authenticode trust is valid.");
-            WriteLog("IMOD.CI.HINT: enable Windows test mode for this development driver with: bcdedit /set testsigning on; then reboot. Disable it later with: bcdedit /set testsigning off; then reboot.");
         }
 
         if (signatureRejected && (hvciRuntime || IsEnabledRegistryState(hvciRegistry) || IsEnabledRegistryState(hvciPolicy)))
@@ -341,108 +334,6 @@ public sealed partial class MainForm
         return includeNotChanged
             ? "DTIMOD driver was unavailable. USB IMOD was not changed."
             : "DTIMOD driver was unavailable.";
-    }
-
-    private static bool TryReadVulnerableDriverBlocklistEnabled(out bool enabled, out string stateText)
-    {
-        enabled = false;
-        stateText = ReadImodRegistryDwordState(
-            RegistryHive.LocalMachine,
-            ImodVulnerableDriverBlocklistPath,
-            ImodVulnerableDriverBlocklistValueName);
-
-        if (stateText.Equals("missing", StringComparison.OrdinalIgnoreCase))
-        {
-            // Absence is not a measured state; defaults/policies depend on Windows.
-            return false;
-        }
-
-        if (stateText.StartsWith("error:", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        enabled = IsEnabledRegistryState(stateText);
-        return true;
-    }
-
-    private bool TryDisableVulnerableDriverBlocklist(out string? error)
-    {
-        DemandRealWrite("DRIVER POLICY");
-        error = null;
-        try
-        {
-            using RegistryKey baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
-            using RegistryKey key = baseKey.CreateSubKey(ImodVulnerableDriverBlocklistPath, writable: true)
-                ?? throw new InvalidOperationException("Unable to open CI\\Config registry key.");
-            key.SetValue(ImodVulnerableDriverBlocklistValueName, 0, RegistryValueKind.DWord);
-            WriteLog("IMOD.BLOCKLIST: VulnerableDriverBlocklistEnable set to 0");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            error = ex.Message;
-            WriteLog($"IMOD.BLOCKLIST.ERROR: failed to disable Vulnerable Driver Blocklist: {FlattenLogText(ex.ToString())}");
-            return false;
-        }
-    }
-
-    private static bool ReportHasImodSignatureBlock(OperationReport report)
-    {
-        return report.Issues.Any(issue =>
-            issue.Severity == OperationIssueSeverity.Error
-            && (issue.Component.Contains("IMOD", StringComparison.OrdinalIgnoreCase)
-                || issue.Component.Contains("NIC ITR", StringComparison.OrdinalIgnoreCase))
-            && IsImodSignatureRejectedError(
-                string.Join(" ", issue.UserMessage ?? string.Empty, issue.TechnicalDetails ?? string.Empty)));
-    }
-
-    private void MaybeOfferVulnerableDriverBlocklistDisable(OperationReport report)
-    {
-        if (!ReportHasImodSignatureBlock(report))
-        {
-            return;
-        }
-
-        if (!TryReadVulnerableDriverBlocklistEnabled(out bool enabled, out string stateText))
-        {
-            WriteLog($"IMOD.BLOCKLIST: state unavailable ({stateText}); disable prompt skipped");
-            return;
-        }
-
-        WriteLog($"IMOD.BLOCKLIST: state={stateText} enabled={enabled}");
-        if (!enabled)
-        {
-            WriteLog("IMOD.BLOCKLIST: already disabled; disable prompt skipped (signature/CI still blocked DTIMOD)");
-            return;
-        }
-
-        bool disable = ShowThemedConfirm(
-            "Windows rejected DTIMOD. Vulnerable Driver Blocklist is enabled in the registry.\n\n"
-            + "Disable Vulnerable Driver Blocklist?\n"
-            + "The cause of rejection is unconfirmed. Other policies or anti-cheats may still block DTIMOD.\n\n"
-            + "After reboot, run CHECK or AUTO-OPTIMIZATION again to apply IMOD.",
-            "VULNERABLE DRIVER BLOCKLIST",
-            UiLanguage.Text("DISABLE"),
-            UiLanguage.Text("KEEP"));
-        if (!disable)
-        {
-            WriteLog("IMOD.BLOCKLIST: user kept Vulnerable Driver Blocklist enabled");
-            return;
-        }
-
-        if (!TryDisableVulnerableDriverBlocklist(out string? error))
-        {
-            ShowThemedInfo(
-                string.IsNullOrWhiteSpace(error)
-                    ? "Failed to disable Vulnerable Driver Blocklist.\nSee the session log for details."
-                    : $"Failed to disable Vulnerable Driver Blocklist.\n{error}");
-            return;
-        }
-
-        ShowThemedInfo(
-            "Vulnerable Driver Blocklist was disabled.\n\n"
-            + "Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IMOD.");
     }
 
     private static string CompactImodLogValue(string? value)

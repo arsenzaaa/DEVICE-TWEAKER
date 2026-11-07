@@ -865,4 +865,21 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
   <data name="BackupReason.BeforeReset" xml:space="preserve"><value>До сброса настроек</value></data>
   <data name="BackupReason.Original" xml:space="preserve"><value>Исходные настройки устройств</value></data>
   <data name="BackupReason.Generic" xml:space="preserve"><value>Бекап настроек устройств</value></data>
+  <data name="Driver.Title" xml:space="preserve"><value>ДРАЙВЕР DTIMOD</value></data>
+  <data name="Driver.CheckAction" xml:space="preserve"><value>ПРОВЕРИТЬ СИСТЕМУ</value></data>
+  <data name="Driver.Purpose" xml:space="preserve"><value>DTIMOD нужен для аппаратного доступа к USB IMOD, NIC ITR и регистрам PCI.</value></data>
+  <data name="Driver.CompatibilityNotice" xml:space="preserve"><value>Easy Anti-Cheat, Riot Vanguard, FACEIT Anti-Cheat и другие средства защиты могут блокировать драйвер или отключать от игры. Совместимость не гарантируется.</value></data>
+  <data name="Driver.LifetimeNotice" xml:space="preserve"><value>Закрытие DEVICE TWEAKER не выгружает драйвер. Для выгрузки перезагрузите Windows. Сохранённые профили могут загрузить его снова при входе, пробуждении или переподключении устройства.</value></data>
+  <data name="Driver.Cancelled" xml:space="preserve"><value>Действие с драйвером отменено.</value></data>
+  <data name="Driver.CheckHeading" xml:space="preserve"><value>Проверка Windows</value></data>
+  <data name="Driver.CompatibilityHeading" xml:space="preserve"><value>Совместимость</value></data>
+  <data name="Driver.HvciInactive" xml:space="preserve"><value>Целостность памяти (HVCI) сейчас выключена.</value></data>
+  <data name="Driver.HvciUnreadable" xml:space="preserve"><value>Не удалось определить состояние целостности памяти (HVCI).</value></data>
+  <data name="Driver.BlocklistOff" xml:space="preserve"><value>В реестре задано отключение списка блокировки драйверов.</value></data>
+  <data name="Driver.BlocklistMissing" xml:space="preserve"><value>Явный параметр списка блокировки драйверов в реестре отсутствует.</value></data>
+  <data name="Driver.BlocklistUnreadable" xml:space="preserve"><value>Не удалось прочитать параметр списка блокировки драйверов.</value></data>
+  <data name="Driver.FaceitInstalled" xml:space="preserve"><value>Обнаружена служба FACEIT.</value></data>
+  <data name="Driver.VanguardInstalled" xml:space="preserve"><value>Обнаружена служба Riot Vanguard.</value></data>
+  <data name="Driver.ServicesUnreadable" xml:space="preserve"><value>Часть сведений о службах недоступна.</value></data>
+  <data name="Driver.CheckScope" xml:space="preserve"><value>Проверка читает параметры Windows и сведения об отдельных службах. Она не загружает DTIMOD и не определяет совместимость с античитами.</value></data>
 </root>

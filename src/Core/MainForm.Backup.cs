@@ -428,6 +428,8 @@ public sealed partial class MainForm
             }
 
             WriteLog($"BACKUP.RESTORE: restore-backup requested choice={choice} path={path}");
+            DeviceTweakerBackup selectedBackup = await Task.Run(() => ReadDeviceTweakerBackup(path));
+            if (selectedBackup.StartupProfile?.Exists == true && !ConfirmDriverUse()) return;
             BackupDeviceTarget[] targets = CaptureBackupTargets();
             BackupCreationResult? rollback = null;
             OperationReport report;
@@ -710,6 +712,8 @@ public sealed partial class MainForm
     private OperationReport RestoreDeviceTweakerBackup(DeviceTweakerBackup backup, string path, IReadOnlyList<BackupDeviceTarget> targets)
     {
         DemandRealWrite("RestoreDeviceTweakerBackup");
+        if (backup.StartupProfile?.Exists == true && !_driverUseConfirmed)
+            throw new InvalidOperationException("Driver profile restoration was not confirmed.");
         using DriverLoadGate gate = DriverLoadGate.Enter();
         DriverLoadGate.AssertLoaderIdle();
 

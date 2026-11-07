@@ -396,6 +396,7 @@ public sealed partial class MainForm
         }
         using IDisposable? operation = TryBeginDeviceOperation("IMOD CHECK");
         if (operation is null) return;
+        if (!ConfirmDriverUse()) return;
 
         block.ImodReadbackRequested = true;
         (bool ok, string? error) = await CheckImodDriverAsync();
@@ -428,7 +429,6 @@ public sealed partial class MainForm
                 string.Empty,
                 "The driver check did not complete.",
                 operationName: "USB IMOD CHECK");
-            MaybeOfferVulnerableDriverBlocklistDisable(report);
             return;
         }
 
@@ -2162,6 +2162,7 @@ public sealed partial class MainForm
 
     private async Task<(bool Ok, string? Error)> CheckImodDriverAsync()
     {
+        if (!ConfirmDriverUse()) return (false, "Driver access cancelled.");
         DeviceBlock[] blocks = _blocks.Where(block => !block.Device.IsTestDevice).ToArray();
         string[] instances = blocks.Select(block => block.Device.InstanceId).ToArray();
         Dictionary<string, InterruptModeResult> results = new(StringComparer.OrdinalIgnoreCase);

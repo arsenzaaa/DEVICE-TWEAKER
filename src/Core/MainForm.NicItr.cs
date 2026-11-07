@@ -302,6 +302,7 @@ public sealed partial class MainForm
         }
         using IDisposable? operation = TryBeginDeviceOperation("NIC ITR CHECK");
         if (operation is null) return;
+        if (!ConfirmDriverUse()) return;
 
         (bool ok, string? error) = await CheckImodDriverAsync();
         if (_uiDisposing || IsDisposed || Disposing || block.Group.IsDisposed) return;
@@ -326,7 +327,6 @@ public sealed partial class MainForm
                 string.Empty,
                 "The driver check did not complete.",
                 operationName: "NIC ITR CHECK");
-            MaybeOfferVulnerableDriverBlocklistDisable(report);
             return;
         }
 
@@ -375,6 +375,7 @@ public sealed partial class MainForm
         }
         using IDisposable? operation = TryBeginDeviceOperation("NIC ITR SET");
         if (operation is null) return;
+        if (!ConfirmDriverUse()) return;
 
         if (!await CreateDeviceTweakerBackup("pre-nic-itr", showDialog: false))
         {
@@ -495,6 +496,7 @@ public sealed partial class MainForm
         }
         using IDisposable? operation = TryBeginDeviceOperation("NIC ITR SAVE");
         if (operation is null) return;
+        if (!ConfirmDriverUse()) return;
 
         if (!await CreateDeviceTweakerBackup("pre-nic-itr-save", showDialog: false))
         {

@@ -31,6 +31,8 @@ The [framework-dependent build](https://github.com/arsenzaaa/DEVICE-TWEAKER/rele
 
 IMOD, NIC ITR and PCI configuration reads use DTIMOD.sys loaded through KDU. Support depends on the hardware, device driver and Windows security settings. See the [driver guide](./docs/guide/11-driver.md) for loading requirements.
 
+DTIMOD may conflict with anti-cheat software, including Easy Anti-Cheat, Riot Vanguard and FACEIT Anti-Cheat, and cause disconnection from games.
+
 ## Documentation
 
 - [User guide](./docs/guide/README.md) - Windows interrupts and device configuration.

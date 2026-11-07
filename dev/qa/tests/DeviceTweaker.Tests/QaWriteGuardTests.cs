@@ -114,12 +114,13 @@ public sealed class QaWriteGuardTests
         AssertBlocked("ClearNdisBaseCore", "", null, null);
         AssertBlocked("ClearNdisRssQueues", "", null, null);
         AssertBlocked("ClearNdisRssExtraValues", "", null, null);
-        AssertBlocked("TryDisableVulnerableDriverBlocklist", (object?)null);
+        Assert.Null(typeof(MainForm).GetMethod("TryDisableVulnerableDriverBlocklist", BindingFlags.Instance | BindingFlags.NonPublic));
     }
 
     [Fact]
     public void DriverStagingAndInitialization_AreSkippedBeforeAnyDriverAccess()
     {
+        Assert.Equal(false, Method("ConfirmDriverUse").Invoke(FormWithoutStartup(), null));
         object?[] args = [false, null, null];
         Assert.Equal(false, Method("EnsureImodDriverOnDisk").Invoke(FormWithoutStartup(), args));
         Assert.Equal(string.Empty, args[1]);

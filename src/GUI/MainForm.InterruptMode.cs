@@ -63,6 +63,7 @@ public sealed partial class MainForm
         if (snapshot.Length == 0) return;
         bool simulated = snapshot.All(block => block.Device.IsTestDevice);
         if (!simulated && QaRun.TryBlock("PCI MODE CHECK")) return;
+        if (!simulated && !ConfirmDriverUse()) return;
         using IDisposable? operation = TryBeginDeviceOperation("READ IRQ MODE");
         if (operation is null) return;
         _interruptModeCheckRunning = true;

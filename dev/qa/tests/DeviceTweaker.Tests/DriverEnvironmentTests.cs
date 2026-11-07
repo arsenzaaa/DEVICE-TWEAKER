@@ -91,8 +91,9 @@ public sealed class DriverEnvironmentTests
         var service = new DriverServiceState(name, true, state);
         snapshot = name switch { "FACEIT" => snapshot with { Faceit = service }, "vgk" => snapshot with { VanguardDriver = service }, _ => snapshot with { VanguardService = service } };
         string text = DriverEnvironment.BuildCompactConfirmation(snapshot);
-        Assert.DoesNotContain("FACEIT", text);
-        Assert.DoesNotContain("Vanguard", text);
+        Assert.Equal(DriverEnvironment.BuildCompactConfirmation(Snapshot()), text);
+        Assert.Contains("Easy Anti-Cheat", text);
+        Assert.Contains("Vanguard", text);
         Assert.DoesNotContain("conflict", text);
         Assert.DoesNotContain("KDU", text);
         Assert.DoesNotContain($"({state})", text);
@@ -114,5 +115,45 @@ public sealed class DriverEnvironmentTests
         var snapshot = Snapshot() with { Faceit = new("FACEIT", null, "unavailable (5)") };
         Assert.Contains("Some system checks are unavailable", DriverEnvironment.BuildCompactConfirmation(snapshot));
         Assert.DoesNotContain("FACEIT detected", DriverEnvironment.BuildCompactConfirmation(snapshot));
+    }
+    [Fact] public void SummaryDoesNotTreatMissingRegistryValueAsDisabledProtection()
+    {
+        var lines = DriverEnvironment.CheckSummary(Snapshot(null));
+        Assert.Contains("Driver blocklist has no explicit registry setting.", lines);
+        Assert.DoesNotContain("Driver blocklist registry value is set to off.", lines);
+    }
+
+    [Fact] public void SummaryReportsUnknownReadsWithoutInventingCompatibility()
+    {
+        var lines = DriverEnvironment.CheckSummary(Snapshot(null, null) with
+        {
+            Faceit = new("FACEIT", null, "unavailable (5)"),
+        });
+        Assert.Contains("Memory integrity (HVCI) could not be read.", lines);
+        Assert.Contains("Some service information could not be read.", lines);
+        Assert.DoesNotContain("A FACEIT service is installed.", lines);
+        Assert.DoesNotContain(lines, line => line.Contains("compatible", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact] public void NoticeExplainsDriverLifetimeAndAutomaticReload()
+    {
+        string text = DriverEnvironment.CompatibilityNotice;
+        Assert.Contains("does not unload", text);
+        Assert.Contains("Saved profiles can load it again", text);
+        Assert.Contains("disconnect you from a game", text);
+        var translate = typeof(UiLanguage).GetMethod("TranslateRussian", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+        string ru = (string)translate.Invoke(null, [text])!;
+        Assert.Contains("не выгружает", ru);
+        Assert.Contains("Сохранённые профили", ru);
+        Assert.DoesNotContain("Saved profiles", ru);
+    }
+    [Fact] public void AcknowledgedSessionKeepsAutoChoiceWithoutRepeatingTheNotice()
+    {
+        string text = DriverEnvironment.BuildCompactConfirmation(Snapshot(1), includeCompatibilityNotice: false);
+        Assert.StartsWith("Include USB IMOD", text);
+        Assert.Contains("Driver blocklist is configured on.", text);
+        Assert.Contains("SKIP continues", text);
+        Assert.DoesNotContain("Easy Anti-Cheat", text);
+        Assert.DoesNotContain("Closing DEVICE TWEAKER", text);
     }
 }

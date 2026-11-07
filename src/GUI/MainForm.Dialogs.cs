@@ -767,11 +767,12 @@ public sealed partial class MainForm
         List<Button> confirmButtons = [yesButton, noButton];
         if (driverEnvironment is not null)
         {
-            Button checkButton = NewDialogButton(UiLanguage.Text("SYSTEM CHECK"), buttonHeight, UiScale(116));
+            Button checkButton = NewDialogButton(UiLanguage.Text("CHECK SYSTEM"), buttonHeight, UiScale(144));
             checkButton.Name = "SYSTEM_CHECK_TOGGLE";
             checkButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(24, 24, 30);
             checkButton.FlatAppearance.MouseDownBackColor = Color.FromArgb(34, 34, 40);
-            checkButton.Click += (_, _) => ShowDriverEnvironmentDetails(dialog, driverEnvironment);
+            checkButton.Click += (_, _) => ShowDriverEnvironmentDetails(dialog,
+                QaRun.IsReadOnly ? driverEnvironment : CaptureDriverEnvironment());
             confirmButtons.Add(checkButton);
         }
         AttachThemedDialogFooter(dialog, confirmButtons, UiScale(12));
@@ -795,66 +796,25 @@ public sealed partial class MainForm
         };
         StyleThemedDialogSurface(dialog);
         WireThemedTitleBar(dialog);
-        int padding = UiScale(20), width = UiScale(620), inner = width - padding * 2;
+        int padding = UiScale(20), width = UiScale(600), inner = width - padding * 2;
         int y = padding;
-        string RegistryState(DriverRegistryState state) => state.Value is uint value
-            ? UiLanguage.Text(value == 0 ? "Off" : "On") + $" ({value})"
-            : UiLanguage.Text(state.Evidence == "missing" ? "Not configured" : "Could not read");
-        string ServiceState(DriverServiceState service) => UiLanguage.Text(service.Exists switch
+        void AddText(string text, bool heading = false, string name = "")
         {
-            false => "Not installed", null => "Could not read",
-            _ => service.State switch
+            Label label = new()
             {
-                "running" => "Running", "stopped" => "Stopped", "starting" => "Starting", "stopping" => "Stopping",
-                "continuing" => "Continuing", "pausing" => "Pausing", "paused" => "Paused", _ => "Could not read",
-            },
-        });
-        Panel AddSection(string title, params (string Name, string Value)[] rows)
-        {
-            int inset = UiScale(12), rowHeight = UiScale(28);
-            Panel panel = new() { BackColor = _bgPanel, Location = new Point(padding, y), Width = inner };
-            panel.Paint += (_, e) =>
-            {
-                using Pen pen = new(_border);
-                e.Graphics.DrawRectangle(pen, 0, 0, panel.Width - 1, panel.Height - 1);
+                Name = name, Text = text, Font = heading ? _blockTitleFont : _dialogFont,
+                ForeColor = heading ? _fgMain : _mutedText, UseMnemonic = false,
+                Location = new Point(padding, y), Width = inner,
             };
-            Label heading = new() { Text = UiLanguage.Text(title), AutoSize = true,
-                Font = _blockTitleFont, ForeColor = _fgMain, Location = new Point(inset, inset) };
-            panel.Controls.Add(heading);
-            int rowY = heading.Bottom + UiScale(10);
-            int valueWidth = Math.Max(UiScale(130), rows.Max(row =>
-                TextRenderer.MeasureText(row.Value, _dialogFont, Size.Empty, TextFormatFlags.NoPadding).Width) + UiScale(12));
-            int nameWidth = inner - inset * 2 - valueWidth - UiScale(12);
-            foreach ((string nameText, string valueText) in rows)
-            {
-                Label name = new() { Text = UiLanguage.Text(nameText), Font = _dialogFont, ForeColor = _mutedText,
-                    UseMnemonic = false, Location = new Point(inset, rowY), Size = new Size(nameWidth, rowHeight) };
-                Label value = new() { Text = valueText, Font = _dialogFont, ForeColor = _fgMain,
-                    UseMnemonic = false, TextAlign = ContentAlignment.TopRight,
-                    Location = new Point(inner - inset - valueWidth, rowY), Size = new Size(valueWidth, rowHeight) };
-                panel.Controls.Add(name); panel.Controls.Add(value);
-                rowY += rowHeight;
-            }
-            panel.Height = rowY + UiScale(6);
-            dialog.Controls.Add(panel);
-            y = panel.Bottom + UiScale(12);
-            return panel;
+            label.Height = label.GetPreferredSize(new Size(inner, 0)).Height;
+            dialog.Controls.Add(label);
+            y = label.Bottom + UiScale(heading ? 10 : 16);
         }
-        AddSection("Windows settings",
-            ("Driver blocklist (registry)", RegistryState(snapshot.Blocklist)),
-            ("Memory integrity (HVCI)", UiLanguage.Text(snapshot.HvciRunning switch { true => "On", false => "Off", _ => "Could not read" })),
-            ("HVCI registry setting", RegistryState(snapshot.HvciConfigured)));
-        AddSection("Services",
-            ("Microsoft Defender", ServiceState(snapshot.Defender)),
-            ("FACEIT", ServiceState(snapshot.Faceit)),
-            ("Vanguard (vgk)", ServiceState(snapshot.VanguardDriver)),
-            ("Vanguard (vgc)", ServiceState(snapshot.VanguardService)));
-        Label note = new() { Text = UiLanguage.Text("Driver loading and anti-cheat compatibility are not tested."),
-            Font = _technicalFont, ForeColor = _mutedText, UseMnemonic = false,
-            Location = new Point(padding, y), Width = inner };
-        note.Height = note.GetPreferredSize(new Size(inner, 0)).Height;
-        dialog.Controls.Add(note);
-        y = note.Bottom + UiScale(12);
+        AddText(UiLanguage.Text("Windows check"), heading: true);
+        AddText(string.Join("\n", DriverEnvironment.CheckSummary(snapshot).Select(UiLanguage.Text)), name: "DRIVER_CHECK_SUMMARY");
+        AddText(UiLanguage.Text("Compatibility"), heading: true);
+        AddText(UiLanguage.Text("Easy Anti-Cheat, Riot Vanguard, FACEIT Anti-Cheat and other protection software may block the driver or disconnect you from a game. Compatibility is not guaranteed."));
+        AddText(UiLanguage.Text("This check reads Windows settings and selected service information. It does not load DTIMOD or test anti-cheat compatibility."));
         Button closeButton = NewDialogButton(UiLanguage.Text("OK"), UiScale(32), UiScale(96), isPrimary: true);
         closeButton.Name = "OK"; closeButton.DialogResult = DialogResult.OK;
         AttachThemedDialogFooter(dialog, [closeButton]);

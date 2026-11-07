@@ -865,4 +865,21 @@ Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IM
   <data name="BackupReason.BeforeReset" xml:space="preserve"><value>Before resetting tweaks</value></data>
   <data name="BackupReason.Original" xml:space="preserve"><value>Original device settings</value></data>
   <data name="BackupReason.Generic" xml:space="preserve"><value>Device settings backup</value></data>
+  <data name="Driver.Title" xml:space="preserve"><value>DTIMOD DRIVER</value></data>
+  <data name="Driver.CheckAction" xml:space="preserve"><value>CHECK SYSTEM</value></data>
+  <data name="Driver.Purpose" xml:space="preserve"><value>DTIMOD provides hardware access for USB IMOD, NIC ITR and PCI register reads.</value></data>
+  <data name="Driver.CompatibilityNotice" xml:space="preserve"><value>Easy Anti-Cheat, Riot Vanguard, FACEIT Anti-Cheat and other protection software may block the driver or disconnect you from a game. Compatibility is not guaranteed.</value></data>
+  <data name="Driver.LifetimeNotice" xml:space="preserve"><value>Closing DEVICE TWEAKER does not unload the driver. Restart Windows to unload it. Saved profiles can load it again at sign-in, wake or device reconnection.</value></data>
+  <data name="Driver.Cancelled" xml:space="preserve"><value>Driver access cancelled.</value></data>
+  <data name="Driver.CheckHeading" xml:space="preserve"><value>Windows check</value></data>
+  <data name="Driver.CompatibilityHeading" xml:space="preserve"><value>Compatibility</value></data>
+  <data name="Driver.HvciInactive" xml:space="preserve"><value>Memory integrity (HVCI) is not running.</value></data>
+  <data name="Driver.HvciUnreadable" xml:space="preserve"><value>Memory integrity (HVCI) could not be read.</value></data>
+  <data name="Driver.BlocklistOff" xml:space="preserve"><value>Driver blocklist registry value is set to off.</value></data>
+  <data name="Driver.BlocklistMissing" xml:space="preserve"><value>Driver blocklist has no explicit registry setting.</value></data>
+  <data name="Driver.BlocklistUnreadable" xml:space="preserve"><value>Driver blocklist registry setting could not be read.</value></data>
+  <data name="Driver.FaceitInstalled" xml:space="preserve"><value>A FACEIT service is installed.</value></data>
+  <data name="Driver.VanguardInstalled" xml:space="preserve"><value>A Riot Vanguard service is installed.</value></data>
+  <data name="Driver.ServicesUnreadable" xml:space="preserve"><value>Some service information could not be read.</value></data>
+  <data name="Driver.CheckScope" xml:space="preserve"><value>This check reads Windows settings and selected service information. It does not load DTIMOD or test anti-cheat compatibility.</value></data>
 </root>

@@ -32,6 +32,7 @@ Source comparison: [v0.0.3 → v0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAK
 
 - Added short transitions for toggles, scrolling and button hover, independent of Windows visual effects.
 - Reworked device accents, outlined badges, system-check layout and backup-reason labels.
+- Added a session-scoped driver compatibility notice and a compact read-only system check. Driver-loading errors no longer offer to disable Windows protections.
 - IRQ reads retain previous values while running and show progress and results on the command button.
 - RSS runtime reads use CIM with a PowerShell fallback. Device discovery and metadata reads run concurrently; card creation yields to UI processing between batches.
 

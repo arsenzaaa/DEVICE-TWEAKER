@@ -26,6 +26,35 @@ internal sealed record DriverEnvironmentSnapshot(
 // Read-only preflight. Presence/configuration is evidence, not a driver-load verdict.
 internal static class DriverEnvironment
 {
+    internal const string CompatibilityNotice =
+        "DTIMOD provides hardware access for USB IMOD, NIC ITR and PCI register reads.\n\n"
+        + "Easy Anti-Cheat, Riot Vanguard, FACEIT Anti-Cheat and other protection software may block the driver or disconnect you from a game. Compatibility is not guaranteed.\n\n"
+        + "Closing DEVICE TWEAKER does not unload the driver. Restart Windows to unload it. Saved profiles can load it again at sign-in, wake or device reconnection.";
+
+    internal static IReadOnlyList<string> CheckSummary(DriverEnvironmentSnapshot snapshot)
+    {
+        List<string> lines = [snapshot.HvciRunning switch
+        {
+            true => "Memory integrity (HVCI) is enabled.",
+            false => "Memory integrity (HVCI) is not running.",
+            _ => "Memory integrity (HVCI) could not be read.",
+        }];
+        lines.Add(snapshot.Blocklist.Enabled switch
+        {
+            true => "Driver blocklist is configured on.",
+            false => "Driver blocklist registry value is set to off.",
+            _ => snapshot.Blocklist.Evidence == "missing"
+                ? "Driver blocklist has no explicit registry setting."
+                : "Driver blocklist registry setting could not be read.",
+        });
+        if (snapshot.Faceit.Exists == true) lines.Add("A FACEIT service is installed.");
+        if (snapshot.VanguardDriver.Exists == true || snapshot.VanguardService.Exists == true)
+            lines.Add("A Riot Vanguard service is installed.");
+        if (snapshot.Faceit.Exists is null || snapshot.VanguardDriver.Exists is null || snapshot.VanguardService.Exists is null)
+            lines.Add("Some service information could not be read.");
+        return lines;
+    }
+
     internal const string BlocklistKey = @"SYSTEM\CurrentControlSet\Control\CI\Config";
     internal const string HvciKey = @"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity";
 
@@ -96,7 +125,7 @@ internal static class DriverEnvironment
         return string.Join("\n", lines);
     }
 
-    internal static string BuildCompactConfirmation(DriverEnvironmentSnapshot snapshot)
+    internal static string BuildCompactConfirmation(DriverEnvironmentSnapshot snapshot, bool includeCompatibilityNotice = true)
     {
         List<string> notes = [];
         if (snapshot.Blocklist.Enabled == true)
@@ -109,7 +138,7 @@ internal static class DriverEnvironment
             notes.Add("Some system checks are unavailable.");
         const string question = "Include USB IMOD in auto-optimization?";
         string concern = notes.Count == 0 ? string.Empty : "\n\n" + string.Join("\n", notes);
-        return question + concern + "\n\n"
+        return question + (includeCompatibilityNotice ? "\n\n" + CompatibilityNotice : string.Empty) + concern + "\n\n"
             + "SKIP continues auto-optimization without USB IMOD.";
     }
 
