@@ -926,7 +926,10 @@ foreach ($preview in $resultPreviews) {
             throw 'IMOD compact prompt exposes the technical report before expansion'
         }
         if ($promptNames -notmatch 'Include USB IMOD in auto-optimization') { throw 'IMOD compact prompt omits the action question' }
-        if ($promptNames -notmatch 'SKIP continues auto-optimization without USB IMOD' -or $promptNames -notmatch 'DTIMOD.sys' -or $promptNames -match 'KDU|SYSTEM CHECK: Windows settings') { throw 'IMOD prompt does not explain the choices and system check' }
+        foreach ($required in @('APPLY configures USB IMOD.', 'SKIP continues AUTO without USB IMOD.',
+            'Anti-cheat software may block DTIMOD or disconnect you from a game.', 'Closing the app does not unload DTIMOD.', 'DRIVER INFO')) {
+            if ($promptNames -notmatch [regex]::Escape($required)) { throw "IMOD prompt omits a choice or driver consequence: $required" }
+        }
         $compactHeight = $resultWindow.Current.BoundingRectangle.Height
         Invoke-Click (Find-AutomationId $resultWindow 'SYSTEM_CHECK_TOGGLE' 3) 'IMOD/SYSTEM CHECK/EXPAND'
         $systemCheck = Find-AutomationId $resultWindow 'DRIVER_ENVIRONMENT_DIALOG' 5
@@ -934,14 +937,18 @@ foreach ($preview in $resultPreviews) {
         $promptNames = @($systemCheck.FindAll([System.Windows.Automation.TreeScope]::Descendants,
             [System.Windows.Automation.Condition]::TrueCondition) | Where-Object { -not $_.Current.IsOffscreen } | ForEach-Object { [string]$_.Current.Name }) -join ' '
         $promptNames = ($promptNames -replace '\s+', ' ').Replace([char]0x2011, '-')
-        foreach ($required in @('Windows settings', 'Services', 'Vulnerable driver blocklist', 'Memory integrity (HVCI)', 'HVCI registry setting', 'Microsoft Defender', 'FACEIT', 'Vanguard (vgk)', 'Vanguard (vgc)')) {
-            if ($promptNames -notmatch [regex]::Escape($required)) { throw "IMOD preflight omits measured state: $required" }
+        foreach ($required in @('DTIMOD provides hardware access', 'Driver lifetime', 'Windows check', 'Compatibility',
+            'Easy Anti-Cheat', 'Riot Vanguard', 'FACEIT Anti-Cheat', 'Compatibility is not guaranteed.',
+            'This check reads Windows settings and selected service information.', 'It does not load DTIMOD or test anti-cheat compatibility.')) {
+            if ($promptNames -notmatch [regex]::Escape($required)) { throw "Driver information omits its purpose or limits: $required" }
         }
-        foreach ($index in 0..6) { if ($null -eq (Find-AutomationId $systemCheck "SYSTEM_CHECK_VALUE_$index" 2)) { throw "Missing system check value $index" } }
+        $summary=Find-AutomationId $systemCheck 'DRIVER_CHECK_SUMMARY' 2
+        if ($null -eq $summary -or $summary.Current.IsOffscreen -or $summary.Current.Name -notmatch 'HVCI' -or
+            $summary.Current.Name -notmatch 'Driver blocklist') { throw 'Driver information omits the readable Windows-check summary' }
         Capture-Window (Join-Path $outDir '21_prompt_imod_details.png') $systemCheck
         Invoke-Click (Find-AutomationId $systemCheck 'OK' 3) 'IMOD/SYSTEM CHECK/CLOSE'
         if ([Math]::Abs($resultWindow.Current.BoundingRectangle.Height - $compactHeight) -gt 2) { throw 'IMOD prompt did not return to its compact height' }
-        Write-Report 'PASS: IMOD prompt stays compact; separate system check shows all seven states and returns to the prompt'
+        Write-Report 'PASS: compact IMOD choices, driver consequences and separate read-only driver information are visible'
     }
     if ($preview.Details) {
         Invoke-Click (Find-Desc $resultWindow 'DETAILS' 'Button' 3) "$($preview.Title)/DETAILS"
@@ -1507,7 +1514,10 @@ try {
         $ruPreflightNames = $ruPreflightNames -replace '\s+', ' '
         if ($ruPreflightNames -match 'Driver preflight|Проверка системы \(только чтение\)|PREFLIGHT') { throw 'Russian IMOD prompt exposes technical details before expansion' }
         if ($ruPreflightNames -notmatch 'Включить USB IMOD в авто.оптимизацию') { throw 'Russian compact IMOD question is missing or untranslated' }
-        if ($ruPreflightNames -notmatch 'При пропуске авто.оптимизация продолжится без USB IMOD' -or $ruPreflightNames -notmatch 'DTIMOD.sys' -or $ruPreflightNames -match 'KDU|Проверка системы: параметры Windows') { throw 'Russian IMOD prompt does not explain the choices and system check' }
+        foreach ($required in @('ПРИМЕНИТЬ настраивает USB IMOD.', 'ПРОПУСТИТЬ продолжает АВТО без USB IMOD.',
+            'Античит может блокировать DTIMOD или отключить вас от игры.', 'Закрытие программы не выгружает DTIMOD.', 'О ДРАЙВЕРЕ')) {
+            if ($ruPreflightNames -notmatch [regex]::Escape($required)) { throw "Russian IMOD prompt omits a choice or driver consequence: $required" }
+        }
         $ruCompactHeight = $ruPreflight.Current.BoundingRectangle.Height
         Invoke-Click (Find-AutomationId $ruPreflight 'SYSTEM_CHECK_TOGGLE' 3) 'RU/IMOD SYSTEM CHECK/EXPAND'
         $ruSystemCheck = Find-AutomationId $ruPreflight 'DRIVER_ENVIRONMENT_DIALOG' 5
@@ -1515,11 +1525,14 @@ try {
         $ruPreflightNames = @($ruSystemCheck.FindAll([System.Windows.Automation.TreeScope]::Descendants,
             [System.Windows.Automation.Condition]::TrueCondition) | Where-Object { -not $_.Current.IsOffscreen } | ForEach-Object { [string]$_.Current.Name }) -join ' '
         $ruPreflightNames = $ruPreflightNames -replace '\s+', ' '
-        foreach ($required in @('Параметры Windows', 'Службы', 'Блокировка уязвимых драйверов', 'Целостность памяти (HVCI)', 'Параметр HVCI в реестре', 'Microsoft Defender', 'FACEIT', 'Vanguard')) {
-            if ($ruPreflightNames -notmatch [regex]::Escape($required)) { throw "Russian IMOD preflight is untranslated: $required" }
+        foreach ($required in @('DTIMOD нужен для аппаратного доступа', 'Драйвер и автозапуск', 'Проверка Windows', 'Совместимость',
+            'Easy Anti-Cheat', 'Riot Vanguard', 'FACEIT Anti-Cheat', 'Совместимость не гарантируется.',
+            'Проверка читает параметры Windows', 'Она не загружает DTIMOD и не определяет совместимость с античитами.')) {
+            if ($ruPreflightNames -notmatch [regex]::Escape($required)) { throw "Russian driver information omits its purpose or limits: $required" }
         }
-        foreach ($index in 0..6) { if ($null -eq (Find-AutomationId $ruSystemCheck "SYSTEM_CHECK_VALUE_$index" 2)) { throw "Missing Russian system check value $index" } }
-        if ($ruPreflightNames -notmatch 'Нет параметра' -or $ruPreflightNames -notmatch 'Загрузка DTIMOD.sys не проверялась') { throw 'Russian system check omits or mistranslates the meaning and limits of its states' }
+        $ruSummary=Find-AutomationId $ruSystemCheck 'DRIVER_CHECK_SUMMARY' 2
+        if ($null -eq $ruSummary -or $ruSummary.Current.IsOffscreen -or $ruSummary.Current.Name -notmatch 'HVCI' -or
+            $ruSummary.Current.Name -notmatch 'блокировк') { throw 'Russian driver information omits the Windows-check summary' }
         Capture-Window (Join-Path $outDir '25_prompt_imod_ru_details.png') $ruSystemCheck
         Invoke-Click (Find-AutomationId $ruSystemCheck 'OK' 3) 'RU/IMOD SYSTEM CHECK/CLOSE'
         if ([Math]::Abs($ruPreflight.Current.BoundingRectangle.Height - $ruCompactHeight) -gt 2) { throw 'Russian IMOD prompt did not collapse' }
