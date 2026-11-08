@@ -16,6 +16,8 @@ This runs `Scenarios/device-flow.json` on a hidden desktop. The result path is p
 
 Developer and inspector builds are shared under `local/qa-builds`, keyed by input paths/content and the selected .NET SDK. Unchanged inputs reuse the build after checking source and output inventories and SHA-256 values. Each session has separate logs, captures, sandbox state and review records. The inspector runs from its compiled DLL without rebuilding for each command.
 
+`-BuildRoot` selects a shared cache directory, including across worktrees. Use a short path when a nested checkout makes Windows DLL paths too long; it does not change Windows settings.
+
 `-FreshBuild` creates an independent build for diagnosing a suspected build problem. An incomplete or altered cache entry stops reuse; it is preserved for inspection. Failed entries are not overwritten and old builds are never deleted automatically. Before archiving a build, retain it with the sessions that reference it, or accept that source/build verification will require restoring it. A session's `build-reference.json` identifies the exact directory and manifest hash.
 
 Create a task-specific JSON using [device-flow.json](Scenarios/device-flow.json) or [control-states.json](Scenarios/control-states.json). After editing, rerun the same scenario against the previous successful run:

@@ -3,6 +3,7 @@
 param(
     [string]$Scenario,
     [string]$OutputRoot,
+    [string]$BuildRoot,
     [string]$CompareWith,
     [switch]$FreshBuild,
     [switch]$Worker,
@@ -27,7 +28,7 @@ if (-not $Worker) {
     $run = Join-Path ([IO.Path]::GetFullPath($OutputRoot)) ('dev_{0}_{1}' -f (Get-Date -Format 'yyyyMMdd_HHmmss'),[Guid]::NewGuid().ToString('N').Substring(0,8))
     New-Item -ItemType Directory -Path $run | Out-Null
     Copy-Item -LiteralPath (Resolve-Path -LiteralPath $Scenario).Path -Destination (Join-Path $run 'scenario.json')
-    $build = Get-QaDevBuild $workspace -FreshBuild:$FreshBuild
+    $build = Get-QaDevBuild $workspace -BuildRoot $BuildRoot -FreshBuild:$FreshBuild
     $snapshot = $build.snapshot
     Copy-Item -LiteralPath (Join-Path $build.directory 'inputs.json') -Destination (Join-Path $run 'inputs.json')
     $build | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $run 'build-reference.json') -Encoding UTF8
