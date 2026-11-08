@@ -56,10 +56,10 @@ P/E-ядра, MSI-X и явная маска привязки к CPU.
 </details>
 
 <details>
-<summary>Проверка Windows и драйвера</summary>
+<summary>Сведения о драйвере</summary>
 
-Настройки безопасности Windows и состояния связанных служб.
+Назначение драйвера, автозапуск, ограничения античитов и проверка Windows без загрузки драйвера.
 
-[![Проверка Windows и драйвера](../assets/screenshots/system-check.ru.png)](../assets/screenshots/system-check.ru.png)
+[![Сведения о драйвере](../assets/screenshots/system-check.ru.png)](../assets/screenshots/system-check.ru.png)
 
 </details>

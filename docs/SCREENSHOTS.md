@@ -56,10 +56,10 @@ Completion summary, warnings and access to logs and backups.
 </details>
 
 <details>
-<summary>Windows and driver checks</summary>
+<summary>Driver information</summary>
 
-Windows security settings and relevant service states.
+Driver requirements, startup behavior, anti-cheat limitations and a read-only Windows check.
 
-[![Windows and driver checks](../assets/screenshots/system-check.en.png)](../assets/screenshots/system-check.en.png)
+[![Driver information](../assets/screenshots/system-check.en.png)](../assets/screenshots/system-check.en.png)
 
 </details>
