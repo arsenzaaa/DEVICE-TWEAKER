@@ -333,7 +333,9 @@ public sealed partial class MainForm
             case "irq-click-burst": await DevIrqClickBurstAsync(step.Id); break;
             case "measure-ui-latency": await DevMeasureUiLatencyAsync(step.Id); break;
             case "measure-frame-pacing": await DevMeasureFramePacingAsync(step.Id, step.Value == "budget"); break;
-            case "capture": DevCaptureWindow(step.Id, step.Target, false, step.Device); break;
+            case "capture":
+                if (!observeTransition) await DevWaitForSettledPresentation();
+                DevCaptureWindow(step.Id, step.Target, false, step.Device); break;
             case "reveal": DevReveal(DevTarget(step)); break;
             case "language": UiLanguage.Set(step.Value == "RU" ? UiLanguageCode.Russian : step.Value == "EN" ? UiLanguageCode.English : throw new InvalidDataException("Language must be RU / EN"), persist: false); break;
             case "resize": DevResize(step.Width, step.Height); break;
@@ -519,11 +521,22 @@ public sealed partial class MainForm
         await Task.Delay(70);
         // Ordinary steps assert settled UI state. Transition triggers explicitly
         // opt out so their native frames can observe the movement itself.
-        if (!observeTransition && step.Action is "click" or "scroll" or "key")
+        if (!observeTransition && step.Action is "click" or "scroll" or "key" or "toggle" or "select" or "hover" or "leave")
+            await DevWaitForSettledPresentation();
+    }
+    private async Task DevWaitForSettledPresentation()
+    {
+        Stopwatch settling = Stopwatch.StartNew();
+        while (true)
         {
-            Stopwatch settling = Stopwatch.StartNew();
-            while (_devicesScroll.IsScrolling && settling.ElapsedMilliseconds < 2000) await Task.Delay(15);
-            if (_devicesScroll.IsScrolling) throw new TimeoutException("Viewport motion did not settle.");
+            Form[] windows = Application.OpenForms.Cast<Form>()
+                .Where(form => form.Visible && (form == this || DevOwned(form))).ToArray();
+            // Painting resolves appearance targets that can start a button transition.
+            foreach (Form window in windows) window.Refresh();
+            if (!_devicesScroll.IsScrolling && !windows.Any(UiFrameClock.QaHasActiveAnimations)) return;
+            if (settling.ElapsedMilliseconds >= 2000)
+                throw new TimeoutException("Owned-window presentation did not settle before a checkpoint.");
+            await Task.Delay(15);
         }
     }
     private IDisposable DevSandboxScope()

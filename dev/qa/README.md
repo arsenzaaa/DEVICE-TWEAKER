@@ -83,7 +83,7 @@ The normal EXE supports `--qa-read-only`. This mode is immutable for the process
 - **Layout:** six EN/RU × 100/125/150% scenarios with actual WinForms controls, rendered button captions and RESTORE dialog. These are developer-build layout models; Windows DPI settings and monitor transitions are not tested.
 - **Logs:** session format/completion and rejection of unexpected ERROR/FATAL entries. Injected errors are accepted only in a successfully verified scenario; dialog samples are labelled separately.
 - **Resources:** twenty refreshes in the normal read-only EXE, confirmation of every press and REFRESH.DONE, handle/GDI/USER settling and memory measurements.
-- **Evidence:** recheck TRX, mandatory stages/test classes, nineteen C# regressions, two native regressions, six scaling scenarios, completed cycles and file hashes.
+- **Evidence:** recheck TRX, mandatory stages/test classes, nineteen C# regressions, three native regressions, six scaling scenarios, completed cycles and file hashes.
 
 Restore checks use synthetic JSON by default. To additionally inspect your own backup samples against in-memory storage, explicitly pass `-BackupSamples <directory>` to `Invoke-Qa.ps1`. Originals are unchanged. Real backups are not required, bundled or selected automatically; their paths may appear in local TRX reports.
 
@@ -106,3 +106,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Test-ReleasePac
 ```
 
 This checks SHA-256, versions, both EXEs in probe mode, the embedded driver and absence of the test panel. It does not open the main window or apply settings.
+
+The native model compiles the production device-write worker and writer as well as dispatch and range parsing. It exercises successful writes, out-of-range requests, cancellation, invalid width/version/IRQL, PCI/resource failures, malformed lists, map failures and reference/work-item cleanup. PCI lookup, resource delivery, the work queue and memory mapping are fake; kernel scheduling and physical devices are outside this model.
+
+`Test-BuildUserData.ps1` checks clean-build preservation using temporary EXE-folder fixtures and a fake publisher. It covers a failure while moving the second folder, a failure at the next EXE flavor, publisher failure and successful publishing. It never starts the app, signs a driver or uses real backups/logs; CI runs it separately.

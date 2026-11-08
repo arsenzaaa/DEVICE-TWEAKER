@@ -19,6 +19,8 @@ internal sealed class UiFrameClock
     private int _pending;
     internal bool HighResolution => _timer.HighResolution;
 #if DEVELOPER_QA
+    internal static bool QaHasActiveAnimations(Form form)
+        => Clocks.TryGetValue(form, out UiFrameClock? clock) && clock._active.Count != 0;
     internal static int? QaRefreshRate { get; set; }
     internal static int QaWorkers;
     internal static int QaQueuedFrames;

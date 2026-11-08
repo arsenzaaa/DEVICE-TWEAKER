@@ -2,7 +2,7 @@
 # No SYS is executed, no driver/service is loaded, no physical memory is accessed.
 [CmdletBinding()]
 param([Parameter(Mandatory=$true)][string]$OutputDirectory,
-    [ValidateSet('unload', 'write-past-device-end')][string]$InjectRegression)
+    [ValidateSet('unload', 'write-past-device-end', 'bypass-device-write-guard')][string]$InjectRegression)
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $driver = Join-Path $root 'src\IMOD\Driver\imod_driver.c'
@@ -10,9 +10,9 @@ $header = Join-Path $root 'src\IMOD\Driver\imod_driver.h'
 $text = Get-Content -LiteralPath $driver -Raw
 $functions = @('ImodDriverUnload','DriverEntry','ImodDriverCreateDriver','ImodDriverInitialize','ImodDriverDispatch',
     'ImodIsValidAccessSize','ImodMapPhysicalMemory','ImodUnmapPhysicalMemory','ImodReadPhysicalMemory','ImodWritePhysicalMemory',
-    'ImodResourcesContainRange')
+    'ImodResourcesContainRange','ImodWriteDeviceWorker','ImodWriteDevice')
 $bodies = foreach ($name in $functions) {
-    $match = [regex]::Match($text, '(?m)^(?:static )?(?:NTSTATUS|BOOLEAN|void) '+$name+'\([^;]+?\)\s*\{')
+    $match = [regex]::Match($text, '(?m)^(?:static )?(?:NTSTATUS|BOOLEAN|VOID|void) '+$name+'\([^;]+?\)\s*\{')
     if (-not $match.Success) { throw "Native function missing: $name" }
     $opening = $text.IndexOf('{',$match.Index); $end = $opening+1; $depth = 1
     while ($depth -gt 0) { if ($text[$end] -eq '{') { $depth++ }; if ($text[$end] -eq '}') { $depth-- }; $end++ }
@@ -24,6 +24,8 @@ $regressions = @{
         detected = 'missing unload assignment in actual driver initialization' }
     'write-past-device-end' = @{ old = 'address - start <= length - size'; new = 'address - start <= length';
         detected = 'device write accepted although it crosses the end of the memory range' }
+    'bypass-device-write-guard' = @{ old = 'if (!ImodResourcesContainRange(reply->resources, bytes, request->physAddress, request->accessSize))'; new = 'if (FALSE)';
+        detected = 'actual device write path bypassed the assigned-resource guard' }
 }
 if ($InjectRegression) {
     $regression = $regressions[$InjectRegression]
@@ -51,6 +53,12 @@ $stub = @'
 #define STATUS_INSUFFICIENT_RESOURCES (-2)
 #define STATUS_INVALID_DEVICE_REQUEST (-3)
 #define STATUS_PENDING 1
+#define STATUS_ACCESS_DENIED (-4)
+#define STATUS_CANCELLED (-5)
+#define STATUS_DATA_ERROR (-6)
+#define PASSIVE_LEVEL 0
+#define DevicePropertyAllocatedResources 1
+#define FIELD_OFFSET(t,f) ((ULONG)offsetof(t,f))
 #define FILE_DEVICE_SECURE_OPEN 0
 #define FILE_READ_ACCESS 1
 #define FILE_ANY_ACCESS 0
@@ -85,18 +93,22 @@ typedef uint64_t ULONGLONG;
 typedef int64_t LONGLONG;
 typedef uintptr_t ULONG_PTR;
 typedef size_t SIZE_T;
-typedef void *PVOID;
+typedef void *PVOID, *PFILE_OBJECT;
+typedef void VOID;
 typedef struct { LONGLONG QuadPart; } PHYSICAL_ADDRESS;
 typedef struct { const wchar_t *text; } UNICODE_STRING, *PUNICODE_STRING;
 typedef struct DEVICE { unsigned Flags; } DEVICE, *PDEVICE_OBJECT;
 typedef struct STACK { int MajorFunction; struct { struct { ULONG InputBufferLength, OutputBufferLength, IoControlCode; } DeviceIoControl; } Parameters; } IO_STACK_LOCATION,*PIO_STACK_LOCATION;
-typedef struct IRP { struct { PVOID SystemBuffer; } AssociatedIrp; struct { NTSTATUS Status; SIZE_T Information; } IoStatus; IO_STACK_LOCATION stack; } IRP,*PIRP;
+typedef struct IRP { struct { PVOID SystemBuffer; } AssociatedIrp; struct { NTSTATUS Status; SIZE_T Information; } IoStatus; IO_STACK_LOCATION stack; int Cancel; } IRP,*PIRP;
 typedef struct DRIVER { PDEVICE_OBJECT DeviceObject; NTSTATUS (*MajorFunction[3])(PDEVICE_OBJECT,PIRP); void (*DriverUnload)(struct DRIVER *); } DRIVER,*PDRIVER_OBJECT;
 typedef void *PIO_WORKITEM;
 
 static int GUID_DEVCLASS_DEVICE_TWEAKER_IMOD, mapCalls, unmapCalls, reads, writes, failMap, failCreate, failLink, deleted;
 
-static unsigned char memory[4096];
+static unsigned char memory[4096], assignedResources[256];
+static ULONG assignedBytes;
+static int allowWorkItem, freedWorkItems, markedPending, completions, openCalls, propertyCalls, dereferences;
+static int failOpen, failProperty, oversizeResources, currentIrql, fileObjectToken, workItemToken;
 static DEVICE device;
 static DRIVER created;
 static void RtlInitUnicodeString(PUNICODE_STRING s,const wchar_t *t) { s->text=t; }
@@ -109,12 +121,30 @@ static NTSTATUS IoDeleteSymbolicLink(PUNICODE_STRING n) { (void)n; return 0; }
 static void ImodDriverUnload(PDRIVER_OBJECT d);
 static void IoDeleteDevice(PDEVICE_OBJECT d) { (void)d;deleted++; }
 static PIO_STACK_LOCATION IoGetCurrentIrpStackLocation(PIRP irp) { return &irp->stack; }
-static void IoCompleteRequest(PIRP irp,int increment) { (void)irp;(void)increment; }
-static PIO_WORKITEM IoAllocateWorkItem(PDEVICE_OBJECT d) { (void)d;return NULL; }
-static void IoMarkIrpPending(PIRP i) { (void)i; }
+static void IoCompleteRequest(PIRP irp,int increment) { (void)irp;(void)increment;completions++; }
+static PIO_WORKITEM IoAllocateWorkItem(PDEVICE_OBJECT d) { (void)d;return allowWorkItem?&workItemToken:NULL; }
+static void IoFreeWorkItem(PIO_WORKITEM item) { assert(item==&workItemToken);freedWorkItems++; }
+static void IoMarkIrpPending(PIRP i) { (void)i;markedPending++; }
 static void ImodQueryPciWorker(void *a,void *b,void *c) { (void)a;(void)b;(void)c; }
-static void ImodWriteDeviceWorker(void *a,void *b,void *c) { (void)a;(void)b;(void)c; }
-static void IoQueueWorkItemEx(PIO_WORKITEM w,void (*fn)(void*,void*,void*),int q,void *c) { (void)w;(void)fn;(void)q;(void)c; }
+static void ImodWriteDeviceWorker(void *a,void *b,void *c);
+// Synchronous fake queue: tests the production worker body, not kernel scheduling.
+static void IoQueueWorkItemEx(PIO_WORKITEM w,void (*fn)(void*,void*,void*),int q,void *c) { (void)q;fn(&device,c,w); }
+static int KeGetCurrentIrql(void) { return currentIrql; }
+static NTSTATUS ImodOpenPciDevice(const WCHAR *pdoName,const WCHAR *instanceId,PFILE_OBJECT *file,PDEVICE_OBJECT *pdo) {
+    assert(pdoName[0]=='p' && instanceId[0]=='i');openCalls++;
+    if(failOpen) { *file=NULL;*pdo=NULL;return STATUS_INVALID_PARAMETER; }
+    *file=&fileObjectToken;*pdo=&device;return STATUS_SUCCESS;
+}
+static NTSTATUS IoGetDeviceProperty(PDEVICE_OBJECT pdo,int property,ULONG capacity,PVOID buffer,ULONG *bytes) {
+    assert(pdo==&device && property==DevicePropertyAllocatedResources);propertyCalls++;
+    if(failProperty)return STATUS_DATA_ERROR;
+    if(oversizeResources) { *bytes=capacity+1;return STATUS_SUCCESS; }
+    assert(assignedBytes<=capacity);memcpy(buffer,assignedResources,assignedBytes);*bytes=assignedBytes;return STATUS_SUCCESS;
+}
+static void ObDereferenceObject(PVOID object) { assert(object==&device || object==&fileObjectToken);dereferences++; }
+struct ImodDeviceWrite;
+struct ImodDeviceWriteReply;
+static NTSTATUS ImodWriteDevice(struct ImodDeviceWrite *request,struct ImodDeviceWriteReply *reply);
 static void *MmMapIoSpace(PHYSICAL_ADDRESS a,SIZE_T n,int cache) { (void)a;(void)cache;assert(n==4096);mapCalls++;return failMap?NULL:memory; }
 static void MmUnmapIoSpace(void *p,SIZE_T n) { assert(p==memory && n==4096);unmapCalls++; }
 #define READ_REGISTER_UCHAR(p) (reads++,*(p))
@@ -135,7 +165,12 @@ static BOOLEAN ImodResourcesContainRange(const UCHAR *list,ULONG bytes,ULONGLONG
 static NTSTATUS IoCreateDriver(PUNICODE_STRING n,NTSTATUS(*fn)(PDRIVER_OBJECT,PUNICODE_STRING)) { (void)n;return fn(&created,NULL); }
 '@
 $main = @'
-static void reset(void) { mapCalls=unmapCalls=reads=writes=failMap=0; }
+static void reset(void) {
+    mapCalls=unmapCalls=reads=writes=failMap=0;
+    allowWorkItem=freedWorkItems=markedPending=completions=openCalls=propertyCalls=dereferences=0;
+    failOpen=failProperty=oversizeResources=currentIrql=0;
+    memset(memory,0,sizeof(memory));
+}
 static void initTests(void) {
 
     DRIVER normal={0},mapped={0};UNICODE_STRING path={L"\\REGISTRY\\MACHINE\\SYSTEM\\CurrentControlSet\\Services\\DTIMOD"};
@@ -232,7 +267,56 @@ static void rangeTests(void) {
     n=put32(list,0,1); n=putFull(list,n,1); n=putPartial(list,n,CmResourceTypeMemoryLarge,0,0x5000,0x10);
     assert(!ImodResourcesContainRange(list,n,0x5000,4));           /* large range without size flag */
 }
-int main(void) { _set_error_mode(_OUT_TO_STDERR);_set_abort_behavior(0,_WRITE_ABORT_MSG|_CALL_REPORTFAULT);initTests();mmioTests();rangeTests();dispatchTests();puts("PASS: actual driver entry, unload assignment, MMIO width/map/unmap, device memory range check and dispatch; fake kernel only; PCI and write workers stubbed");return 0; }
+// Run the real dispatch, METHOD_BUFFERED worker, resource guard and MMIO writer.
+// Only PCI lookup, resource delivery, scheduling and physical mapping are fake.
+static NTSTATUS dispatchDeviceWrite(ULONGLONG address,ULONG width,ULONG version,int cancelled) {
+    static union { struct ImodDeviceWrite request;struct ImodDeviceWriteReply reply; } buffer;
+    IRP irp={0};
+    memset(&buffer,0,sizeof(buffer));
+    buffer.request.version=version;buffer.request.accessSize=width;buffer.request.physAddress=address;
+    buffer.request.value=0x12345678;buffer.request.pdoName[0]='p';buffer.request.instanceId[0]='i';
+    irp.AssociatedIrp.SystemBuffer=&buffer;irp.Cancel=cancelled;irp.stack.MajorFunction=IRP_MJ_DEVICE_CONTROL;
+    irp.stack.Parameters.DeviceIoControl.InputBufferLength=sizeof(struct ImodDeviceWrite);
+    irp.stack.Parameters.DeviceIoControl.OutputBufferLength=sizeof(struct ImodDeviceWriteReply);
+    irp.stack.Parameters.DeviceIoControl.IoControlCode=IOCTL_IMOD_WRITE_DEVICE;allowWorkItem=1;
+    assert(ImodDriverDispatch(&device,&irp)==STATUS_PENDING);
+    assert(markedPending==1 && freedWorkItems==1 && completions==1);
+    if(NT_SUCCESS(irp.IoStatus.Status)) {
+        assert(buffer.reply.version==IMOD_DEVICE_WRITE_VERSION && buffer.reply.resourcesBytes==assignedBytes);
+        assert(irp.IoStatus.Information==offsetof(struct ImodDeviceWriteReply,resources)+assignedBytes);
+    } else assert(irp.IoStatus.Information==0);
+    return irp.IoStatus.Status;
+}
+static void deviceWriteTests(void) {
+    ULONG n=put32(assignedResources,0,1);
+    n=putFull(assignedResources,n,1);
+    assignedBytes=putPartial(assignedResources,n,CmResourceTypeMemory,0,0x1000,0x1000);
+    reset();assert(dispatchDeviceWrite(0x1004,4,IMOD_DEVICE_WRITE_VERSION,0)==STATUS_SUCCESS);
+    assert(writes==1 && mapCalls==1 && unmapCalls==1 && memory[4]==0x78 && memory[7]==0x12);
+    assert(openCalls==1 && propertyCalls==1 && dereferences==2);
+    reset();assert(dispatchDeviceWrite(0x1ffc,4,IMOD_DEVICE_WRITE_VERSION,0)==STATUS_SUCCESS && writes==1);
+    reset();assert(dispatchDeviceWrite(0x1ffd,4,IMOD_DEVICE_WRITE_VERSION,0)==STATUS_ACCESS_DENIED);
+    assert(mapCalls==0 && writes==0 && dereferences==2);
+    reset();assert(dispatchDeviceWrite(0x3000,4,IMOD_DEVICE_WRITE_VERSION,0)==STATUS_ACCESS_DENIED && writes==0);
+    reset();assert(dispatchDeviceWrite(0x1004,4,IMOD_DEVICE_WRITE_VERSION,1)==STATUS_CANCELLED);
+    assert(openCalls==0 && propertyCalls==0 && writes==0 && dereferences==0);
+    reset();assert(dispatchDeviceWrite(0x1004,4,99,0)==STATUS_INVALID_PARAMETER && openCalls==0 && writes==0);
+    reset();assert(dispatchDeviceWrite(0x1004,8,IMOD_DEVICE_WRITE_VERSION,0)==STATUS_INVALID_PARAMETER && openCalls==0);
+    reset();currentIrql=1;assert(dispatchDeviceWrite(0x1004,4,IMOD_DEVICE_WRITE_VERSION,0)==STATUS_INVALID_PARAMETER && openCalls==0);
+    reset();failOpen=1;assert(dispatchDeviceWrite(0x1004,4,IMOD_DEVICE_WRITE_VERSION,0)<0);
+    assert(propertyCalls==0 && dereferences==0 && writes==0);
+    reset();failProperty=1;assert(dispatchDeviceWrite(0x1004,4,IMOD_DEVICE_WRITE_VERSION,0)==STATUS_DATA_ERROR);
+    assert(dereferences==2 && writes==0);
+    reset();oversizeResources=1;assert(dispatchDeviceWrite(0x1004,4,IMOD_DEVICE_WRITE_VERSION,0)==STATUS_DATA_ERROR);
+    assert(dereferences==2 && writes==0);
+    reset();failMap=1;assert(dispatchDeviceWrite(0x1004,4,IMOD_DEVICE_WRITE_VERSION,0)==STATUS_INSUFFICIENT_RESOURCES);
+    assert(dereferences==2 && writes==0 && unmapCalls==0);
+    reset();put32(assignedResources,0,2); /* valid first range, missing second header */
+    assert(dispatchDeviceWrite(0x1004,4,IMOD_DEVICE_WRITE_VERSION,0)==STATUS_ACCESS_DENIED);
+    assert(dereferences==2 && writes==0 && mapCalls==0);
+    put32(assignedResources,0,1);
+}
+int main(void) { _set_error_mode(_OUT_TO_STDERR);_set_abort_behavior(0,_WRITE_ABORT_MSG|_CALL_REPORTFAULT);initTests();mmioTests();rangeTests();dispatchTests();deviceWriteTests();puts("PASS: actual driver entry, unload assignment, MMIO width/map/unmap, device-scoped write worker, cancellation, cleanup and dispatch; fake kernel only; PCI lookup and PCI query worker stubbed");return 0; }
 '@
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 $OutputDirectory = (Resolve-Path $OutputDirectory).Path

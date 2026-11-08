@@ -149,3 +149,5 @@ In `transition`, a nonempty `value` checks the target's selected `property` befo
 `motion-lifecycle` checks the always-on default with real native controls: completion when hidden, no idle frame posts, movement after showing, coalescing during a busy UI and worker cleanup on disposal. It also verifies removal of the old system-menu command. JSON tests cover dropping the obsolete flag on language save while retaining unknown settings.
 
 `dialog-consistency.json` covers driver consent, the USB IMOD choice before and after consent, and driver information on EN/RU at 100/125/150% layout scaling. Dialog audits check text fit, a shared action baseline and scaled 20-pixel bottom/right insets. `dialog-audit-en.json` and `dialog-audit-ru.json` cover the remaining dialog surfaces.
+
+Ordinary checkpoints wait for active animations in the main window and owned dialogs to finish after painting their current targets. Transition steps keep recording the motion itself. Pixel tolerance and masks are unchanged.
