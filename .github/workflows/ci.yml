@@ -48,6 +48,10 @@ jobs:
             if ($parseErrors.Count -gt 0) { throw "PowerShell parse error in ${script}: $($parseErrors[0].Message)" }
           }
 
+      - name: Check build user-data recovery
+        shell: powershell
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File dev/qa/Test-BuildUserData.ps1
+
       - name: Check QA build cache contracts
         shell: powershell
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File dev/qa/Test-QaBuildCache.ps1

@@ -5,7 +5,7 @@
 ## Требования
 
 - Windows 10 / 11 x64, [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0), Windows PowerShell 5.1.
-- Для пересборки `DTIMOD.sys` и нативной модели в QA: Visual Studio с C++ Build Tools, Windows SDK и Windows Driver Kit. Готовый драйвер уже лежит в репозитории, для обычной сборки они не нужны.
+- Для пересборки `DTIMOD.sys`: Visual Studio с C++ Build Tools, Windows SDK и Windows Driver Kit. Нативной модели QA нужны C++ Build Tools и Windows SDK, без WDK. Готовый драйвер уже лежит в репозитории, для обычной сборки они не нужны.
 
 `global.json` требует SDK 10.0.403 или более новый стабильный feature band 10.0. Перед сборкой установите подходящий SDK; CI использует тот же файл. Общий `src/Startup/DeviceTweakerImodRuntime.cs` также компилируется Windows PowerShell 5.1: в нём сохраняется синтаксис C# 5.
 
@@ -37,7 +37,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\src\build.ps1 -Flavor both
 - `src/bin/Publish/DEVICE TWEAKER (SELF-CONTAINED)/…` - со встроенным .NET, сжатый single-file;
 - `src/bin/ReleasePackages/v<версия>/` - два EXE и `SHA256SUMS.txt` для релиза.
 
-Папки `Backups` и `logs` рядом с EXE при чистой сборке сохраняются.
+Чистая сборка сохраняет папки `Backups` и `logs` рядом с EXE, в том числе при ошибке подготовки или публикации. Перед пересборкой закройте запущенные копии из Publish.
 
 ## Драйвер DTIMOD
 

@@ -5,7 +5,7 @@
 ## Requirements
 
 - Windows 10 / 11 x64, [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0), Windows PowerShell 5.1.
-- To rebuild `DTIMOD.sys` and the native model used by QA: Visual Studio with C++ Build Tools, the Windows SDK and the Windows Driver Kit. The built driver is already in the repository, so a regular build does not need them.
+- To rebuild `DTIMOD.sys`: Visual Studio with C++ Build Tools, the Windows SDK and the Windows Driver Kit. The native QA model needs C++ Build Tools and Windows SDK, without WDK. The built driver is already in the repository, so a regular application build does not need them.
 
 ## Build and test
 
@@ -37,7 +37,7 @@ Output:
 - `src/bin/Publish/DEVICE TWEAKER (SELF-CONTAINED)/…` - self-contained, compressed single file;
 - `src/bin/ReleasePackages/v<version>/` - both EXEs and `SHA256SUMS.txt` for the release.
 
-A clean build keeps the `Backups` and `logs` folders next to the EXEs.
+A clean build keeps the `Backups` and `logs` folders next to the EXEs, including when preparation or publishing fails. Close running published copies before rebuilding them.
 
 ## DTIMOD driver
 

@@ -71,21 +71,20 @@ Write-Host ""
 # are the user's restore points and history, so they are moved aside and put back.
 $keptUserData = @()
 $keepRoot = Join-Path $root ("bin\.kept-user-data-" + [Guid]::NewGuid().ToString("N"))
-if (-not $NoClean) {
-    foreach ($exe in @($withNetExe, $withoutNetExe)) {
-        foreach ($name in @("Backups", "logs")) {
-            $source = Join-Path (Split-Path -Parent $exe) $name
-            if (Test-Path -LiteralPath $source -PathType Container) {
-                $kept = Join-Path $keepRoot ((Split-Path -Leaf (Split-Path -Parent $exe)) + "\" + $name)
-                New-Item -ItemType Directory -Path (Split-Path -Parent $kept) -Force | Out-Null
-                Move-Item -LiteralPath $source -Destination $kept
-                $keptUserData += [pscustomobject]@{ Source = $source; Kept = $kept }
+try {
+    if (-not $NoClean) {
+        foreach ($exe in @($withNetExe, $withoutNetExe)) {
+            foreach ($name in @("Backups", "logs")) {
+                $source = Join-Path (Split-Path -Parent $exe) $name
+                if (Test-Path -LiteralPath $source -PathType Container) {
+                    $kept = Join-Path $keepRoot ((Split-Path -Leaf (Split-Path -Parent $exe)) + "\" + $name)
+                    New-Item -ItemType Directory -Path (Split-Path -Parent $kept) -Force | Out-Null
+                    Move-Item -LiteralPath $source -Destination $kept
+                    $keptUserData += [pscustomobject]@{ Source = $source; Kept = $kept }
+                }
             }
         }
     }
-}
-
-try {
     & powershell.exe @argsList
     $publishExitCode = $LASTEXITCODE
 } finally {
