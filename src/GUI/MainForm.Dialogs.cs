@@ -752,6 +752,7 @@ public sealed partial class MainForm
             .Where(p => p.Length > 0)
             .ToArray();
 
+        string riskParagraph = NormalizeDialogMessage(UiLanguage.Text(DriverEnvironment.BriefCompatibilityNotice));
         foreach (string paragraph in paragraphs)
         {
             if (driverEnvironment is null)
@@ -764,7 +765,8 @@ public sealed partial class MainForm
             Label label = new()
             {
                 Text = paragraph, Font = primary ? _blockTitleFont : _dialogFont,
-                ForeColor = primary ? _fgMain : _mutedText, UseMnemonic = false,
+                ForeColor = paragraph == riskParagraph ? _driverNotice : primary ? _fgMain : _mutedText,
+                UseMnemonic = false,
                 TextAlign = ContentAlignment.TopLeft,
                 Location = new Point(padding, currentY), Width = innerWidth,
             };
@@ -825,12 +827,12 @@ public sealed partial class MainForm
         WireThemedTitleBar(dialog);
         int padding = UiScale(20), width = UiScale(600), inner = width - padding * 2;
         int y = padding;
-        void AddText(string text, bool heading = false, string name = "")
+        void AddText(string text, bool heading = false, string name = "", bool warning = false)
         {
             Label label = new()
             {
                 Name = name, Text = text, Font = heading ? _blockTitleFont : _dialogFont,
-                ForeColor = heading ? _fgMain : _mutedText, UseMnemonic = false,
+                ForeColor = warning ? _driverNotice : heading ? _fgMain : _mutedText, UseMnemonic = false,
                 Location = new Point(padding, y), Width = inner,
             };
             label.Height = label.GetPreferredSize(new Size(inner, 0)).Height;
@@ -844,7 +846,7 @@ public sealed partial class MainForm
         AddText(UiLanguage.Text("Windows check"), heading: true);
         AddText(string.Join("\n", DriverEnvironment.CheckSummary(snapshot).Select(UiLanguage.Text)), name: "DRIVER_CHECK_SUMMARY");
         AddText(UiLanguage.Text("Compatibility"), heading: true);
-        AddText(UiLanguage.Text(DriverEnvironment.AntiCheatNotice));
+        AddText(UiLanguage.Text(DriverEnvironment.AntiCheatNotice), warning: true);
         AddText(UiLanguage.Text("This check reads Windows settings and selected service information. It does not load DTIMOD or test anti-cheat compatibility."));
         Button closeButton = NewDialogButton(UiLanguage.Text("OK"), UiScale(32), UiScale(96), isPrimary: true);
         closeButton.Name = "OK"; closeButton.DialogResult = DialogResult.OK;
