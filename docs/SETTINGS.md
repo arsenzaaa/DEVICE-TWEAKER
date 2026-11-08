@@ -58,7 +58,7 @@ The current mask covers processor group 0, up to 64 logical processors. It contr
 
 ## USB xHCI IMOD
 
-Before using DTIMOD, the program shows a compatibility notice once per application session. AUTO includes it in the USB IMOD question. **CHECK SYSTEM** shows a read-only summary of HVCI, the driver-blocklist registry setting and detected FACEIT/Vanguard services. It does not load DTIMOD or test anti-cheat compatibility; an absent registry value or service is not a compatibility verdict. Technical states are recorded in the log.
+Before using DTIMOD, the program shows a compatibility notice once per application session. AUTO includes it in the USB IMOD question. **DRIVER INFO** shows a read-only summary of HVCI, the driver-blocklist registry setting and detected FACEIT/Vanguard services. It does not load DTIMOD or test anti-cheat compatibility; an absent registry value or service is not a compatibility verdict. Technical states are recorded in the log.
 
 The AUTO profile sets mouse IMOD to 0 regardless of polling rate, disabling interrupt moderation. This is a profile rule, not a latency measurement or a change to USB polling frequency. Manual IMOD is configured separately.
 

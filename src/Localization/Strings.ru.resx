@@ -882,4 +882,9 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
   <data name="Driver.VanguardInstalled" xml:space="preserve"><value>Обнаружена служба Riot Vanguard.</value></data>
   <data name="Driver.ServicesUnreadable" xml:space="preserve"><value>Часть сведений о службах недоступна.</value></data>
   <data name="Driver.CheckScope" xml:space="preserve"><value>Проверка читает параметры Windows и сведения об отдельных службах. Она не загружает DTIMOD и не определяет совместимость с античитами.</value></data>
+  <data name="Driver.InfoAction" xml:space="preserve"><value>О ДРАЙВЕРЕ</value></data>
+  <data name="Driver.UseHeading" xml:space="preserve"><value>Для этого действия нужен DTIMOD.</value></data>
+  <data name="Driver.BriefRisk" xml:space="preserve"><value>Античит может блокировать DTIMOD или отключить вас от игры.</value></data>
+  <data name="Driver.BriefLifetime" xml:space="preserve"><value>Закрытие программы не выгружает DTIMOD. Сохранённые профили могут загружать его автоматически.</value></data>
+  <data name="Driver.LifetimeHeading" xml:space="preserve"><value>Драйвер и автозапуск</value></data>
 </root>

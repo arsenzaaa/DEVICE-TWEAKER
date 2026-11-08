@@ -14,7 +14,7 @@ DTIMOD has no public Microsoft signature for ordinary loading. The project uses 
 
 DTIMOD can conflict with Easy Anti-Cheat, Riot Vanguard, FACEIT Anti-Cheat and other protection software. Successful driver loading does not confirm compatibility: a game may disconnect you while the driver is loaded. EAC disconnects with `Forbidden Tool` have been reproduced with DTIMOD loaded on a tested system. Compatibility with Vanguard and FACEIT has not been established.
 
-The application shows a notice once per session before driver use or saving/restoring a driver profile. AUTO includes the notice in its IMOD question. **CHECK SYSTEM** reads available Windows settings and selected service information without loading DTIMOD. It does not test compatibility, and absence of a registry value or service does not prove that the system permits the driver. Details are written to the log. The application does not offer to disable Windows protections after a loading error.
+The application shows a notice once per session before driver use or saving/restoring a driver profile. AUTO includes the notice in its IMOD question. **DRIVER INFO** reads available Windows settings and selected service information without loading DTIMOD. It does not test compatibility, and absence of a registry value or service does not prove that the system permits the driver. Details are written to the log. The application does not offer to disable Windows protections after a loading error.
 
 The application checks pinned file hashes and blocks fallback loading after an uncertain load outcome. Inspect the operation details for the reason. Restart Windows to replace an already loaded older driver or unload DTIMOD; closing the EXE only closes its connection.
 

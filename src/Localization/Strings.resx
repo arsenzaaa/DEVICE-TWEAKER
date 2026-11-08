@@ -882,4 +882,9 @@ Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IM
   <data name="Driver.VanguardInstalled" xml:space="preserve"><value>A Riot Vanguard service is installed.</value></data>
   <data name="Driver.ServicesUnreadable" xml:space="preserve"><value>Some service information could not be read.</value></data>
   <data name="Driver.CheckScope" xml:space="preserve"><value>This check reads Windows settings and selected service information. It does not load DTIMOD or test anti-cheat compatibility.</value></data>
+  <data name="Driver.InfoAction" xml:space="preserve"><value>DRIVER INFO</value></data>
+  <data name="Driver.UseHeading" xml:space="preserve"><value>This action requires DTIMOD.</value></data>
+  <data name="Driver.BriefRisk" xml:space="preserve"><value>Anti-cheat software may block DTIMOD or disconnect you from a game.</value></data>
+  <data name="Driver.BriefLifetime" xml:space="preserve"><value>Closing the app does not unload DTIMOD. Saved profiles can load it automatically.</value></data>
+  <data name="Driver.LifetimeHeading" xml:space="preserve"><value>Driver lifetime</value></data>
 </root>

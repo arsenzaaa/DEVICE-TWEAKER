@@ -73,7 +73,7 @@ public sealed class DriverEnvironmentTests
     {
         string text = DriverEnvironment.BuildCompactConfirmation(Snapshot());
         Assert.StartsWith("Include USB IMOD in auto-optimization?", text);
-        Assert.Contains("SKIP continues auto-optimization without USB IMOD.", text);
+        Assert.Contains(DriverEnvironment.BriefLifetimeNotice, text);
         Assert.DoesNotContain("SYSTEM CHECK:", text);
         Assert.DoesNotContain("KDU", text);
         Assert.DoesNotContain("conflict", text);
@@ -92,8 +92,8 @@ public sealed class DriverEnvironmentTests
         snapshot = name switch { "FACEIT" => snapshot with { Faceit = service }, "vgk" => snapshot with { VanguardDriver = service }, _ => snapshot with { VanguardService = service } };
         string text = DriverEnvironment.BuildCompactConfirmation(snapshot);
         Assert.Equal(DriverEnvironment.BuildCompactConfirmation(Snapshot()), text);
-        Assert.Contains("Easy Anti-Cheat", text);
-        Assert.Contains("Vanguard", text);
+        Assert.Contains(DriverEnvironment.BriefCompatibilityNotice, text);
+        Assert.DoesNotContain("Vanguard", text);
         Assert.DoesNotContain("conflict", text);
         Assert.DoesNotContain("KDU", text);
         Assert.DoesNotContain($"({state})", text);
@@ -137,7 +137,7 @@ public sealed class DriverEnvironmentTests
 
     [Fact] public void NoticeExplainsDriverLifetimeAndAutomaticReload()
     {
-        string text = DriverEnvironment.CompatibilityNotice;
+        string text = DriverEnvironment.AntiCheatNotice + "\n\n" + DriverEnvironment.LifetimeNotice;
         Assert.Contains("does not unload", text);
         Assert.Contains("Saved profiles can load it again", text);
         Assert.Contains("disconnect you from a game", text);
@@ -152,7 +152,7 @@ public sealed class DriverEnvironmentTests
         string text = DriverEnvironment.BuildCompactConfirmation(Snapshot(1), includeCompatibilityNotice: false);
         Assert.StartsWith("Include USB IMOD", text);
         Assert.Contains("Driver blocklist is configured on.", text);
-        Assert.Contains("SKIP continues", text);
+        Assert.DoesNotContain(DriverEnvironment.BriefCompatibilityNotice, text);
         Assert.DoesNotContain("Easy Anti-Cheat", text);
         Assert.DoesNotContain("Closing DEVICE TWEAKER", text);
     }

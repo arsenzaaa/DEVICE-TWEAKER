@@ -26,6 +26,7 @@ public sealed partial class MainForm
     }
 
     private bool ShowDriverUsePrompt(DriverEnvironmentSnapshot snapshot)
-        => ShowThemedConfirm(DriverEnvironment.CompatibilityNotice, "DTIMOD DRIVER",
+        => ShowThemedConfirm("This action requires DTIMOD.\n\n"
+            + DriverEnvironment.BriefCompatibilityNotice + "\n\n" + DriverEnvironment.BriefLifetimeNotice, "DTIMOD DRIVER",
             "CONTINUE", "CANCEL", snapshot);
 }

@@ -26,10 +26,17 @@ internal sealed record DriverEnvironmentSnapshot(
 // Read-only preflight. Presence/configuration is evidence, not a driver-load verdict.
 internal static class DriverEnvironment
 {
-    internal const string CompatibilityNotice =
-        "DTIMOD provides hardware access for USB IMOD, NIC ITR and PCI register reads.\n\n"
-        + "Easy Anti-Cheat, Riot Vanguard, FACEIT Anti-Cheat and other protection software may block the driver or disconnect you from a game. Compatibility is not guaranteed.\n\n"
-        + "Closing DEVICE TWEAKER does not unload the driver. Restart Windows to unload it. Saved profiles can load it again at sign-in, wake or device reconnection.";
+    internal const string PurposeNotice =
+        "DTIMOD provides hardware access for USB IMOD, NIC ITR and PCI register reads.";
+    internal const string AntiCheatNotice =
+        "Easy Anti-Cheat, Riot Vanguard, FACEIT Anti-Cheat and other protection software may block the driver or disconnect you from a game. Compatibility is not guaranteed.";
+    internal const string LifetimeNotice =
+        "Closing DEVICE TWEAKER does not unload the driver. Restart Windows to unload it. Saved profiles can load it again at sign-in, wake or device reconnection.";
+
+    internal const string BriefCompatibilityNotice =
+        "Anti-cheat software may block DTIMOD or disconnect you from a game.";
+    internal const string BriefLifetimeNotice =
+        "Closing the app does not unload DTIMOD. Saved profiles can load it automatically.";
 
     internal static IReadOnlyList<string> CheckSummary(DriverEnvironmentSnapshot snapshot)
     {
@@ -138,8 +145,8 @@ internal static class DriverEnvironment
             notes.Add("Some system checks are unavailable.");
         const string question = "Include USB IMOD in auto-optimization?";
         string concern = notes.Count == 0 ? string.Empty : "\n\n" + string.Join("\n", notes);
-        return question + (includeCompatibilityNotice ? "\n\n" + CompatibilityNotice : string.Empty) + concern + "\n\n"
-            + "SKIP continues auto-optimization without USB IMOD.";
+        return question + (includeCompatibilityNotice
+            ? "\n\n" + BriefCompatibilityNotice + "\n\n" + BriefLifetimeNotice : string.Empty) + concern;
     }
 
     private static string RegistryText(DriverRegistryState state) => state.Value is uint value

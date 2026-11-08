@@ -753,8 +753,25 @@ public sealed partial class MainForm
             .ToArray();
 
         foreach (string paragraph in paragraphs)
-            AddCenteredDialogText(dialog, paragraph, innerWidth, padding, ref currentY,
-                currentY == padding ? _fgMain : _mutedText);
+        {
+            if (driverEnvironment is null)
+            {
+                AddCenteredDialogText(dialog, paragraph, innerWidth, padding, ref currentY,
+                    currentY == padding ? _fgMain : _mutedText);
+                continue;
+            }
+            bool primary = currentY == padding;
+            Label label = new()
+            {
+                Text = paragraph, Font = primary ? _blockTitleFont : _dialogFont,
+                ForeColor = primary ? _fgMain : _mutedText, UseMnemonic = false,
+                TextAlign = ContentAlignment.TopLeft,
+                Location = new Point(padding, currentY), Width = innerWidth,
+            };
+            label.Height = label.GetPreferredSize(new Size(innerWidth, 0)).Height;
+            dialog.Controls.Add(label);
+            currentY = label.Bottom + UiScale(primary ? 16 : 12);
+        }
 
         Button yesButton = NewDialogButton(UiLanguage.Text(yesText), buttonHeight, buttonWidth, isPrimary: true);
         yesButton.Name = yesText;
@@ -764,18 +781,28 @@ public sealed partial class MainForm
         noButton.Name = noText;
         noButton.DialogResult = DialogResult.No;
 
-        List<Button> confirmButtons = [yesButton, noButton];
+        Panel footer = AttachThemedDialogFooter(dialog, [yesButton, noButton], UiScale(12));
         if (driverEnvironment is not null)
         {
-            Button checkButton = NewDialogButton(UiLanguage.Text("CHECK SYSTEM"), buttonHeight, UiScale(144));
-            checkButton.Name = "SYSTEM_CHECK_TOGGLE";
-            checkButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(24, 24, 30);
-            checkButton.FlatAppearance.MouseDownBackColor = Color.FromArgb(34, 34, 40);
-            checkButton.Click += (_, _) => ShowDriverEnvironmentDetails(dialog,
+            Button infoButton = NewDialogButton(UiLanguage.Text("DRIVER INFO"), buttonHeight, UiScale(144));
+            infoButton.Name = "SYSTEM_CHECK_TOGGLE";
+            infoButton.FlatAppearance.BorderSize = 0;
+            infoButton.ForeColor = _mutedText;
+            infoButton.TextAlign = ContentAlignment.MiddleLeft;
+            infoButton.Cursor = Cursors.Hand;
+            infoButton.Click += (_, _) => ShowDriverEnvironmentDetails(dialog,
                 QaRun.IsReadOnly ? driverEnvironment : CaptureDriverEnvironment());
-            confirmButtons.Add(checkButton);
+            footer.Controls.Add(infoButton);
+            void LayoutDriverActions()
+            {
+                infoButton.Location = new Point(padding, (footer.Height - buttonHeight) / 2);
+                noButton.Left = footer.ClientSize.Width - padding - noButton.Width;
+                yesButton.Left = noButton.Left - UiScale(12) - yesButton.Width;
+            }
+            footer.Resize += (_, _) => LayoutDriverActions();
+            LayoutDriverActions();
+            dialog.ActiveControl = yesButton;
         }
-        AttachThemedDialogFooter(dialog, confirmButtons, UiScale(12));
 
         dialog.ClientSize = new Size(clientWidth, currentY + footerHeight);
         dialog.AcceptButton = yesButton;
@@ -788,7 +815,7 @@ public sealed partial class MainForm
     {
         using Form dialog = new ThemedDialogForm
         {
-            Name = "DRIVER_ENVIRONMENT_DIALOG", Text = UiLanguage.Text("SYSTEM CHECK"),
+            Name = "DRIVER_ENVIRONMENT_DIALOG", Text = UiLanguage.Text("DRIVER INFO"),
             FormBorderStyle = FormBorderStyle.FixedDialog, StartPosition = FormStartPosition.CenterParent,
             MaximizeBox = false, MinimizeBox = false, ShowInTaskbar = false,
             AutoScaleMode = AutoScaleMode.None, Font = _dialogFont, Icon = Icon,
@@ -810,10 +837,14 @@ public sealed partial class MainForm
             dialog.Controls.Add(label);
             y = label.Bottom + UiScale(heading ? 10 : 16);
         }
+        AddText("DTIMOD", heading: true);
+        AddText(UiLanguage.Text(DriverEnvironment.PurposeNotice));
+        AddText(UiLanguage.Text("Driver lifetime"), heading: true);
+        AddText(UiLanguage.Text(DriverEnvironment.LifetimeNotice));
         AddText(UiLanguage.Text("Windows check"), heading: true);
         AddText(string.Join("\n", DriverEnvironment.CheckSummary(snapshot).Select(UiLanguage.Text)), name: "DRIVER_CHECK_SUMMARY");
         AddText(UiLanguage.Text("Compatibility"), heading: true);
-        AddText(UiLanguage.Text("Easy Anti-Cheat, Riot Vanguard, FACEIT Anti-Cheat and other protection software may block the driver or disconnect you from a game. Compatibility is not guaranteed."));
+        AddText(UiLanguage.Text(DriverEnvironment.AntiCheatNotice));
         AddText(UiLanguage.Text("This check reads Windows settings and selected service information. It does not load DTIMOD or test anti-cheat compatibility."));
         Button closeButton = NewDialogButton(UiLanguage.Text("OK"), UiScale(32), UiScale(96), isPrimary: true);
         closeButton.Name = "OK"; closeButton.DialogResult = DialogResult.OK;
