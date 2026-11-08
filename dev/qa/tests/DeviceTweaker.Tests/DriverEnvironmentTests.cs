@@ -151,6 +151,12 @@ public sealed class DriverEnvironmentTests
     {
         string text = DriverEnvironment.BuildCompactConfirmation(Snapshot(1), includeCompatibilityNotice: false);
         Assert.StartsWith("Include USB IMOD", text);
+        Assert.Contains("APPLY configures USB IMOD. SKIP continues AUTO without USB IMOD.", text);
+        var translate = typeof(UiLanguage).GetMethod("TranslateRussian", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+        string ru = (string)translate.Invoke(null, [text])!;
+        Assert.Contains("ПРИМЕНИТЬ настраивает USB IMOD.", ru);
+        Assert.Contains("ПРОПУСТИТЬ продолжает АВТО без USB IMOD.", ru);
+        Assert.DoesNotContain("APPLY configures", ru);
         Assert.Contains("Driver blocklist is configured on.", text);
         Assert.DoesNotContain(DriverEnvironment.BriefCompatibilityNotice, text);
         Assert.DoesNotContain("Easy Anti-Cheat", text);

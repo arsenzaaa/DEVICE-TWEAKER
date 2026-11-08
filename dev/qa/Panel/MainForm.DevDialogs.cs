@@ -22,6 +22,16 @@ public sealed partial class MainForm
             controls.Add(new { control.Name, control.Text, bounds = control.Bounds.ToString(), fits });
             if (!fits) defects.Add(control.GetType().Name + ": " + control.Name + " / " + control.Text);
         }
+        foreach (Panel footer in window.Controls.OfType<Panel>().Where(p => p.Dock == DockStyle.Bottom))
+        {
+            Button[] actions = footer.Controls.OfType<Button>().Where(b => b.Visible).ToArray();
+            if (actions.Length == 0) continue;
+            int bottomInset = window.ClientSize.Height - footer.Bottom + footer.Height - actions.Max(b => b.Bottom);
+            int rightInset = footer.ClientSize.Width - actions.Max(b => b.Right);
+            if (Math.Abs(bottomInset - UiScale(20)) > 1) defects.Add($"Action row bottom inset: {bottomInset}, expected {UiScale(20)}.");
+            if (Math.Abs(rightInset - UiScale(20)) > 1) defects.Add($"Action row right inset: {rightInset}, expected {UiScale(20)}.");
+            if (actions.Any(b => b.Top != actions[0].Top)) defects.Add("Action buttons do not share a baseline.");
+        }
         string relative = "state/" + id + ".layout.json";
         DevFiles.Write(DevArtifact(relative), new { window = window.Name, scale = _uiScale, controls, defects });
         DevRecordState(relative);
@@ -41,6 +51,7 @@ public sealed partial class MainForm
             case "driver": ShowDriverUsePrompt(environment); break;
             case "system": ShowDriverEnvironmentDetails(this, environment); break;
             case "system-unknown": ShowDriverEnvironmentDetails(this, environment with { Blocklist = new(null, "unavailable"), HvciRunning = null, Faceit = new("FACEIT", null, "unavailable") }); break;
+            case "imod-confirmed": ShowThemedConfirm(DriverEnvironment.BuildCompactConfirmation(environment, includeCompatibilityNotice: false), "USB IMOD TUNING", "APPLY", "SKIP", environment); break;
             case "imod": ShowThemedConfirm(DriverEnvironment.BuildCompactConfirmation(environment), "USB IMOD TUNING", "APPLY", "SKIP", environment); break;
             case "confirm": ShowThemedConfirm("Restore the selected backup?", "RESTORE", "RESTORE", "CANCEL"); break;
             case "backup-location": ShowAutoBackupChoiceDialog(); break;

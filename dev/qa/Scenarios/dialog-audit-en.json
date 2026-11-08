@@ -26,6 +26,10 @@
       "target": "@active"
     },
     {
+      "id": "backup-restored-layout",
+      "action": "audit-dialog"
+    },
+    {
       "id": "backup-restored-close",
       "action": "click",
       "target": "id:OK"
@@ -55,6 +59,10 @@
       "id": "backup-saved",
       "action": "capture",
       "target": "@active"
+    },
+    {
+      "id": "backup-saved-layout",
+      "action": "audit-dialog"
     },
     {
       "id": "backup-saved-close",
@@ -88,6 +96,10 @@
       "target": "@active"
     },
     {
+      "id": "system-layout",
+      "action": "audit-dialog"
+    },
+    {
       "id": "system-close",
       "action": "click",
       "target": "id:OK"
@@ -117,6 +129,10 @@
       "id": "system-unknown",
       "action": "capture",
       "target": "@active"
+    },
+    {
+      "id": "system-unknown-layout",
+      "action": "audit-dialog"
     },
     {
       "id": "system-unknown-close",
@@ -150,6 +166,10 @@
       "target": "@active"
     },
     {
+      "id": "imod-layout",
+      "action": "audit-dialog"
+    },
+    {
       "id": "imod-close",
       "action": "click",
       "target": "id:SKIP"
@@ -179,6 +199,10 @@
       "id": "confirm",
       "action": "capture",
       "target": "@active"
+    },
+    {
+      "id": "confirm-layout",
+      "action": "audit-dialog"
     },
     {
       "id": "confirm-close",
@@ -212,6 +236,10 @@
       "target": "@active"
     },
     {
+      "id": "backup-location-layout",
+      "action": "audit-dialog"
+    },
+    {
       "id": "backup-location-close",
       "action": "click",
       "target": "id:SKIP"
@@ -241,6 +269,10 @@
       "id": "restore-empty",
       "action": "capture",
       "target": "@active"
+    },
+    {
+      "id": "restore-empty-layout",
+      "action": "audit-dialog"
     },
     {
       "id": "restore-empty-close",
@@ -274,6 +306,10 @@
       "target": "@active"
     },
     {
+      "id": "restore-layout",
+      "action": "audit-dialog"
+    },
+    {
       "id": "restore-close",
       "action": "click",
       "target": "id:CANCEL"
@@ -303,6 +339,10 @@
       "id": "restore-many",
       "action": "capture",
       "target": "@active"
+    },
+    {
+      "id": "restore-many-layout",
+      "action": "audit-dialog"
     },
     {
       "id": "restore-many-close",
@@ -336,6 +376,10 @@
       "target": "@active"
     },
     {
+      "id": "success-layout",
+      "action": "audit-dialog"
+    },
+    {
       "id": "success-close",
       "action": "click",
       "target": "id:OK"
@@ -365,6 +409,10 @@
       "id": "warnings",
       "action": "capture",
       "target": "@active"
+    },
+    {
+      "id": "warnings-layout",
+      "action": "audit-dialog"
     },
     {
       "id": "warnings-close",
@@ -398,6 +446,10 @@
       "target": "@active"
     },
     {
+      "id": "partial-layout",
+      "action": "audit-dialog"
+    },
+    {
       "id": "partial-details",
       "action": "click",
       "target": "id:DETAILS"
@@ -413,6 +465,10 @@
       "id": "partial-technical",
       "action": "capture",
       "target": "@active"
+    },
+    {
+      "id": "partial-technical-layout",
+      "action": "audit-dialog"
     },
     {
       "id": "partial-detail-close",
@@ -452,6 +508,10 @@
       "target": "@active"
     },
     {
+      "id": "failed-layout",
+      "action": "audit-dialog"
+    },
+    {
       "id": "failed-details",
       "action": "click",
       "target": "id:DETAILS"
@@ -467,6 +527,10 @@
       "id": "failed-technical",
       "action": "capture",
       "target": "@active"
+    },
+    {
+      "id": "failed-technical-layout",
+      "action": "audit-dialog"
     },
     {
       "id": "failed-detail-close",
@@ -506,6 +570,10 @@
       "target": "@active"
     },
     {
+      "id": "stress-layout",
+      "action": "audit-dialog"
+    },
+    {
       "id": "stress-details",
       "action": "click",
       "target": "id:DETAILS"
@@ -521,6 +589,10 @@
       "id": "stress-technical",
       "action": "capture",
       "target": "@active"
+    },
+    {
+      "id": "stress-technical-layout",
+      "action": "audit-dialog"
     },
     {
       "id": "stress-detail-close",
@@ -565,6 +637,10 @@
       "target": "@active"
     },
     {
+      "id": "after-delete-layout",
+      "action": "audit-dialog"
+    },
+    {
       "id": "delete-close",
       "action": "key",
       "target": "@active",
@@ -595,6 +671,10 @@
       "id": "restore-reasons",
       "action": "capture",
       "target": "@active"
+    },
+    {
+      "id": "restore-reasons-layout",
+      "action": "audit-dialog"
     },
     {
       "id": "restore-reasons-audit",

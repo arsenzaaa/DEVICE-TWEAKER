@@ -1,0 +1,1037 @@
+{
+  "schemaVersion": 1,
+  "id": "dialog-consistency",
+  "preset": "DevicePalette",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "en96-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en96-scale",
+      "action": "layout-rebind",
+      "value": "96"
+    },
+    {
+      "id": "en96-driver-open",
+      "action": "dialog",
+      "value": "driver"
+    },
+    {
+      "id": "en96-driver-ready",
+      "action": "wait",
+      "target": "id:CANCEL",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en96-driver",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en96-driver-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en96-driver-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "en96-driver-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en96-imod-open",
+      "action": "dialog",
+      "value": "imod"
+    },
+    {
+      "id": "en96-imod-ready",
+      "action": "wait",
+      "target": "id:SKIP",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en96-imod",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en96-imod-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en96-imod-close",
+      "action": "click",
+      "target": "id:SKIP"
+    },
+    {
+      "id": "en96-imod-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en96-imod-confirmed-open",
+      "action": "dialog",
+      "value": "imod-confirmed"
+    },
+    {
+      "id": "en96-imod-confirmed-ready",
+      "action": "wait",
+      "target": "id:SKIP",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en96-imod-confirmed",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en96-imod-confirmed-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en96-imod-confirmed-close",
+      "action": "click",
+      "target": "id:SKIP"
+    },
+    {
+      "id": "en96-imod-confirmed-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en96-system-open",
+      "action": "dialog",
+      "value": "system"
+    },
+    {
+      "id": "en96-system-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en96-system",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en96-system-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en96-system-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "en96-system-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru96-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru96-scale",
+      "action": "layout-rebind",
+      "value": "96"
+    },
+    {
+      "id": "ru96-driver-open",
+      "action": "dialog",
+      "value": "driver"
+    },
+    {
+      "id": "ru96-driver-ready",
+      "action": "wait",
+      "target": "id:CANCEL",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru96-driver",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru96-driver-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru96-driver-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "ru96-driver-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru96-imod-open",
+      "action": "dialog",
+      "value": "imod"
+    },
+    {
+      "id": "ru96-imod-ready",
+      "action": "wait",
+      "target": "id:SKIP",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru96-imod",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru96-imod-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru96-imod-close",
+      "action": "click",
+      "target": "id:SKIP"
+    },
+    {
+      "id": "ru96-imod-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru96-imod-confirmed-open",
+      "action": "dialog",
+      "value": "imod-confirmed"
+    },
+    {
+      "id": "ru96-imod-confirmed-ready",
+      "action": "wait",
+      "target": "id:SKIP",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru96-imod-confirmed",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru96-imod-confirmed-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru96-imod-confirmed-close",
+      "action": "click",
+      "target": "id:SKIP"
+    },
+    {
+      "id": "ru96-imod-confirmed-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru96-system-open",
+      "action": "dialog",
+      "value": "system"
+    },
+    {
+      "id": "ru96-system-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru96-system",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru96-system-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru96-system-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "ru96-system-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en120-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en120-scale",
+      "action": "layout-rebind",
+      "value": "120"
+    },
+    {
+      "id": "en120-driver-open",
+      "action": "dialog",
+      "value": "driver"
+    },
+    {
+      "id": "en120-driver-ready",
+      "action": "wait",
+      "target": "id:CANCEL",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en120-driver",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en120-driver-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en120-driver-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "en120-driver-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en120-imod-open",
+      "action": "dialog",
+      "value": "imod"
+    },
+    {
+      "id": "en120-imod-ready",
+      "action": "wait",
+      "target": "id:SKIP",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en120-imod",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en120-imod-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en120-imod-close",
+      "action": "click",
+      "target": "id:SKIP"
+    },
+    {
+      "id": "en120-imod-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en120-imod-confirmed-open",
+      "action": "dialog",
+      "value": "imod-confirmed"
+    },
+    {
+      "id": "en120-imod-confirmed-ready",
+      "action": "wait",
+      "target": "id:SKIP",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en120-imod-confirmed",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en120-imod-confirmed-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en120-imod-confirmed-close",
+      "action": "click",
+      "target": "id:SKIP"
+    },
+    {
+      "id": "en120-imod-confirmed-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en120-system-open",
+      "action": "dialog",
+      "value": "system"
+    },
+    {
+      "id": "en120-system-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en120-system",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en120-system-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en120-system-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "en120-system-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru120-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru120-scale",
+      "action": "layout-rebind",
+      "value": "120"
+    },
+    {
+      "id": "ru120-driver-open",
+      "action": "dialog",
+      "value": "driver"
+    },
+    {
+      "id": "ru120-driver-ready",
+      "action": "wait",
+      "target": "id:CANCEL",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru120-driver",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru120-driver-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru120-driver-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "ru120-driver-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru120-imod-open",
+      "action": "dialog",
+      "value": "imod"
+    },
+    {
+      "id": "ru120-imod-ready",
+      "action": "wait",
+      "target": "id:SKIP",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru120-imod",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru120-imod-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru120-imod-close",
+      "action": "click",
+      "target": "id:SKIP"
+    },
+    {
+      "id": "ru120-imod-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru120-imod-confirmed-open",
+      "action": "dialog",
+      "value": "imod-confirmed"
+    },
+    {
+      "id": "ru120-imod-confirmed-ready",
+      "action": "wait",
+      "target": "id:SKIP",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru120-imod-confirmed",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru120-imod-confirmed-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru120-imod-confirmed-close",
+      "action": "click",
+      "target": "id:SKIP"
+    },
+    {
+      "id": "ru120-imod-confirmed-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru120-system-open",
+      "action": "dialog",
+      "value": "system"
+    },
+    {
+      "id": "ru120-system-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru120-system",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru120-system-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru120-system-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "ru120-system-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en144-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en144-scale",
+      "action": "layout-rebind",
+      "value": "144"
+    },
+    {
+      "id": "en144-driver-open",
+      "action": "dialog",
+      "value": "driver"
+    },
+    {
+      "id": "en144-driver-ready",
+      "action": "wait",
+      "target": "id:CANCEL",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en144-driver",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en144-driver-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en144-driver-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "en144-driver-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en144-imod-open",
+      "action": "dialog",
+      "value": "imod"
+    },
+    {
+      "id": "en144-imod-ready",
+      "action": "wait",
+      "target": "id:SKIP",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en144-imod",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en144-imod-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en144-imod-close",
+      "action": "click",
+      "target": "id:SKIP"
+    },
+    {
+      "id": "en144-imod-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en144-imod-confirmed-open",
+      "action": "dialog",
+      "value": "imod-confirmed"
+    },
+    {
+      "id": "en144-imod-confirmed-ready",
+      "action": "wait",
+      "target": "id:SKIP",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en144-imod-confirmed",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en144-imod-confirmed-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en144-imod-confirmed-close",
+      "action": "click",
+      "target": "id:SKIP"
+    },
+    {
+      "id": "en144-imod-confirmed-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en144-system-open",
+      "action": "dialog",
+      "value": "system"
+    },
+    {
+      "id": "en144-system-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en144-system",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en144-system-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en144-system-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "en144-system-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru144-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru144-scale",
+      "action": "layout-rebind",
+      "value": "144"
+    },
+    {
+      "id": "ru144-driver-open",
+      "action": "dialog",
+      "value": "driver"
+    },
+    {
+      "id": "ru144-driver-ready",
+      "action": "wait",
+      "target": "id:CANCEL",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru144-driver",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru144-driver-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru144-driver-close",
+      "action": "click",
+      "target": "id:CANCEL"
+    },
+    {
+      "id": "ru144-driver-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru144-imod-open",
+      "action": "dialog",
+      "value": "imod"
+    },
+    {
+      "id": "ru144-imod-ready",
+      "action": "wait",
+      "target": "id:SKIP",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru144-imod",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru144-imod-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru144-imod-close",
+      "action": "click",
+      "target": "id:SKIP"
+    },
+    {
+      "id": "ru144-imod-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru144-imod-confirmed-open",
+      "action": "dialog",
+      "value": "imod-confirmed"
+    },
+    {
+      "id": "ru144-imod-confirmed-ready",
+      "action": "wait",
+      "target": "id:SKIP",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru144-imod-confirmed",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru144-imod-confirmed-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru144-imod-confirmed-close",
+      "action": "click",
+      "target": "id:SKIP"
+    },
+    {
+      "id": "ru144-imod-confirmed-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru144-system-open",
+      "action": "dialog",
+      "value": "system"
+    },
+    {
+      "id": "ru144-system-ready",
+      "action": "wait",
+      "target": "id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru144-system",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru144-system-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru144-system-close",
+      "action": "click",
+      "target": "id:OK"
+    },
+    {
+      "id": "ru144-system-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en-path-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en-path-scale",
+      "action": "layout-rebind",
+      "value": "96"
+    },
+    {
+      "id": "en-path-result",
+      "action": "dialog",
+      "value": "backup-restored"
+    },
+    {
+      "id": "en-path-result-ready",
+      "action": "wait",
+      "target": "id:BACKUP_FILE",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en-path-details",
+      "action": "click",
+      "target": "id:DETAILS"
+    },
+    {
+      "id": "en-path-ready",
+      "action": "wait",
+      "target": "id:BACKUP_FULL_PATH",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en-path",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en-path-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en-path-close",
+      "action": "click",
+      "target": "active:id:OK"
+    },
+    {
+      "id": "en-path-result-close",
+      "action": "click",
+      "target": "active:id:OK"
+    },
+    {
+      "id": "en-path-done",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru-path-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru-path-scale",
+      "action": "layout-rebind",
+      "value": "96"
+    },
+    {
+      "id": "ru-path-result",
+      "action": "dialog",
+      "value": "backup-restored"
+    },
+    {
+      "id": "ru-path-result-ready",
+      "action": "wait",
+      "target": "id:BACKUP_FILE",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru-path-details",
+      "action": "click",
+      "target": "id:DETAILS"
+    },
+    {
+      "id": "ru-path-ready",
+      "action": "wait",
+      "target": "id:BACKUP_FULL_PATH",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru-path",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru-path-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru-path-close",
+      "action": "click",
+      "target": "active:id:OK"
+    },
+    {
+      "id": "ru-path-result-close",
+      "action": "click",
+      "target": "active:id:OK"
+    },
+    {
+      "id": "ru-path-done",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    }
+  ]
+}

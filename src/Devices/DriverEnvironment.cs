@@ -145,7 +145,7 @@ internal static class DriverEnvironment
             notes.Add("Some system checks are unavailable.");
         const string question = "Include USB IMOD in auto-optimization?";
         string concern = notes.Count == 0 ? string.Empty : "\n\n" + string.Join("\n", notes);
-        return question + (includeCompatibilityNotice
+        return question + "\n\nAPPLY configures USB IMOD. SKIP continues AUTO without USB IMOD." + (includeCompatibilityNotice
             ? "\n\n" + BriefCompatibilityNotice + "\n\n" + BriefLifetimeNotice : string.Empty) + concern;
     }
 

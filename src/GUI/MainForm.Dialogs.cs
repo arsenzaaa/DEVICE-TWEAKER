@@ -50,11 +50,14 @@ public sealed partial class MainForm
         }
     }
 
-    private Panel AttachThemedDialogFooter(Form dialog, IReadOnlyList<Button> buttons, int buttonGap = 10)
+    private int DialogFooterHeight => UiScale(52);
+
+    private Panel AttachThemedDialogFooter(Form dialog, IReadOnlyList<Button> buttons)
     {
-        int footerHeight = UiScale(50);
+        int footerHeight = DialogFooterHeight;
         Panel footerPanel = new()
         {
+            Name = "DIALOG_ACTIONS",
             Dock = DockStyle.Bottom,
             Height = footerHeight,
             BackColor = _bgForm,
@@ -62,10 +65,12 @@ public sealed partial class MainForm
 
         void LayoutButtons()
         {
+            int buttonGap = UiScale(12);
             int totalWidth = buttons.Sum(b => b.Width) + Math.Max(0, buttons.Count - 1) * buttonGap;
-            int startX = Math.Max(UiScale(14), (footerPanel.ClientSize.Width - totalWidth) / 2);
+            int startX = Math.Max(UiScale(20), footerPanel.ClientSize.Width - UiScale(20) - totalWidth);
             int currentX = startX;
-            int btnY = (footerHeight - (buttons.Count > 0 ? buttons[0].Height : UiScale(32))) / 2;
+            // Content owns the gap above actions; keep a full inset below them.
+            int btnY = Math.Max(0, footerPanel.ClientSize.Height - UiScale(20) - buttons.Select(b => b.Height).DefaultIfEmpty(UiScale(32)).Max());
 
             foreach (Button btn in buttons)
             {
@@ -97,7 +102,7 @@ public sealed partial class MainForm
             BackColor = _bgForm, ForeColor = _fgMain,
         };
         WireThemedTitleBar(dialog);
-        int padding = UiScale(24), width = UiScale(620), inner = width - padding * 2;
+        int padding = UiScale(20), width = UiScale(620), inner = width - padding * 2;
         int y = padding;
         foreach (string paragraph in NormalizeDialogMessage(UiLanguage.Text(message)).Replace("\r\n", "\n").Split("\n\n", StringSplitOptions.RemoveEmptyEntries))
             AddCenteredDialogText(dialog, paragraph.Trim(), inner, padding, ref y, _fgMain);
@@ -128,7 +133,7 @@ public sealed partial class MainForm
             buttons.Add(folder);
         }
         AttachThemedDialogFooter(dialog, buttons);
-        dialog.ClientSize = new Size(width, y + UiScale(8) + UiScale(50));
+        dialog.ClientSize = new Size(width, y + UiScale(8) + DialogFooterHeight);
         dialog.AcceptButton = ok; dialog.CancelButton = ok;
         ShowDialogDimmed(dialog);
     }
@@ -150,18 +155,18 @@ public sealed partial class MainForm
         };
         WireThemedTitleBar(dialog);
         Label hint = new() { Text = UiLanguage.Text("Full path (select to copy):"), AutoSize = true,
-            Font = _technicalFont, ForeColor = _mutedText, Location = new Point(UiScale(24), UiScale(20)) };
+            Font = _technicalFont, ForeColor = _mutedText, Location = new Point(UiScale(20), UiScale(20)) };
         TextBox pathBox = new()
         {
             Name = "BACKUP_FULL_PATH", Text = path, ReadOnly = true, Multiline = false,
             Font = _dialogFont, BackColor = _bgForm, ForeColor = _fgMain, BorderStyle = BorderStyle.FixedSingle,
-            Location = new Point(UiScale(24), hint.Bottom + UiScale(12)), Width = UiScale(632),
+            Location = new Point(UiScale(20), hint.Bottom + UiScale(12)), Width = UiScale(640),
         };
         dialog.Controls.Add(hint); dialog.Controls.Add(pathBox);
         Button ok = NewDialogButton(UiLanguage.Text("OK"), UiScale(32), UiScale(96), isPrimary: true);
         ok.Name = "OK"; ok.DialogResult = DialogResult.OK;
         AttachThemedDialogFooter(dialog, [ok]);
-        dialog.ClientSize = new Size(UiScale(680), pathBox.Bottom + UiScale(24) + UiScale(50));
+        dialog.ClientSize = new Size(UiScale(680), pathBox.Bottom + UiScale(20) + DialogFooterHeight);
         dialog.AcceptButton = ok; dialog.CancelButton = ok;
         LocalizeControlTree(dialog);
         dialog.ShowDialog(owner);
@@ -338,7 +343,7 @@ public sealed partial class MainForm
 
         int padding = UiScale(20);
         int buttonHeight = UiScale(32);
-        int footerHeight = UiScale(50);
+        int footerHeight = DialogFooterHeight;
         Rectangle workingArea = Screen.FromControl(this).WorkingArea;
 
         List<Button> visibleButtons = [];
@@ -365,7 +370,8 @@ public sealed partial class MainForm
         backupsButton.AccessibleDescription = backupFolder;
         visibleButtons.Add(backupsButton);
 
-        int clientWidth = isSuccess ? UiScale(480) : UiScale(600);
+        int clientWidth = Math.Max(isSuccess ? UiScale(480) : UiScale(600),
+            visibleButtons.Sum(b => b.Width) + UiScale(12) * (visibleButtons.Count - 1) + padding * 2);
         int innerWidth = clientWidth - (padding * 2);
         int currentY = padding;
 
@@ -423,7 +429,7 @@ public sealed partial class MainForm
                         : "See DETAILS and LOGS for the error."), innerWidth, padding, ref currentY, _mutedText);
         }
 
-        AttachThemedDialogFooter(dialog, visibleButtons, UiScale(10));
+        AttachThemedDialogFooter(dialog, visibleButtons);
         int compactHeight = currentY + UiScale(12) + footerHeight;
         dialog.ClientSize = new Size(clientWidth, Math.Min(compactHeight, workingArea.Height - UiScale(60)));
         logsButton.Click += (_, _) => TryOpenResultFolder(logsFolder, "UI.RESULT.LOGS");
@@ -491,7 +497,7 @@ public sealed partial class MainForm
             BackColor = _bgForm, ForeColor = _fgMain,
         };
         WireThemedTitleBar(dialog);
-        int padding = UiScale(24), width = UiScale(680);
+        int padding = UiScale(20), width = UiScale(680);
         int maxHeight = Math.Min(UiScale(360), Screen.FromControl(owner).WorkingArea.Height - UiScale(180));
         Panel viewport = new() { BackColor = _bgForm, Location = new Point(padding, padding), Size = new Size(width - padding * 2, maxHeight) };
         Panel content = new() { BackColor = _bgForm };
@@ -530,7 +536,7 @@ public sealed partial class MainForm
         Button ok = NewDialogButton(UiLanguage.Text("OK"), UiScale(32), UiScale(96), isPrimary: true);
         ok.Name = "OK"; ok.DialogResult = DialogResult.OK;
         AttachThemedDialogFooter(dialog, [ok]);
-        dialog.ClientSize = new Size(width, viewport.Bottom + padding + UiScale(50));
+        dialog.ClientSize = new Size(width, viewport.Bottom + padding + DialogFooterHeight);
         dialog.AcceptButton = ok; dialog.CancelButton = ok;
         LocalizeControlTree(dialog);
         dialog.ShowDialog(owner);
@@ -742,7 +748,7 @@ public sealed partial class MainForm
         int innerWidth = clientWidth - (padding * 2);
         int buttonWidth = UiScale(110);
         int buttonHeight = UiScale(32);
-        int footerHeight = UiScale(50);
+        int footerHeight = DialogFooterHeight;
         int currentY = padding;
 
         string[] paragraphs = normalized
@@ -783,7 +789,7 @@ public sealed partial class MainForm
         noButton.Name = noText;
         noButton.DialogResult = DialogResult.No;
 
-        Panel footer = AttachThemedDialogFooter(dialog, [yesButton, noButton], UiScale(12));
+        Panel footer = AttachThemedDialogFooter(dialog, [yesButton, noButton]);
         if (driverEnvironment is not null)
         {
             Button infoButton = NewDialogButton(UiLanguage.Text("DRIVER INFO"), buttonHeight, UiScale(144));
@@ -797,9 +803,7 @@ public sealed partial class MainForm
             footer.Controls.Add(infoButton);
             void LayoutDriverActions()
             {
-                infoButton.Location = new Point(padding, (footer.Height - buttonHeight) / 2);
-                noButton.Left = footer.ClientSize.Width - padding - noButton.Width;
-                yesButton.Left = noButton.Left - UiScale(12) - yesButton.Width;
+                infoButton.Location = new Point(padding, yesButton.Top);
             }
             footer.Resize += (_, _) => LayoutDriverActions();
             LayoutDriverActions();
@@ -851,7 +855,7 @@ public sealed partial class MainForm
         Button closeButton = NewDialogButton(UiLanguage.Text("OK"), UiScale(32), UiScale(96), isPrimary: true);
         closeButton.Name = "OK"; closeButton.DialogResult = DialogResult.OK;
         AttachThemedDialogFooter(dialog, [closeButton]);
-        dialog.ClientSize = new Size(width, y + UiScale(50));
+        dialog.ClientSize = new Size(width, y + DialogFooterHeight);
         dialog.AcceptButton = closeButton; dialog.CancelButton = closeButton;
         LocalizeControlTree(dialog);
         WriteLog("UI.IMOD.PREFLIGHT.DETAILS: opened separate system check");
@@ -898,7 +902,7 @@ public sealed partial class MainForm
         int resetButtonWidth = UiScale(210);
         int cancelButtonWidth = UiScale(110);
         int buttonHeight = UiScale(32);
-        int footerHeight = UiScale(50);
+        int footerHeight = DialogFooterHeight;
         int innerWidth = clientWidth - (padding * 2);
 
         RestoreChoice choice = RestoreChoice.Cancel;
@@ -1298,7 +1302,7 @@ public sealed partial class MainForm
         };
         footerButtons.Add(cancelButton);
 
-        AttachThemedDialogFooter(dialog, footerButtons, UiScale(10));
+        AttachThemedDialogFooter(dialog, footerButtons);
 
         dialog.ClientSize = new Size(clientWidth, currentY + footerHeight);
         dialog.AcceptButton = latestButton ?? resetButton;
@@ -1329,7 +1333,7 @@ public sealed partial class MainForm
         int padding = UiScale(20);
         int buttonWidth = UiScale(140);
         int buttonHeight = UiScale(32);
-        int footerHeight = UiScale(50);
+        int footerHeight = DialogFooterHeight;
         int clientWidth = UiScale(600);
         int innerWidth = clientWidth - (padding * 2);
 
@@ -1367,7 +1371,7 @@ public sealed partial class MainForm
             dialog.Close();
         };
 
-        AttachThemedDialogFooter(dialog, [exeButton, appDataButton, skipButton], UiScale(12));
+        AttachThemedDialogFooter(dialog, [exeButton, appDataButton, skipButton]);
 
         dialog.ClientSize = new Size(clientWidth, currentY + footerHeight);
         dialog.AcceptButton = exeButton;
