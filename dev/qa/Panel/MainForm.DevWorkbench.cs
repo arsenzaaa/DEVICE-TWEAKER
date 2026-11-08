@@ -532,7 +532,14 @@ public sealed partial class MainForm
             Form[] windows = Application.OpenForms.Cast<Form>()
                 .Where(form => form.Visible && (form == this || DevOwned(form))).ToArray();
             // Painting resolves appearance targets that can start a button transition.
-            foreach (Form window in windows) window.Refresh();
+            foreach (Form window in windows)
+            {
+                window.Refresh();
+                // Refresh the controls themselves: a parent paint can leave a
+                // child's appearance target unresolved until PrintWindow.
+                foreach (ThemedButton button in DevDescendants(window).OfType<ThemedButton>().Where(button => button.Visible))
+                    button.Refresh();
+            }
             if (!_devicesScroll.IsScrolling && !windows.Any(UiFrameClock.QaHasActiveAnimations)) return;
             if (settling.ElapsedMilliseconds >= 2000)
                 throw new TimeoutException("Owned-window presentation did not settle before a checkpoint.");
