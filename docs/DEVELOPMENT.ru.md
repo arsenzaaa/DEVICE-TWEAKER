@@ -7,7 +7,7 @@
 - Windows 10 / 11 x64, [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0), Windows PowerShell 5.1.
 - Для пересборки `DTIMOD.sys` и нативной модели в QA: Visual Studio с C++ Build Tools, Windows SDK и Windows Driver Kit. Готовый драйвер уже лежит в репозитории, для обычной сборки они не нужны.
 
-`global.json` выбирает стабильный SDK 10.0 и допускает более новые feature bands внутри этой версии. Общий `src/Startup/DeviceTweakerImodRuntime.cs` также компилируется Windows PowerShell 5.1: в нём сохраняется синтаксис C# 5.
+`global.json` требует SDK 10.0.403 или более новый стабильный feature band 10.0. Перед сборкой установите подходящий SDK; CI использует тот же файл. Общий `src/Startup/DeviceTweakerImodRuntime.cs` также компилируется Windows PowerShell 5.1: в нём сохраняется синтаксис C# 5.
 
 ## Сборка и тесты
 
