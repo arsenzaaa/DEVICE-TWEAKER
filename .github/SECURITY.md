@@ -16,7 +16,7 @@ Publication and credit will be coordinated after a fix is available.
 
 ## Driver trust boundary
 
-`DTIMOD.sys` runs in kernel mode and the current artifact is test-signed, not publicly trusted. HVCI, Microsoft Vulnerable Driver Blocklist, endpoint security, or anti-cheat may block it. The application reports a loading failure and may offer a user-confirmed blocklist change.
+`DTIMOD.sys` runs in kernel mode and the current artifact is test-signed, not publicly trusted. HVCI, Microsoft Vulnerable Driver Blocklist, endpoint security, or anti-cheat may block it. The application reports loading failures and does not offer to disable Windows protections. A successful load or a read-only system check does not establish anti-cheat compatibility.
 
 - The driver's device object is open only to SYSTEM and Administrators.
 - Reads cover physical memory and PCI configuration space.
