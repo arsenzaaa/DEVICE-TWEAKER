@@ -7,6 +7,7 @@ param(
     [string]$CompareWith,
     [switch]$FreshBuild,
     [switch]$Worker,
+    [switch]$PreparationWorker,
     [string]$RunDirectory,
     [string]$ExePath,
     [ValidateRange(1,1800)][int]$ScenarioTimeoutSeconds = 120
@@ -27,9 +28,24 @@ if (-not $Worker) {
     if (($outputFull -eq $appRoot -or $outputFull.StartsWith($appRoot+'\',[StringComparison]::OrdinalIgnoreCase)) -and
         -not $outputFull.StartsWith($appRoot+'\tmp\',[StringComparison]::OrdinalIgnoreCase) -and
         -not $outputFull.StartsWith($appRoot+'\bin\',[StringComparison]::OrdinalIgnoreCase)) { throw 'Use local/dev-sessions or app tmp/bin for output' }
-    $run = Join-Path ([IO.Path]::GetFullPath($OutputRoot)) ('dev_{0}_{1}' -f (Get-Date -Format 'yyyyMMdd_HHmmss'),[Guid]::NewGuid().ToString('N').Substring(0,8))
-    New-Item -ItemType Directory -Path $run | Out-Null
-    Copy-Item -LiteralPath (Resolve-Path -LiteralPath $Scenario).Path -Destination (Join-Path $run 'scenario.json')
+    if (-not $PreparationWorker) {
+        $run = Join-Path ([IO.Path]::GetFullPath($OutputRoot)) ('dev_{0}_{1}' -f (Get-Date -Format 'yyyyMMdd_HHmmss'),[Guid]::NewGuid().ToString('N').Substring(0,8))
+        New-Item -ItemType Directory -Path $run | Out-Null
+        Copy-Item -LiteralPath (Resolve-Path -LiteralPath $Scenario).Path -Destination (Join-Path $run 'scenario.json')
+        $parameters = @{ PreparationWorker = $true; RunDirectory = $run; Scenario = (Join-Path $run 'scenario.json');
+            ScenarioTimeoutSeconds = $ScenarioTimeoutSeconds; FreshBuild = [bool]$FreshBuild }
+        if ($BuildRoot) { $parameters.BuildRoot = [IO.Path]::GetFullPath($BuildRoot) }
+        if ($CompareWith) { $parameters.CompareWith = [IO.Path]::GetFullPath($CompareWith) }
+        # Include cache hashing, snapshots, compilation and the scenario in one
+        # bounded job. Allow 30 minutes for preparation plus the scenario budget.
+        $code = Invoke-QaPrivateDesktop -ScriptPath $PSCommandPath -Parameters $parameters -ReportDirectory (Join-Path $run 'isolation') -TimeoutSeconds (1800 + $ScenarioTimeoutSeconds + 120)
+        if ($null -ne $code) { Write-Output $run; exit $code }
+        # An existing bounded integration worker needs no second desktop/job.
+        $RunDirectory = $run
+    }
+    Assert-QaBoundedWorkload
+    if (-not $RunDirectory -or -not (Test-Path -LiteralPath (Join-Path $RunDirectory 'scenario.json') -PathType Leaf)) { throw 'Preparation worker requires an existing run directory and scenario' }
+    $run = [IO.Path]::GetFullPath($RunDirectory)
     $build = Get-QaDevBuild $workspace -BuildRoot $BuildRoot -FreshBuild:$FreshBuild
     $snapshot = $build.snapshot
     Copy-Item -LiteralPath (Join-Path $build.directory 'inputs.json') -Destination (Join-Path $run 'inputs.json')
@@ -38,13 +54,15 @@ if (-not $Worker) {
     $parameters = @{ Worker = $true; RunDirectory = $run; Scenario = (Join-Path $run 'scenario.json'); ScenarioTimeoutSeconds = $ScenarioTimeoutSeconds;
         ExePath = (Join-Path $snapshot 'src\bin\DeveloperQa\Release\net10.0-windows\win-x64\DEVICE TWEAKER QA.exe') }
     if ($CompareWith) { $parameters.CompareWith = [IO.Path]::GetFullPath($CompareWith) }
-    $code = Invoke-QaPrivateDesktop -ScriptPath (Join-Path $snapshot 'dev\qa\Invoke-DevSession.ps1') -Parameters $parameters -ReportDirectory (Join-Path $run 'isolation') -TimeoutSeconds ($ScenarioTimeoutSeconds + 120)
+    # Execute the immutable snapshot inside the same private job, so compiler
+    # descendants, validation and the GUI share its ceiling and watchdog.
+    & (Join-Path $snapshot 'dev\qa\Invoke-DevSession.ps1') @parameters
     Test-QaInputSnapshot $run
     $null = Get-QaSessionInspector $run
     Write-Output $run
-    exit $code
+    return
 }
-Assert-QaPrivateDesktop
+Assert-QaBoundedWorkload
 if (-not $ExePath -or -not $RunDirectory) { throw 'Worker requires an isolated executable and run directory' }
 $RunDirectory = [IO.Path]::GetFullPath($RunDirectory)
 New-Item -ItemType Directory -Force -Path $RunDirectory | Out-Null

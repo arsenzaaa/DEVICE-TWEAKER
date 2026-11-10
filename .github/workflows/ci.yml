@@ -56,6 +56,10 @@ jobs:
         shell: powershell
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File dev/qa/Test-QaBuildCache.ps1
 
+      - name: Check bounded QA preparation
+        shell: powershell
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File dev/qa/Test-QaDevPreparation.ps1 -OutputDirectory local/qa-preparation
+
       - name: Check release application identities
         shell: powershell
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File dev/qa/Test-PackageIdentity.ps1

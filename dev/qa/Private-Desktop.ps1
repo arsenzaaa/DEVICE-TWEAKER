@@ -12,6 +12,17 @@ function Assert-QaPrivateDesktop {
     if ([DeviceTweakerQaDesktop]::InputDesktop() -eq $actual) { throw 'QA desktop is visible.' }
 }
 
+function Assert-QaBoundedWorkload {
+    Assert-QaPrivateDesktop
+    # AcquireWorkload returns no lease only after verifying the actual desktop
+    # and inherited kill-on-close job with a memory ceiling, not an env flag.
+    $lease = [DeviceTweakerQaDesktop]::AcquireWorkload()
+    if ($null -ne $lease) {
+        $lease.Dispose()
+        throw 'QA preparation requires a bounded private job'
+    }
+}
+
 function Start-QaOwnedProcess([string]$ExePath, [string]$Arguments) {
     if ($env:DEVICE_TWEAKER_QA_DESKTOP) { Assert-QaPrivateDesktop }
     $start = New-Object Diagnostics.ProcessStartInfo
