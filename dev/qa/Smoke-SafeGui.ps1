@@ -10,6 +10,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Private-Desktop.ps1')
+. (Join-Path $PSScriptRoot 'Smoke-Contracts.ps1')
 if (-not $VisibleGui) {
     if (-not $OutputRoot) { $OutputRoot = Join-Path $PSScriptRoot '..\..\src\tmp\qa-gui' }
     $OutputRoot = [IO.Path]::GetFullPath($OutputRoot)
@@ -968,8 +969,6 @@ Start-Sleep -Seconds 3
 $main = Get-MainWindow -processId $proc.Id -timeoutSec 10
 Capture-Window (Join-Path $outDir '22_test_only_main.png') $main
 
-$affinityHeading = Find-Desc $main 'CPU Affinity' 'Text' 0
-$affinityTop = if ($affinityHeading) { $affinityHeading.Current.BoundingRectangle.Top } else { 0 }
 $obsoleteAffinityButtons = @()
 foreach ($buttonName in @('[ ALL ]', '[ NONE ]', '[ P-CORES ]', '[ CCD0 ]')) {
     $nameCondition = New-Object System.Windows.Automation.PropertyCondition(
@@ -979,7 +978,7 @@ foreach ($buttonName in @('[ ALL ]', '[ NONE ]', '[ P-CORES ]', '[ CCD0 ]')) {
         [System.Windows.Automation.ControlType]::Button)
     $buttonCondition = New-Object System.Windows.Automation.AndCondition($nameCondition, $typeCondition)
     $matches = $main.FindAll([System.Windows.Automation.TreeScope]::Descendants, $buttonCondition)
-    if ($matches | Where-Object { $_.Current.BoundingRectangle.Top -gt $affinityTop }) {
+    if ($matches | Where-Object { Test-QaObsoleteAffinityButton $_.Current.Name $_.Current.AutomationId }) {
         $obsoleteAffinityButtons += $buttonName
     }
 }

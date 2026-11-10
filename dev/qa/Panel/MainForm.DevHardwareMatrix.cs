@@ -11,7 +11,7 @@ public sealed partial class MainForm
     private Func<string, bool>? _devMatrixLoadSystem;
     private Func<string, TestCpuConfig>? _devMatrixLoadCpu;
 
-    private async Task DevAuditHardwareMatrixAsync(string id, string mode)
+    private async Task DevAuditHardwareMatrixAsync(string id, string mode, string profileFilter)
     {
         bool presentationOnly = string.Equals(mode, "presentation", StringComparison.Ordinal);
         bool cpuOnly = string.Equals(mode, "cpu", StringComparison.Ordinal);
@@ -46,6 +46,9 @@ public sealed partial class MainForm
         var profiles = systems.Select((name, index) => (Kind: "system", Name: name, Index: index))
             .Concat(cpus.Select((name, index) => (Kind: "cpu", Name: name, Index: index)))
             .Where(profile => !cpuOnly || profile.Kind == "cpu").ToArray();
+        HashSet<string> selected = ProfileSelection.Parse(profileFilter,
+            profiles.Select(profile => profile.Kind + "-" + profile.Index.ToString("D2")));
+        profiles = profiles.Where(profile => selected.Contains(profile.Kind + "-" + profile.Index.ToString("D2"))).ToArray();
         List<object> totals = [];
         int totalPassed = 0, totalFailed = 0, totalNotApplicable = 0, profileFailures = 0;
         foreach (var profile in profiles)
@@ -168,7 +171,7 @@ public sealed partial class MainForm
         }
         string summary = "state/" + id + ".json";
         DevFiles.Write(DevArtifact(summary), new { status = profileFailures == 0 ? "PASS" : "FAIL",
-            systemProfiles = systems.Length, cpuProfiles = cpus.Length, selectedProfiles = profiles.Length, totalPassed, totalFailed, totalNotApplicable, presentationOnly, cpuOnly,
+            systemProfiles = systems.Length, cpuProfiles = cpus.Length, selectedProfiles = profiles.Length, totalPassed, totalFailed, totalNotApplicable, presentationOnly, cpuOnly, profileFilter,
             profileFailures, profiles = totals, hardwareValidation = "MODELED_ONLY" });
         DevRecordState(summary);
         if (profileFailures != 0)

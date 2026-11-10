@@ -326,7 +326,7 @@ public sealed partial class MainForm
                 break;
             case "audit-toggle-motion": await DevAuditToggleMotionAsync(step.Id); break;
             case "audit-ui-motion": await DevAuditUiMotionAsync(step.Id); break;
-            case "audit-hardware-matrix": await DevAuditHardwareMatrixAsync(step.Id, step.Value); break;
+            case "audit-hardware-matrix": await DevAuditHardwareMatrixAsync(step.Id, step.Value, step.Device); break;
             case "audit-snapshot-overlap": await DevAuditSnapshotOverlapAsync(step.Id); break;
             case "audit-operation-feedback": await DevAuditOperationFeedbackAsync(step.Id); break;
             case "audit-motion-lifecycle": await DevAuditMotionLifecycleAsync(step.Id); break;

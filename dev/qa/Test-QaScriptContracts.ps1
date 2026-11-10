@@ -181,3 +181,5 @@ foreach ($case in @(
     $identityContracts += @{case=$case.name;expectedExit=$case.expected;actualExit=$code;passed=$true}
 }
 $identityContracts | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutputDirectory 'identity-contracts.json') -Encoding UTF8
+
+& (Join-Path $PSScriptRoot 'Test-SmokeAffinityContract.ps1') -ReportPath (Join-Path $OutputDirectory 'smoke-affinity-contracts.json')
