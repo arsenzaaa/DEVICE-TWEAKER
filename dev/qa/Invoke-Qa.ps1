@@ -16,6 +16,8 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Private-Desktop.ps1')
 . (Join-Path $PSScriptRoot 'Input-Snapshot.ps1')
 . (Join-Path $PSScriptRoot 'Test-QaEvidence.ps1')
+$qaWorkloadLease = if (-not $Worker) { [DeviceTweakerQaDesktop]::AcquireWorkload() } else { $null }
+try {
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..\src')).Path
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) { $OutputRoot = Join-Path $root 'tmp\qa' }
 $outputFull = [IO.Path]::GetFullPath($OutputRoot).TrimEnd('\')
@@ -257,3 +259,5 @@ try {
 }
 Write-Output (Join-Path $runDir 'qa.json')
 if ($status -eq 'FAIL') { exit 1 }
+
+} finally { if ($null -ne $qaWorkloadLease) { $qaWorkloadLease.Dispose() } }

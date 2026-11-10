@@ -72,9 +72,9 @@ function Get-QaDevBuild([string]$Workspace, [string]$BuildRoot, [switch]$FreshBu
             if ((Get-QaBuildKey $inputs.files $sdkVersion) -ne $key) { throw 'Sources changed while preparing the QA build; rerun with stable inputs' }
             Push-Location -LiteralPath $snapshot
             try {
-                & dotnet build 'src\DeviceTweakerCS.csproj' -c Release -p:DeveloperQa=true -p:BuildImodDriver=false -p:TreatWarningsAsErrors=true --nologo *> (Join-Path $directory 'build.log')
+                & dotnet build 'src\DeviceTweakerCS.csproj' -c Release -p:DeveloperQa=true -p:BuildImodDriver=false -p:TreatWarningsAsErrors=true -p:UseSharedCompilation=false -m:1 -nr:false --nologo *> (Join-Path $directory 'build.log')
                 if ($LASTEXITCODE -ne 0) { throw "Developer build failed; see $directory\build.log" }
-                & dotnet build 'dev\qa\Inspect\Inspect.csproj' -c Release -p:TreatWarningsAsErrors=true --nologo *> (Join-Path $directory 'inspect-build.log')
+                & dotnet build 'dev\qa\Inspect\Inspect.csproj' -c Release -p:TreatWarningsAsErrors=true -p:UseSharedCompilation=false -m:1 -nr:false --nologo *> (Join-Path $directory 'inspect-build.log')
                 if ($LASTEXITCODE -ne 0) { throw "Inspector build failed; see $directory\inspect-build.log" }
             } finally { Pop-Location }
             Test-QaInputSnapshot $directory

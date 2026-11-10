@@ -56,6 +56,9 @@ function Invoke-QaPrivateDesktop {
     $encodedPayload = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($payload))
     $worker = @'
 $ErrorActionPreference = 'Stop'
+$env:DOTNET_CLI_USE_MSBUILD_SERVER = '0'
+$env:MSBUILDDISABLENODEREUSE = '1'
+$env:UseSharedCompilation = 'false'
 $payload = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__PAYLOAD__')) | ConvertFrom-Json
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 $OutputEncoding = [Console]::OutputEncoding
@@ -79,7 +82,7 @@ try {
     $result = $null
     try {
         $env:DEVICE_TWEAKER_QA_DESKTOP = $desktop
-        $result = [DeviceTweakerQaDesktop]::Run($desktop, $hostExe, $command, (Split-Path $ScriptPath), $TimeoutSeconds)
+        $result = [DeviceTweakerQaDesktop]::Run($desktop, $hostExe, $command, (Split-Path $ScriptPath), $TimeoutSeconds, (Join-Path $destination 'resources.json'))
         [ordered]@{ status = $(if ($result.exitCode -eq 0) { 'PASS' } else { 'FAIL' });
             desktop = $result.desktop; workerPid = $result.processId; exitCode = $result.exitCode;
             inputBefore = $result.inputBefore; inputAfter = $result.inputAfter;

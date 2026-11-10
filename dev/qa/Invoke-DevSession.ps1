@@ -17,6 +17,8 @@ if (-not $Scenario) { $Scenario = Join-Path $PSScriptRoot 'Scenarios\device-flow
 . (Join-Path $PSScriptRoot 'Input-Snapshot.ps1')
 . (Join-Path $PSScriptRoot 'Read-QaJson.ps1')
 . (Join-Path $PSScriptRoot 'Build-Cache.ps1')
+$qaWorkloadLease = if (-not $Worker) { [DeviceTweakerQaDesktop]::AcquireWorkload() } else { $null }
+try {
 if (-not $Worker) {
     $workspace = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
     if (-not $OutputRoot) { $OutputRoot = Join-Path $workspace 'local\dev-sessions' }
@@ -113,3 +115,5 @@ try {
     if ($process) { if (-not $process.HasExited) { $null = Stop-QaOwnedProcess $process }; $process.Dispose() }
     foreach ($name in $vars) { [Environment]::SetEnvironmentVariable($name,$saved[$name]) }
 }
+
+} finally { if ($null -ne $qaWorkloadLease) { $qaWorkloadLease.Dispose() } }
