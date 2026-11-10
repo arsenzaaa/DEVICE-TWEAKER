@@ -888,4 +888,7 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
   <data name="Driver.BriefLifetime" xml:space="preserve"><value>Закрытие программы не выгружает DTIMOD. Сохранённые профили могут загружать его автоматически.</value></data>
   <data name="Driver.LifetimeHeading" xml:space="preserve"><value>Драйвер и автозапуск</value></data>
   <data name="Driver.AutoChoice" xml:space="preserve"><value>ПРИМЕНИТЬ настраивает USB IMOD. ПРОПУСТИТЬ продолжает АВТО без USB IMOD.</value></data>
+  <data name="Read.DeviceListChanged" xml:space="preserve">
+    <value>Состав устройств изменился во время обновления. Нажмите ОБНОВИТЬ, чтобы перечитать список.</value>
+  </data>
 </root>

@@ -431,19 +431,8 @@ public sealed partial class MainForm
 #if DEVELOPER_QA
         DevRecordDataRead("LoadBlockSettings");
 #endif
-        block.SuppressCpuEvents++;
-        try
-        {
-            foreach (CheckBox cb in block.CpuBoxes)
-            {
-                cb.Checked = false;
-            }
-        }
-        finally
-        {
-            block.SuppressCpuEvents--;
-        }
-
+        // Each path below applies its complete resulting selection. Clearing
+        // first toggles unchanged live checkboxes twice on a retained card.
         block.AffinityMask = 0;
 
         bool isTestDevice = block.Device.IsTestDevice;
@@ -626,7 +615,7 @@ public sealed partial class MainForm
             block.RssBaseCore = baseCore;
             if (skipTestWifiAffinity)
             {
-                block.AffinityMask = 0;
+                ApplyMaskToCpuBoxes(block, 0);
             }
             else if (baseCore is >= 0 && baseCore < _maxLogical)
             {
@@ -651,6 +640,7 @@ public sealed partial class MainForm
                 block.RssBaseCore = Enumerable.Range(0, block.CpuBoxes.Count).FirstOrDefault(i => (irqMask & (1UL << i)) != 0);
                 ApplyMaskToCpuBoxes(block, irqMask);
             }
+            else ApplyMaskToCpuBoxes(block, 0);
 
             string loadPrefix = isTestDevice ? "LOAD.TEST" : "LOAD";
             WriteLog($"{loadPrefix}.RSS.ACTIVE: {block.Device.InstanceId} {FormatNdisRssRuntimeState(block.NdisRssRuntime)}");

@@ -59,6 +59,27 @@ $cases += @(
 [INFO] TEST.SCENARIO.END: status=FAIL assertions=1/1 faultConsumed=False
 '@ }
 )
+$cases += @(
+    @{ name = 'discovery-consumed'; exit = 0; text = @'
+[INFO] TEST.SCENARIO.BEGIN: fault=DiscoveryRead
+[ERROR] SCAN.FAILED: Injected QA discovery failure.
+[INFO] TEST.SCENARIO.END: status=PASS assertions=2/0 faultConsumed=True
+'@ },
+    @{ name = 'discovery-unclosed'; exit = 1; text = @'
+[INFO] TEST.SCENARIO.BEGIN: fault=DiscoveryRead
+[ERROR] SCAN.FAILED: Injected QA discovery failure.
+'@ },
+    @{ name = 'discovery-unconsumed'; exit = 1; text = @'
+[INFO] TEST.SCENARIO.BEGIN: fault=DiscoveryRead
+[ERROR] SCAN.FAILED: Injected QA discovery failure.
+[INFO] TEST.SCENARIO.END: status=FAIL assertions=1/1 faultConsumed=False
+'@ },
+    @{ name = 'discovery-unrelated'; exit = 1; text = @'
+[INFO] TEST.SCENARIO.BEGIN: fault=DiscoveryRead
+[ERROR] SCAN.FAILED: Actual provider access denied.
+[INFO] TEST.SCENARIO.END: status=PASS assertions=2/0 faultConsumed=True
+'@ }
+)
 $results = @()
 foreach ($case in $cases) {
     $file = Join-Path $OutputDirectory ($case.name + '.log')

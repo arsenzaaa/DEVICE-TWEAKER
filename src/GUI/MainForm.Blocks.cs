@@ -1569,6 +1569,9 @@ public sealed partial class MainForm
         DeviceBlock block = new()
         {
             Device = device,
+            CardDefinition = DeviceCardDefinition.From(device),
+            CardCpuContext = _cpuInfo,
+            CardTopologyGeneration = _deviceTopologyGeneration,
             Kind = device.Kind,
             Group = grp,
             HeaderPanel = headerPanel,
@@ -2110,10 +2113,11 @@ public sealed partial class MainForm
     private Task<OperationReport> RefreshBlocksAsync(bool includeImodReadback = true, bool preserveEdits = true)
         => _lastDeviceRefresh = RefreshBlocksCoreAsync(includeImodReadback, preserveEdits);
 
-    private async Task<OperationReport> RefreshBlocksCoreAsync(bool includeImodReadback, bool preserveEdits, bool yieldUi = true)
+    private async Task<OperationReport> RefreshBlocksCoreAsync(bool includeImodReadback, bool preserveEdits, bool yieldUi = true, int topologyRetry = 0)
     {
         OperationReport refreshReport = new();
         long refreshStarted = Stopwatch.GetTimestamp();
+        int topologyGeneration = _deviceTopologyGeneration;
         SetInterruptModeStatus(null);
         WriteLog($"REFRESH.START: includeImodReadback={includeImodReadback} previousBlocks={_blocks.Count}");
         bool ownsBusy = _devicesBusyDepth == 0;
@@ -2163,8 +2167,22 @@ public sealed partial class MainForm
                 startupConfig = await LoadStartupConfigForRefreshAsync(virtualOnly);
                 if (_uiDisposing || IsDisposed || Disposing) return refreshReport;
             }
+            if (topologyGeneration != _deviceTopologyGeneration)
+            {
+                WriteLog($"REFRESH.TOPOLOGY: changed while reading; retry={topologyRetry}");
+                if (topologyRetry == 0)
+                    return await RefreshBlocksCoreAsync(includeImodReadback, preserveEdits, yieldUi, topologyRetry: 1);
+                refreshReport.MarkNoChangesMade();
+                refreshReport.AddError("Device discovery", UiResources.English(UiText.DeviceListChanged));
+                return refreshReport;
+            }
             Dictionary<string, EditorDraft> drafts = preserveEdits ? CaptureEditorDrafts() : new(StringComparer.OrdinalIgnoreCase);
             DeviceViewport viewport = CaptureDeviceViewport();
+            FocusedEditor? focusedEditor = CaptureFocusedDeviceEditor();
+            Dictionary<string, DeviceBlock> reusable = SelectReusableCards(devs);
+            _imodReadbackGeneration++;
+            _irqRefreshGeneration++;
+            foreach (DeviceBlock oldBlock in _blocks) oldBlock.NicItrOperationGeneration++;
             InvalidateImodCache();
             if (startupConfig is not null)
             {
@@ -2198,7 +2216,7 @@ public sealed partial class MainForm
             _devicesPanel.SuspendLayout();
             try
             {
-                DisposeDeviceBlocks();
+                DisposeDeviceBlocks(reusable.Values.Select(block => block.Group).ToHashSet());
                 WriteLog($"REFRESH.TOOLTIPS: before={tooltipRegistrationsBeforeClear} after={_copyToolTip.RegistrationCount}");
 
 #if DEVELOPER_QA
@@ -2236,7 +2254,14 @@ public sealed partial class MainForm
                         SetDevicesBusyStage($"Building device list ({index + 1}/{total})");
                     }
 
-                    NewDeviceBlock(d, index, priorImodStatuses);
+                    if (reusable.TryGetValue(d.InstanceId, out DeviceBlock? retained))
+                    {
+                        ReloadRetainedCard(retained, d);
+                        _blocks.Add(retained);
+                    }
+                    else NewDeviceBlock(d, index, priorImodStatuses);
+                    _blocks[^1].Group.TabIndex = index;
+                    _devicesPanel.Controls.SetChildIndex(_blocks[^1].Group, index);
                     index++;
                     if (yieldUi && index < devs.Count && Stopwatch.GetElapsedTime(uiSliceStarted).TotalMilliseconds >= 20)
                     {
@@ -2291,6 +2316,8 @@ public sealed partial class MainForm
             AdjustInitialDeviceViewportHeight();
             _devicesPanel.Invalidate(true);
             _devicesHost.Invalidate(true);
+            if (yieldUi) await YieldDeviceUiAsync();
+            if (_uiDisposing || IsDisposed || Disposing) return refreshReport;
 
             _deviceDiscoveryCompleted = true;
             List<Task> readbacks = _blocks.Where(block => block.NicItrBox is not null)
@@ -2303,7 +2330,18 @@ public sealed partial class MainForm
             TickDevicesBusy("Updating IRQ counts...", 0);
             readbacks.Add(CalculateIrqCountsAsync("refresh-blocks"));
             await AwaitBackgroundUiTasksAsync(refreshReport, readbacks.ToArray());
+            // Readers can finish synchronously on a model or a warm provider.
+            // Give input and paint a turn before the remaining editor/layout tail.
+            if (yieldUi) await YieldDeviceUiAsync();
             if (_uiDisposing || IsDisposed || Disposing) return refreshReport;
+            if (topologyGeneration != _deviceTopologyGeneration)
+            {
+                // Controls may already be bound, but a later hardware snapshot
+                // must not be presented as confirmed after a PnP notification.
+                InvalidateDeviceTopology();
+                MarkImodMapsStale();
+                refreshReport.AddWarning("Device discovery", UiResources.English(UiText.DeviceListChanged));
+            }
             if (ownsBusy) TickDevicesBusy("Finalizing device display...", includeImodReadback ? 2 : 1);
 #if DEVELOPER_QA
             DevMarkUiStage("before-finalize");
@@ -2333,7 +2371,13 @@ public sealed partial class MainForm
             DevMarkUiStage("after-layout-scope");
 #endif
             LayoutBlocks();
-            if (preserveEdits) RestoreDeviceViewport(viewport);
+            if (preserveEdits)
+            {
+                RestoreDeviceViewport(viewport);
+                if (focusedEditor is not null && reusable.ContainsKey(focusedEditor.InstanceId))
+                    RestoreFocusedDeviceEditor(focusedEditor);
+            }
+            WriteLog($"REFRESH.CARDS: total={devs.Count} retained={reusable.Count} created={devs.Count - reusable.Count}");
 #if DEVELOPER_QA
             DevMarkUiStage("after-layout");
 #endif

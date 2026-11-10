@@ -928,6 +928,12 @@ public sealed partial class MainForm
     private Task<IReadOnlyList<DeviceInfo>> DiscoverDevicesAsync(DiscoveryInput input)
     {
 #if DEVELOPER_QA
+        if (_devDiscoveryFailure)
+        {
+            if (!input.Enabled || !input.Only) throw new InvalidOperationException("Discovery fault requires a model-only fixture.");
+            _devDiscoveryFailure = false;
+            return Task.FromException<IReadOnlyList<DeviceInfo>>(new IOException("Injected QA discovery failure."));
+        }
         if (_devDiscoveryDelayMs > 0)
         {
             if (!input.Enabled || !input.Only) throw new InvalidOperationException("Discovery delay requires a model-only fixture.");

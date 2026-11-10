@@ -172,18 +172,22 @@ public sealed partial class MainForm
         }
     }
 
-    private void DisposeDeviceBlocks()
+    private void DisposeDeviceBlocks(IReadOnlySet<Control>? retained = null)
     {
         foreach (Control control in _devicesPanel.Controls.Cast<Control>().ToArray())
         {
+            if (retained?.Contains(control) == true) continue;
             _copyToolTip.RemoveAll(control);
             control.Dispose();
         }
         _copyToolTip.RemoveDisposedRegistrations();
         _copyToolTip.RemoveDetachedRegistrations(this);
-        _devicesPanel.Controls.Clear();
-        _devicesPanel.Location = new Point(0, 0);
-        if (_devicesScroll is not null) _devicesScroll.Value = 0;
+        if (retained is null || retained.Count == 0) _devicesPanel.Controls.Clear();
+        if (retained is null || retained.Count == 0)
+        {
+            _devicesPanel.Location = new Point(0, 0);
+            if (_devicesScroll is not null) _devicesScroll.Value = 0;
+        }
         _blocks.Clear();
         _reservedCpuPanel = null;
     }

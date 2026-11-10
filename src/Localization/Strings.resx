@@ -888,4 +888,7 @@ Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IM
   <data name="Driver.BriefLifetime" xml:space="preserve"><value>Closing the app does not unload DTIMOD. Saved profiles can load it automatically.</value></data>
   <data name="Driver.LifetimeHeading" xml:space="preserve"><value>Driver lifetime</value></data>
   <data name="Driver.AutoChoice" xml:space="preserve"><value>APPLY configures USB IMOD. SKIP continues AUTO without USB IMOD.</value></data>
+  <data name="Read.DeviceListChanged" xml:space="preserve">
+    <value>Devices changed while refreshing. Press REFRESH to read the current list.</value>
+  </data>
 </root>

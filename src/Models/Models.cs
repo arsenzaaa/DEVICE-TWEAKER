@@ -189,6 +189,9 @@ internal sealed class DeviceInfo
 internal sealed class DeviceBlock
 {
     public required DeviceInfo Device { get; init; }
+    internal DeviceCardDefinition? CardDefinition { get; init; }
+    internal object? CardCpuContext { get; init; }
+    internal int CardTopologyGeneration { get; init; }
     public required DeviceKind Kind { get; init; }
     public required Control Group { get; init; }
     public Panel? HeaderPanel { get; init; }

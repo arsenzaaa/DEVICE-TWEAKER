@@ -17,7 +17,8 @@ foreach ($line in [IO.File]::ReadAllLines($LogPath)) {
         } elseif ($scenario -and $scenario -ne 'None' -and
             ($line -match 'TEST.SANDBOX.(WRITE|IMOD).ERROR:' -or
              ($scenario -eq 'BackupDelete' -and $line -match 'BACKUP.DELETE: failed .*System.IO.IOException: Injected file deletion failure\.') -or
-             ($scenario -eq 'DisplayRead' -and $line -match 'DISPLAY.READ.FAILED: (Injected display provider failure\.|Device state read timed out\. The current device list was preserved\.)$'))) { $pending.Add($line) }
+             ($scenario -eq 'DisplayRead' -and $line -match 'DISPLAY.READ.FAILED: (Injected display provider failure\.|Device state read timed out\. The current device list was preserved\.)$') -or
+             ($scenario -eq 'DiscoveryRead' -and $line -match 'SCAN.FAILED: Injected QA discovery failure\.$'))) { $pending.Add($line) }
         else { $unexpected.Add($line) }
     }
     if ($line -match 'TEST.SCENARIO.END:') {

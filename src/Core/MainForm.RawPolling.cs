@@ -54,6 +54,7 @@ public sealed partial class MainForm
         // is added or removed; a burst of them collapses into one update.
         if (m.Msg == WmDeviceChange && m.WParam == DbtDevNodesChanged)
         {
+            InvalidateDeviceTopology();
             _deviceChangeTimer ??= CreateDeviceChangeTimer();
             _deviceChangeTimer.Stop();
             _deviceChangeTimer.Start();

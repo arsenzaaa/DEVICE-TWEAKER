@@ -8,6 +8,7 @@ Source comparison: [v0.0.3 → v0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAK
 
 ### Changed
 
+- REFRESH reuses compatible device cards while rereading settings; device changes invalidate previous bindings.
 - Moved IMOD/NIC ITR startup to Task Scheduler, adding resume and USB-device connection events alongside logon.
 - Updated the self-contained runtime to .NET 10.0.14; builds require SDK 10.0.403 or newer within .NET 10.
 

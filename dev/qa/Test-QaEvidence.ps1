@@ -64,7 +64,7 @@ function Test-QaEvidence([string]$RunDirectory) {
         $expectedScenarios = @('device-flow','control-states','dtimod-status','imod-check','imod-editor',
             'text-fields-intel','text-fields-amd','text-fields-imod','text-fields-nic',
             'dialog-audit-en','dialog-audit-ru','dialog-audit-en-120','dialog-audit-en-144',
-            'dialog-audit-ru-120','dialog-audit-ru-144','backup-menu-flow','navigation-audit','irq-check-loading')
+            'dialog-audit-ru-120','dialog-audit-ru-144','backup-menu-flow','navigation-audit','irq-check-loading','refresh-reuse','refresh-reuse-lifecycle','refresh-reuse-lifecycle-amd')
         if ($bench.status -ne 'PASS' -or $bench.cases.Count -ne $expectedScenarios.Count -or
             @(Compare-Object $expectedScenarios @($bench.cases.scenario)).Count) { throw 'Workbench cases are incomplete' }
         foreach ($case in $bench.cases) {

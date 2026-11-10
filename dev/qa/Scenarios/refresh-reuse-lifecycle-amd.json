@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "refresh-reuse-lifecycle-amd",
+  "preset": "Ryzen9950X3D",
+  "language": "RU",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    {
+      "id": "idle",
+      "action": "wait",
+      "target": "@main",
+      "property": "refresh-idle",
+      "value": "true",
+      "durationMs": 6000
+    },
+    {
+      "id": "before",
+      "action": "capture"
+    },
+    {
+      "id": "lifecycle",
+      "action": "audit-refresh-lifecycle"
+    },
+    {
+      "id": "after",
+      "action": "capture"
+    }
+  ]
+}

@@ -66,7 +66,7 @@ public sealed partial class MainForm
             double elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
             double trailingGap = UiMotion.Now - heartbeatAt;
             heartbeats.Add(trailingGap);
-            refreshes.Add(new { elapsedMs = elapsed, report.Errors.Count, cards = _blocks.Count, layoutCalls = _devLayoutCalls - priorLayouts, cpuGridMs = _devCpuGridTimes.Sum(), cardMs = _devCardTimes.Sum(), measuredCpuLabels = _cpuCheckboxWidthCache.Count, maxCardMs = _devCardTimes.Max() });
+            refreshes.Add(new { elapsedMs = elapsed, report.Errors.Count, cards = _blocks.Count, layoutCalls = _devLayoutCalls - priorLayouts, cpuGridMs = _devCpuGridTimes.Sum(), cardMs = _devCardTimes.Sum(), measuredCpuLabels = _cpuCheckboxWidthCache.Count, createdCards = _devCardTimes.Count, retainedCards = _blocks.Count - _devCardTimes.Count, maxCardMs = _devCardTimes.DefaultIfEmpty(0).Max() });
             if (report.Errors.Count != 0) throw new InvalidOperationException("Synthetic refresh failed during timing audit.");
             await Task.Delay(80);
         }

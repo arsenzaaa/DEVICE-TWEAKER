@@ -10,7 +10,7 @@ $cases = @()
 foreach ($name in @('device-flow','control-states','dtimod-status','imod-check','imod-editor',
     'text-fields-intel','text-fields-amd','text-fields-imod','text-fields-nic',
     'dialog-audit-en','dialog-audit-ru','dialog-audit-en-120','dialog-audit-en-144',
-    'dialog-audit-ru-120','dialog-audit-ru-144','backup-menu-flow','navigation-audit','irq-check-loading')) {
+    'dialog-audit-ru-120','dialog-audit-ru-144','backup-menu-flow','navigation-audit','irq-check-loading','refresh-reuse','refresh-reuse-lifecycle','refresh-reuse-lifecycle-amd')) {
     $first = Join-Path $OutputDirectory ($name+'-before')
     $second = Join-Path $OutputDirectory ($name+'-after')
     foreach ($entry in @(@{dir=$first;compare=$null},@{dir=$second;compare=$first})) {
