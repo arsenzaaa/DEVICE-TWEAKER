@@ -9,7 +9,7 @@
 
 ## Build and test
 
-`global.json` requires SDK 10.0.403 or a newer stable 10.0 feature band. Install a matching SDK before building; CI reads the same file. `src/Startup/DeviceTweakerImodRuntime.cs` is also compiled by Windows PowerShell 5.1 and must keep C# 5 syntax.
+`global.json` requires SDK 10.0.404 or a newer stable 10.0 feature band. Install a matching SDK before building; CI reads the same file. `src/Startup/DeviceTweakerImodRuntime.cs` is also compiled by Windows PowerShell 5.1 and must keep C# 5 syntax.
 
 From the repository root:
 

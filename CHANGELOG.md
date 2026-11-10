@@ -10,7 +10,7 @@ Source comparison: [v0.0.3 → v0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAK
 
 - REFRESH reuses compatible device cards while rereading settings; device changes invalidate previous bindings.
 - Moved IMOD/NIC ITR startup to Task Scheduler, adding resume and USB-device connection events alongside logon.
-- Updated the self-contained runtime to .NET 10.0.14; builds require SDK 10.0.403 or newer within .NET 10.
+- Updated the self-contained runtime to .NET 10.0.15; builds require SDK 10.0.404 or newer within .NET 10.
 
 ### Added
 
@@ -50,7 +50,7 @@ Source comparison: [v0.0.3 → v0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAK
 
 ### Build
 
-- QA reuses builds with source and output integrity checks. Read-only backup lookup stays inside the run directory.
+- QA reuses builds with source and output integrity checks. Cache preparation and scenarios share a memory-limited private job. Read-only backup lookup stays inside the run directory.
 - Package validation rejects EXE flavors with different application build identities.
 
 - Moved application sources to src and QA tools to dev/qa. The test panel is included only in DeveloperQa builds and excluded from the normal EXE.
