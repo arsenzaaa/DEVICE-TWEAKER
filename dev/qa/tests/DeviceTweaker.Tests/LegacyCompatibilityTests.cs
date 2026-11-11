@@ -43,8 +43,8 @@ public sealed class LegacyCompatibilityTests
     [Fact] public void StartupAndApplicationAddressTheSameOldDevice()
     {
         const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Static;
-        Assert.Equal("DeviceTweakerImod2", typeof(MainForm).GetField("ImodDriverServiceName", flags)!.GetRawConstantValue());
-        Assert.Equal(@"\\.\DeviceTweakerImod2", typeof(MainForm).GetField("ImodDriverDevicePath", flags)!.GetRawConstantValue());
+        Assert.Equal("DeviceTweakerImod2", typeof(ImodDriverNative).GetField("ImodDriverServiceName", flags)!.GetRawConstantValue());
+        Assert.Equal(@"\\.\DeviceTweakerImod2", typeof(ImodDriverNative).GetField("ImodDriverDevicePath", flags)!.GetRawConstantValue());
         string script = StartupScriptTests.ReadResource("DeviceTweakerCS.Startup.ApplyIMOD.ps1");
         Assert.Contains("-drvn DeviceTweakerImod2 -drvr DeviceTweakerImod2", script);
         Assert.Contains("$imodScriptVersion = 31", script);

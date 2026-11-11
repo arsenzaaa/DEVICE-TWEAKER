@@ -9,7 +9,7 @@ public sealed class LegacyServiceCleanupTests
     public void NativeCleanupRefusesImmutableQaModeBeforeCallingWindows(string method)
     {
         const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
-        Type type = typeof(MainForm).GetNestedType("ImodDriverContext", System.Reflection.BindingFlags.NonPublic)!;
+        Type type = typeof(ImodDriverContext);
         object context = Activator.CreateInstance(type, flags, null, new object?[] { "unused-driver-path", null }, null)!;
         object?[] args = method == "StopServiceIfNeeded" ? [] : ["unused-driver-path"];
         var error = Assert.Throws<System.Reflection.TargetInvocationException>(() => type.GetMethod(method, flags)!.Invoke(context, args));

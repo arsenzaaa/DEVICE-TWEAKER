@@ -142,7 +142,7 @@ public sealed class DriverRuntimeTests
     [Fact]
     public void PublishedContextWithoutOwnershipDisposesWithoutNativeServiceAccess()
     {
-        Type type = typeof(MainForm).GetNestedType("ImodDriverContext", BindingFlags.NonPublic)!;
+        Type type = typeof(ImodDriverContext);
         var context = (IDisposable)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(type);
         type.GetField("<DriverHandle>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(context, new IntPtr(-1));
         Assert.Null(type.GetField("_operationGate", BindingFlags.Instance | BindingFlags.NonPublic));

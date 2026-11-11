@@ -98,6 +98,8 @@ Python 3.11+ is needed only for this automation. See [releasing](./RELEASE.md).
 
 ## Code map
 
+Driver session ownership is in `src/Core/ImodDriverContext.cs`, with device/SCM interop in `ImodDriverNative.cs` and path policy in `ImodDriverPaths.cs`. The session receives its loader callback from the application; it does not reference the Form. `PciInterruptBatch.cs` materializes per-device IRQ results while the session is open. MainForm retains progress, translation and control updates, including rejection of stale results after a topology change.
+
 - `src/Affinity` - CPU topology, affinity masks, ReservedCpuSets
 - `src/Devices` - device discovery and classification, RSS, power saving
 - `src/Core` - applying and restoring settings, IMOD, NIC ITR, startup, logs

@@ -34,14 +34,14 @@ public sealed partial class MainForm
     private string _devIrqReadOutcome = "success";
     private readonly List<string> _devIrqReadInstances = [];
 
-    private (DeviceBlock Block, InterruptModeResult Result)[] ReadTestInterruptModesForCheck(DeviceBlock[] blocks)
+    private PciInterruptReading[] ReadTestInterruptModesForCheck(DeviceInfo[] devices)
     {
-        if (!QaRun.IsReadOnly || blocks.Any(block => !block.Device.IsTestDevice)) throw new InvalidOperationException("IRQ model requires read-only synthetic devices");
-        lock (_devIrqReadInstances) _devIrqReadInstances.AddRange(blocks.Select(block => block.Device.InstanceId));
+        if (!QaRun.IsReadOnly || devices.Any(device => !device.IsTestDevice)) throw new InvalidOperationException("IRQ model requires read-only synthetic devices");
+        lock (_devIrqReadInstances) _devIrqReadInstances.AddRange(devices.Select(device => device.InstanceId));
         Thread.Sleep(_devIrqReadDelayMs);
-        return blocks.Select(block => (block, _devIrqReadOutcome == "failure"
+        return devices.Select(device => new PciInterruptReading(device.InstanceId, _devIrqReadOutcome == "failure"
             ? new InterruptModeResult(InterruptMode.Unavailable, "Simulated PCI read failure. No hardware was queried.", DateTimeOffset.Now)
-            : CreateTestInterruptMode(block.Device) with { ReadAt = DateTimeOffset.Now })).ToArray();
+            : CreateTestInterruptMode(device) with { ReadAt = DateTimeOffset.Now })).ToArray();
     }
     [DllImport("user32.dll", EntryPoint = "PrintWindow", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

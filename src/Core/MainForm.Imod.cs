@@ -1,3 +1,4 @@
+using static DeviceTweakerCS.ImodDriverNative;
 using Microsoft.Win32;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -142,23 +143,7 @@ public sealed partial class MainForm
     }
 
     private static string GetImodDriverSystemPath()
-    {
-        string windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-        if (string.IsNullOrWhiteSpace(windows))
-        {
-            windows = Path.GetPathRoot(Environment.SystemDirectory) ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(windows))
-            {
-                windows = AppContext.BaseDirectory;
-                if (string.IsNullOrWhiteSpace(windows))
-                {
-                    windows = Environment.CurrentDirectory;
-                }
-            }
-        }
-
-        return Path.Combine(windows, ImodDriverName);
-    }
+        => ImodDriverPaths.SystemPath();
 
     private static bool EnsureImodStartupKduPayload(out string kduPath, out string dbPath, out string? error)
     {
@@ -190,22 +175,7 @@ public sealed partial class MainForm
     }
 
     private static bool IsImodDriverSystemPath(string? path)
-    {
-        string systemPath = GetImodDriverSystemPath();
-        if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(systemPath))
-        {
-            return false;
-        }
-
-        try
-        {
-            return string.Equals(Path.GetFullPath(path), Path.GetFullPath(systemPath), StringComparison.OrdinalIgnoreCase);
-        }
-        catch
-        {
-            return string.Equals(path, systemPath, StringComparison.OrdinalIgnoreCase);
-        }
-    }
+        => ImodDriverPaths.IsSystemPath(path);
 
     // HKCU\...\Run started the script before the scheduled task replaced it.
     private void DeleteImodStartupRegistration(OperationReport? report = null)

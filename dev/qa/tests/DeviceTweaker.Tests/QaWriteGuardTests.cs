@@ -125,11 +125,11 @@ public sealed class QaWriteGuardTests
         Assert.Equal(false, Method("EnsureImodDriverOnDisk").Invoke(FormWithoutStartup(), args));
         Assert.Equal(string.Empty, args[1]);
         Assert.Contains("QA read-only", (string)args[2]!);
-        Type ctx = typeof(MainForm).GetNestedType("ImodDriverContext", BindingFlags.NonPublic)!;
-        object?[] initializeArgs = ["does-not-exist.sys", null, null, null];
+        Type ctx = typeof(ImodDriverContext);
+        object?[] initializeArgs = ["does-not-exist.sys", null, null, null, null];
         Assert.Equal(false, ctx.GetMethod("TryInitialize")!.Invoke(null, initializeArgs));
-        Assert.Null(initializeArgs[2]);
-        Assert.Contains("QA read-only", (string)initializeArgs[3]!);
+        Assert.Null(initializeArgs[3]);
+        Assert.Contains("QA read-only", (string)initializeArgs[4]!);
         object context = RuntimeHelpers.GetUninitializedObject(ctx);
         var registers = Assert.Throws<TargetInvocationException>(() => ctx.GetProperty("Registers")!.GetValue(context));
         Assert.IsType<QaWriteBlockedException>(registers.InnerException);

@@ -4,6 +4,8 @@ using System.Security;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
 
+using static DeviceTweakerCS.ImodDriverNative;
+
 namespace DeviceTweakerCS;
 
 public sealed partial class MainForm
@@ -626,7 +628,7 @@ public sealed partial class MainForm
 
         try
         {
-            if (!ImodDriverContext.TryInitialize(driverPath, WriteLog, out ImodDriverContext? driverContext, out error))
+            if (!ImodDriverContext.TryInitialize(driverPath, WriteLog, TryLoadImodDriverWithKduFallback, out ImodDriverContext? driverContext, out error))
             {
                 LogImodDriverLoadDiagnostics(driverPath, error);
                 return false;

@@ -13,7 +13,7 @@ public sealed class ImodDiagnosticsTests
     [InlineData(32, false)]
     public void MissingEndpointPromptsCheckWithoutHidingOtherOpenErrors(int code, bool needsCheck)
     {
-        string error = (string)typeof(MainForm)
+        string error = (string)typeof(ImodDriverNative)
             .GetMethod("FormatImodDeviceOpenError", BindingFlags.Static | BindingFlags.NonPublic)!
             .Invoke(null, [code])!;
         Assert.Contains($"Win32 {code}", error);

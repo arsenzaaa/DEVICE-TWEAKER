@@ -1,3 +1,4 @@
+using static DeviceTweakerCS.ImodDriverNative;
 using System.Globalization;
 using System.Text.RegularExpressions;
 

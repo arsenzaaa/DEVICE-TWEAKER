@@ -3,6 +3,8 @@ using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
 
+using static DeviceTweakerCS.ImodDriverNative;
+
 namespace DeviceTweakerCS;
 
 // Saved USB IMOD / NIC ITR profile and the standalone script that applies it.

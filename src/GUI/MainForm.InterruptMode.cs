@@ -61,6 +61,8 @@ public sealed partial class MainForm
         DeviceBlock[] snapshot = _blocks.Where(block =>
             block.Device.InstanceId.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase)).ToArray();
         if (snapshot.Length == 0) return;
+        DeviceInfo[] devices = snapshot.Select(block => block.Device).ToArray();
+        string[] instances = devices.Select(device => device.InstanceId).ToArray();
         bool simulated = snapshot.All(block => block.Device.IsTestDevice);
         if (!simulated && QaRun.TryBlock("PCI MODE CHECK")) return;
         if (!simulated && !ConfirmDriverUse()) return;
@@ -75,7 +77,7 @@ public sealed partial class MainForm
         SetInterruptModeStatus(UiText.IrqReading, snapshot.Length);
         IProgress<string> progress = new Progress<string>(key =>
         {
-            if (_interruptModeCheckRunning && !IsDisposed && !Disposing)
+            if (_interruptModeCheckRunning && !IsDisposed && !Disposing && generation == _irqRefreshGeneration)
                 SetInterruptModeStatus(key, snapshot.Length);
         });
         try
@@ -86,12 +88,11 @@ public sealed partial class MainForm
             WriteLog($"IRQ.MODE.BEGIN: scope=all-pci devices={snapshot.Length} simulated={simulated}");
             var results = await Task.Run(() =>
             {
-                (DeviceBlock Block, InterruptModeResult Result)[] Failed(string detail) => snapshot
-                    .Select(block => (block, new InterruptModeResult(InterruptMode.Unavailable, detail, DateTimeOffset.Now))).ToArray();
+                PciInterruptReading[] Failed(string detail) => PciInterruptBatch.Unavailable(instances, detail);
                 if (simulated)
                 {
 #if DEVELOPER_QA
-                    return ReadTestInterruptModesForCheck(snapshot);
+                    return ReadTestInterruptModesForCheck(devices);
 #else
                     return Failed("Device simulation requires the developer QA build.");
 #endif
@@ -100,26 +101,25 @@ public sealed partial class MainForm
                 progress.Report(UiText.IrqPreparing);
                 // An explicit refresh prepares the current payload if it has not been staged yet.
                 if (!EnsureImodDriverOnDisk(persistDriver: true, out string driverPath, out string? error)
-                    || !ImodDriverContext.TryInitialize(driverPath, WriteLog, out ImodDriverContext? context, out error))
+                    || !ImodDriverContext.TryInitialize(driverPath, WriteLog, TryLoadImodDriverWithKduFallback, out ImodDriverContext? context, out error))
                     return Failed(error ?? "DTIMOD load failed");
                 progress.Report(UiText.IrqReading);
                 using (context)
-                    return snapshot.Select(block =>
-                    {
-                        try { return (block, PciInterruptReader.Query(context!.DriverHandle, block.Device.InstanceId)); }
-                        catch (Exception ex)
-                        {
-                            WriteLog($"IRQ.MODE.ERROR: instance=\"{SanitizeLogValue(block.Device.InstanceId)}\" {ex}");
-                            return (block, new InterruptModeResult(InterruptMode.Unavailable, ex.Message, DateTimeOffset.Now));
-                        }
-                    }).ToArray();
+                    return PciInterruptBatch.Read(instances,
+                        instance => PciInterruptReader.Query(context!.DriverHandle, instance),
+                        (instance, ex) => WriteLog($"IRQ.MODE.ERROR: instance=\"{SanitizeLogValue(instance)}\" {ex}"));
             });
             if (!IsDisposed && generation == _irqRefreshGeneration)
             {
-                foreach (var (block, result) in results)
-                    if (_blocks.Contains(block)) SetInterruptModeResult(block, result);
+                for (int index = 0; index < results.Length; index++)
+                {
+                    DeviceBlock block = snapshot[index];
+                    PciInterruptReading reading = results[index];
+                    if (_blocks.Contains(block) && string.Equals(block.Device.InstanceId, reading.InstanceId, StringComparison.OrdinalIgnoreCase))
+                        SetInterruptModeResult(block, reading.Result);
+                }
                 SetInterruptModeStatus(UiText.IrqCompleted, results.Length,
-                    results.Count(item => item.Item2.Mode == InterruptMode.Unavailable));
+                    results.Count(item => item.Result.Mode == InterruptMode.Unavailable));
             }
             WriteLog($"IRQ.MODE.END: scope=all-pci devices={results.Length}");
         }
