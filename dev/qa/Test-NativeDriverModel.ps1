@@ -2,8 +2,10 @@
 # No SYS is executed, no driver/service is loaded, no physical memory is accessed.
 [CmdletBinding()]
 param([Parameter(Mandatory=$true)][string]$OutputDirectory,
-    [ValidateSet('unload', 'write-past-device-end', 'bypass-device-write-guard')][string]$InjectRegression)
+    [ValidateSet('unload', 'write-past-device-end', 'bypass-device-write-guard')][string]$InjectRegression,
+    [switch]$ProbeRemovalRace)
 $ErrorActionPreference = 'Stop'
+if ($ProbeRemovalRace -and $InjectRegression) { throw 'Run diagnostic removal probes separately from injected regressions' }
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $driver = Join-Path $root 'src\IMOD\Driver\imod_driver.c'
 $header = Join-Path $root 'src\IMOD\Driver\imod_driver.h'
@@ -106,9 +108,11 @@ typedef void *PIO_WORKITEM;
 static int GUID_DEVCLASS_DEVICE_TWEAKER_IMOD, mapCalls, unmapCalls, reads, writes, failMap, failCreate, failLink, deleted;
 
 static unsigned char memory[4096], assignedResources[256];
+static unsigned char reassignedMemory[4096];
 static ULONG assignedBytes;
 static int allowWorkItem, freedWorkItems, markedPending, completions, openCalls, propertyCalls, dereferences;
 static int failOpen, failProperty, oversizeResources, currentIrql, fileObjectToken, workItemToken;
+static int invalidateAfterQuery, modelInvalidated, staleMappings;
 static DEVICE device;
 static DRIVER created;
 static void RtlInitUnicodeString(PUNICODE_STRING s,const wchar_t *t) { s->text=t; }
@@ -139,14 +143,16 @@ static NTSTATUS IoGetDeviceProperty(PDEVICE_OBJECT pdo,int property,ULONG capaci
     assert(pdo==&device && property==DevicePropertyAllocatedResources);propertyCalls++;
     if(failProperty)return STATUS_DATA_ERROR;
     if(oversizeResources) { *bytes=capacity+1;return STATUS_SUCCESS; }
-    assert(assignedBytes<=capacity);memcpy(buffer,assignedResources,assignedBytes);*bytes=assignedBytes;return STATUS_SUCCESS;
+    assert(assignedBytes<=capacity);memcpy(buffer,assignedResources,assignedBytes);*bytes=assignedBytes;
+    /* The referenced model object survives while its hardware resources change. */
+    modelInvalidated=invalidateAfterQuery;return STATUS_SUCCESS;
 }
 static void ObDereferenceObject(PVOID object) { assert(object==&device || object==&fileObjectToken);dereferences++; }
 struct ImodDeviceWrite;
 struct ImodDeviceWriteReply;
 static NTSTATUS ImodWriteDevice(struct ImodDeviceWrite *request,struct ImodDeviceWriteReply *reply);
-static void *MmMapIoSpace(PHYSICAL_ADDRESS a,SIZE_T n,int cache) { (void)a;(void)cache;assert(n==4096);mapCalls++;return failMap?NULL:memory; }
-static void MmUnmapIoSpace(void *p,SIZE_T n) { assert(p==memory && n==4096);unmapCalls++; }
+static void *MmMapIoSpace(PHYSICAL_ADDRESS a,SIZE_T n,int cache) { (void)a;(void)cache;assert(n==4096);mapCalls++;if(modelInvalidated)staleMappings++;return failMap?NULL:(modelInvalidated==2 ? reassignedMemory:memory); }
+static void MmUnmapIoSpace(void *p,SIZE_T n) { assert((p==memory || p==reassignedMemory) && n==4096);unmapCalls++; }
 #define READ_REGISTER_UCHAR(p) (reads++,*(p))
 #define READ_REGISTER_USHORT(p) (reads++,*(p))
 #define READ_REGISTER_ULONG(p) (reads++,*(p))
@@ -167,6 +173,7 @@ static NTSTATUS IoCreateDriver(PUNICODE_STRING n,NTSTATUS(*fn)(PDRIVER_OBJECT,PU
 $main = @'
 static void reset(void) {
     mapCalls=unmapCalls=reads=writes=failMap=0;
+    invalidateAfterQuery=modelInvalidated=staleMappings=0;
     allowWorkItem=freedWorkItems=markedPending=completions=openCalls=propertyCalls=dereferences=0;
     failOpen=failProperty=oversizeResources=currentIrql=0;
     memset(memory,0,sizeof(memory));
@@ -318,6 +325,26 @@ static void deviceWriteTests(void) {
 }
 int main(void) { _set_error_mode(_OUT_TO_STDERR);_set_abort_behavior(0,_WRITE_ABORT_MSG|_CALL_REPORTFAULT);initTests();mmioTests();rangeTests();dispatchTests();deviceWriteTests();puts("PASS: actual driver entry, unload assignment, MMIO width/map/unmap, device-scoped write worker, cancellation, cleanup and dispatch; fake kernel only; PCI lookup and PCI query worker stubbed");return 0; }
 '@
+if ($ProbeRemovalRace) {
+    $probe = @'
+static void removalRaceTests(void) {
+    int mode;
+    for(mode=1;mode<=2;mode++) {
+        ULONG n=put32(assignedResources,0,1);
+        n=putFull(assignedResources,n,1);
+        assignedBytes=putPartial(assignedResources,n,CmResourceTypeMemory,0,0x1000,0x1000);
+        reset();memset(reassignedMemory,0,sizeof(reassignedMemory));invalidateAfterQuery=mode;
+        (void)dispatchDeviceWrite(0x1004,4,IMOD_DEVICE_WRITE_VERSION,0);
+        assert(openCalls==1 && propertyCalls==1 && dereferences==2);
+        assert(mapCalls==unmapCalls);
+        if(mode==2 && writes)assert(reassignedMemory[4]==0x78);
+        printf(mode==1 ? "MODEL_REMOVAL_WRITES=%d\n" : "MODEL_REASSIGNMENT_WRITES=%d\n",staleMappings ? writes : 0);
+    }
+}
+'@
+    $main = $main.Replace('int main(void)', $probe + "`nint main(void)")
+    $main = $main.Replace('deviceWriteTests();puts(', 'deviceWriteTests();removalRaceTests();puts(')
+}
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 $OutputDirectory = (Resolve-Path $OutputDirectory).Path
 $source = Join-Path $OutputDirectory 'driver-model.c'
@@ -345,6 +372,22 @@ if ($InjectRegression) {
     exit 0
 }
 if ($runCode -ne 0) { throw "Native model failed: $OutputDirectory\run.log" }
+if ($ProbeRemovalRace) {
+    $output = Get-Content -LiteralPath (Join-Path $OutputDirectory 'run.log') -Raw
+    $removal = [regex]::Match($output,'MODEL_REMOVAL_WRITES=(\d+)')
+    $reassignment = [regex]::Match($output,'MODEL_REASSIGNMENT_WRITES=(\d+)')
+    if (-not $removal.Success -or -not $reassignment.Success) { throw 'Incomplete native removal probe evidence' }
+    $writesAfterRemoval = [int]$removal.Groups[1].Value
+    $writesAfterReassignment = [int]$reassignment.Groups[1].Value
+    [ordered]@{ status=$(if ($writesAfterRemoval -or $writesAfterReassignment) {'EXPOSURE_OBSERVED'} else {'NOT_OBSERVED'});
+        writesAfterModelRemoval=$writesAfterRemoval; writesAfterModelResourceReassignment=$writesAfterReassignment;
+        kernelExecuted=$false; hardwareAccessed=$false; pnpSynchronizationValidated=$false;
+        driverSourceSha256=(Get-FileHash -LiteralPath $driver).Hash; modelSourceSha256=(Get-FileHash -LiteralPath $source).Hash;
+        scope='Diagnostic invalidation after resource query, before MMIO mapping; referenced object survives. Does not emulate Windows PnP or prove a kernel crash.' } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutputDirectory 'removal-probe.json') -Encoding UTF8
+    Get-Content -LiteralPath (Join-Path $OutputDirectory 'removal-probe.json')
+    exit 0
+}
 [ordered]@{ status='PASS'; driverSourceSha256=(Get-FileHash $driver).Hash; driverHeaderSha256=(Get-FileHash $header).Hash;
     modelSourceSha256=(Get-FileHash $source).Hash; functions=$functions; kernelExecuted=$false; hardwareAccessed=$false } |
     ConvertTo-Json -Depth 4 | Set-Content (Join-Path $OutputDirectory 'result.json') -Encoding UTF8

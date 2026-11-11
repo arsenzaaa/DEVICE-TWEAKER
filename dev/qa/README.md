@@ -89,6 +89,12 @@ Restore checks use synthetic JSON by default. To additionally inspect your own b
 
 Virtual APPLY/BACKUP/RESTORE actions are labelled as model checks. Actual hardware application, driver readback and live Raw Input measurements remain `SKIPPED`.
 
+## Native removal diagnostic
+
+`Test-NativeDriverModel.ps1 -ProbeRemovalRace` adds two deterministic interleavings after the resource query: target removal and reassignment of the old address range to another model owner. Real C driver functions execute against fake kernel APIs; the second case maps a separate memory buffer belonging to that owner. No SYS is loaded and no hardware is accessed.
+
+`removal-probe.json` reports `EXPOSURE_OBSERVED` when the model observes a write after invalidation, or `NOT_OBSERVED` otherwise. Neither result validates Windows PnP synchronization. This diagnostic is separate from the ordinary native regression `PASS`; it is not included in the default run. Retain the model assumptions and review them against the Windows device/resource lifetime contract.
+
 ## Results
 
 `src/tmp/qa/run_*/` contains `qa.json`, `inputs.json`, copied inputs, TRX, logs, mutation reports, GUI screenshots, `layout/layout.json`, `resources/resources.json`, `desktop-contracts/contracts.json`, `isolation/desktop.json` and `evidence.json`. `desktop.json` records the desktop name, active-desktop checks and descendant cleanup confirmation.
