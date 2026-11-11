@@ -16,7 +16,6 @@ Avoid disabling, restarting or removing the target PCI controller during an appl
 
 ## Loading through KDU
 
-
 DTIMOD has no public Microsoft signature for ordinary loading. The project uses a pinned [KDU](../../src/IMOD/KDU/README.md) version that relies on a vulnerable signed driver. This is a highly privileged hardware tool; antivirus, HVCI, Vulnerable Driver Blocklist and anti-cheat software can prevent it from working.
 
 DTIMOD can conflict with Easy Anti-Cheat, Riot Vanguard, FACEIT Anti-Cheat and other protection software. Successful driver loading does not confirm compatibility: a game may disconnect you while the driver is loaded. EAC disconnects with `Forbidden Tool` have been reproduced with DTIMOD loaded on a tested system. Compatibility with Vanguard and FACEIT has not been established.
