@@ -8,6 +8,7 @@ internal delegate bool ImodDriverLoader(string path, Action<string>? log, out st
 
 internal sealed class ImodDriverContext : IDisposable
 {
+    internal const int StartupScriptVersion = 31;
     public IntPtr DriverHandle { get; private set; } = InvalidHandleValue;
     public bool ServiceCreated { get; private set; }
     public bool ServiceStartedByContext { get; private set; }
@@ -60,7 +61,7 @@ internal sealed class ImodDriverContext : IDisposable
     {
         if (QaRun.TryBlock("PUBLISHED DRIVER INITIALIZE")) { ctx = null; error = "QA read-only session"; return false; }
         DriverRename.Prepare(DriverRename.Native(driverPath), false);
-        log?.Invoke("IMOD.RUNTIME.PROFILE: startup=30 loader=1.4.5 irq-source=pci-existing-device-or-windows");
+        log?.Invoke($"IMOD.RUNTIME.PROFILE: startup={StartupScriptVersion} loader=1.4.5 irq-source=pci-existing-device-or-windows");
         ctx = new ImodDriverContext(driverPath, log) { _loadDriver = loadDriver };
         if (!ctx.Initialize(out error))
         {

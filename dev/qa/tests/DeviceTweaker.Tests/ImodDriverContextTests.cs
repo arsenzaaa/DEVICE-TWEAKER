@@ -7,6 +7,15 @@ namespace DeviceTweaker.Tests;
 public sealed class ImodDriverContextTests
 {
     [Fact]
+    public void DiagnosticVersionMatchesTheEmbeddedStartupScript()
+    {
+        string script = StartupScriptTests.ReadResource("DeviceTweakerCS.Startup.ApplyIMOD.ps1");
+        var version = System.Text.RegularExpressions.Regex.Match(script, @"\$imodScriptVersion\s*=\s*(\d+)");
+        Assert.True(version.Success);
+        Assert.Equal(ImodDriverContext.StartupScriptVersion.ToString(System.Globalization.CultureInfo.InvariantCulture), version.Groups[1].Value);
+    }
+
+    [Fact]
     public void NativeDeviceOpenBoundaryAlsoRefusesReadOnlyMode()
     {
         Assert.False(ImodDriverNative.TryOpenImodDriverDevice(out var handle, out var error));
