@@ -6,6 +6,14 @@
 
 A device policy controls the processor assignment of its interrupts. **SpecCPU** uses the selected mask; it does not pin every DPC and driver thread to those CPUs. Microsoft recommends the default policy where appropriate. See [Interrupt affinity](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/interrupt-affinity-and-priority).
 
+## Choosing CPUs
+
+Interrupt and DPC work can compete with latency-sensitive game threads on a busy CPU even when total CPU usage is low. Moving a device's interrupt processing to an underused physical core can reduce that competition. This is especially relevant when several busy drivers share a processor, including CPU 0; it does not mean every device uses CPU 0 by default.
+
+Inspect per-module ISR/DPC activity under the intended workload, choose CPUs using the actual SMT and CCD topology, and compare frame times and processing placement before and after the change. Check both interrupt and DPC placement: a saved mask alone does not prove that the driver's work moved. Keep network RSS and interrupt policies consistent with the [adapter type](./06-network.md).
+
+## Policies
+
 | Application | Code | CPU selection |
 | :--- | :--- | :--- |
 | MachineDefault | 0 | Windows default |
