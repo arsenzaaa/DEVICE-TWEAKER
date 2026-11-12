@@ -5,6 +5,7 @@ dev/**/bin/
 dev/**/obj/
 tmp/
 local/
+Device Tweaker Trash/
 src/artifacts/
 src/IMOD/Driver/build/
 src/IMOD/Driver/obj/
