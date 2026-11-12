@@ -100,6 +100,8 @@ Python 3.11+ is needed only for this automation. See [releasing](./RELEASE.md).
 
 Driver session ownership is in `src/Core/ImodDriverContext.cs`, with device/SCM interop in `ImodDriverNative.cs` and path policy in `ImodDriverPaths.cs`. The session receives its loader callback from the application; it has no dependency on the MainForm type. `PciInterruptBatch.cs` materializes per-device IRQ results while the session is open. MainForm retains progress, translation and control updates, including rejection of stale results after a topology change.
 
+`src/Devices/NdisRssSettingsWriter.cs` owns RSS registry write and clear sequences. MainForm keeps the write authorization and operation coordination; the Windows key factory independently enforces the immutable QA write block. Tests use disposable fake registry keys. Per-value logs record completed writes and the exact failed step; active adapter readback remains separate from registry-write success.
+
 - `src/Affinity` - CPU topology, affinity masks, ReservedCpuSets
 - `src/Devices` - device discovery and classification, RSS, power saving
 - `src/Core` - applying and restoring settings, IMOD, NIC ITR, startup, logs

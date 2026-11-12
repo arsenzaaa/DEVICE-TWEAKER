@@ -30,8 +30,9 @@ public sealed partial class MainForm
             using RegistryKey? ck = Registry.LocalMachine.OpenSubKey(classKeyPath);
             return ck is not null ? classKeyPath : null;
         }
-        catch
+        catch (Exception error)
         {
+            WriteLog($"REG.CLASS.WARN: instance={instanceId} path=HKLM\\{enumPath} hresult=0x{error.HResult:X8} error=\"{SanitizeLogValue(error.ToString())}\"");
             return null;
         }
     }
@@ -506,128 +507,6 @@ public sealed partial class MainForm
         };
     }
 
-    private void SetNdisBaseCore(
-        string instanceId,
-        int baseCore,
-        OperationReport? report = null,
-        string? deviceName = null)
-    {
-        DemandRealWrite("SetNdisBaseCore");
-        if (baseCore < 0)
-        {
-            baseCore = 0;
-        }
-
-        string? ckPath = GetClassKeyForDevice(instanceId);
-        if (!string.IsNullOrWhiteSpace(ckPath))
-        {
-            try
-            {
-                using RegistryKey? ck = Registry.LocalMachine.CreateSubKey(ckPath);
-                if (ck is null)
-                {
-                    throw new InvalidOperationException("NDIS class key could not be opened for writing");
-                }
-
-                ck.SetValue("*RssBaseProcNumber", baseCore, RegistryValueKind.DWord);
-                WriteLog($"RSS.SET: {instanceId} -> *RssBaseProcNumber={baseCore} (class key)");
-            }
-            catch (Exception ex)
-            {
-                WriteLog($"RSS.SET.ERROR: {instanceId} value=*RssBaseProcNumber error=\"{FlattenLogText(ex.ToString())}\"");
-                report?.AddError($"{deviceName ?? instanceId}: set RSS base CPU", ex.Message);
-            }
-        }
-        else
-        {
-            WriteLog($"RSS.SET.SKIP: {instanceId} class key not found; *RssBaseProcNumber not written");
-            report?.AddError($"{deviceName ?? instanceId}: set RSS base CPU", "NDIS class key was not found");
-        }
-    }
-
-    private void SetNdisRssQueues(
-        string instanceId,
-        int queues,
-        OperationReport? report = null,
-        string? deviceName = null)
-    {
-        DemandRealWrite("SetNdisRssQueues");
-        if (queues < 1)
-        {
-            queues = 1;
-        }
-
-        string? ckPath = GetClassKeyForDevice(instanceId);
-        if (!string.IsNullOrWhiteSpace(ckPath))
-        {
-            try
-            {
-                using RegistryKey? ck = Registry.LocalMachine.CreateSubKey(ckPath);
-                if (ck is null)
-                {
-                    throw new InvalidOperationException("NDIS class key could not be opened for writing");
-                }
-
-                ck.SetValue("*NumRssQueues", queues, RegistryValueKind.DWord);
-                WriteLog($"RSS.SET: {instanceId} -> *NumRssQueues={queues} (class key)");
-            }
-            catch (Exception ex)
-            {
-                WriteLog($"RSS.SET.ERROR: {instanceId} value=*NumRssQueues error=\"{FlattenLogText(ex.ToString())}\"");
-                report?.AddError($"{deviceName ?? instanceId}: set RSS queue count", ex.Message);
-            }
-        }
-        else
-        {
-            WriteLog($"RSS.SET.SKIP: {instanceId} class key not found; *NumRssQueues not written");
-            report?.AddError($"{deviceName ?? instanceId}: set RSS queue count", "NDIS class key was not found");
-        }
-    }
-
-    private void SetNdisRssExtraValues(
-        string instanceId,
-        NdisRssLayout.Layout layout,
-        OperationReport? report = null,
-        string? deviceName = null)
-    {
-        DemandRealWrite("SetNdisRssExtraValues");
-        int queues = layout.Processors.Count;
-        int maxCore = layout.MaxProcessor;
-        string? ckPath = GetClassKeyForDevice(instanceId);
-        if (string.IsNullOrWhiteSpace(ckPath))
-        {
-            WriteLog($"RSS.EXTRA.SET.SKIP: {instanceId} class key not found");
-            report?.AddError($"{deviceName ?? instanceId}: set extended RSS values", "NDIS class key was not found");
-            return;
-        }
-
-        try
-        {
-            using RegistryKey? ck = Registry.LocalMachine.CreateSubKey(ckPath);
-            if (ck is null)
-            {
-                report?.AddError($"{deviceName ?? instanceId}: set extended RSS values", "NDIS class key is unavailable");
-                return;
-            }
-
-            ck.SetValue("*RssBaseProcGroup", 0, RegistryValueKind.DWord);
-            ck.SetValue("*MaxRssProcessors", queues, RegistryValueKind.DWord);
-            ck.SetValue("*RSSMaxProcGroup", 0, RegistryValueKind.DWord);
-            ck.SetValue("*RssMaxProcNumber", maxCore, RegistryValueKind.DWord);
-            // Do not force NUMA node 0. When the keyword is absent, NDIS can
-            // select the node closest to the adapter according to ACPI. This
-            // preserves the existing group-0 RSS policy without breaking
-            // multi-node systems.
-            ck.DeleteValue("*NumaNodeId", throwOnMissingValue: false);
-            WriteLog($"RSS.EXTRA.SET: {instanceId} group=0 maxProcessors={queues} maxProc={maxCore} cpus=[{string.Join(',', layout.Processors)}] numa=automatic");
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"RSS.EXTRA.SET: {instanceId} failed: {ex.Message}");
-            report?.AddError($"{deviceName ?? instanceId}: set extended RSS values", ex.Message);
-        }
-    }
-
     private static bool TryParseRegistryInt(object? value, out int result)
     {
         result = 0;
@@ -730,90 +609,6 @@ public sealed partial class MainForm
         catch
         {
             return false;
-        }
-    }
-
-    private void ClearNdisBaseCore(
-        string instanceId,
-        OperationReport? report = null,
-        string? deviceName = null)
-    {
-        DemandRealWrite("ClearNdisBaseCore");
-        string? ckPath = GetClassKeyForDevice(instanceId);
-        if (string.IsNullOrWhiteSpace(ckPath))
-        {
-            return;
-        }
-
-        try
-        {
-            using RegistryKey? ck = Registry.LocalMachine.OpenSubKey(ckPath, writable: true);
-            ck?.DeleteValue("*RssBaseProcNumber", throwOnMissingValue: false);
-            WriteLog($"RSS.CLEAR: {instanceId} value=*RssBaseProcNumber keyPresent={ck is not null}");
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"RSS.CLEAR.ERROR: {instanceId} value=*RssBaseProcNumber error=\"{FlattenLogText(ex.ToString())}\"");
-            report?.AddError($"{deviceName ?? instanceId}: clear RSS base CPU", ex.Message);
-        }
-    }
-
-    private void ClearNdisRssQueues(
-        string instanceId,
-        OperationReport? report = null,
-        string? deviceName = null)
-    {
-        DemandRealWrite("ClearNdisRssQueues");
-        string? ckPath = GetClassKeyForDevice(instanceId);
-        if (string.IsNullOrWhiteSpace(ckPath))
-        {
-            return;
-        }
-
-        try
-        {
-            using RegistryKey? ck = Registry.LocalMachine.OpenSubKey(ckPath, writable: true);
-            ck?.DeleteValue("*NumRssQueues", throwOnMissingValue: false);
-            WriteLog($"RSS.CLEAR: {instanceId} value=*NumRssQueues keyPresent={ck is not null}");
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"RSS.CLEAR.ERROR: {instanceId} value=*NumRssQueues error=\"{FlattenLogText(ex.ToString())}\"");
-            report?.AddError($"{deviceName ?? instanceId}: clear RSS queue count", ex.Message);
-        }
-    }
-
-    private void ClearNdisRssExtraValues(
-        string instanceId,
-        OperationReport? report = null,
-        string? deviceName = null)
-    {
-        DemandRealWrite("ClearNdisRssExtraValues");
-        string? ckPath = GetClassKeyForDevice(instanceId);
-        if (string.IsNullOrWhiteSpace(ckPath))
-        {
-            return;
-        }
-
-        try
-        {
-            using RegistryKey? ck = Registry.LocalMachine.OpenSubKey(ckPath, writable: true);
-            if (ck is null)
-            {
-                return;
-            }
-
-            foreach (string name in new[] { "*RssBaseProcGroup", "*MaxRssProcessors", "*RSSMaxProcGroup", "*RssMaxProcNumber", "*NumaNodeId" })
-            {
-                ck.DeleteValue(name, throwOnMissingValue: false);
-            }
-
-            WriteLog($"RSS.CLEAR: {instanceId} values=extra-rss keyPresent=true");
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"RSS.CLEAR.ERROR: {instanceId} values=extra-rss error=\"{FlattenLogText(ex.ToString())}\"");
-            report?.AddError($"{deviceName ?? instanceId}: clear extended RSS values", ex.Message);
         }
     }
 

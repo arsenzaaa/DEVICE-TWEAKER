@@ -23,6 +23,7 @@ Source comparison: [v0.0.3 → v0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAK
 ### Fixed
 
 - Closed the service handle when DTIMOD service configuration fails; session disposal now releases owned resources once.
+- RSS write errors identify the value, requested data, registry path, failure stage and completed steps. Missing-key cleanup is logged separately from a failed write.
 
 - Preserve local backups and logs when clean-build preparation fails partway through.
 - Removed the general physical-memory write command from DTIMOD.sys. Its replacement validates the write range against the selected device resources.
