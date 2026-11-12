@@ -3,9 +3,11 @@
 [CmdletBinding()]
 param([Parameter(Mandatory=$true)][string]$OutputDirectory,
     [ValidateSet('unload', 'write-past-device-end', 'bypass-device-write-guard')][string]$InjectRegression,
-    [switch]$ProbeRemovalRace)
+    [switch]$ProbeRemovalRace,
+    [switch]$ProbeDeviceLifecycle)
 $ErrorActionPreference = 'Stop'
 if ($ProbeRemovalRace -and $InjectRegression) { throw 'Run diagnostic removal probes separately from injected regressions' }
+if ($ProbeDeviceLifecycle -and ($ProbeRemovalRace -or $InjectRegression)) { throw 'Run lifecycle diagnostics separately from other probes and injected regressions' }
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $driver = Join-Path $root 'src\IMOD\Driver\imod_driver.c'
 $header = Join-Path $root 'src\IMOD\Driver\imod_driver.h'
@@ -345,6 +347,29 @@ static void removalRaceTests(void) {
     $main = $main.Replace('int main(void)', $probe + "`nint main(void)")
     $main = $main.Replace('deviceWriteTests();puts(', 'deviceWriteTests();removalRaceTests();puts(')
 }
+if ($ProbeDeviceLifecycle) {
+    $lifecycleHooks = Join-Path $PSScriptRoot 'NativeDriverLifecycle.h'
+    $lifecycleTests = Join-Path $PSScriptRoot 'NativeDriverLifecycleTests.h'
+    # Hooks belong only to fake APIs. Extracted production bodies remain intact.
+    $hookInclude = '#include "' + $lifecycleHooks.Replace('\','/') + '"'
+    $stub = $stub.Replace('static DEVICE device;', 'static DEVICE device;' + "`n" + $hookInclude)
+    $stub = $stub.Replace('modelInvalidated=invalidateAfterQuery;return STATUS_SUCCESS;',
+        'modelInvalidated=invalidateAfterQuery;LifecycleEvent(LifecycleAfterQuery);return STATUS_SUCCESS;')
+    $oldMap = 'mapCalls++;if(modelInvalidated)staleMappings++;return failMap?NULL:(modelInvalidated==2 ? reassignedMemory:memory);'
+    if (-not $stub.Contains($oldMap)) { throw 'Lifecycle mapping hook anchor missing' }
+    $stub = $stub.Replace($oldMap, 'return LifecycleMap();')
+    foreach ($width in @(@('UCHAR','Uchar'),@('USHORT','Ushort'),@('ULONG','Ulong'))) {
+        $stub = $stub.Replace("#define READ_REGISTER_$($width[0])(p) (reads++,*(p))",
+            "#define READ_REGISTER_$($width[0])(p) LifecycleRead$($width[1])(p)")
+        $stub = $stub.Replace("#define WRITE_REGISTER_$($width[0])(p,v) (writes++,*(p)=(v))",
+            "#define WRITE_REGISTER_$($width[0])(p,v) LifecycleWrite$($width[1])(p,v)")
+    }
+    $main = $main.Replace('mapCalls=unmapCalls=reads=writes=failMap=0;',
+        'LifecycleReset();mapCalls=unmapCalls=reads=writes=failMap=0;')
+    $testInclude = '#include "' + $lifecycleTests.Replace('\','/') + '"'
+    $main = $main.Replace('int main(void)', $testInclude + "`nint main(void)")
+    $main = $main.Replace('deviceWriteTests();puts(', 'deviceWriteTests();deviceLifecycleTests();puts(')
+}
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 $OutputDirectory = (Resolve-Path $OutputDirectory).Path
 $source = Join-Path $OutputDirectory 'driver-model.c'
@@ -372,6 +397,37 @@ if ($InjectRegression) {
     exit 0
 }
 if ($runCode -ne 0) { throw "Native model failed: $OutputDirectory\run.log" }
+if ($ProbeDeviceLifecycle) {
+    $cases = @(Get-Content -LiteralPath (Join-Path $OutputDirectory 'run.log') |
+        Where-Object { $_.StartsWith('LIFECYCLE_CASE=') } |
+        ForEach-Object { $_.Substring('LIFECYCLE_CASE='.Length) | ConvertFrom-Json })
+    $expected = @('write-steady','read-steady','write-open-failed','write-query-failed',
+        'write-map-failed','read-map-failed','write-outside-range','write-cancelled',
+        'write-old-range-rejected','write-new-range-accepted','write-removed-after-access','read-stopped-after-access')
+    foreach ($change in @('removed','reassigned','stopped')) {
+        foreach ($point in @('after-query','before-map','after-map')) { $expected += "write-$change-$point" }
+        foreach ($point in @('before-map','after-map')) { $expected += "read-$change-$point" }
+    }
+    if ($cases.Count -ne $expected.Count -or @($cases.name | Select-Object -Unique).Count -ne $expected.Count -or
+        @(Compare-Object $expected @($cases.name)).Count) { throw 'Incomplete or duplicate lifecycle cases' }
+    $invalidAccesses = ($cases | Measure-Object -Property accessesAfterInvalidation -Sum).Sum
+    [ordered]@{
+        status=$(if ($invalidAccesses) {'UNCOORDINATED_ACCESS_OBSERVED'} else {'NOT_OBSERVED'})
+        diagnosticAssertions='PASS'; caseCount=$cases.Count; accessesAfterModelInvalidation=$invalidAccesses
+        kernelExecuted=$false; hardwareAccessed=$false; pnpSynchronizationValidated=$false
+        windowsOrderingEmulated=$false; physicalFailureOutcomePredicted=$false
+        driverSourceSha256=(Get-FileHash -LiteralPath $driver).Hash
+        driverHeaderSha256=(Get-FileHash -LiteralPath $header).Hash
+        modelSourceSha256=(Get-FileHash -LiteralPath $source).Hash
+        hooksSha256=(Get-FileHash -LiteralPath $lifecycleHooks).Hash
+        testsSha256=(Get-FileHash -LiteralPath $lifecycleTests).Hash
+        scriptSha256=(Get-FileHash -LiteralPath $PSCommandPath).Hash
+        cases=$cases
+        scope='Actual dispatch/MMIO/write functions with fake APIs and injected resource invalidation at query/map/access boundaries. Tests access attempts, guards and cleanup, not Windows PnP scheduling or hardware results. PCI open/query are stubbed.'
+    } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'lifecycle-probe.json') -Encoding UTF8
+    Write-Output "Lifecycle diagnostic: $($cases.Count) cases, $invalidAccesses access attempts after injected invalidation; not a PnP protection PASS."
+    exit 0
+}
 if ($ProbeRemovalRace) {
     $output = Get-Content -LiteralPath (Join-Path $OutputDirectory 'run.log') -Raw
     $removal = [regex]::Match($output,'MODEL_REMOVAL_WRITES=(\d+)')

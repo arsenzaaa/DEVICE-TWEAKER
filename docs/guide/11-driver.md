@@ -8,11 +8,11 @@ DTIMOD.sys provides hardware access to supported USB IMOD/NIC ITR registers and 
 
 MSI, affinity, RSS, ReservedCpuSets, Mouse Throttle and available power settings do not require DTIMOD. Some IRQ Mode information comes from Windows resources without the driver; an available driver supplies additional evidence. Incomplete mode detection is distinct from a failed setting write.
 
-## Controller removal during register access
+## Controller lifecycle during register access
 
-The driver checks the target device's allocated MMIO range before a write. This check does not establish full synchronization with PCI controller removal or resource reassignment. Holding a reference keeps the device object alive; hardware resources can be released earlier during [surprise removal](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/handling-an-irp-mn-surprise-removal-request).
+DTIMOD checks each device-scoped write against a snapshot of the target device's allocated MMIO ranges. It does not coordinate register reads or writes with that controller's PnP and power transitions. The range check does not guarantee that resources remain valid during controller stop, removal or reassignment. An object reference preserves the device object, not its hardware resources: Windows can release resources during [surprise removal](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/handling-an-irp-mn-surprise-removal-request) or [stop/rebalance](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/handling-an-irp-mn-stop-device-request--windows-2000-and-later-).
 
-Avoid disabling, restarting or removing the target PCI controller during an application or startup-profile register operation. Unplugging a mouse while its USB controller remains present is a different event. The native QA model can demonstrate access after modeled resource invalidation; it does not reproduce Windows PnP or establish that a kernel crash occurs.
+Avoid disabling, restarting or removing the target PCI controller during register operations, including saved-profile application outside the GUI. Unplugging a USB peripheral while its host controller remains present is a different event. Safe handling of concurrent controller removal or power transitions is not established for this driver.
 
 ## Loading through KDU
 

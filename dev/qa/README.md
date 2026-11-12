@@ -89,11 +89,15 @@ Restore checks use synthetic JSON by default. To additionally inspect your own b
 
 Virtual APPLY/BACKUP/RESTORE actions are labelled as model checks. Actual hardware application, driver readback and live Raw Input measurements remain `SKIPPED`.
 
-## Native removal diagnostic
+## Native lifecycle diagnostics
 
 `Test-NativeDriverModel.ps1 -ProbeRemovalRace` adds two deterministic interleavings after the resource query: target removal and reassignment of the old address range to another model owner. Real C driver functions execute against fake kernel APIs; the second case maps a separate memory buffer belonging to that owner. No SYS is loaded and no hardware is accessed.
 
 `removal-probe.json` reports `EXPOSURE_OBSERVED` when the model observes a write after invalidation, or `NOT_OBSERVED` otherwise. Neither result validates Windows PnP synchronization. This diagnostic is separate from the ordinary native regression `PASS`; it is not included in the default run. Retain the model assumptions and review them against the Windows device/resource lifetime contract.
+
+`Test-NativeDriverModel.ps1 -OutputDirectory .\local\native-lifecycle -ProbeDeviceLifecycle` exercises 27 cases using the production dispatch, register access and device-write functions. Injected resource invalidation occurs after query, before mapping, after mapping or after access. Cases cover reads and writes, removal/stop/reassignment assumptions, failures, cancellation, changed ranges and cleanup. The fake APIs do not implement Windows notification ordering, power management or the PCI open/query path. A failed resource query is a tested input, not a guarantee that Windows rejects every query on a stopped device.
+
+`lifecycle-probe.json` records each case and hashes of the source and diagnostic inputs. `UNCOORDINATED_ACCESS_OBSERVED` means that register access was attempted after injected invalidation; permissive fake mappings do not predict the outcome on absent hardware. Assertion success validates the diagnostic expectations, not a PnP safety fix. Negative timing controls inject a change after access; those earlier accesses must not be reported as stale. Run this diagnostic separately from `-ProbeRemovalRace` and `-InjectRegression`.
 
 ## Results
 
