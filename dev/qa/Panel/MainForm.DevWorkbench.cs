@@ -334,6 +334,7 @@ public sealed partial class MainForm
             case "audit-refresh-lifecycle": await DevAuditRefreshLifecycleAsync(step.Id); break;
             case "audit-refresh-reuse": await DevAuditRefreshReuseAsync(step.Id); break;
             case "measure-ui-latency": await DevMeasureUiLatencyAsync(step.Id); break;
+            case "measure-raw-polling": await DevMeasureRawPollingAsync(step.Id, step.Value == "budget"); break;
             case "measure-frame-pacing": await DevMeasureFramePacingAsync(step.Id, step.Value == "budget"); break;
             case "capture":
                 if (!observeTransition) await DevWaitForSettledPresentation();

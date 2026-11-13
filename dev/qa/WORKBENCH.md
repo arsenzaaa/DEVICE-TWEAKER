@@ -34,6 +34,12 @@ If reproduction initially fails, keep its screenshots and exceptions. Automated 
 
 `refresh-readback-lifecycle.json` delays only the virtual IRQ source within the shared read path. It checks awaiting, progress until completion, UI release after timeout and generation-based rejection of late responses. Data comes from a preset; Windows WMI/PCI and the driver are not called. `refresh-readback-model` modes exist only in the developer workbench. The normal application's IRQ-read timeout remains 20 seconds.
 
+## Focused resource measurements
+
+`Measure-IdleResources.ps1 -ExePath '<production EXE>' -OutputDirectory 'local/idle-measurement' -Seconds 30` observes the exact production binary after its initial refresh and three seconds of settling. It uses the bounded invisible desktop and immutable read-only mode. `resources.json` records process CPU time, cycles, private bytes, working set, handles and threads at one-second intervals. CPU percentages include both one-core and whole-machine values. It neither sends physical input nor assumes populated Raw Input buffers; a short observation does not exclude a long-term leak.
+
+`Invoke-DevSession.ps1 -Scenario dev/qa/Scenarios/raw-polling-performance.json` measures the actual polling update with two synthetic sample buffers, unchanged data and arriving samples. It also observes ten seconds of the real 250 ms timer. The allocation budget concerns two populated synthetic states; accelerated-loop timings include JIT effects and are not physical input latency. Native Raw Input packet delivery and monitor smoothness are outside this scenario.
+
 ## Inspecting results
 
 `Scenarios/hardware-matrix.json` enumerates every system and CPU preset in the test panel. It runs applicable operations and injected faults through the sandbox runner, then checks REFRESH, pending edits and completed category navigation. Each profile has its own JSON report and screenshot. Unsupported operation/fault combinations are recorded as `NOT_APPLICABLE`. CPU-only profiles use the first system preset's devices. This models application decisions and virtual writes, not firmware, physical driver behavior or device timing.

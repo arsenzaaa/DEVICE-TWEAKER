@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "raw-polling-performance",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    { "id": "polling", "action": "measure-raw-polling", "value": "budget" },
+    { "id": "after", "action": "capture" }
+  ]
+}

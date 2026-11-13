@@ -159,28 +159,7 @@ public sealed partial class MainForm
         if (state.LastTick != 0)
         {
             double intervalMs = (now - state.LastTick) * 1000d / Stopwatch.Frequency;
-            if (intervalMs > 500d)
-            {
-                state.IntervalsMs.Clear();
-                state.LiveIntervalsMs.Clear();
-            }
-            else if (intervalMs >= 0.05d && intervalMs <= 200d)
-            {
-                state.LiveIntervalsMs.Enqueue(intervalMs);
-                while (state.LiveIntervalsMs.Count > 128)
-                {
-                    _ = state.LiveIntervalsMs.Dequeue();
-                }
-
-                if (intervalMs <= 12.5d)
-                {
-                    state.IntervalsMs.Enqueue(intervalMs);
-                    while (state.IntervalsMs.Count > 256)
-                    {
-                        _ = state.IntervalsMs.Dequeue();
-                    }
-                }
-            }
+            state.RecordInterval(intervalMs);
         }
 
         state.LastTick = now;
@@ -204,7 +183,7 @@ public sealed partial class MainForm
                 continue;
             }
 
-            if (TryEstimateLivePollingHz(state.LiveIntervalsMs, out double liveHertz))
+            if (state.TryEstimateLive(out double liveHertz))
             {
                 liveHertz = NormalizeLivePollingHz(liveHertz);
                 string liveTag = FormatPollingRateTag(liveHertz);
@@ -223,12 +202,12 @@ public sealed partial class MainForm
                         || Stopwatch.GetElapsedTime(state.LastLiveLogTimestamp, now).TotalMilliseconds >= RawPollingLiveLogIntervalMs)
                     {
                         state.LastLiveLogTimestamp = now;
-                        WriteLog($"USBPOLL.RAW.LIVE: {state.Role} {liveTag} hz={liveHertz.ToString("0.##", CultureInfo.InvariantCulture)} controller={state.ControllerId} inst={state.InstanceId} samples={state.LiveIntervalsMs.Count}");
+                        WriteLog($"USBPOLL.RAW.LIVE: {state.Role} {liveTag} hz={liveHertz.ToString("0.##", CultureInfo.InvariantCulture)} controller={state.ControllerId} inst={state.InstanceId} samples={state.LiveSampleCount}");
                     }
                 }
             }
 
-            if (state.IntervalsMs.Count < RawPollingMinSamples || !TryEstimateRawPollingHz(state.IntervalsMs, out double hertz))
+            if (state.StableSampleCount < RawPollingMinSamples || !state.TryEstimateStable(out double hertz))
             {
                 continue;
             }
@@ -248,7 +227,7 @@ public sealed partial class MainForm
 
             roles[state.Role] = tag;
             changed = true;
-            WriteLog($"USBPOLL.RAW: measured {state.Role} {tag} hz={hertz.ToString("0.##", CultureInfo.InvariantCulture)} controller={state.ControllerId} inst={state.InstanceId} samples={state.IntervalsMs.Count}");
+            WriteLog($"USBPOLL.RAW: measured {state.Role} {tag} hz={hertz.ToString("0.##", CultureInfo.InvariantCulture)} controller={state.ControllerId} inst={state.InstanceId} samples={state.StableSampleCount}");
         }
 
         if (changed || liveChanged)

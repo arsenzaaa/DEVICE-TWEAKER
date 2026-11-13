@@ -8,8 +8,13 @@ internal sealed class RawPollingState
     public required string InstanceId { get; init; }
     public string? ControllerId { get; set; }
     public long LastTick { get; set; }
-    public Queue<double> IntervalsMs { get; } = [];
-    public Queue<double> LiveIntervalsMs { get; } = [];
+    private readonly Queue<double> _intervalsMs = [];
+    private readonly Queue<double> _liveIntervalsMs = [];
+    public int StableSampleCount => _intervalsMs.Count;
+    public int LiveSampleCount => _liveIntervalsMs.Count;
+    private bool _stableDirty = true, _liveDirty = true;
+    private bool _hasStableEstimate, _hasLiveEstimate;
+    private double _stableHertz, _liveHertz;
     public string CandidateTag { get; set; } = string.Empty;
     public int CandidateCount { get; set; }
     public string LastDisplayedTag { get; set; } = string.Empty;
@@ -19,6 +24,52 @@ internal sealed class RawPollingState
     public string LiveCandidateTag { get; set; } = string.Empty;
     public int LiveCandidateCount { get; set; }
     public long LastLiveLogTimestamp { get; set; }
+
+    internal void RecordInterval(double intervalMs)
+    {
+        if (intervalMs > 500d)
+        {
+            _intervalsMs.Clear();
+            _liveIntervalsMs.Clear();
+            _stableDirty = _liveDirty = true;
+        }
+        else if (intervalMs >= 0.05d && intervalMs <= 200d)
+        {
+            _liveIntervalsMs.Enqueue(intervalMs);
+            while (_liveIntervalsMs.Count > 128) _ = _liveIntervalsMs.Dequeue();
+            _liveDirty = true;
+            if (intervalMs <= 12.5d)
+            {
+                _intervalsMs.Enqueue(intervalMs);
+                while (_intervalsMs.Count > 256) _ = _intervalsMs.Dequeue();
+                _stableDirty = true;
+            }
+        }
+    }
+
+    // Only sample changes invalidate estimates. Confirmation still runs on
+    // every UI timer tick, including when no new input has arrived.
+    internal bool TryEstimateLive(out double hertz)
+    {
+        if (_liveDirty)
+        {
+            _hasLiveEstimate = RawPollingService.TryEstimateLivePollingHz(_liveIntervalsMs, out _liveHertz);
+            _liveDirty = false;
+        }
+        hertz = _liveHertz;
+        return _hasLiveEstimate;
+    }
+
+    internal bool TryEstimateStable(out double hertz)
+    {
+        if (_stableDirty)
+        {
+            _hasStableEstimate = RawPollingService.TryEstimateRawPollingHz(_intervalsMs, out _stableHertz);
+            _stableDirty = false;
+        }
+        hertz = _stableHertz;
+        return _hasStableEstimate;
+    }
 }
 
 internal static class RawPollingService
