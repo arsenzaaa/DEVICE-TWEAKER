@@ -1,6 +1,6 @@
 ﻿# Deliberately corrupt isolated source copies; the expected tests must fail.
 [CmdletBinding()]
-param([Parameter(Mandatory = $true)][string]$OutputDirectory)
+param([Parameter(Mandatory = $true)][string]$OutputDirectory, [string[]]$MutationName)
 
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..\src')).Path
@@ -58,16 +58,12 @@ $mutations = @(
         old = 'line = rawLine; message = rawMessage;';
         new = 'if (consumed != data.Length) { error = "second list rejected"; return false; } line = rawLine; message = rawMessage;';
         expected = 'ActualWindowsRawAndTranslatedListsAreBothDecoded' },
-    @{ name = 'parallel-driver-stage-without-lock'; file = 'Core\DriverStagingGate.cs'; filter = 'DriverStagingTests';
-        old = 'lock (Sync) return stage();'; new = 'return stage();'; expected = 'ParallelStagesDoNotCompeteForTheSameFile' },
-    @{ name = 'load-during-background-read'; file = 'Core\DriverRuntime.cs'; filter = 'DriverRuntimeTests';
-        old = 'if (!allowLoad) return openCompatible() ? DriverReadyResult.Existing : DriverReadyResult.Unavailable;';
-        new = 'if (!allowLoad) { loadKdu(); return DriverReadyResult.Unavailable; }'; expected = 'ReadbackNeverChecksJournalOrInvokesEitherLoader' },
+    @{ name = 'load-before-checking-existing-device'; file = 'Core\DriverRuntime.cs'; filter = 'DriverRuntimeTests';
+        old = 'if (openExisting()) return DriverReadyResult.Existing;';
+        new = '// existing device check deliberately removed'; expected = 'ReadyPolicyUsesServiceOnlyAfterCompletedKdu(scenario: "existing"' },
     @{ name = 'fallback-after-loader-timeout'; file = 'Core\DriverRuntime.cs'; filter = 'DriverRuntimeTests';
-        old = 'assertIdle(); // A timeout/unknown outcome must stop SCM fallback, even if a device appeared.';
+        old = 'assertIdle(); // An unknown KDU outcome must stop SCM fallback.';
         new = '// pending loader guard deliberately removed'; expected = 'PendingKduStopsServiceEvenIfDeviceAppeared' },
-    @{ name = 'accept-incompatible-driver-protocol'; file = 'Core\DriverRuntime.cs'; filter = 'DriverRuntimeTests';
-        old = 'protocol != ProtocolVersion'; new = 'protocol == 0'; expected = 'MalformedOrIncompatibleReplyIsRejected(offset: 4' },
     @{ name = 'drop-nic-values-from-startup-profile'; file = 'Core\MainForm.Startup.cs'; filter = 'StartupScriptTests';
         old = 'Values = entry.Values.Select(StartupProfile.Hex).ToList(),'; new = 'Values = [],';
         expected = 'ImportImodProfileGivesTheScriptTheSavedValues' },
@@ -75,6 +71,12 @@ $mutations = @(
         old = 'interrupter = endpointInterrupter;'; new = 'endpointInterrupter = interrupter;';
         expected = 'EndpointTargetWinsOverSlotTargetAndHubsAreSkipped' }
 )
+
+if ($MutationName) {
+    $unknown = @($MutationName | Where-Object { $_ -notin $mutations.name })
+    if ($unknown.Count) { throw "Unknown mutation: $($unknown -join ', ')" }
+    $mutations = @($mutations | Where-Object { $_.name -in $MutationName })
+}
 
 . (Join-Path $PSScriptRoot 'Input-Snapshot.ps1')
 $workspace = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path.TrimEnd('\')

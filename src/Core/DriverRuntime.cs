@@ -1,4 +1,4 @@
-// DTIMOD loading policy, protocol check and the loader journal.
+// DTIMOD loading policy and the loader journal shared with startup.
 #if NET8_0_OR_GREATER
 #nullable disable
 #endif
@@ -8,56 +8,27 @@ namespace DeviceTweakerCS
 
     public static class DriverReadyPolicy
     {
-        // Backends own handles and native access. This sequence is also exercised on fake backends.
-        public static DriverReadyResult Ensure(bool allowLoad, System.Func<bool> openCompatible,
-            System.Action assertIdle, System.Func<bool> loadKdu, System.Func<bool> loadService)
+        // Used by ImodDriverContext; callbacks retain native handles and diagnostic details.
+        public static DriverReadyResult Ensure(System.Func<bool> openExisting,
+            System.Func<bool> loadKdu, System.Action assertIdle, System.Func<bool> loadService)
         {
-            if (!allowLoad) return openCompatible() ? DriverReadyResult.Existing : DriverReadyResult.Unavailable;
-            assertIdle();
-            if (openCompatible()) return DriverReadyResult.Existing;
-            bool mapped = loadKdu();
-            assertIdle(); // A timeout/unknown outcome must stop SCM fallback, even if a device appeared.
-            if (openCompatible()) return mapped ? DriverReadyResult.Kdu : DriverReadyResult.Existing;
-            if (loadService() && openCompatible()) return DriverReadyResult.Service;
-            return DriverReadyResult.Unavailable;
+            if (openExisting()) return DriverReadyResult.Existing;
+            if (loadKdu()) return DriverReadyResult.Kdu;
+            assertIdle(); // An unknown KDU outcome must stop SCM fallback.
+            return loadService() ? DriverReadyResult.Service : DriverReadyResult.Unavailable;
         }
     }
 
     public static class DriverRuntime
     {
-        public static readonly bool SupportsInfoQuery = false;
-        public const uint ProtocolVersion = 1;
-        public const uint RequiredCapabilities = 7; // physical read/write, PCI query, resident lifetime
-        public const int InfoSize = 32;
         public const string RestartMessage = "DTIMOD is unavailable.\nRestart Windows, then press CHECK.";
 
-        public static bool ValidateInfo(byte[] reply, int returned, out string description)
-        {
-            description = RestartMessage;
-            if (reply == null || returned != InfoSize || reply.Length < InfoSize) return false;
-            uint size = System.BitConverter.ToUInt32(reply, 0);
-            uint protocol = System.BitConverter.ToUInt32(reply, 4);
-            ulong build = System.BitConverter.ToUInt64(reply, 8);
-            uint capabilities = System.BitConverter.ToUInt32(reply, 16);
-            uint mode = System.BitConverter.ToUInt32(reply, 20);
-            if (size != InfoSize || protocol != ProtocolVersion || build == 0
-                || (capabilities & RequiredCapabilities) != RequiredCapabilities || (mode != 1 && mode != 2)
-                || System.BitConverter.ToUInt64(reply, 24) != 0) return false;
-            description = "build=" + build + " protocol=" + protocol + " mode=" + (mode == 2 ? "kdu" : "service") + " lifetime=resident";
-            return true;
-        }
-
-        public static bool QueryInfo(System.IntPtr handle, out string description)
+        public static string DescribeLoadedDriver()
         {
             DemandNativeAccess();
-            if (!SupportsInfoQuery)
-            { description = "device=DeviceTweakerImod2 query-info=unsupported loaded-build=unverified"; return true; }
-            byte[] reply = new byte[InfoSize];
-            int returned;
-            if (!DeviceIoControl(handle, (0x8010u << 16) | (1u << 14) | (0x815u << 2),
-                System.IntPtr.Zero, 0, reply, reply.Length, out returned, System.IntPtr.Zero))
-            { description = RestartMessage + " (query error " + System.Runtime.InteropServices.Marshal.GetLastWin32Error() + ")"; return false; }
-            return ValidateInfo(reply, returned, out description);
+            // The bundled driver has no QUERY_INFO operation. Opening its device
+            // does not establish the identity of an already loaded binary.
+            return "device=DeviceTweakerImod2 query-info=unsupported loaded-build=unverified";
         }
 
         internal static void DemandNativeAccess()
@@ -66,10 +37,6 @@ namespace DeviceTweakerCS
             QaRun.DemandWrite("DTIMOD RUNTIME COORDINATOR");
 #endif
         }
-
-        [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool DeviceIoControl(System.IntPtr handle, uint code, System.IntPtr input, int inputLength,
-            byte[] output, int outputLength, out int returned, System.IntPtr overlapped);
     }
 
     // The journal survives an app exit; the boot ID prevents a stale timeout surviving a reboot.

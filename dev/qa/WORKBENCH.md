@@ -100,7 +100,7 @@ At least three real frames are saved. Slow capture can make observation exceed `
 
 [usb-role-order.json](Scenarios/usb-role-order.json) shows all USB roles on one controller: EN/RU headers, language transition and a narrowed window. Run `Invoke-DevSession.ps1 -Scenario .\dev\qa\Scenarios\usb-role-order.json`. This caption-order review scenario runs separately from the general suite.
 
-`Invoke-Qa.ps1` runs eighteen scenarios twice and compares checkpoints: `device-flow`, `control-states`, `dtimod-status`, `imod-check`, `imod-editor`, four `text-fields-*`, six `dialog-audit-*`, `backup-menu-flow`, `navigation-audit` and `irq-check-loading`. This checks reproducibility of the current build. Gallery, EN/RU, scaling models, log/resource audits, tests and intentional mutations follow. `dtimod-status` uses shared lifecycle code with fake backends and actual error dialogs, without loading the driver.
+`Invoke-Qa.ps1` runs the integration scenarios twice and compares checkpoints: `device-flow`, `control-states`, `dtimod-status`, `imod-check`, `imod-editor`, four `text-fields-*`, six `dialog-audit-*`, `backup-menu-flow`, `navigation-audit`, `irq-check-loading` and the three `refresh-reuse*` scenarios. This checks reproducibility of the current build. Gallery, EN/RU, scaling models, log/resource audits, tests and intentional mutations follow. `dtimod-status` uses shared lifecycle code with fake backends and actual error dialogs, without loading the driver.
 
 Registry, power plans, startup and drivers are neither changed nor completely emulated. A new feature needs its own scenario and shared technical-code checks against fake data; coverage does not appear automatically.
 

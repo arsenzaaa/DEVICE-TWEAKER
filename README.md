@@ -27,7 +27,7 @@ Also includes [ReservedCpuSets](./docs/guide/07-cpu-topology.md), [mouse event-r
 
 Choose a saved backup under **RESTORE**. Operation logs are stored in `logs` next to the EXE.
 
-The [framework-dependent build](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/download/v0.0.4/DEVICE.TWEAKER.exe) requires [.NET 10 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/10.0). Files and checksums are available on the [release page](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest).
+The [framework-dependent build](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.exe) requires [.NET 10 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/10.0). Files and checksums are available on the [release page](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest).
 
 IMOD, NIC ITR and PCI configuration reads use DTIMOD.sys loaded through KDU. Support depends on the hardware, device driver and Windows security settings. See the [driver guide](./docs/guide/11-driver.md) for loading requirements.
 

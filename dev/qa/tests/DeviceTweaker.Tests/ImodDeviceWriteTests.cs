@@ -54,7 +54,7 @@ public sealed class ImodDeviceWriteTests
     {
         Assert.Contains(@"0xF7000024 is outside the memory of PCI\X", DeviceTweakerImodRuntime.DescribeWriteFailure(5, 0xF7000024, @"PCI\X"));
         // ERROR_INVALID_FUNCTION: the resident DTIMOD predates device-checked writes.
-        Assert.Equal(DriverRename.RestartMessage, DeviceTweakerImodRuntime.DescribeWriteFailure(1, 0, @"PCI\X"));
+        Assert.Equal(DriverIdentity.RestartMessage, DeviceTweakerImodRuntime.DescribeWriteFailure(1, 0, @"PCI\X"));
         Assert.StartsWith("failed to write physical memory via driver: ", DeviceTweakerImodRuntime.DescribeWriteFailure(87, 0, @"PCI\X"));
     }
 

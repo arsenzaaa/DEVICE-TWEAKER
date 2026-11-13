@@ -251,12 +251,14 @@ internal static partial class UiLanguage
             return source;
         }
 
-        if (Russian.TryGetValue(source, out string? exact))
+        string normalized = UiResources.NormalizeLineEndings(source);
+        if (Russian.TryGetValue(normalized, out string? exact))
         {
-            return exact;
+            return source.Contains("\r\n", StringComparison.Ordinal)
+                ? exact.Replace("\n", "\r\n", StringComparison.Ordinal)
+                : exact;
         }
 
-        string normalized = source.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
         if (normalized.Contains('\n'))
         {
             string translated = string.Join("\n", normalized.Split('\n').Select(TranslateLine));

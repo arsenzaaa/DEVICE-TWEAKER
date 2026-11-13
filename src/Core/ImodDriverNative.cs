@@ -41,8 +41,8 @@ internal static class ImodDriverNative
     internal const uint OpenExisting = 3;
     internal const uint FileAttributeNormal = 0x00000080;
 
-    internal const string ImodDriverDevicePath = DriverRename.DevicePath;
-    internal const string ImodDriverServiceName = DriverRename.ServiceName;
+    internal const string ImodDriverDevicePath = DriverIdentity.DevicePath;
+    internal const string ImodDriverServiceName = DriverIdentity.ServiceName;
     internal const int ImodDriverOpenRetryCount = 10;
     internal const int ImodDriverOpenRetryDelayMs = 100;
     internal const int ImodKduTimeoutMs = 60000;

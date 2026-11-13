@@ -43,7 +43,7 @@ The task runs independently of the EXE. Profile read or parse errors stop change
 
 ## Verification and recovery
 
-Compare an EXE's SHA-256 with `SHA256SUMS.txt` from the same release package. `SOURCE-SHA256SUMS.txt` identifies the corresponding sources. Matching hashes establish package consistency, not hardware behavior.
+Compare an EXE's SHA-256 with `SHA256SUMS.txt` from the same release package. The source commit in the release description identifies the corresponding code. Matching hashes establish package consistency, not hardware behavior.
 
 Hardware changes need readback and device checks, including sleep and reconnect. Local QA does not perform these: it uses models and real write blocking. Preserve the original profile and a recovery backup before experimenting.
 

@@ -2,99 +2,15 @@
 
 [DEVICE TWEAKER](./README.md) / Changelog · [Русский](./CHANGELOG.ru.md)
 
-## [0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4) - 2026-10-31
+## 0.0.1
 
-Source comparison: [v0.0.3 → v0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/compare/b82e8d095ac3303e0bcd8607ac291f0d3dc29bc1...v0.0.4).
+Initial release of DEVICE TWEAKER Rework.
 
-### Changed
-
-- REFRESH reuses compatible device cards while rereading settings; device changes invalidate previous bindings.
-- Moved IMOD/NIC ITR startup to Task Scheduler, adding resume and USB-device connection events alongside logon.
-- Updated the self-contained runtime to .NET 10.0.15; builds require SDK 10.0.404 or newer within .NET 10.
-
-### Added
-
-- The application and startup script share register-access code. The runtime SHA-256 is checked before compilation; driver and loader files are checked when loading DTIMOD.
-- Added IRQ Mode and a command to read IRQ information for all PCI devices. The active interrupt mode and PCI capabilities are displayed separately from the MSI registry setting.
-- RSS allocation selects one logical processor per physical core. Available queue counts account for driver and device limits.
-- Saving NIC ITR disables supported driver moderation settings; deleting the profile can restore their INF defaults.
-- Added diagnostics for HVCI, Vulnerable Driver Blocklist, Microsoft Defender and FACEIT/Vanguard services before driver operations.
-
-### Fixed
-
-- Closed the service handle when DTIMOD service configuration fails; session disposal now releases owned resources once.
-- RSS write errors identify the value, requested data, registry path, failure stage and completed steps. Missing-key cleanup is logged separately from a failed write.
-
-- Preserve local backups and logs when clean-build preparation fails partway through.
-- Removed the general physical-memory write command from DTIMOD.sys. Its replacement validates the write range against the selected device resources.
-- USB Selective Suspend restore uses Windows Power API for AC and DC values and verifies the result.
-- The mouse display shows the measured event rate, including when it is below the USB descriptor maximum.
-- Automatic backup cleanup no longer deletes the selected restore file or the rollback copy during restoration. Device power-restore errors are reported separately.
-- The application no longer overwrites a startup profile when reading or parsing it fails.
-- After a driver-loading attempt with an uncertain outcome, the application and startup script block loading through the fallback mechanism.
-- DTIMOD.sys rejects incomplete hardware-resource lists, including malformed data after a valid write range.
-
-### Interface
-
-- Added short transitions for toggles, scrolling and button hover, independent of Windows visual effects.
-- Unified dialog action rows and clarified APPLY/SKIP in USB IMOD tuning.
-- Reworked device accents, outlined badges, system-check layout and backup-reason labels.
-- Added a session-scoped driver compatibility notice and a compact read-only system check. Driver-loading errors no longer offer to disable Windows protections.
-- IRQ reads retain previous values while running and show progress and results on the command button.
-- RSS runtime reads use CIM with a PowerShell fallback. Device discovery and metadata reads run concurrently; card creation yields to UI processing between batches.
-
-- Backup selection uses neutral colors for the selected row, file locations and protected original settings.
-- IMOD readback includes the last read time in the current value's tooltip and marks the device map as stale after device changes.
-- Dual-CCD status is displayed as On/Off.
-- Apply, save, restore and reset run long operations in the background. Refresh preserves pending edits and scroll position; a failed device scan keeps the previous cards on screen.
-- RSS settings, power settings and driver details are read in the background. Failed or timed-out reads preserve the previous device list; late results are ignored.
-- Layout changes preserve card state, focus and the text caret. After a partial apply, unconfirmed settings remain marked as pending.
-- Moved English and Russian strings to resource files. Clarified messages for failed settings reads, corrupt profiles and invalid MSI Limit values.
-
-### Build
-
-- QA reuses builds with source and output integrity checks. Cache preparation and scenarios share a memory-limited private job. Read-only backup lookup stays inside the run directory.
-- Package validation rejects EXE flavors with different application build identities.
-
-- Moved application sources to src and QA tools to dev/qa. The test panel is included only in DeveloperQa builds and excluded from the normal EXE.
-- Updated the application and build tools to .NET 10. The framework-dependent build requires .NET 10 Desktop Runtime x64; the self-contained build includes the runtime.
-- The release workflow builds a selected source commit without publishing by default. Replacing 0.0.4 is a separate action with backup and download verification.
-
-## [0.0.3](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.3) - 2026-10-01
-
-Source comparison: [v0.0.2 → v0.0.3](https://github.com/arsenzaaa/DEVICE-TWEAKER/compare/39f016b6ab5e5edda4fbb83c115aae6cff2ee4c7...b82e8d095ac3303e0bcd8607ac291f0d3dc29bc1).
-
-### Added
-
-- Replaced WinIO with DTIMOD.sys loaded through KDU.
-- Added NIC ITR readback, writes and saved profiles for supported Intel and Realtek adapters.
-- Expanded RSS controls with queue counts and runtime state from Get-NetAdapterRss.
-- Added mouse event-rate measurement through Raw Input and Mouse Throttle for supported Windows 11 builds.
-- Added USB and network-adapter power-saving controls.
-- Added CPPC and AMD CCD/CCX information to CPU topology and AUTO planning.
-- Added RU/EN switching without restart, backup selection for restore and operation-result reports.
-
-### Fixed
-
-- Corrected AllClose and All mappings to Windows policy values; added Unlimited and capability-aware validation for MSI Limit.
-
-## [0.0.2](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.2) - 2026-01-15
-
-Source comparison: [v0.0.1 → v0.0.2](https://github.com/arsenzaaa/DEVICE-TWEAKER/compare/7e003dcf55e843881372c3308b5df7032c049295...39f016b6ab5e5edda4fbb83c115aae6cff2ee4c7).
-
-### Changed
-
-- Added UI scaling based on Windows DPI.
-- P/E-core classification for the CPU list and AUTO now combines EfficiencyClass with SMT availability.
-- Changed the order in which AUTO allocates CPUs to devices.
-
-### Fixed
-
-- Removed duplicate USB-role log entries for alternative keys of the same controller.
-
-## [0.0.1](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.1) - 2026-01-14
-
-Initial release. Sources: [v0.0.1](https://github.com/arsenzaaa/DEVICE-TWEAKER/tree/7e003dcf55e843881372c3308b5df7032c049295).
-
-- MSI Mode and Limit, IRQ Priority, Interrupt Affinity and ReservedCpuSets controls.
-- RSS base CPU selection and xHCI IMOD configuration through WinIO.
+- MSI Mode and Limit, IRQ Priority and CPU affinity, with separate reporting of registry settings and current interrupt allocation.
+- Topology-aware automatic configuration and ReservedCpuSets controls.
+- USB xHCI IMOD by controller, device role or interrupter, and NIC ITR for supported Intel and Realtek adapters.
+- RSS processor and queue selection, device power settings, mouse event-rate measurement and Mouse Throttle controls.
+- Saved IMOD/NIC ITR profiles applied at logon, resume and supported device-connection events.
+- Backups, restoration, operation reports and detailed session logs with build identity and partial-failure diagnostics.
+- English and Russian interface, device filtering, asynchronous reads and compatible-card reuse on REFRESH.
+- Portable Windows x64 builds with and without the .NET runtime, plus source-based models and a read-only GUI workbench.

@@ -45,7 +45,11 @@ internal static class UiResources
     internal static IReadOnlyDictionary<string, string> LoadRussianPhrases()
         => ReadCulture(CultureInfo.InvariantCulture)
             .Where(entry => !entry.Key.StartsWith("Inline.", StringComparison.Ordinal))
-            .ToDictionary(entry => entry.Value, entry => Required(entry.Key, RussianCulture), StringComparer.Ordinal);
+            .ToDictionary(entry => NormalizeLineEndings(entry.Value),
+                entry => NormalizeLineEndings(Required(entry.Key, RussianCulture)), StringComparer.Ordinal);
+
+    internal static string NormalizeLineEndings(string value)
+        => value.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
 
     internal static (string English, string Russian)[] LoadInlineReplacements()
         => ReadCulture(CultureInfo.InvariantCulture)

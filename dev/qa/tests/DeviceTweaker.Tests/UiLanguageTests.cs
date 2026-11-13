@@ -6,6 +6,23 @@ namespace DeviceTweaker.Tests;
 public class UiLanguageTests
 {
     [Theory]
+    [InlineData("\n", false)]
+    [InlineData("\r\n", false)]
+    [InlineData("\n", true)]
+    [InlineData("\r\n", true)]
+    public void DriverMessagesTranslateWithEitherLineEnding(string newline, bool pending)
+    {
+        string source = pending
+            ? "DTIMOD loading did not finish normally.\nRestart Windows, then press CHECK."
+            : DriverRuntime.RestartMessage;
+        source = source.Replace("\n", newline, StringComparison.Ordinal);
+        var translate = typeof(UiLanguage).GetMethod("TranslateRussian", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+        string actual = (string)translate.Invoke(null, [source])!;
+        string firstLine = pending ? "Загрузка DTIMOD не завершилась штатно." : "DTIMOD недоступен.";
+        Assert.Equal(firstLine + newline + "Перезагрузите Windows и нажмите ПРОВЕРИТЬ.", actual);
+    }
+
+    [Theory]
     [InlineData("The operation stopped before any changes were made.", "Настройки не изменены: операция остановлена до применения.")]
     [InlineData("Apply changes (Ctrl+S) — modified: 3", "изменено: 3")]
     [InlineData("Apply changes (Ctrl+S): modified: 3", "изменено: 3")]

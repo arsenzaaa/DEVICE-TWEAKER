@@ -47,205 +47,194 @@ public sealed partial class MainForm
             return false;
         }
 
-        bool cleanupDriver = false;
-        try
+        if (!TryEnumerateXhciControllers(out List<ImodControllerInfo> controllers, out error))
         {
-            if (!TryEnumerateXhciControllers(out List<ImodControllerInfo> controllers, out error))
-            {
-                return false;
-            }
+            return false;
+        }
 
-            stats.ControllersFound = controllers.Count;
-            if (controllers.Count == 0)
-            {
-                return true;
-            }
+        stats.ControllersFound = controllers.Count;
+        if (controllers.Count == 0)
+        {
+            return true;
+        }
 
-            if (!ImodDriverContext.TryInitialize(driverPath, WriteLog, TryLoadImodDriverWithKduFallback, out ImodDriverContext? driverContext, out error))
+        if (!ImodDriverContext.TryInitialize(driverPath, WriteLog, TryLoadImodDriverWithKduFallback, out ImodDriverContext? driverContext, out error))
+        {
+            if (IsImodKernelCiBlockedLoadError(error))
             {
-                if (IsImodKernelCiBlockedLoadError(error))
+                string ciState = GetImodKernelCiBlockState();
+                error = $"{error} (kernel CI blocked; {ciState})";
+            }
+            LogImodDriverLoadDiagnostics(driverPath, error);
+            return false;
+        }
+
+        ClearImodKernelCiBlockStatus();
+        ImodDriverContext imodDriver = driverContext!;
+        using (imodDriver)
+        {
+            WriteLog($"IMOD: controllers={controllers.Count}");
+            foreach (ImodControllerInfo controller in controllers)
+            {
+                if (controller.ProblemCode == CmProbDisabled)
                 {
-                    string ciState = GetImodKernelCiBlockState();
-                    error = $"{error} (kernel CI blocked; {ciState})";
+                    stats.SkippedDisabled++;
+                    WriteLog($"IMOD: skipped disabled {controller.DeviceId}");
+                    continue;
                 }
-                LogImodDriverLoadDiagnostics(driverPath, error);
-                return false;
-            }
 
-            ClearImodKernelCiBlockStatus();
-            ImodDriverContext imodDriver = driverContext!;
-            using (imodDriver)
-            {
-                WriteLog($"IMOD: controllers={controllers.Count}");
-                foreach (ImodControllerInfo controller in controllers)
+                if (!controller.HasBase)
                 {
-                    if (controller.ProblemCode == CmProbDisabled)
+                    stats.MissingBase++;
+                    if (!string.IsNullOrWhiteSpace(controller.BaseError))
                     {
-                        stats.SkippedDisabled++;
-                        WriteLog($"IMOD: skipped disabled {controller.DeviceId}");
+                        WriteLog($"IMOD: {controller.DeviceId} base error: {controller.BaseError}");
+                    }
+                    continue;
+                }
+
+                if (!imodDriver.TrySetWriteTarget(controller.DeviceId, out string? targetError))
+                {
+                    stats.ControllersFailed++;
+                    WriteLog($"IMOD: {controller.DeviceId} skipped: {targetError}");
+                    if (imodDriver.OlderDriverLoaded)
+                    {
+                        // Every controller would fail the same way until Windows restarts.
+                        stats.DriverError = targetError;
+                        break;
+                    }
+
+                    continue;
+                }
+
+                uint desiredInterval = config.GlobalInterval;
+                List<uint>? desiredIntervals = null;
+                ImodConfigEntry? adaptiveEntry = null;
+                uint hcsparamsOffset = config.GlobalHcsparamsOffset;
+                uint rtsoff = config.GlobalRtsoff;
+                bool enabled = true;
+                string? overrideMatch = null;
+
+                foreach (ImodConfigEntry entry in config.Overrides)
+                {
+                    if (string.IsNullOrWhiteSpace(entry.Hwid))
+                    {
                         continue;
                     }
 
-                    if (!controller.HasBase)
+                    if (controller.DeviceId.IndexOf(entry.Hwid, StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        stats.MissingBase++;
-                        if (!string.IsNullOrWhiteSpace(controller.BaseError))
+                        if (entry.Enabled.HasValue)
                         {
-                            WriteLog($"IMOD: {controller.DeviceId} base error: {controller.BaseError}");
+                            enabled = entry.Enabled.Value;
                         }
-                        continue;
-                    }
-
-                    if (!imodDriver.TrySetWriteTarget(controller.DeviceId, out string? targetError))
-                    {
-                        stats.ControllersFailed++;
-                        WriteLog($"IMOD: {controller.DeviceId} skipped: {targetError}");
-                        if (imodDriver.OlderDriverLoaded)
+                        if (entry.Interval.HasValue)
                         {
-                            // Every controller would fail the same way until Windows restarts.
-                            stats.DriverError = targetError;
-                            break;
+                            desiredInterval = entry.Interval.Value;
+                            desiredIntervals = null;
                         }
-
-                        continue;
-                    }
-
-                    uint desiredInterval = config.GlobalInterval;
-                    List<uint>? desiredIntervals = null;
-                    ImodConfigEntry? adaptiveEntry = null;
-                    uint hcsparamsOffset = config.GlobalHcsparamsOffset;
-                    uint rtsoff = config.GlobalRtsoff;
-                    bool enabled = true;
-                    string? overrideMatch = null;
-
-                    foreach (ImodConfigEntry entry in config.Overrides)
-                    {
-                        if (string.IsNullOrWhiteSpace(entry.Hwid))
+                        if (entry.Intervals is { Count: > 0 })
                         {
-                            continue;
+                            desiredIntervals = entry.Intervals;
                         }
-
-                        if (controller.DeviceId.IndexOf(entry.Hwid, StringComparison.OrdinalIgnoreCase) >= 0)
+                        if (entry.AdaptiveRoleBinding == true && entry.RoleIntervals is { Count: > 0 })
                         {
-                            if (entry.Enabled.HasValue)
-                            {
-                                enabled = entry.Enabled.Value;
-                            }
-                            if (entry.Interval.HasValue)
-                            {
-                                desiredInterval = entry.Interval.Value;
-                                desiredIntervals = null;
-                            }
-                            if (entry.Intervals is { Count: > 0 })
-                            {
-                                desiredIntervals = entry.Intervals;
-                            }
-                            if (entry.AdaptiveRoleBinding == true && entry.RoleIntervals is { Count: > 0 })
-                            {
-                                adaptiveEntry = entry;
-                            }
-                            if (entry.HcsparamsOffset.HasValue)
-                            {
-                                hcsparamsOffset = entry.HcsparamsOffset.Value;
-                            }
-                            if (entry.Rtsoff.HasValue)
-                            {
-                                rtsoff = entry.Rtsoff.Value;
-                            }
-                            overrideMatch = entry.Hwid;
+                            adaptiveEntry = entry;
                         }
-                    }
-
-                    if (!enabled)
-                    {
-                        stats.SkippedDisabled++;
-                        WriteLog($"IMOD: skipped config-disabled {controller.DeviceId} ({overrideMatch})");
-                        continue;
-                    }
-
-                    if (!DeviceTweakerImodRuntime.TryResolveXhciRuntimeLayout(
-                            imodDriver.Registers,
-                            controller.BaseAddress,
-                            controller.MemoryLength,
-                            hcsparamsOffset,
-                            rtsoff,
-                            out uint maxIntrs,
-                            out ulong runtimeAddress,
-                            out _,
-                            out _,
-                            out string? ioError))
-                    {
-                        stats.ReadFailures++;
-                        WriteLog($"IMOD: unsafe or invalid xHCI MMIO layout {controller.DeviceId}: {ioError}");
-                        continue;
-                    }
-
-                    if (adaptiveEntry?.RoleIntervals is { Count: > 0 } roleIntervals)
-                    {
-                        if (TryBuildAdaptiveImodIntervals(
-                                roleSnapshot, controller,
-                                imodDriver,
-                                maxIntrs,
-                                roleIntervals,
-                                desiredInterval,
-                                out List<uint> adaptiveIntervals,
-                                out string adaptiveDetail))
+                        if (entry.HcsparamsOffset.HasValue)
                         {
-                            desiredIntervals = adaptiveIntervals;
-                            adaptiveEntry.Intervals = adaptiveIntervals;
-                            WriteLog($"IMOD.ADAPTIVE.APPLY: {controller.DeviceId} {adaptiveDetail}");
+                            hcsparamsOffset = entry.HcsparamsOffset.Value;
                         }
-                        else
+                        if (entry.Rtsoff.HasValue)
                         {
-                            WriteLog($"IMOD.ADAPTIVE.FALLBACK.WARN: {controller.DeviceId} {adaptiveDetail}");
+                            rtsoff = entry.Rtsoff.Value;
                         }
+                        overrideMatch = entry.Hwid;
                     }
+                }
 
-                    uint writeFailures = 0;
-                    uint writeCount = desiredIntervals is { Count: > 0 }
-                        ? Math.Min(maxIntrs, (uint)desiredIntervals.Count)
-                        : maxIntrs;
-                    for (uint i = 0; i < writeCount; ++i)
-                    {
-                        ulong interrupterAddress = runtimeAddress + 0x24 + (0x20 * i);
-                        uint targetInterval = desiredIntervals is { Count: > 0 }
-                            ? desiredIntervals[(int)i]
-                            : desiredInterval;
-                        if (!TryWriteImodInterval(imodDriver, interrupterAddress, targetInterval, out ioError))
-                        {
-                            writeFailures++;
-                            WriteLog($"IMOD: write failed {controller.DeviceId} @ {ToHex(interrupterAddress)}: {ioError}");
-                        }
-                    }
+                if (!enabled)
+                {
+                    stats.SkippedDisabled++;
+                    WriteLog($"IMOD: skipped config-disabled {controller.DeviceId} ({overrideMatch})");
+                    continue;
+                }
 
-                    stats.WritesAttempted += (int)writeCount;
-                    stats.WritesSucceeded += (int)(writeCount - writeFailures);
-                    stats.WriteFailures += (int)writeFailures;
-                    if (writeCount > 0 && writeFailures == 0)
+                if (!DeviceTweakerImodRuntime.TryResolveXhciRuntimeLayout(
+                        imodDriver.Registers,
+                        controller.BaseAddress,
+                        controller.MemoryLength,
+                        hcsparamsOffset,
+                        rtsoff,
+                        out uint maxIntrs,
+                        out ulong runtimeAddress,
+                        out _,
+                        out _,
+                        out string? ioError))
+                {
+                    stats.ReadFailures++;
+                    WriteLog($"IMOD: unsafe or invalid xHCI MMIO layout {controller.DeviceId}: {ioError}");
+                    continue;
+                }
+
+                if (adaptiveEntry?.RoleIntervals is { Count: > 0 } roleIntervals)
+                {
+                    if (TryBuildAdaptiveImodIntervals(
+                            roleSnapshot, controller,
+                            imodDriver,
+                            maxIntrs,
+                            roleIntervals,
+                            desiredInterval,
+                            out List<uint> adaptiveIntervals,
+                            out string adaptiveDetail))
                     {
-                        stats.ControllersApplied++;
-                    }
-                    else if (writeCount > 0 && writeFailures < writeCount)
-                    {
-                        stats.ControllersPartiallyApplied++;
+                        desiredIntervals = adaptiveIntervals;
+                        adaptiveEntry.Intervals = adaptiveIntervals;
+                        WriteLog($"IMOD.ADAPTIVE.APPLY: {controller.DeviceId} {adaptiveDetail}");
                     }
                     else
                     {
-                        stats.ControllersFailed++;
+                        WriteLog($"IMOD.ADAPTIVE.FALLBACK.WARN: {controller.DeviceId} {adaptiveDetail}");
                     }
-
-                    string modeText = desiredIntervals is { Count: > 0 }
-                        ? $"vector={desiredIntervals.Count}"
-                        : $"interval={FormatImodValue(desiredInterval)}";
-                    WriteLog($"IMOD: {controller.DeviceId} writes={writeCount}/{maxIntrs} {modeText} failures={writeFailures}");
                 }
-            }
-        }
-        finally
-        {
-            if (cleanupDriver && !IsImodDriverSystemPath(driverPath))
-            {
-                DeleteFileIfExists(driverPath, "IMOD.DRIVER");
+
+                uint writeFailures = 0;
+                uint writeCount = desiredIntervals is { Count: > 0 }
+                    ? Math.Min(maxIntrs, (uint)desiredIntervals.Count)
+                    : maxIntrs;
+                for (uint i = 0; i < writeCount; ++i)
+                {
+                    ulong interrupterAddress = runtimeAddress + 0x24 + (0x20 * i);
+                    uint targetInterval = desiredIntervals is { Count: > 0 }
+                        ? desiredIntervals[(int)i]
+                        : desiredInterval;
+                    if (!TryWriteImodInterval(imodDriver, interrupterAddress, targetInterval, out ioError))
+                    {
+                        writeFailures++;
+                        WriteLog($"IMOD: write failed {controller.DeviceId} @ {ToHex(interrupterAddress)}: {ioError}");
+                    }
+                }
+
+                stats.WritesAttempted += (int)writeCount;
+                stats.WritesSucceeded += (int)(writeCount - writeFailures);
+                stats.WriteFailures += (int)writeFailures;
+                if (writeCount > 0 && writeFailures == 0)
+                {
+                    stats.ControllersApplied++;
+                }
+                else if (writeCount > 0 && writeFailures < writeCount)
+                {
+                    stats.ControllersPartiallyApplied++;
+                }
+                else
+                {
+                    stats.ControllersFailed++;
+                }
+
+                string modeText = desiredIntervals is { Count: > 0 }
+                    ? $"vector={desiredIntervals.Count}"
+                    : $"interval={FormatImodValue(desiredInterval)}";
+                WriteLog($"IMOD: {controller.DeviceId} writes={writeCount}/{maxIntrs} {modeText} failures={writeFailures}");
             }
         }
 

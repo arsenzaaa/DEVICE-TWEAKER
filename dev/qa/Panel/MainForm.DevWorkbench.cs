@@ -578,10 +578,10 @@ public sealed partial class MainForm
                 : DriverLoadGate.CheckJournal("11111111-1111-1111-1111-111111111111|pending", "11111111-1111-1111-1111-111111111111");
             try
             {
-                DriverReadyPolicy.Ensure(true,
+                DriverReadyPolicy.Ensure(
                     () => { if (name == "dtimod-incompatible") throw new InvalidOperationException(expected); return false; },
-                    () => { if (pending) throw new InvalidOperationException(expected); },
                     () => { pending = true; return false; },
+                    () => { if (pending) throw new InvalidOperationException(expected); },
                     () => throw new InvalidOperationException("Unexpected SCM call in pending-load model"));
                 throw new InvalidOperationException("Expected DTIMOD model failure was not raised");
             }

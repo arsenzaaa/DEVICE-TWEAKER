@@ -12,6 +12,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Open-TestPanel.
 
 The command builds `local/tools/TestPanel/DEVICE TWEAKER QA.exe` from a source copy and opens the panel. This build is always read-only. **Ctrl+Shift+T** and **Ctrl+Alt+Shift+T** reopen it; normal EXEs do not include the panel. `-BuildOnly` builds and checks the EXE without opening windows.
 
+For focused fault checks, `Test-QaSensitivity.ps1` accepts `-MutationName` with case names. Without it, all cases run. Execute these checks in a bounded QA worker; a selected subset is not a full QA result.
+
 ## Full hidden QA
 
 The native model also requires Visual Studio C++ Build Tools and the Windows SDK. It compiles DTIMOD functions with substituted system calls; it does not run the SYS.
@@ -57,7 +59,7 @@ The normal EXE supports `--qa-read-only`. This mode is immutable for the process
 - **Build:** normal and developer versions, with warnings treated as errors.
 - **xUnit:** masks, parsing, localization, profiles and blocking of actual write methods.
 - **WMI / RSS:** the shared query/write/readback sequence against a fake backend, unavailable capabilities, failures and readback mismatches. Actual RSS PowerShell code runs with substituted Get-NetAdapter / Get-NetAdapterRss functions. Wi-Fi skips, incomplete reads and mismatches have separate cases.
-- **Application identity:** logs and crash reports include the assembly MVID and running EXE SHA-256. Package checks compare that hash with the file; the version remains 0.0.4.
+- **Application identity:** logs and crash reports include the assembly MVID and running EXE SHA-256. Package checks compare that hash with the file.
 - **IRQ Mode:** parsing PCI MSI/MSI-X Enable and allocated CM_RESOURCE_LIST data; one IRQ for either mode, malformed data, read failures and device mismatches. QA does not open DTIMOD; live PCI reads require manual verification.
 - **Recorded resources:** six saved Windows 10 responses covering USB/GPU/NIC/NVMe/SATA. Both raw and translated lists, types and malformed tails are checked from JSON without driver access.
 - **DTIMOD preparation:** concurrent branches share a lock. A separate test file uses real exclusive file handles.
@@ -66,7 +68,7 @@ The normal EXE supports `--qa-read-only`. This mode is immutable for the process
 - **Native model:** actual DriverEntry/dispatch/MMIO functions compile with fake kernel APIs. Checks cover absent unload, protocol response, sizes, alignment, failed mapping and unmapping. Writes must stay within device-assigned memory: boundaries, ports, address overflow and malformed resource lists are checked. Two deliberate defects, restored unload and an out-of-range write, must be caught by model assertions.
 - **KDU:** the EXE/DLL pair, versions, hashes, build manifest and 283 inputs of the pinned upstream. Source, EXE and database substitutions run in separate copies.
 - **Apply:** shared DeviceSettingsWriter MSI, limit, priority, binary mask and Windows Default operations against an in-memory registry.
-- **DTIMOD rename:** shared migration policy against a fake SCM, covering loaded/missing/unrelated services and failed deletion.
+- **Driver identity:** application/startup names, pinned SYS payload, rejection of a loaded legacy device and immutable QA blocking. No service migration. The shared loading policy covers existing/KDU/service outcomes and uncertain KDU completion.
 - **Startup:** `profile.json` and app settings, migration of the older AppData script and saved backups without losing values, and Task Scheduler XML (SYSTEM, logon, resume, USB/HID connection). Actual `ApplyIMOD.ps1` runs in PowerShell 5.1 up to profile loading and compiles the shared runtime. No task is registered and no driver is loaded.
 - **Restore:** shared BackupRestoreService version-1 JSON, initial snapshot, writes, readback and rollback.
 - **Power plan:** shared restore component with separate AC/DC values, saved GUID, active/inactive schemes and modeled API failures.
@@ -74,7 +76,7 @@ The normal EXE supports `--qa-read-only`. This mode is immutable for the process
 - **CPU:** shared scheduler against synthetic SMT, P/E and CCD/CCX topologies, including GPU/input isolation.
 - **Polling:** synthetic intervals, confirmation and rate changes; low keyboard activity must not replace the endpoint rate.
 - **Reports:** concurrent JSON reads/updates and exclusion of the test panel from normal builds.
-- **Sensitivity:** nineteen corrupted C# copies cover the I225 address, NIC readback, IMOD count, backup readback, GPU pair selection, premature polling downgrade, wrong AC/DC, activation of an inactive scheme, removing read-only through the environment, using MSI-X table size as Enable, ignoring a one-pixel difference, disposing fonts before controls, failing the second Windows resource list, concurrent DTIMOD preparation without a lock, loading from background reads, SCM after KDU timeout, accepting an incompatible protocol, losing saved NIC ITR values and choosing an interrupter from Slot Context instead of TRB. The relevant assertions must fail; a build failure does not count.
+- **Sensitivity:** seventeen corrupted C# copies cover the I225 address, NIC readback, IMOD count, backup readback, GPU pair selection, premature polling downgrade, wrong AC/DC, activation of an inactive scheme, removing read-only through the environment, using MSI-X table size as Enable, ignoring a one-pixel difference, disposing fonts before controls, failing the second Windows resource list, loading before checking the existing device, SCM after KDU timeout, losing saved NIC ITR values and choosing an interrupter from Slot Context instead of TRB. The relevant assertions must fail; a build failure does not count.
 - **GUI:** EN/RU, geometry, dialogs, navigation, test panel and virtual scenarios.
 - **Workbench:** two scenarios run twice, with native captures, a transition, test JSON changes/restoration, a real fake-storage exception and exact checkpoint comparison. Design review is recorded separately.
 - **Normal-build controls:** dropdown key routing, selection and popup closing, Ctrl+Z/Home/End in editors and RU→EN→RU with source strings preserved. Eight normal/hover/focus/disabled captures use no physical input.
@@ -83,7 +85,7 @@ The normal EXE supports `--qa-read-only`. This mode is immutable for the process
 - **Layout:** six EN/RU × 100/125/150% scenarios with actual WinForms controls, rendered button captions and RESTORE dialog. These are developer-build layout models; Windows DPI settings and monitor transitions are not tested.
 - **Logs:** session format/completion and rejection of unexpected ERROR/FATAL entries. Injected errors are accepted only in a successfully verified scenario; dialog samples are labelled separately.
 - **Resources:** twenty refreshes in the normal read-only EXE, confirmation of every press and REFRESH.DONE, handle/GDI/USER settling and memory measurements.
-- **Evidence:** recheck TRX, mandatory stages/test classes, nineteen C# regressions, three native regressions, six scaling scenarios, completed cycles and file hashes.
+- **Evidence:** recheck TRX, mandatory stages/test classes, seventeen C# regressions, three native regressions, six scaling scenarios, completed cycles and file hashes.
 
 Restore checks use synthetic JSON by default. To additionally inspect your own backup samples against in-memory storage, explicitly pass `-BackupSamples <directory>` to `Invoke-Qa.ps1`. Originals are unchanged. Real backups are not required, bundled or selected automatically; their paths may appear in local TRX reports.
 
@@ -112,7 +114,7 @@ Layout `main.png` / `restore.png` captures use native PrintWindow within display
 Check an existing local EXE package separately:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Test-ReleasePackage.ps1 -PackageDirectory ".\src\bin\ReleasePackages\v0.0.4"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Test-ReleasePackage.ps1 -PackageDirectory ".\src\bin\ReleasePackages\v0.0.1"
 ```
 
 This checks SHA-256, versions, both EXEs in probe mode, the embedded driver and absence of the test panel. It does not open the main window or apply settings.

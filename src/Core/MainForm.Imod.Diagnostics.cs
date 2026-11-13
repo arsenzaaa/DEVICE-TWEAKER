@@ -313,8 +313,8 @@ public sealed partial class MainForm
 
     private static string FormatImodUnavailableUserMessage(string? technicalDetails, bool includeNotChanged = true)
     {
-        if (technicalDetails?.Contains(DriverRename.RestartMessage, StringComparison.Ordinal) == true)
-            return DriverRename.RestartMessage;
+        if (technicalDetails?.Contains(DriverIdentity.RestartMessage, StringComparison.Ordinal) == true)
+            return DriverIdentity.RestartMessage;
         if (technicalDetails?.Contains(DriverRuntime.RestartMessage, StringComparison.Ordinal) == true)
             return DriverRuntime.RestartMessage;
         if (technicalDetails?.Contains("Restart Windows before loading", StringComparison.Ordinal) == true)

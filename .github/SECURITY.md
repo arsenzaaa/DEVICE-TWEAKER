@@ -4,7 +4,7 @@
 
 ## Supported version
 
-The current supported release is `0.0.4`. Earlier releases are unsupported.
+Security fixes target the latest release.
 
 ## Reporting a vulnerability
 

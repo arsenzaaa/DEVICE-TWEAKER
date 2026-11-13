@@ -6,36 +6,6 @@ namespace DeviceTweaker.Tests;
 
 public sealed class DriverRuntimeTests
 {
-    private static byte[] Info(uint mode = 2, ulong build = 2026102301)
-    {
-        byte[] data = new byte[32];
-        BitConverter.GetBytes(32u).CopyTo(data, 0);
-        BitConverter.GetBytes(1u).CopyTo(data, 4);
-        BitConverter.GetBytes(build).CopyTo(data, 8);
-        BitConverter.GetBytes(7u).CopyTo(data, 16);
-        BitConverter.GetBytes(mode).CopyTo(data, 20);
-        return data;
-    }
-
-    [Theory] [InlineData(1u)] [InlineData(2u)]
-    public void CompatibleProtocolAcceptsDifferentBuildsAndReportsActualMode(uint mode)
-    {
-        Assert.True(DriverRuntime.ValidateInfo(Info(mode, 123), 32, out string result));
-        Assert.Contains("build=123", result);
-        Assert.Contains(mode == 1 ? "mode=service" : "mode=kdu", result);
-    }
-
-    [Theory] [InlineData(0, 31u)] [InlineData(4, 2u)] [InlineData(16, 3u)] [InlineData(20, 0u)] [InlineData(24, 1u)]
-    public void MalformedOrIncompatibleReplyIsRejected(int offset, uint value)
-    {
-        byte[] data = Info(); BitConverter.GetBytes(value).CopyTo(data, offset);
-        Assert.False(DriverRuntime.ValidateInfo(data, data.Length, out _));
-    }
-
-    [Theory] [InlineData(0)] [InlineData(31)] [InlineData(33)]
-    public void TruncatedAndOversizedReplyIsRejected(int returned)
-        => Assert.False(DriverRuntime.ValidateInfo(Info(), returned, out _));
-
     [Fact]
     public void IncompleteLoadBlocksBothLoadersUntilReboot()
     {
@@ -47,36 +17,36 @@ public sealed class DriverRuntimeTests
     }
 
     [Fact]
-    public void AutonomousQaCannotEnterNativeCoordinatorOrQueryDriver()
+    public void AutonomousQaCannotEnterNativeCoordinator()
     {
         Assert.True(QaRun.IsReadOnly);
         Assert.Throws<QaWriteBlockedException>(() => DriverLoadGate.Enter());
-        Assert.Throws<QaWriteBlockedException>(() => DriverRuntime.QueryInfo(IntPtr.Zero, out _));
+        Assert.Throws<QaWriteBlockedException>(() => DriverRuntime.DescribeLoadedDriver());
         Assert.Throws<QaWriteBlockedException>(() => DriverLoadGate.BeginLoader());
     }
 
-    [Theory] [InlineData(false)] [InlineData(true)]
-    public void ReadbackNeverChecksJournalOrInvokesEitherLoader(bool available)
+    [Fact]
+    public void ReadOnlyExistingDeviceProbeStopsBeforeNativeAccess()
     {
-        var result = DriverReadyPolicy.Ensure(false, () => available,
-            () => throw new Exception("journal/staging touched by readback"),
-            () => throw new Exception("KDU called by readback"), () => throw new Exception("SCM called by readback"));
-        Assert.Equal(available ? DriverReadyResult.Existing : DriverReadyResult.Unavailable, result);
+        Assert.False(ImodDriverContext.TryOpenExisting(_ => throw new Exception("native diagnostics reached"), out var context, out string? error));
+        Assert.Null(context);
+        Assert.NotNull(error);
+        Assert.Contains("QA read-only", error);
     }
 
     [Theory] [InlineData("existing")] [InlineData("kdu")] [InlineData("service")] [InlineData("failed")]
-    public void ReadyPolicyRechecksDeviceAndUsesServiceOnlyAfterCompletedKdu(string scenario)
+    public void ReadyPolicyUsesServiceOnlyAfterCompletedKdu(string scenario)
     {
         List<string> calls = [];
         bool available = scenario == "existing";
-        var result = DriverReadyPolicy.Ensure(true,
-            () => { calls.Add("open"); return available; }, () => calls.Add("idle"),
-            () => { calls.Add("kdu"); return available = scenario == "kdu"; },
+        var result = DriverReadyPolicy.Ensure(
+            () => { calls.Add("open"); return available; },
+            () => { calls.Add("kdu"); return scenario == "kdu"; }, () => calls.Add("idle"),
             () => { calls.Add("service"); return available = scenario == "service"; });
         string[] expected = scenario switch {
-            "existing" => ["idle", "open"], "kdu" => ["idle", "open", "kdu", "idle", "open"],
-            "service" => ["idle", "open", "kdu", "idle", "open", "service", "open"],
-            _ => ["idle", "open", "kdu", "idle", "open", "service"] };
+            "existing" => ["open"], "kdu" => ["open", "kdu"],
+            "service" => ["open", "kdu", "idle", "service"],
+            _ => ["open", "kdu", "idle", "service"] };
         Assert.Equal(expected, calls);
         Assert.Equal(scenario switch { "existing" => DriverReadyResult.Existing, "kdu" => DriverReadyResult.Kdu,
             "service" => DriverReadyResult.Service, _ => DriverReadyResult.Unavailable }, result);
@@ -86,17 +56,17 @@ public sealed class DriverRuntimeTests
     public void PendingKduStopsServiceEvenIfDeviceAppeared()
     {
         bool pending = false, appeared = false;
-        Assert.Throws<TimeoutException>(() => DriverReadyPolicy.Ensure(true, () => appeared,
-            () => { if (pending) throw new TimeoutException(); },
+        Assert.Throws<TimeoutException>(() => DriverReadyPolicy.Ensure(() => appeared,
             () => { pending = appeared = true; return false; },
+            () => { if (pending) throw new TimeoutException(); },
             () => throw new Exception("SCM must never run after timeout")));
     }
 
     [Fact]
-    public void IncompatibleLoadedDriverStopsAllLoading()
-        => Assert.Throws<InvalidDataException>(() => DriverReadyPolicy.Ensure(true,
-            () => throw new InvalidDataException("incompatible protocol"), () => { },
-            () => throw new Exception("must not map"), () => throw new Exception("must not start")));
+    public void ExistingDeviceProbeFailureStopsAllLoading()
+        => Assert.Throws<IOException>(() => DriverReadyPolicy.Ensure(
+            () => throw new IOException("device probe failed"),
+            () => throw new Exception("must not map"), () => { }, () => throw new Exception("must not start")));
 
     [Fact]
     public async Task ProductionMutexLeaseSerializesCompetingOperationsAndReleasesAfterFailure()

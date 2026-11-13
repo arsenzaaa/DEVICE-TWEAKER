@@ -27,7 +27,7 @@
 
 Сохранённую копию можно выбрать через **ВОССТАНОВЛЕНИЕ**. Результаты операций находятся в `logs` рядом с EXE.
 
-[Сборка без встроенного .NET](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/download/v0.0.4/DEVICE.TWEAKER.exe) требует [.NET 10 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/10.0). Файлы и контрольные суммы доступны на [странице выпуска](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest).
+[Сборка без встроенного .NET](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.exe) требует [.NET 10 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/10.0). Файлы и контрольные суммы доступны на [странице выпуска](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest).
 
 Для IMOD, NIC ITR и чтения конфигурации PCI используется DTIMOD.sys с загрузкой через KDU. Поддержка зависит от оборудования, драйвера устройства и настроек безопасности Windows. Условия загрузки описаны в [руководстве по драйверу](./docs/guide/11-driver.ru.md).
 

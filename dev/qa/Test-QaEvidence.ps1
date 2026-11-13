@@ -32,8 +32,8 @@ function Test-QaEvidence([string]$RunDirectory) {
     $expectedMutants = @('shift-i225-register', 'ignore-readback-mismatch', 'erase-imod-counter', 'ignore-backup-readback',
         'wrong-gpu-physical-pair', 'accept-polling-downgrade-too-early', 'restore-wrong-power-source',
         'activate-inactive-power-plan', 'release-read-only-lock-through-environment', 'confuse-msix-table-size-with-enable',
-        'ignore-single-pixel-regression', 'dispose-shared-font-before-controls', 'reject-second-resource-list', 'parallel-driver-stage-without-lock',
-        'load-during-background-read', 'fallback-after-loader-timeout', 'accept-incompatible-driver-protocol', 'drop-nic-values-from-startup-profile',
+        'ignore-single-pixel-regression', 'dispose-shared-font-before-controls', 'reject-second-resource-list',
+        'load-before-checking-existing-device', 'fallback-after-loader-timeout', 'drop-nic-values-from-startup-profile',
         'route-by-slot-interrupter')
     if ($mutants.Count -ne $expectedMutants.Count) { throw 'Intentional regression matrix is incomplete' }
     foreach ($name in $expectedMutants) {

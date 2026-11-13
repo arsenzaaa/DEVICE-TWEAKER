@@ -20,7 +20,7 @@ internal static class PciInterruptReader
         if (QaRun.IsReadOnly) return InterruptModeResult.Pending;
         if (!instanceId.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase))
             return new(InterruptMode.NotPci, "This device has no PCI interrupt mode.");
-        using SafeFileHandle handle = CreateFile(DriverRename.DevicePath, 0x80000000, 3, IntPtr.Zero, 3, 0, IntPtr.Zero);
+        using SafeFileHandle handle = CreateFile(DriverIdentity.DevicePath, 0x80000000, 3, IntPtr.Zero, 3, 0, IntPtr.Zero);
         if (handle.IsInvalid)
         {
             int error = Marshal.GetLastWin32Error();

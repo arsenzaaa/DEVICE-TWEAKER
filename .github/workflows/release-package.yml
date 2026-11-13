@@ -7,23 +7,6 @@ on:
         description: Exact reviewed source commit (40-character SHA)
         required: true
         type: string
-      action:
-        description: Build only, or explicitly replace the existing 0.0.4
-        type: choice
-        options: [build, replace-0.0.4]
-        default: build
-      expected_tag_object:
-        description: Replacement only - reviewed current v0.0.4 tag object SHA
-        type: string
-      expected_release_updated_at:
-        description: Replacement only - reviewed release updated_at from the API
-        type: string
-      verified_run_id:
-        description: Replacement only - successful build run containing the accepted files
-        type: string
-      expected_exe_sums_sha256:
-        description: Replacement only - SHA-256 of SHA256SUMS.txt from the accepted package
-        type: string
 
 permissions:
   contents: read
@@ -34,7 +17,6 @@ concurrency:
 
 jobs:
   package:
-    if: inputs.action == 'build'
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
@@ -51,6 +33,7 @@ jobs:
           global-json-file: global.json
 
       - name: Verify source and version
+        id: source
         shell: pwsh
         env:
           SELECTED_SHA: ${{ inputs.source_sha }}
@@ -59,7 +42,10 @@ jobs:
           $head = (git rev-parse HEAD).Trim()
           if ($LASTEXITCODE -ne 0 -or $head -cne $env:SELECTED_SHA) { throw 'Checkout differs from selected source' }
           [xml]$project = Get-Content -LiteralPath 'src/DeviceTweakerCS.csproj'
-          if ([string]$project.Project.PropertyGroup.Version -ne '0.0.4') { throw 'Expected version 0.0.4' }
+          $version = [string]($project.Project.PropertyGroup.InformationalVersion | Where-Object { $_ } | Select-Object -First 1)
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:\.\d+)?$') { throw 'Expected a numeric release version' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "package=src/bin/ReleasePackages/v$version" >> $env:GITHUB_OUTPUT
           if (git status --porcelain) { throw 'Source checkout is dirty' }
 
       - name: Restore and test
@@ -74,103 +60,17 @@ jobs:
 
       - name: Build and inspect both EXEs
         shell: pwsh
+        env:
+          PACKAGE: ${{ steps.source.outputs.package }}
         run: |
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'src/build.ps1' -Flavor both -Configuration Release -SkipImodDriverBuild
           if ($LASTEXITCODE -ne 0) { throw 'Release build failed' }
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'dev/qa/Test-ReleasePackage.ps1' -PackageDirectory 'src/bin/ReleasePackages/v0.0.4'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'dev/qa/Test-ReleasePackage.ps1' -PackageDirectory $env:PACKAGE
           if ($LASTEXITCODE -ne 0) { throw 'Package inspection failed' }
-
-      - name: Archive exact sources
-        shell: pwsh
-        run: |
-          $package = 'src/bin/ReleasePackages/v0.0.4'
-          $sourceName = 'DEVICE.TWEAKER.Source.v0.0.4.zip'
-          git archive --format=zip --output="$package/$sourceName" HEAD
-          if ($LASTEXITCODE -ne 0) { throw 'Source archive failed' }
-          $hash = (Get-FileHash -LiteralPath "$package/$sourceName" -Algorithm SHA256).Hash
-          "$hash  $sourceName" | Set-Content -LiteralPath "$package/SOURCE-SHA256SUMS.txt" -Encoding ascii
 
       - name: Save package for inspection
         uses: actions/upload-artifact@v7
         with:
-          name: DEVICE-TWEAKER-v0.0.4-${{ inputs.source_sha }}
-          path: src/bin/ReleasePackages/v0.0.4/
+          name: DEVICE-TWEAKER-v${{ steps.source.outputs.version }}-${{ inputs.source_sha }}
+          path: ${{ steps.source.outputs.package }}/
           if-no-files-found: error
-
-  replace:
-    if: inputs.action == 'replace-0.0.4' && github.repository == 'arsenzaaa/DEVICE-TWEAKER' && github.ref == 'refs/heads/main'
-    runs-on: windows-latest
-    timeout-minutes: 30
-    permissions:
-      contents: write
-      actions: read
-    steps:
-      - name: Check out reviewed sources
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.source_sha }}
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
-
-      - name: Download the verified package
-        uses: actions/download-artifact@v8
-        with:
-          name: DEVICE-TWEAKER-v0.0.4-${{ inputs.source_sha }}
-          path: release-package
-          run-id: ${{ inputs.verified_run_id }}
-          github-token: ${{ github.token }}
-
-      - name: Verify the selected build run
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BUILD_RUN: ${{ inputs.verified_run_id }}
-        run: |
-          if ($env:BUILD_RUN -notmatch '^\d+$') { throw 'A successful build run ID is required' }
-          $run = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:BUILD_RUN" | ConvertFrom-Json
-          if ($LASTEXITCODE -ne 0 -or $run.conclusion -ne 'success' -or $run.event -ne 'workflow_dispatch' -or $run.path -ne '.github/workflows/release-package.yml') { throw 'Expected a successful Release package build run' }
-
-      - name: Validate remote state and archive the old release
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SOURCE_SHA: ${{ inputs.source_sha }}
-          OLD_TAG: ${{ inputs.expected_tag_object }}
-          OLD_RELEASE_UPDATED: ${{ inputs.expected_release_updated_at }}
-          ACCEPTED_SUMS: ${{ inputs.expected_exe_sums_sha256 }}
-        run: |
-          python dev/release/replace_release.py --source-sha $env:SOURCE_SHA --expected-main $env:SOURCE_SHA --expected-tag-object $env:OLD_TAG --expected-release-updated-at $env:OLD_RELEASE_UPDATED --expected-exe-sums-sha256 $env:ACCEPTED_SUMS --package release-package --backup release-backup
-          if ($LASTEXITCODE -ne 0) { throw 'Replacement preflight failed; no release changes made' }
-
-      - name: Preserve recovery files before changing GitHub
-        uses: actions/upload-artifact@v7
-        with:
-          name: previous-v0.0.4-${{ github.run_id }}
-          path: release-backup/
-          if-no-files-found: error
-          retention-days: 90
-
-      - name: Replace and verify existing 0.0.4
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SOURCE_SHA: ${{ inputs.source_sha }}
-          OLD_TAG: ${{ inputs.expected_tag_object }}
-          OLD_RELEASE_UPDATED: ${{ inputs.expected_release_updated_at }}
-          ACCEPTED_SUMS: ${{ inputs.expected_exe_sums_sha256 }}
-        run: |
-          python dev/release/replace_release.py --source-sha $env:SOURCE_SHA --expected-main $env:SOURCE_SHA --expected-tag-object $env:OLD_TAG --expected-release-updated-at $env:OLD_RELEASE_UPDATED --expected-exe-sums-sha256 $env:ACCEPTED_SUMS --package release-package --backup release-backup --apply
-          if ($LASTEXITCODE -ne 0) { throw 'Replacement failed; inspect recovery report' }
-
-      - name: Save replacement and recovery evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: replacement-v0.0.4-${{ github.run_id }}
-          path: release-backup/
-          if-no-files-found: warn
-          retention-days: 90

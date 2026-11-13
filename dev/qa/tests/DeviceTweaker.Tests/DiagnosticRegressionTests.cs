@@ -26,7 +26,8 @@ public sealed class DiagnosticRegressionTests
     public void SessionAndCrashVersionsIdentifyTheActualBuild(Type owner)
     {
         string actual = (string)owner.GetMethod("GetAppVersion", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, null)!;
-        Assert.Contains("product=0.0.4", actual);
+        string version = typeof(MainForm).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+        Assert.Contains($"product={version}", actual);
         Assert.Contains($"build={typeof(MainForm).Assembly.ManifestModule.ModuleVersionId:N}", actual);
         Assert.Contains("exeSha256=", actual);
     }

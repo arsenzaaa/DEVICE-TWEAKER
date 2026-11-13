@@ -88,17 +88,13 @@ Capture the read-only developer build with `dev/qa/Capture-Showcase.ps1`. The [s
 
 ## Release automation
 
-The release workflow defaults to packaging without publication. Replacement uses a previously accepted build artifact and a verified archive of the former release. Run its failure-injection checks locally without GitHub access:
-
-```powershell
-python -m unittest discover -s dev/release -p test_replace_release.py -v
-```
-
-Python 3.11+ is needed only for this automation. See [releasing](./RELEASE.md).
+The `Release package` workflow builds an exact selected SHA, checks both EXEs and saves the package as an Actions artifact. It has read-only permissions and cannot create or replace tags or releases. Publish the accepted files separately after owner review. See [releasing](./RELEASE.md).
 
 ## Code map
 
 Driver session ownership is in `src/Core/ImodDriverContext.cs`, with device/SCM interop in `ImodDriverNative.cs` and path policy in `ImodDriverPaths.cs`. The session receives its loader callback from the application; it has no dependency on the MainForm type. `PciInterruptBatch.cs` materializes per-device IRQ results while the session is open. MainForm retains progress, translation and control updates, including rejection of stale results after a topology change.
+
+`DriverIdentity.cs` keeps device/service names and the loaded legacy-device preflight. `DriverRuntime.cs` contains loader selection and app/startup coordination; `ImodDriverContext` calls the selection policy exercised by unit tests. Existing-device readback does not invoke loading.
 
 `src/Devices/NdisRssSettingsWriter.cs` owns RSS registry write and clear sequences. MainForm keeps the write authorization and operation coordination; the Windows key factory independently enforces the immutable QA write block. Tests use disposable fake registry keys. Per-value logs record completed writes and the exact failed step; active adapter readback remains separate from registry-write success.
 

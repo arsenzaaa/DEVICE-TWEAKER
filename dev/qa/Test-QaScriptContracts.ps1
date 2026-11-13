@@ -157,6 +157,7 @@ try {
         Set-Content -LiteralPath (Join-Path $OutputDirectory 'subtitle-contracts.json') -Encoding UTF8
 } finally { $bitmap.Dispose() }
 Write-Host 'PASS: QA error classifier accepts expected faults and rejects unexpected errors.'
+# Historical fixture: log validation must also accept earlier product versions.
 $versionBase = 'LOG.VERSION: product=0.0.4 file=0.0.4.0 assembly=0.0.4.0'
 $identity = ' build='+('a'*32)+' exeSha256='+('B'*64)
 $identityContracts = @()

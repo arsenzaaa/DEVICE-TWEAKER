@@ -60,7 +60,9 @@ internal sealed class ImodDriverContext : IDisposable
     public static bool TryInitialize(string driverPath, Action<string>? log, ImodDriverLoader loadDriver, out ImodDriverContext? ctx, out string? error)
     {
         if (QaRun.TryBlock("PUBLISHED DRIVER INITIALIZE")) { ctx = null; error = "QA read-only session"; return false; }
-        DriverRename.Prepare(DriverRename.Native(driverPath), false);
+        using DriverLoadGate gate = DriverLoadGate.Enter();
+        DriverLoadGate.AssertLoaderIdle();
+        DriverIdentity.CheckLegacyDevice();
         log?.Invoke($"IMOD.RUNTIME.PROFILE: startup={StartupScriptVersion} loader=1.4.5 irq-source=pci-existing-device-or-windows");
         ctx = new ImodDriverContext(driverPath, log) { _loadDriver = loadDriver };
         if (!ctx.Initialize(out error))
@@ -77,15 +79,8 @@ internal sealed class ImodDriverContext : IDisposable
     {
         ctx = null;
         if (QaRun.TryBlock("IMOD DRIVER READ")) { error = "QA read-only session: driver access skipped"; return false; }
-        IntPtr handle = InvalidHandleValue;
-        string? openError = null;
-        DriverReadyResult state = DriverReadyPolicy.Ensure(false,
-            () => TryOpenImodDriverDeviceOnce(out handle, out openError),
-            () => throw new InvalidOperationException("Readback requested a loader"),
-            () => throw new InvalidOperationException("Readback requested KDU"),
-            () => throw new InvalidOperationException("Readback requested SCM"));
-        if (state == DriverReadyResult.Unavailable) { error = openError; return false; }
-        if (!DriverRuntime.QueryInfo(handle, out string info)) { CloseHandle(handle); error = info; return false; }
+        if (!TryOpenImodDriverDeviceOnce(out IntPtr handle, out error)) return false;
+        log?.Invoke("IMOD.DRIVER.INFO: " + DriverRuntime.DescribeLoadedDriver());
         ctx = new ImodDriverContext(ImodDriverPaths.SystemPath(), log) { DriverHandle = handle };
         error = null;
         return true;
@@ -118,27 +113,37 @@ internal sealed class ImodDriverContext : IDisposable
         error = null;
         _log?.Invoke("IMOD.DRIVER: primary loader=kdu");
 
-        if (TryOpenImodDriverDeviceOnce(out IntPtr existingHandle, out string? openError))
+        string? kduError = null, serviceError = null;
+        DriverReadyResult result = DriverReadyPolicy.Ensure(
+            () =>
+            {
+                if (TryOpenImodDriverDeviceOnce(out IntPtr existingHandle, out string? openError))
+                {
+                    _ = CloseHandle(existingHandle);
+                    _log?.Invoke("IMOD.DRIVER: device already available");
+                    return true;
+                }
+                _log?.Invoke($"IMOD.DRIVER.PRELOAD: deviceAvailable=false loaderNext=kdu detail=\"{SanitizeLogValue(openError)}\"");
+                return false;
+            },
+            () => _loadDriver!(DriverPath, _log, out kduError),
+            DriverLoadGate.AssertLoaderIdle,
+            () =>
+            {
+                _log?.Invoke($"IMOD.DRIVER.KDU.WARN: load failed; falling back to service: {kduError}");
+                return TryEnsureImodDriverService(out serviceError);
+            });
+        switch (result)
         {
-            _ = CloseHandle(existingHandle);
-            _log?.Invoke("IMOD.DRIVER: device already available");
-            _log?.Invoke("IMOD.DRIVER.SUMMARY: final=existing loader=already-loaded");
-            return true;
-        }
-
-        _log?.Invoke($"IMOD.DRIVER.PRELOAD: deviceAvailable=false loaderNext=kdu detail=\"{SanitizeLogValue(openError)}\"");
-        if (_loadDriver!(DriverPath, _log, out string? kduError))
-        {
-            _log?.Invoke("IMOD.DRIVER.SUMMARY: final=kdu loader=kdu");
-            return true;
-        }
-
-        DriverLoadGate.AssertLoaderIdle();
-        _log?.Invoke($"IMOD.DRIVER.KDU.WARN: load failed; falling back to service: {kduError}");
-        if (TryEnsureImodDriverService(out string? serviceError))
-        {
-            _log?.Invoke($"IMOD.DRIVER.SUMMARY: final=service loader=service kdu_error={kduError ?? "none"}");
-            return true;
+            case DriverReadyResult.Existing:
+                _log?.Invoke("IMOD.DRIVER.SUMMARY: final=existing loader=already-loaded");
+                return true;
+            case DriverReadyResult.Kdu:
+                _log?.Invoke("IMOD.DRIVER.SUMMARY: final=kdu loader=kdu");
+                return true;
+            case DriverReadyResult.Service:
+                _log?.Invoke($"IMOD.DRIVER.SUMMARY: final=service loader=service kdu_error={kduError ?? "none"}");
+                return true;
         }
 
         error = $"kdu={kduError ?? "unknown"}; service={serviceError ?? "unknown"}";

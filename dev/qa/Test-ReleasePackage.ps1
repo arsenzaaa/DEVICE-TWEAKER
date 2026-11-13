@@ -6,6 +6,12 @@ $package = (Resolve-Path -LiteralPath $PackageDirectory).Path
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $package '..\validation' }
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
+[xml]$project = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\src\DeviceTweakerCS.csproj')
+$expectedVersion = [string]($project.Project.PropertyGroup.InformationalVersion | Where-Object { $_ } | Select-Object -First 1)
+$expectedFileVersion = [string]($project.Project.PropertyGroup.FileVersion | Where-Object { $_ } | Select-Object -First 1)
+if ($expectedVersion -notmatch '^\d+\.\d+\.\d+(?:\.\d+)?$' -or $expectedFileVersion -notmatch '^\d+\.\d+\.\d+\.\d+$') {
+    throw 'Expected numeric source release and file versions'
+}
 $results = @()
 $expectedNames = @('DEVICE.TWEAKER.exe', 'DEVICE.TWEAKER.SelfContained.exe')
 $manifestLines = @(Get-Content -LiteralPath (Join-Path $package 'SHA256SUMS.txt'))
@@ -26,7 +32,7 @@ try {
         $hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
         if ($hash -ne $expected) { throw "Package checksum mismatch: $fileName" }
         $info = [Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
-        if ($info.ProductVersion -ne '0.0.4' -or $info.FileVersion -ne '0.0.4.0') { throw "Wrong release version: $fileName" }
+        if ($info.ProductVersion -ne $expectedVersion -or $info.FileVersion -ne $expectedFileVersion) { throw "Wrong release version: $fileName" }
         $env:DEVICE_TWEAKER_QA_READ_ONLY = '1'
         $env:DEVICE_TWEAKER_QA_SESSION = [Guid]::NewGuid().ToString('N')
         $env:DEVICE_TWEAKER_QA_OUTPUT = Join-Path $OutputDirectory ([IO.Path]::GetFileNameWithoutExtension($fileName))
@@ -35,7 +41,7 @@ try {
             if (-not $process.WaitForExit(20000)) { throw "Packaged EXE probe timed out: $fileName" }
             if ($process.ExitCode -ne 0) { throw "Packaged EXE probe failed: $fileName" }
             $report = Read-QaJson (Join-Path $env:DEVICE_TWEAKER_QA_OUTPUT "process-$($process.Id).json")
-            if ($report.readOnly -ne $true -or $report.build.version -ne '0.0.4' -or $report.build.hasTestPanel -ne $false) {
+            if ($report.readOnly -ne $true -or $report.build.version -ne $expectedVersion -or $report.build.hasTestPanel -ne $false) {
                 throw "Packaged EXE is not the verified production build: $fileName"
             }
             if ($report.build.appBuildId -notmatch '^[0-9a-f]{32}$' -or $report.build.executableSha256 -ne $hash) {
@@ -61,7 +67,7 @@ try {
     }
     [ordered]@{ status = 'PASS'; hardwareValidation = 'SKIPPED'; files = $results } |
         ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'release.json') -Encoding UTF8
-    Write-Host 'PASS: both packaged 0.0.4 EXEs start in probe mode, contain the same driver, and contain no test panel.'
+    Write-Host "PASS: both packaged $expectedVersion EXEs start in probe mode, contain the same driver, and contain no test panel."
 } finally {
     foreach ($name in $names) { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
 }
