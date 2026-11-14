@@ -2,39 +2,53 @@
 
 **English** · [Русский](./README.ru.md)
 
-**DEVICE TWEAKER** brings the MSI and interrupt-affinity controls familiar from MSI Utility V3 and Interrupt Affinity Policy Tool together with ReservedCpuSets and USB IMOD in one Windows utility. Configure devices manually or let automatic optimization select CPU cores based on your processor's topology.
+**DEVICE TWEAKER** combines the controls familiar from MSI Utility V3 and Interrupt Affinity Policy Tool with ReservedCpuSets and USB IMOD in one Windows utility.
 
-[Download](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.SelfContained.exe) · [Guide](./docs/guide/README.md) · [Screenshots](./docs/SCREENSHOTS.md) · [Changelog](./CHANGELOG.md)
+Configure device interrupts manually, or use automatic optimization to select CPU cores based on your processor's topology. Inspect the current state, apply changes and restore saved settings from the same interface.
+
+**[Download for Windows](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.SelfContained.exe)** · [Guide](./docs/guide/README.md) · [Screenshots](./docs/SCREENSHOTS.md) · [Changelog](./CHANGELOG.md)
 
 ## Features
 
-Configure MSI Mode, MSI Limit, IRQ Priority and the CPU cores assigned to device interrupts. Saved settings are shown separately from the current IRQ mode, so you can check how the device driver uses them.
+### Interrupts and CPU affinity
 
-**Automatic optimization** selects cores for the GPU, input devices and network adapters. It accounts for physical cores and SMT siblings, P/E cores, CCDs and available CPPC rankings. You can also configure each device manually and manage ReservedCpuSets separately.
+Adjust MSI Mode, MSI Limit, IRQ Priority and interrupt affinity for each device. Inspect the current IRQ mode alongside the saved configuration and manage ReservedCpuSets separately.
 
-USB IMOD can be configured for an entire controller, by device role or by interrupter index. Network controls include RSS processor and queue selection, with NIC ITR available for supported Intel and Realtek adapters. IMOD and NIC ITR values can be read back from the hardware and saved in startup profiles.
+### Topology-aware automatic optimization
 
-DEVICE TWEAKER preserves original device settings and supports restoring saved backups. Detailed logs record the application build, devices, requested values and the outcome of each stage. The utility also includes device power settings, mouse event-rate measurement and Mouse Throttle controls.
+Select cores for the GPU, input devices and network adapters automatically. Selection accounts for physical cores and SMT siblings, P/E cores, CCDs and available CPPC rankings. Individual device settings remain available for manual adjustment.
+
+### USB and network tuning
+
+Set USB IMOD for a controller, by device role or by interrupter index. Configure RSS processors and queues, and NIC ITR on supported Intel and Realtek adapters. IMOD and NIC ITR support register readback and saved startup profiles.
+
+### Backups and diagnostics
+
+Preserve original device settings and restore saved backups. Operation logs record the build, target device, requested values and the result of each stage. Built-in tools measure mouse event rates and provide Mouse Throttle and device power-saving controls.
 
 ## Getting started
 
-Requires **Windows 10/11 x64** and administrator access. The [self-contained build](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.SelfContained.exe) includes .NET and runs without installation. The [smaller framework-dependent build](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.exe) requires [.NET 10 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/10.0).
+Requires **Windows 10/11 x64** and administrator access.
+
+The **[self-contained build](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.SelfContained.exe)** includes .NET and needs no installation. The smaller [framework-dependent build](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.exe) requires [.NET 10 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/10.0).
 
 1. Run the EXE as administrator and select a device.
 2. Adjust its settings and click **APPLY**, or use **AUTO-OPTIMIZATION** to select settings automatically.
 3. Restart Windows after changing MSI or Interrupt Affinity. See the [verification guide](./docs/guide/10-verification.md) for checking the result.
 
-Saved backups are available under **RESTORE**. Operation logs are stored in the `logs` folder next to the EXE. All release files and their checksums are available on the [download page](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest).
+Open **RESTORE** to access saved backups. Logs are stored in the `logs` folder next to the EXE. All release files and checksums are on the [releases page](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest).
 
-IMOD, NIC ITR and PCI configuration reads use DTIMOD.sys, loaded through KDU. The driver may conflict with anti-cheat software, including EAC, Vanguard and FACEIT. Closing the application does not unload it; see the [driver guide](./docs/guide/11-driver.md) for loading requirements and startup profile behavior.
+**Driver compatibility.** IMOD, NIC ITR and PCI configuration reads use DTIMOD.sys, loaded through KDU. It may conflict with anti-cheat software, including EAC, Vanguard and FACEIT. Closing the application does not unload the driver. Loading requirements and startup profile behavior are covered in the [driver guide](./docs/guide/11-driver.md).
 
 ## Documentation
 
-The [guide](./docs/guide/README.md) explains interrupt handling and device configuration. The [settings reference](./docs/SETTINGS.md) covers interface fields, applying changes and restoring settings. Build instructions and developer checks are covered in the [development guide](./docs/DEVELOPMENT.md).
+- [User guide](./docs/guide/README.md) - interrupt handling, CPU topology and device configuration.
+- [Settings reference](./docs/SETTINGS.md) - interface controls, applying changes and restoring settings.
+- [Development](./docs/DEVELOPMENT.md) - building from source and running focused checks with the QA workbench.
 
 ## Feedback and support
 
-Report bugs and suggest improvements through [Issues](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues). You can share results from your hardware using the [hardware report form](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=hardware_report.yml), or get in touch on [Telegram](https://t.me/arsenzaa).
+Report bugs and suggest improvements through [Issues](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues). Use the [hardware report form](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=hardware_report.yml) to share results from your system. For direct contact, use [Telegram](https://t.me/arsenzaa).
 
 Support the development of DEVICE TWEAKER on [Boosty](https://boosty.to/arsenza).
 
