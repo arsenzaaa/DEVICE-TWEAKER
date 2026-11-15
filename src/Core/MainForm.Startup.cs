@@ -1,7 +1,4 @@
-using System.Security.AccessControl;
-using System.Security.Principal;
 using System.Text;
-using System.Text.Json;
 
 using static DeviceTweakerCS.ImodDriverNative;
 
@@ -10,43 +7,53 @@ namespace DeviceTweakerCS;
 // Saved USB IMOD / NIC ITR profile and the standalone script that applies it.
 // The script, its C# runtime and the loader live in %ProgramData%\DEVICE TWEAKER\Startup,
 // run from Task Scheduler as SYSTEM and keep working without DEVICE TWEAKER.exe.
+// StartupBundle owns those files and the task; this part maps settings to the profile.
 public sealed partial class MainForm
 {
     private const string StartupScriptResource = "DeviceTweakerCS.Startup.ApplyIMOD.ps1";
     private const string StartupRuntimeResource = "DeviceTweakerCS.Startup.DeviceTweakerImodRuntime.cs";
-    private const string StartupRuntimeFileName = "DeviceTweakerImodRuntime.cs";
-    private const string StartupProfileFileName = "profile.json";
 
-    private static string GetStartupParentDirectory()
-    {
-        string programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-        if (string.IsNullOrWhiteSpace(programData))
-        {
-            throw new InvalidOperationException("%ProgramData% is not available.");
-        }
+    internal static string GetStartupRoot() => StartupBundleLayout.ForCurrentUser().Root;
 
-        return Path.Combine(programData, "DEVICE TWEAKER");
-    }
+    private static string GetStartupScriptPath() => StartupBundleLayout.ForCurrentUser().ScriptPath;
 
-    internal static string GetStartupRoot() => Path.Combine(GetStartupParentDirectory(), "Startup");
-
-    private static string GetStartupScriptPath() => Path.Combine(GetStartupRoot(), ImodScriptFileName);
-
-    private static string GetStartupRuntimePath() => Path.Combine(GetStartupRoot(), StartupRuntimeFileName);
-
-    private static string GetStartupProfilePath() => Path.Combine(GetStartupRoot(), StartupProfileFileName);
-
-    private static string GetImodStartupKduDirectory() => Path.Combine(GetStartupRoot(), "Loader");
+    private static string GetStartupProfilePath() => StartupBundleLayout.ForCurrentUser().ProfilePath;
 
     // Before this layout the script lived in %APPDATA% and started from HKCU\...\Run;
     // older versions used the Startup folder.
-    private static string GetLegacyAppDataImodDirectory()
-        => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DEVICE TWEAKER", "IMOD");
-
-    private static string GetLegacyAppDataImodScriptPath() => Path.Combine(GetLegacyAppDataImodDirectory(), ImodScriptFileName);
+    private static string GetLegacyAppDataImodScriptPath()
+        => Path.Combine(StartupBundleLayout.CurrentLegacyAppDataDirectory(), ImodScriptFileName);
 
     private static string GetLegacyImodStartupPath()
-        => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup), ImodScriptFileName);
+        => Path.Combine(StartupBundleLayout.CurrentLegacyStartupFolder(), ImodScriptFileName);
+
+    private StartupBundle CreateStartupBundle()
+        => new(StartupBundleLayout.ForCurrentUser(), new EmbeddedStartupPayload(), new ScheduledStartupTask(),
+            StartupBundle.SecureFolder, DeleteImodStartupRegistration, WriteLog);
+
+    // The script, runtime and loader embedded in this EXE.
+    private sealed class EmbeddedStartupPayload : IStartupPayload
+    {
+        private const string KduResource = "DeviceTweakerCS.IMOD.Loader.kdu.exe";
+        private const string DatabaseResource = "DeviceTweakerCS.IMOD.Loader.drv64.dll";
+
+        public string Script => ReadStartupResource(StartupScriptResource);
+        public string Runtime => ReadStartupResource(StartupRuntimeResource);
+
+        public bool TryWriteLoader(string directory, out string? error)
+        {
+            string kduPath = Path.Combine(directory, ImodKduFileName);
+            string dbPath = Path.Combine(directory, ImodKduDatabaseFileName);
+            return TryWriteEmbeddedImodResource(KduResource, ".kdu.exe", kduPath, out error)
+                && TryWriteEmbeddedImodResource(DatabaseResource, ".drv64.dll", dbPath, out error)
+                && TryVerifyEmbeddedImodResourceFile(KduResource, ".kdu.exe", kduPath, out error)
+                && TryVerifyEmbeddedImodResourceFile(DatabaseResource, ".drv64.dll", dbPath, out error);
+        }
+
+        public bool IsLoaderCurrent(string directory)
+            => TryVerifyEmbeddedImodResourceFile(KduResource, ".kdu.exe", Path.Combine(directory, ImodKduFileName), out _)
+                && TryVerifyEmbeddedImodResourceFile(DatabaseResource, ".drv64.dll", Path.Combine(directory, ImodKduDatabaseFileName), out _);
+    }
 
     private static string ReadStartupResource(string name)
     {
@@ -122,26 +129,7 @@ public sealed partial class MainForm
         return config;
     }
 
-    private bool IsStartupBundleCurrent()
-    {
-        try
-        {
-            return FileTextEquals(GetStartupScriptPath(), ReadStartupResource(StartupScriptResource))
-                && FileTextEquals(GetStartupRuntimePath(), ReadStartupResource(StartupRuntimeResource))
-                && TryVerifyEmbeddedImodResourceFile("DeviceTweakerCS.IMOD.Loader.kdu.exe", ".kdu.exe",
-                    Path.Combine(GetImodStartupKduDirectory(), ImodKduFileName), out _)
-                && TryVerifyEmbeddedImodResourceFile("DeviceTweakerCS.IMOD.Loader.drv64.dll", ".drv64.dll",
-                    Path.Combine(GetImodStartupKduDirectory(), ImodKduDatabaseFileName), out _)
-                && StartupTask.Exists();
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
-        {
-            return false;
-        }
-    }
-
-    private static bool FileTextEquals(string path, string expected)
-        => File.Exists(path) && string.Equals(File.ReadAllText(path, Encoding.UTF8), expected, StringComparison.Ordinal);
+    private bool IsStartupBundleCurrent() => CreateStartupBundle().IsCurrent();
 
     private void InstallStartupBundle(ImodConfig config)
     {
@@ -157,103 +145,15 @@ public sealed partial class MainForm
         string profileJson = profile.ToJson();
         _ = ConvertStartupProfile(StartupProfile.FromJson(profileJson));
 
-        SecureStartupFolder(GetStartupParentDirectory());
-        SecureStartupFolder(GetStartupRoot());
-        // PowerShell 5.1 reads a script without BOM in the ANSI code page.
-        WriteAllTextAtomic(GetStartupScriptPath(), ReadStartupResource(StartupScriptResource), new UTF8Encoding(true));
-        WriteAllTextAtomic(GetStartupRuntimePath(), ReadStartupResource(StartupRuntimeResource), new UTF8Encoding(false));
-        if (!EnsureImodStartupKduPayload(out _, out _, out string? loaderError))
-        {
-            throw new IOException("The startup loader could not be prepared: " + loaderError);
-        }
-
-        WriteAllTextAtomic(GetStartupProfilePath(), profileJson, new UTF8Encoding(false));
-        if (!StartupTask.Register(GetStartupScriptPath(), WriteLog, out string? taskError))
-        {
-            throw new InvalidOperationException("The startup task could not be registered: " + taskError);
-        }
-
-        RemoveLegacyStartup(report: null);
-        WriteLog($"IMOD.STARTUP: saved profile usb={profile.Usb.Controllers.Count} nic={profile.NicItr.Count} root=\"{GetStartupRoot()}\"");
+        StartupBundle bundle = CreateStartupBundle();
+        bundle.Install(profileJson);
+        WriteLog($"IMOD.STARTUP: saved profile usb={profile.Usb.Controllers.Count} nic={profile.NicItr.Count} root=\"{bundle.Layout.Root}\"");
     }
 
     private void RemoveStartupBundle(OperationReport? report)
     {
         DemandRealWrite("RemoveStartupBundle");
-        if (!StartupTask.Delete(WriteLog, out string? taskError))
-        {
-            WriteLog($"IMOD.STARTUP.TASK: {taskError}");
-            report?.AddError("IMOD.STARTUP", taskError ?? "startup task was not deleted");
-        }
-
-        DeleteFileIfExists(GetStartupProfilePath(), "IMOD.STARTUP", report);
-        DeleteFileIfExists(GetStartupScriptPath(), "IMOD.STARTUP", report);
-        DeleteFileIfExists(GetStartupRuntimePath(), "IMOD.STARTUP", report);
-        DeleteDirectoryIfExists(GetImodStartupKduDirectory(), "IMOD.STARTUP");
-        RemoveLegacyStartup(report);
-    }
-
-    private void RemoveLegacyStartup(OperationReport? report)
-    {
-        DeleteImodStartupRegistration(report);
-        DeleteFileIfExists(GetLegacyAppDataImodScriptPath(), "IMOD.STARTUP.LEGACY", report);
-        DeleteFileIfExists(GetLegacyImodStartupPath(), "IMOD.STARTUP.LEGACY", report);
-        string legacyDirectory = GetLegacyAppDataImodDirectory();
-        DeleteDirectoryIfExists(Path.Combine(legacyDirectory, "Loader"), "IMOD.STARTUP.LEGACY");
-        if (Directory.Exists(legacyDirectory))
-        {
-            foreach (string previous in Directory.GetFiles(legacyDirectory, ImodScriptFileName + ".pre-DTIMOD-*.bak"))
-            {
-                DeleteFileIfExists(previous, "IMOD.STARTUP.LEGACY", report);
-            }
-        }
-    }
-
-    // A non-admin user can pre-create folders in %ProgramData% or plant a junction.
-    // The folder must be a real directory owned by Administrators that only
-    // administrators and SYSTEM can change; users keep read access to review the script.
-    private static void SecureStartupFolder(string path)
-    {
-        DirectoryInfo directory = new(path);
-        if (directory.Exists && directory.Attributes.HasFlag(FileAttributes.ReparsePoint))
-        {
-            directory.Delete();
-        }
-
-        directory.Refresh();
-        if (!directory.Exists)
-        {
-            directory.Create();
-        }
-
-        directory.Refresh();
-        if (directory.Attributes.HasFlag(FileAttributes.ReparsePoint))
-        {
-            throw new IOException($"Refusing to use a reparse point as the startup folder: {path}");
-        }
-
-        DirectorySecurity security = new();
-        security.SetOwner(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
-        security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
-        void Allow(WellKnownSidType sid, FileSystemRights rights)
-            => security.AddAccessRule(new FileSystemAccessRule(
-                new SecurityIdentifier(sid, null),
-                rights,
-                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
-                PropagationFlags.None,
-                AccessControlType.Allow));
-        Allow(WellKnownSidType.LocalSystemSid, FileSystemRights.FullControl);
-        Allow(WellKnownSidType.BuiltinAdministratorsSid, FileSystemRights.FullControl);
-        Allow(WellKnownSidType.BuiltinUsersSid, FileSystemRights.ReadAndExecute);
-        try
-        {
-            directory.SetAccessControl(security);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            throw new UnauthorizedAccessException(
-                $"{path} belongs to another account and cannot be secured. Delete the folder and save again.", ex);
-        }
+        CreateStartupBundle().Remove(report);
     }
 
     internal static StartupProfile BuildStartupProfile(ImodConfig config, string driverPath)
@@ -262,7 +162,7 @@ public sealed partial class MainForm
         {
             CreatedBy = "DEVICE TWEAKER " + AppBuildIdentity.ProductVersion,
             Driver = new StartupFile { Path = driverPath, Sha256 = ReadEmbeddedImodDriverHash() ?? string.Empty },
-            Runtime = new StartupFile { File = StartupRuntimeFileName, Sha256 = ComputeTextSha256(ReadStartupResource(StartupRuntimeResource)) },
+            Runtime = new StartupFile { File = StartupBundleLayout.RuntimeFileName, Sha256 = ComputeTextSha256(ReadStartupResource(StartupRuntimeResource)) },
             Loader = new StartupLoader
             {
                 Kdu = new StartupFile

@@ -145,35 +145,6 @@ public sealed partial class MainForm
     private static string GetImodDriverSystemPath()
         => ImodDriverPaths.SystemPath();
 
-    private static bool EnsureImodStartupKduPayload(out string kduPath, out string dbPath, out string? error)
-    {
-        string directory = GetImodStartupKduDirectory();
-        kduPath = Path.Combine(directory, ImodKduFileName);
-        dbPath = Path.Combine(directory, ImodKduDatabaseFileName);
-
-        try
-        {
-            SecureStartupFolder(directory);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            error = ex.Message;
-            return false;
-        }
-
-        if (!TryWriteEmbeddedImodResource("DeviceTweakerCS.IMOD.Loader.kdu.exe", ".kdu.exe", kduPath, out error))
-        {
-            return false;
-        }
-
-        if (!TryWriteEmbeddedImodResource("DeviceTweakerCS.IMOD.Loader.drv64.dll", ".drv64.dll", dbPath, out error))
-        {
-            return false;
-        }
-        return TryVerifyEmbeddedImodResourceFile("DeviceTweakerCS.IMOD.Loader.kdu.exe", ".kdu.exe", kduPath, out error)
-            && TryVerifyEmbeddedImodResourceFile("DeviceTweakerCS.IMOD.Loader.drv64.dll", ".drv64.dll", dbPath, out error);
-    }
-
     private static bool IsImodDriverSystemPath(string? path)
         => ImodDriverPaths.IsSystemPath(path);
 

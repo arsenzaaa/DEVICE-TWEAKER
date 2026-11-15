@@ -273,80 +273,10 @@ public sealed partial class MainForm : Form
     }
 
     private static void WriteAllTextAtomic(string path, string content, Encoding encoding)
-    {
-        QaRun.DemandArtifactPath(path);
-        string fullPath = Path.GetFullPath(path);
-        string? directory = Path.GetDirectoryName(fullPath);
-        if (string.IsNullOrWhiteSpace(directory))
-        {
-            throw new InvalidOperationException($"Cannot resolve the destination directory for {path}.");
-        }
-
-        Directory.CreateDirectory(directory);
-        string temporaryPath = Path.Combine(directory, $".{Path.GetFileName(fullPath)}.{Guid.NewGuid():N}.tmp");
-        try
-        {
-            using (FileStream stream = new(
-                       temporaryPath,
-                       FileMode.CreateNew,
-                       FileAccess.Write,
-                       FileShare.None,
-                       bufferSize: 4096,
-                       FileOptions.WriteThrough))
-            using (StreamWriter writer = new(stream, encoding))
-            {
-                writer.Write(content);
-                writer.Flush();
-                stream.Flush(flushToDisk: true);
-            }
-
-            File.Move(temporaryPath, fullPath, overwrite: true);
-        }
-        finally
-        {
-            if (File.Exists(temporaryPath))
-            {
-                File.Delete(temporaryPath);
-            }
-        }
-    }
+        => AtomicFile.WriteAllText(path, content, encoding);
 
     private static void WriteAllBytesAtomic(string path, byte[] content)
-    {
-        QaRun.DemandArtifactPath(path);
-        string fullPath = Path.GetFullPath(path);
-        string? directory = Path.GetDirectoryName(fullPath);
-        if (string.IsNullOrWhiteSpace(directory))
-        {
-            throw new InvalidOperationException($"Cannot resolve the destination directory for {path}.");
-        }
-
-        Directory.CreateDirectory(directory);
-        string temporaryPath = Path.Combine(directory, $".{Path.GetFileName(fullPath)}.{Guid.NewGuid():N}.tmp");
-        try
-        {
-            using (FileStream stream = new(
-                       temporaryPath,
-                       FileMode.CreateNew,
-                       FileAccess.Write,
-                       FileShare.None,
-                       bufferSize: 4096,
-                       FileOptions.WriteThrough))
-            {
-                stream.Write(content);
-                stream.Flush(flushToDisk: true);
-            }
-
-            File.Move(temporaryPath, fullPath, overwrite: true);
-        }
-        finally
-        {
-            if (File.Exists(temporaryPath))
-            {
-                File.Delete(temporaryPath);
-            }
-        }
-    }
+        => AtomicFile.WriteAllBytes(path, content);
 
     private void WriteLog(string message)
     {
