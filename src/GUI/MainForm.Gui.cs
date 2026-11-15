@@ -52,7 +52,7 @@ public sealed partial class MainForm
         string informationalVersion = Assembly.GetEntryAssembly()
             ?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion
-            ?? "0.0.1";
+            ?? "0.1.0";
         if (informationalVersion.Contains('+'))
         {
             informationalVersion = informationalVersion.Split('+')[0];

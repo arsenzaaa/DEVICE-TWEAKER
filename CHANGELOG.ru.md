@@ -2,7 +2,7 @@
 
 [DEVICE TWEAKER](./README.ru.md) / История изменений · [English](./CHANGELOG.md)
 
-## 0.0.1
+## 0.1.0
 
 Первый выпуск **DEVICE TWEAKER REWORK**.
 

@@ -114,7 +114,7 @@ Layout `main.png` / `restore.png` captures use native PrintWindow within display
 Check an existing local EXE package separately:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Test-ReleasePackage.ps1 -PackageDirectory ".\src\bin\ReleasePackages\v0.0.1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Test-ReleasePackage.ps1 -PackageDirectory ".\src\bin\ReleasePackages\v0.1.0"
 ```
 
 This checks SHA-256, versions, both EXEs in probe mode, the embedded driver and absence of the test panel. It does not open the main window or apply settings.

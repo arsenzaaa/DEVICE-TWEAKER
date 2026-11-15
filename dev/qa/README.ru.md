@@ -116,7 +116,7 @@ dotnet build ".\src\DeviceTweakerCS.csproj" -c Release -p:DeveloperQa=true -p:Bu
 Готовый локальный набор EXE проверяется отдельно:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Test-ReleasePackage.ps1 -PackageDirectory ".\src\bin\ReleasePackages\v0.0.1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Test-ReleasePackage.ps1 -PackageDirectory ".\src\bin\ReleasePackages\v0.1.0"
 ```
 
 Проверяются SHA-256, версия, запуск обоих EXE в probe, встроенный драйвер и отсутствие тест-панели. Главное окно и применение настроек не запускаются.

@@ -2,7 +2,7 @@
 
 [DEVICE TWEAKER](./README.md) / Changelog · [Русский](./CHANGELOG.ru.md)
 
-## 0.0.1
+## 0.1.0
 
 Initial release of **DEVICE TWEAKER REWORK**.
 
