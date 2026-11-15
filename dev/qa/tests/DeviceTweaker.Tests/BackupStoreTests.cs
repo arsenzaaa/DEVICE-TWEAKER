@@ -71,7 +71,7 @@ public sealed class BackupStoreTests : IDisposable
         InvalidOperationException error = Assert.Throws<InvalidOperationException>(() => Store().Save(Local, "Local", "pre-apply", backup));
 
         Assert.StartsWith("Backup capture is incomplete: 1 registry value(s) could not be read.", error.Message);
-        Assert.Empty(Directory.GetFiles(Local));
+        Assert.False(Directory.Exists(Local));
     }
 
     [Theory]
@@ -177,6 +177,25 @@ public sealed class BackupStoreTests : IDisposable
         string[] kept = Directory.GetFiles(Local).Order(StringComparer.OrdinalIgnoreCase).ToArray();
         Assert.Equal(paths.Take(9).Append(paths[12]).Append(original).Order(StringComparer.OrdinalIgnoreCase), kept);
         Assert.Equal(3, _log.Count(line => line.StartsWith("BACKUP.PRUNE: deleted old backup path=", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void BlockedSnapshotDoesNotCreateAnOutsideDirectory()
+    {
+        string outside = Path.Combine(Path.GetTempPath(), "dt-backup-blocked-" + Guid.NewGuid().ToString("N"));
+        Assert.False(Directory.Exists(outside));
+        try
+        {
+            BackupStore store = new(outside, Roaming, backup => BackupFormat.ValidateDocument(backup, _ => false), _log.Add);
+            Assert.Throws<QaWriteBlockedException>(() => store.Save(outside, "Local", "pre-apply", Snapshot("pre-apply")));
+            Assert.False(Directory.Exists(outside));
+            Assert.False(store.EnsureOriginal(outside, "Local", Capture));
+            Assert.False(Directory.Exists(outside));
+        }
+        finally
+        {
+            if (Directory.Exists(outside)) Directory.Delete(outside, recursive: true);
+        }
     }
 
     [Fact]

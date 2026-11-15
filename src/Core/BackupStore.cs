@@ -59,8 +59,6 @@ internal sealed class BackupStore(
     // Writes a new snapshot; the caller prunes the directory afterwards.
     public string Save(string directory, string location, string reason, DeviceTweakerBackup backup)
     {
-        Directory.CreateDirectory(directory);
-
         string safeReason = MakeFileReason(reason);
         string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture);
         string path = Path.Combine(directory, $"{FilePrefix}{stamp}_{safeReason}.json");
@@ -121,7 +119,6 @@ internal sealed class BackupStore(
 
         try
         {
-            Directory.CreateDirectory(preferredDirectory);
             string path = Path.Combine(preferredDirectory, OriginalFileName);
 
             DeviceTweakerBackup? original = null;
