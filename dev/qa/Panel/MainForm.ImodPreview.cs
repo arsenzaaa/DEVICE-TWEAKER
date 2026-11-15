@@ -48,18 +48,18 @@ public sealed partial class MainForm
 
         List<uint> values = BuildTestImodPreviewValues(block.Device, parsedInput, fallback);
         Dictionary<uint, List<string>> labelsByInterrupter = BuildTestImodPreviewLabels(block.Device);
-        string mappedDeviceLine = FormatMappedImodDeviceLine(values, labelsByInterrupter, [], FormatUnknownImodDeviceValue(values));
-        string visibleInterruptLines = FormatVisibleImodInterrupterLines(values);
+        string mappedDeviceLine = ImodMapText.MappedDeviceLine(values, labelsByInterrupter, [], ImodMapText.UnknownDeviceValue(values));
+        string visibleInterruptLines = ImodMapText.VisibleInterrupterLines(values);
         string detailText =
-            $"{mappedDeviceLine}\r\n\r\n{visibleInterruptLines}\r\n{FormatDetailedImodInterrupterMap(values, labelsByInterrupter)}\r\n{FormatRawImodInterrupterMap(values)}\r\n{FormatTimeImodInterrupterMap(values)}\r\nsource: test preview only; no driver read/write";
+            $"{mappedDeviceLine}\r\n\r\n{visibleInterruptLines}\r\n{ImodMapText.Detailed(values, labelsByInterrupter)}\r\n{ImodMapText.Raw(values)}\r\n{ImodMapText.Time(values)}\r\nsource: test preview only; no driver read/write";
 
         block.ImodDefaultLabel.Text = $"default: {FormatImodValue(fallback)}";
         block.ImodDefaultLabel.Tag = FormatImodValue(fallback);
         // Fixed time keeps workbench snapshots comparable between runs.
         block.ImodMapReadAt = DateTime.Today.AddHours(12);
         block.ImodMapStale = false;
-        block.ImodCurrentLabel.Text = $"current: {FormatImodValueList(values)}";
-        block.ImodCurrentLabel.Tag = FormatImodReadbackTooltip($"test preview raw: {FormatImodValueListForLog(values)}", block.ImodMapReadAt.Value);
+        block.ImodCurrentLabel.Text = $"current: {ImodMapText.ValueList(values)}";
+        block.ImodCurrentLabel.Tag = FormatImodReadbackTooltip($"test preview raw: {ImodMapText.ValueListForLog(values)}", block.ImodMapReadAt.Value);
         block.ImodCurrentLabel.ForeColor = _statusActive;
         SetImodStatusTooltip(block.ImodCurrentLabel);
 
@@ -86,7 +86,7 @@ public sealed partial class MainForm
 
         SetImodDetailsVisibility(block, forceVisible: false);
         LogImodUiSnapshot(block, reason, values, detailText);
-        WriteLog($"IMOD.TEST.PREVIEW: {block.Device.InstanceId} values={FormatImodValueListForLog(values)} reason={reason}");
+        WriteLog($"IMOD.TEST.PREVIEW: {block.Device.InstanceId} values={ImodMapText.ValueListForLog(values)} reason={reason}");
     }
 
     private static List<uint> BuildTestImodPreviewValues(DeviceInfo device, ImodInput input, uint fallback)
@@ -112,11 +112,11 @@ public sealed partial class MainForm
         {
             List<uint> values = Enumerable.Repeat(normalizedFallback, previewInterrupters).ToList();
             Dictionary<string, List<string>> labelsByRole = new(StringComparer.OrdinalIgnoreCase);
-            AddAdaptiveRoleDisplayLabels(device.UsbRoles, labelsByRole);
-            AddAdaptiveRoleDisplayLabels(device.AudioEndpoints, labelsByRole);
+            ImodRoleMap.AddDisplayLabels(device.UsbRoles, labelsByRole);
+            ImodRoleMap.AddDisplayLabels(device.AudioEndpoints, labelsByRole);
 
             uint currentIntr = 0;
-            foreach (string role in AdaptiveRolePriority)
+            foreach (string role in ImodRoleMap.Priority)
             {
                 if (!labelsByRole.ContainsKey(role))
                 {
@@ -143,14 +143,14 @@ public sealed partial class MainForm
     private static Dictionary<uint, List<string>> BuildTestImodPreviewLabels(DeviceInfo device)
     {
         Dictionary<string, List<string>> labelsByRole = new(StringComparer.OrdinalIgnoreCase);
-        AddAdaptiveRoleDisplayLabels(device.UsbRoles, labelsByRole);
-        AddAdaptiveRoleDisplayLabels(device.AudioEndpoints, labelsByRole);
+        ImodRoleMap.AddDisplayLabels(device.UsbRoles, labelsByRole);
+        ImodRoleMap.AddDisplayLabels(device.AudioEndpoints, labelsByRole);
 
         Dictionary<uint, List<string>> result = [];
         HashSet<string> emitted = new(StringComparer.OrdinalIgnoreCase);
         uint currentIntr = 0;
 
-        foreach (string role in AdaptiveRolePriority)
+        foreach (string role in ImodRoleMap.Priority)
         {
             if (!labelsByRole.TryGetValue(role, out List<string>? roleLabels))
             {
@@ -205,8 +205,8 @@ public sealed partial class MainForm
     private static HashSet<string> BuildTestImodPreviewRoles(DeviceInfo device)
     {
         Dictionary<string, List<string>> labelsByRole = new(StringComparer.OrdinalIgnoreCase);
-        AddAdaptiveRoleDisplayLabels(device.UsbRoles, labelsByRole);
-        AddAdaptiveRoleDisplayLabels(device.AudioEndpoints, labelsByRole);
+        ImodRoleMap.AddDisplayLabels(device.UsbRoles, labelsByRole);
+        ImodRoleMap.AddDisplayLabels(device.AudioEndpoints, labelsByRole);
         return new HashSet<string>(labelsByRole.Keys, StringComparer.OrdinalIgnoreCase);
     }
 

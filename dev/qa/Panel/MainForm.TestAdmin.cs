@@ -1323,14 +1323,14 @@ public sealed partial class MainForm
                     return columns.Length >= 2 && columns.All(column => column == columns[0]);
                 }
 
-                string deviceMap = FormatDeviceFirstImodLines(
+                string deviceMap = ImodMapText.DeviceFirstLines(
                 [
                     "Mouse 1K -> intr0=0x0/0 ns",
                     "Keyboard 8K -> intr0=0x0/0 ns",
                     "Audio -> intr0=0xC8/50us",
                     "Microphone -> intr0=0x0/0 ns",
                 ]);
-                string interrupterMap = FormatVisibleImodInterrupterLines([0, 0xC8, 0xC8, 0xC8, 0, 0xC8, 0xC8, 0]);
+                string interrupterMap = ImodMapText.VisibleInterrupterLines([0, 0xC8, 0xC8, 0xC8, 0, 0xC8, 0xC8, 0]);
                 NicItrProfile nicProfile = NicItrService.NicItrProfiles.First(profile => profile.TimingKind == NicItrTimingKind.RealtekIntrMitV2);
                 string nicDetails = FormatNicItrQueueDetailText([0x7E600958, 0, 0x7E600938, 0], nicProfile);
                 string[] nicRows = nicDetails.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries);

@@ -4,15 +4,7 @@ namespace DeviceTweakerCS;
 
 public sealed partial class MainForm
 {
-    private static string NormalizeInstanceId(string? id)
-    {
-        if (string.IsNullOrWhiteSpace(id))
-        {
-            return string.Empty;
-        }
-
-        return id.Replace("\\\\", "\\").Trim().ToUpperInvariant();
-    }
+    private static string NormalizeInstanceId(string? id) => DeviceIds.Normalize(id);
 
     private string? GetParentId(string id)
     {

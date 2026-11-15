@@ -826,10 +826,7 @@ public sealed partial class MainForm
         return false;
     }
 
-    private static string FormatImodValue(uint value)
-    {
-        return $"0x{value:X}";
-    }
+    private static string FormatImodValue(uint value) => ImodMapText.Value(value);
 
     private static string FormatImodVector(IReadOnlyList<uint> values)
     {

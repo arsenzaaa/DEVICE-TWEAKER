@@ -28,7 +28,7 @@ public sealed partial class MainForm
 
         foreach (string part in text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            if (TryGetAdaptiveRoleBase(part, out string role)
+            if (ImodRoleMap.TryGetRoleBase(part, out string role)
                 && ImodDeviceEditorRoleOrder.Contains(role, StringComparer.OrdinalIgnoreCase))
             {
                 roles.Add(role);

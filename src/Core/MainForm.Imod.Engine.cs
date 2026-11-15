@@ -460,8 +460,8 @@ public sealed partial class MainForm
 
             block.ImodMapReadAt = DateTime.Now;
             block.ImodMapStale = false;
-            block.ImodCurrentLabel.Text = $"current: {FormatImodValueList(values)}";
-            block.ImodCurrentLabel.Tag = FormatImodReadbackTooltip($"current raw: {FormatImodValueListForLog(values)}", block.ImodMapReadAt.Value);
+            block.ImodCurrentLabel.Text = $"current: {ImodMapText.ValueList(values)}";
+            block.ImodCurrentLabel.Tag = FormatImodReadbackTooltip($"current raw: {ImodMapText.ValueListForLog(values)}", block.ImodMapReadAt.Value);
             block.ImodCurrentLabel.ForeColor = _statusActive;
             SetImodStatusTooltip(block.ImodCurrentLabel);
             if (block.ImodMapLabel is not null)
@@ -489,7 +489,7 @@ public sealed partial class MainForm
                 RevealImodCheckResult(block);
             }
             LogImodUiSnapshot(block, reason, values, block.ImodMapLabel?.Tag as string);
-            WriteLog($"IMOD.READBACK: {block.Device.InstanceId} values={FormatImodValueListForLog(values)}");
+            WriteLog($"IMOD.READBACK: {block.Device.InstanceId} values={ImodMapText.ValueListForLog(values)}");
         }
     }
 
@@ -499,9 +499,9 @@ public sealed partial class MainForm
         string defaultText = FlattenLogText(block.ImodDefaultLabel.Text);
         string currentText = FlattenLogText(block.ImodCurrentLabel.Text);
         string baseRoles = block.Device.UsbRoles ?? string.Empty;
-        string effectiveRoles = GetEffectiveUsbRolesForController(block.Device, block.Device.InstanceId);
+        string effectiveRoles = ImodRoleMap.EffectiveUsbRoles(baseRoles, block.Device.InstanceId, block.Device.InstanceId, _usbRoleOverrideByController);
         string rawValues = values is { Count: > 0 }
-            ? FormatImodValueListForLog(values)
+            ? ImodMapText.ValueListForLog(values)
             : string.Empty;
         string detail = (mapDetail ?? (block.ImodMapLabel?.Tag as string) ?? block.ImodMapLabel?.Text ?? string.Empty).Trim();
 
@@ -886,34 +886,6 @@ public sealed partial class MainForm
         return true;
     }
 
-    private static string FormatImodValueList(IReadOnlyList<uint> values)
-    {
-        if (values.Count == 0)
-        {
-            return "-";
-        }
-
-        uint first = values[0];
-        if (values.All(v => v == first))
-        {
-            return values.Count > 1
-                ? $"{FormatImodValue(first)} x{values.Count}"
-                : FormatImodValue(first);
-        }
-
-        return "varies by interrupter";
-    }
-
-    private static string FormatImodValueListForLog(IReadOnlyList<uint> values)
-    {
-        if (values.Count == 0)
-        {
-            return "-";
-        }
-
-        return string.Join(",", values.Select(value => $"0x{value & 0xFFFF:X4}"));
-    }
-
     private static string FormatImodReadbackStatus(string? error)
     {
         if (string.IsNullOrWhiteSpace(error))
@@ -1111,476 +1083,15 @@ public sealed partial class MainForm
             WriteLog($"IMOD.MAP.ROLES.WARN: unavailable {controller.DeviceId}: {resolveDetail}");
         }
 
-        Dictionary<string, List<string>> displayLabelsByRole = BuildAdaptiveRoleDisplayLabels(roleSnapshot, controller.DeviceId);
-        Dictionary<uint, List<string>> displayLabelsByInterrupter = [];
-        HashSet<string> mappedLabelsSeen = new(StringComparer.OrdinalIgnoreCase);
-
-        if (hasRoleMap)
-        {
-            foreach (KeyValuePair<uint, HashSet<string>> pair in rolesByInterrupter.OrderBy(static kvp => kvp.Key))
-            {
-                if (pair.Key >= currentIntervals.Count || pair.Value.Count == 0)
-                {
-                    continue;
-                }
-
-                List<string> mappedLabels = [];
-                HashSet<string> localLabelsSeen = new(StringComparer.OrdinalIgnoreCase);
-                foreach (string label in FormatAdaptiveDisplayRoles(pair.Value, displayLabelsByRole))
-                {
-                    string cleanLabel = FormatImodDeviceMapLabel(label);
-                    if (localLabelsSeen.Add(cleanLabel))
-                    {
-                        mappedLabels.Add(cleanLabel);
-                        mappedLabelsSeen.Add(cleanLabel);
-                    }
-                }
-
-                if (mappedLabels.Count > 0)
-                {
-                    displayLabelsByInterrupter[pair.Key] = mappedLabels;
-                }
-            }
-        }
-
-        string unknownDeviceValue = FormatUnknownImodDeviceValue(currentIntervals);
-        List<string> unknownLabels = [];
-        HashSet<string> unknownLabelsSeen = new(StringComparer.OrdinalIgnoreCase);
-        foreach (string label in BuildControllerImodDeviceDisplayLabels(roleSnapshot, controller.DeviceId))
-        {
-            string cleanLabel = FormatImodDeviceMapLabel(label);
-            if (!mappedLabelsSeen.Contains(cleanLabel) && unknownLabelsSeen.Add(cleanLabel))
-            {
-                unknownLabels.Add(cleanLabel);
-            }
-        }
-
-        string mappedDeviceLine = FormatMappedImodDeviceLine(currentIntervals, displayLabelsByInterrupter, unknownLabels, unknownDeviceValue);
-        string visibleInterruptLines = FormatVisibleImodInterrupterLines(currentIntervals);
-        string detailedInterruptLine = FormatDetailedImodInterrupterMap(currentIntervals, displayLabelsByInterrupter);
-        string rawLine = FormatRawImodInterrupterMap(currentIntervals);
-        string timeLine = FormatTimeImodInterrupterMap(currentIntervals);
-
-        mapText = $"{mappedDeviceLine}\r\n\r\n{visibleInterruptLines}";
-        detail = string.IsNullOrWhiteSpace(resolveDetail)
-            ? $"{mappedDeviceLine}\r\n\r\n{visibleInterruptLines}\r\n{detailedInterruptLine}\r\n{rawLine}\r\n{timeLine}"
-            : $"{mappedDeviceLine}\r\n\r\n{visibleInterruptLines}\r\n{detailedInterruptLine}\r\n{rawLine}\r\n{timeLine}\r\nmap: {resolveDetail}";
+        (mapText, detail) = ImodMapText.Compose(currentIntervals, hasRoleMap ? rolesByInterrupter : null,
+            roleSnapshot, controller.DeviceId, resolveDetail);
         return true;
-    }
-
-    private static List<string> BuildControllerImodDeviceDisplayLabels(ImodRoleSnapshot roleSnapshot, string controllerDeviceId)
-    {
-        Dictionary<string, List<string>> labelsByRole = BuildAdaptiveRoleDisplayLabels(roleSnapshot, controllerDeviceId);
-        List<string> labels = [];
-        HashSet<string> emitted = new(StringComparer.OrdinalIgnoreCase);
-
-        foreach (string role in AdaptiveRolePriority)
-        {
-            if (!labelsByRole.TryGetValue(role, out List<string>? roleLabels))
-            {
-                continue;
-            }
-
-            foreach (string label in roleLabels)
-            {
-                if (emitted.Add(label))
-                {
-                    labels.Add(label);
-                }
-            }
-        }
-
-        foreach (KeyValuePair<string, List<string>> pair in labelsByRole.OrderBy(static kvp => kvp.Key, StringComparer.OrdinalIgnoreCase))
-        {
-            foreach (string label in pair.Value)
-            {
-                if (emitted.Add(label))
-                {
-                    labels.Add(label);
-                }
-            }
-        }
-
-        return labels;
-    }
-
-    private static string FormatRawImodInterrupterMap(IReadOnlyList<uint> values)
-    {
-        if (values.Count == 0)
-        {
-            return "raw: -";
-        }
-
-        return "raw: " + string.Join(" | ", values.Select((value, index) => $"I{index}:{FormatImodValue(value)}"));
-    }
-
-    private static string FormatMappedImodDeviceLine(
-        IReadOnlyList<uint> values,
-        IReadOnlyDictionary<uint, List<string>> labelsByInterrupter,
-        IReadOnlyList<string> unknownLabels,
-        string unknownDeviceValue)
-    {
-        List<string> parts = [];
-        foreach (KeyValuePair<uint, List<string>> pair in labelsByInterrupter.OrderBy(static kvp => kvp.Key))
-        {
-            if (pair.Key >= values.Count || pair.Value.Count == 0)
-            {
-                continue;
-            }
-
-            uint value = values[(int)pair.Key];
-            foreach (string label in pair.Value)
-            {
-                parts.Add($"{label} -> intr{pair.Key}={FormatImodValue(value)}/{FormatUsbImodTime(value)}");
-            }
-        }
-
-        if (unknownLabels.Count > 0)
-        {
-            foreach (string label in unknownLabels)
-            {
-                parts.Add($"{label} -> intr?={unknownDeviceValue}");
-            }
-        }
-
-        return parts.Count > 0
-            ? FormatDeviceFirstImodLines(parts)
-            : "devices: no exact USB role map";
-    }
-
-    private static string FormatDeviceFirstImodLines(IReadOnlyList<string> parts)
-    {
-        List<(string Role, string Intr, string Value, string Time)> rows = [];
-        foreach (string part in parts)
-        {
-            string[] roleAndValue = part.Split([" -> "], 2, StringSplitOptions.None);
-            string role = roleAndValue[0].Trim();
-            string assignment = roleAndValue.Length == 2 ? roleAndValue[1].Trim() : string.Empty;
-            string[] intrAndValue = assignment.Split(['='], 2);
-            string intr = intrAndValue[0].Trim();
-            string valueAndTime = intrAndValue.Length == 2 ? intrAndValue[1].Trim() : string.Empty;
-            string[] valueParts = valueAndTime.Split(['/'], 2);
-            rows.Add((
-                role,
-                intr,
-                valueParts[0].Trim(),
-                valueParts.Length == 2 ? valueParts[1].Trim() : string.Empty));
-        }
-
-        int roleWidth = rows.Select(row => row.Role.Length).DefaultIfEmpty(0).Max();
-        int intrWidth = rows.Select(row => row.Intr.Length).DefaultIfEmpty(0).Max();
-        int valueWidth = rows.Select(row => row.Value.Length).DefaultIfEmpty(0).Max();
-        return string.Join("\r\n", rows.Select((row, index) =>
-        {
-            string prefix = index == 0 ? "devices: " : "         ";
-            string time = string.IsNullOrEmpty(row.Time) ? string.Empty : $"  {row.Time}";
-            return $"{prefix}{row.Role.PadRight(roleWidth)} -> {row.Intr.PadRight(intrWidth)}  {row.Value.PadRight(valueWidth)}{time}";
-        }));
-    }
-
-    private static string FormatVisibleImodInterrupterLines(IReadOnlyList<uint> values)
-    {
-        // Keep lines short enough for the map box width so WordWrap never splits
-        // mid-token (e.g. "intr3=" on one line and "0xC8/50us" on the next).
-        const int chunkSize = 2;
-        const int maxVisible = 8;
-
-        if (values.Count == 0)
-        {
-            return "interrupters: -";
-        }
-
-        int visibleCount = Math.Min(values.Count, maxVisible);
-        List<string> lines = [];
-        List<(string Intr, string Value, string Time)> formatted = Enumerable.Range(0, visibleCount)
-            .Select(index => ($"intr{index}", FormatImodValue(values[index]), FormatUsbImodTime(values[index])))
-            .ToList();
-        int intrWidth = formatted.Select(part => part.Intr.Length).DefaultIfEmpty(0).Max();
-        int valueWidth = formatted.Select(part => part.Value.Length).DefaultIfEmpty(0).Max();
-        int timeWidth = formatted.Select(part => part.Time.Length).DefaultIfEmpty(0).Max();
-
-        for (int start = 0; start < visibleCount; start += chunkSize)
-        {
-            int end = Math.Min(start + chunkSize, visibleCount);
-            IReadOnlyList<(string Intr, string Value, string Time)> parts = formatted.Skip(start).Take(end - start).ToList();
-
-            string suffix = string.Empty;
-            if (end == visibleCount && values.Count > visibleCount)
-            {
-                suffix = $" | +{values.Count - visibleCount} more";
-            }
-
-            string[] columns = parts
-                .Select(part => $"{part.Intr.PadRight(intrWidth)}  {part.Value.PadRight(valueWidth)}  {part.Time.PadRight(timeWidth)}")
-                .ToArray();
-            columns[^1] = columns[^1].TrimEnd();
-            string rowText = string.Join(" | ", columns);
-            lines.Add($"interrupters {start}-{end - 1}: {rowText}{suffix}");
-        }
-
-        return string.Join("\r\n", lines);
-    }
-
-    private static string FormatDetailedImodInterrupterMap(
-        IReadOnlyList<uint> values,
-        IReadOnlyDictionary<uint, List<string>> labelsByInterrupter)
-    {
-        if (values.Count == 0)
-        {
-            return "detail: -";
-        }
-
-        List<string> parts = [];
-        for (int i = 0; i < values.Count; i++)
-        {
-            string labelText = labelsByInterrupter.TryGetValue((uint)i, out List<string>? labels) && labels.Count > 0
-                ? $" {string.Join("/", labels)}"
-                : string.Empty;
-            parts.Add($"I{i}{labelText}={FormatImodValue(values[i])} ({FormatUsbImodTime(values[i])})");
-        }
-
-        return "detail: " + string.Join(" | ", parts);
-    }
-
-    private static string FormatTimeImodInterrupterMap(IReadOnlyList<uint> values)
-    {
-        if (values.Count == 0)
-        {
-            return "time: -";
-        }
-
-        return "time: " + string.Join(" | ", values.Select((value, index) => $"I{index}:{FormatUsbImodTime(value)}"));
-    }
-
-    private static string FormatUnknownImodDeviceValue(IReadOnlyList<uint> values)
-    {
-        if (values.Count == 0)
-        {
-            return "-";
-        }
-
-        uint first = values[0];
-        return values.All(value => value == first)
-            ? FormatImodValue(first)
-            : "mixed";
-    }
-
-    private static string FormatImodDeviceMapLabel(string label)
-    {
-        string clean = string.IsNullOrWhiteSpace(label) ? "Device" : label.Trim();
-        clean = clean.Replace(" | ", "/", StringComparison.Ordinal);
-        clean = clean.Replace("=", "-", StringComparison.Ordinal);
-        return clean;
-    }
-
-    internal static Dictionary<string, List<string>> BuildAdaptiveRoleDisplayLabels(ImodRoleSnapshot roleSnapshot, string controllerDeviceId)
-    {
-        Dictionary<string, List<string>> labelsByRole = new(StringComparer.OrdinalIgnoreCase);
-        foreach (ImodRoleDevice device in roleSnapshot.Devices)
-        {
-            if (!HostControllerPathMatchesDeviceId(device.InstanceId, controllerDeviceId) &&
-                !HostControllerPathMatchesDeviceId(controllerDeviceId, device.InstanceId))
-            {
-                continue;
-            }
-
-            AddAdaptiveRoleDisplayLabels(GetEffectiveUsbRolesForController(device.UsbRoles, device.InstanceId, controllerDeviceId, roleSnapshot.Overrides), labelsByRole);
-            AddAdaptiveRoleDisplayLabels(device.AudioEndpoints, labelsByRole);
-        }
-
-        return labelsByRole;
     }
 
     private ImodRoleSnapshot CaptureImodRoleSnapshot() => new(
         _blocks.Where(block => block.Kind == DeviceKind.USB && !block.Device.IsTestDevice)
             .Select(block => new ImodRoleDevice(block.Device.InstanceId, block.Device.UsbRoles, block.Device.AudioEndpoints)),
         _usbRoleOverrideByController);
-
-    private string GetEffectiveUsbRolesForController(DeviceInfo device, string controllerDeviceId)
-        => GetEffectiveUsbRolesForController(device.UsbRoles, device.InstanceId, controllerDeviceId, _usbRoleOverrideByController);
-
-    private static string GetEffectiveUsbRolesForController(string usbRoles, string instanceId, string controllerDeviceId,
-        IReadOnlyDictionary<string, string> overrides)
-    {
-        string controllerKey = NormalizeInstanceId(controllerDeviceId);
-        if (!string.IsNullOrWhiteSpace(controllerKey)
-            && overrides.TryGetValue(controllerKey, out string? controllerRoles)
-            && !string.IsNullOrWhiteSpace(controllerRoles))
-        {
-            return MergeUsbRolePollingOverrideWithCurrentRoles(usbRoles, controllerRoles);
-        }
-
-        string deviceKey = NormalizeInstanceId(instanceId);
-        if (!string.IsNullOrWhiteSpace(deviceKey)
-            && overrides.TryGetValue(deviceKey, out string? deviceRoles)
-            && !string.IsNullOrWhiteSpace(deviceRoles))
-        {
-            return MergeUsbRolePollingOverrideWithCurrentRoles(usbRoles, deviceRoles);
-        }
-
-        return usbRoles;
-    }
-
-    private static string MergeUsbRolePollingOverrideWithCurrentRoles(string currentRoles, string overrideRoles)
-    {
-        if (string.IsNullOrWhiteSpace(currentRoles) || string.IsNullOrWhiteSpace(overrideRoles))
-        {
-            return currentRoles;
-        }
-
-        Dictionary<string, string> pollingOverrides = new(StringComparer.OrdinalIgnoreCase);
-        foreach (string rawEntry in overrideRoles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            string entry = rawEntry.Trim();
-            foreach (string role in new[] { "Mouse", "Keyboard" })
-            {
-                if (!IsUsbRoleText(entry, role))
-                {
-                    continue;
-                }
-
-                string tag = entry[role.Length..].Trim();
-                if (tag.Length > 0)
-                {
-                    pollingOverrides[role] = tag;
-                }
-            }
-        }
-
-        return pollingOverrides.Count > 0
-            ? ApplyUsbRolePollingOverrides(currentRoles, pollingOverrides)
-            : currentRoles;
-    }
-
-    private static IEnumerable<string> FormatAdaptiveDisplayRoles(
-        IEnumerable<string> roles,
-        IReadOnlyDictionary<string, List<string>> labelsByRole)
-    {
-        HashSet<string> emitted = new(StringComparer.OrdinalIgnoreCase);
-        foreach (string role in OrderAdaptiveRoles(roles))
-        {
-            if (labelsByRole.TryGetValue(role, out List<string>? labels) && labels.Count > 0)
-            {
-                foreach (string label in labels)
-                {
-                    if (emitted.Add(label))
-                    {
-                        yield return label;
-                    }
-                }
-            }
-            else if (emitted.Add(role))
-            {
-                yield return role;
-            }
-        }
-    }
-
-    private static void AddAdaptiveRoleDisplayLabels(string? text, Dictionary<string, List<string>> labelsByRole)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return;
-        }
-
-        foreach (string rawPart in text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            string label = rawPart.Trim();
-            if (label.Length == 0 || !TryGetAdaptiveRoleBase(label, out string role))
-            {
-                continue;
-            }
-
-            if (!labelsByRole.TryGetValue(role, out List<string>? labels))
-            {
-                labels = [];
-                labelsByRole[role] = labels;
-            }
-
-            if (!labels.Contains(label, StringComparer.OrdinalIgnoreCase))
-            {
-                labels.Add(label);
-            }
-        }
-    }
-
-    private static bool TryGetAdaptiveRoleBase(string text, out string role)
-    {
-        role = string.Empty;
-        if (text.Contains("Mouse", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("Мышь", StringComparison.OrdinalIgnoreCase))
-        {
-            role = "Mouse";
-            return true;
-        }
-
-        if (text.Contains("Keyboard", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("Клавиатура", StringComparison.OrdinalIgnoreCase))
-        {
-            role = "Keyboard";
-            return true;
-        }
-
-        if (text.Contains("Audio", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("Аудио", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("Microphone", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("Микрофон", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("Speaker", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("Headphone", StringComparison.OrdinalIgnoreCase))
-        {
-            role = "Audio";
-            return true;
-        }
-
-        if (text.Contains("Gamepad", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("Геймпад", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("Joystick", StringComparison.OrdinalIgnoreCase))
-        {
-            role = "Gamepad";
-            return true;
-        }
-
-        if (text.Contains("Camera", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("Webcam", StringComparison.OrdinalIgnoreCase))
-        {
-            role = "Webcam";
-            return true;
-        }
-
-        return false;
-    }
-
-    private static string FormatUsbImodTime(uint rawValue)
-    {
-        ulong ns = (rawValue & 0xFFFF) * 250UL;
-        if (ns >= 1000)
-        {
-            double us = ns / 1000.0;
-            return us.ToString(us % 1 == 0 ? "0" : "0.###", System.Globalization.CultureInfo.InvariantCulture) + " us";
-        }
-
-        return ns.ToString(System.Globalization.CultureInfo.InvariantCulture) + " ns";
-    }
-
-    private static IEnumerable<string> OrderAdaptiveRoles(IEnumerable<string> roles)
-    {
-        return roles
-            .OrderBy(static role => AdaptiveRolePriorityIndex(role))
-            .ThenBy(static role => role, StringComparer.OrdinalIgnoreCase);
-    }
-
-    private static int AdaptiveRolePriorityIndex(string role)
-    {
-        for (int i = 0; i < AdaptiveRolePriority.Length; i++)
-        {
-            if (AdaptiveRolePriority[i].Equals(role, StringComparison.OrdinalIgnoreCase))
-            {
-                return i;
-            }
-        }
-
-        return AdaptiveRolePriority.Length;
-    }
 
     private bool TryResolveAdaptiveRolesByInterrupter(
         ImodRoleSnapshot roleSnapshot, ImodControllerInfo controller,
@@ -1616,14 +1127,14 @@ public sealed partial class MainForm
             return true;
         }
 
-        HashSet<string> fallbackRoles = BuildAdaptiveControllerRoleFallback(roleSnapshot, controller.DeviceId);
+        HashSet<string> fallbackRoles = ImodRoleMap.ControllerRoleFallback(roleSnapshot, controller.DeviceId);
         if (fallbackRoles.Count == 0)
         {
             detail = "no exact USB role/interrupter map and no controller role fallback";
             return false;
         }
 
-        if (!TryAssignFallbackRolesToActiveInterrupters(fallbackRoles, interruptersByRootPort, maxIntrs, rolesByInterrupter, out detail))
+        if (!ImodRoleMap.TryAssignFallbackRoles(fallbackRoles, interruptersByRootPort, maxIntrs, rolesByInterrupter, out detail))
         {
             return false;
         }
@@ -1663,177 +1174,19 @@ public sealed partial class MainForm
             return false;
         }
 
-        int addressMatches = 0;
-        int rootPortMatches = 0;
-        int classifiedEndpoints = 0;
-        int filteredGamepadEndpoints = 0;
-        HashSet<string> controllerRoles = BuildAdaptiveControllerRoleFallback(roleSnapshot, controller.DeviceId);
-        foreach (UsbEndpointInfo endpoint in endpoints)
-        {
-            if (!HostControllerPathMatchesDeviceId(endpoint.HostControllerPath, controller.DeviceId)
-                || !TryClassifyAdaptiveUsbRole(endpoint, out string role))
-            {
-                continue;
-            }
-
-            if (role.Equals("Gamepad", StringComparison.OrdinalIgnoreCase)
-                && !controllerRoles.Contains("Gamepad"))
-            {
-                filteredGamepadEndpoints++;
-                continue;
-            }
-
-            classifiedEndpoints++;
-            bool mapped = false;
-            if (endpoint.DeviceAddress > 0
-                && topology.ByDeviceAddress.TryGetValue((uint)endpoint.DeviceAddress, out List<uint>? addressIntrs))
-            {
-                AddAdaptiveRoleToInterrupters(rolesByInterrupter, addressIntrs, role);
-                addressMatches++;
-                mapped = true;
-            }
-
-            if (!mapped
-                && TryGetUsbRootPort(endpoint.TopologyPath, out uint rootPort)
-                && topology.ByRootPort.TryGetValue(rootPort, out List<uint>? rootIntrs))
-            {
-                AddAdaptiveRoleToInterrupters(rolesByInterrupter, rootIntrs, role);
-                rootPortMatches++;
-            }
-        }
+        HashSet<string> controllerRoles = ImodRoleMap.ControllerRoleFallback(roleSnapshot, controller.DeviceId);
+        rolesByInterrupter = ImodRoleMap.MapEndpoints(endpoints, topology, controller.DeviceId, controllerRoles,
+            out ImodRoleMap.EndpointMapCounts counts);
 
         if (rolesByInterrupter.Count == 0)
         {
-            detail = $"no USB endpoints matched active xHCI interrupters; classified={classifiedEndpoints}; {topologyDetail}";
+            detail = $"no USB endpoints matched active xHCI interrupters; classified={counts.Classified}; {topologyDetail}";
             return false;
         }
 
         detail =
-            $"exact xHCI map: addressMatches={addressMatches}, rootPortMatches={rootPortMatches}, endpointTargets={topology.EndpointTargetCount}, slotTargets={topology.SlotTargetCount}, classified={classifiedEndpoints}, filteredGenericHid={filteredGamepadEndpoints}; {topologyDetail}";
+            $"exact xHCI map: addressMatches={counts.AddressMatches}, rootPortMatches={counts.RootPortMatches}, endpointTargets={topology.EndpointTargetCount}, slotTargets={topology.SlotTargetCount}, classified={counts.Classified}, filteredGenericHid={counts.FilteredGamepads}; {topologyDetail}";
         return true;
-    }
-
-    private static void AddAdaptiveRoleToInterrupters(
-        Dictionary<uint, HashSet<string>> rolesByInterrupter,
-        IEnumerable<uint> interrupters,
-        string role)
-    {
-        foreach (uint intr in interrupters)
-        {
-            if (!rolesByInterrupter.TryGetValue(intr, out HashSet<string>? roles))
-            {
-                roles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                rolesByInterrupter[intr] = roles;
-            }
-
-            roles.Add(role);
-        }
-    }
-
-    internal static HashSet<string> BuildAdaptiveControllerRoleFallback(ImodRoleSnapshot roleSnapshot, string controllerDeviceId)
-    {
-        HashSet<string> roles = new(StringComparer.OrdinalIgnoreCase);
-        foreach (ImodRoleDevice device in roleSnapshot.Devices)
-        {
-            if (!HostControllerPathMatchesDeviceId(device.InstanceId, controllerDeviceId) &&
-                !HostControllerPathMatchesDeviceId(controllerDeviceId, device.InstanceId))
-            {
-                continue;
-            }
-
-            AddAdaptiveRolesFromText(GetEffectiveUsbRolesForController(device.UsbRoles, device.InstanceId, controllerDeviceId, roleSnapshot.Overrides), roles);
-            AddAdaptiveRolesFromText(device.AudioEndpoints, roles);
-        }
-
-        return roles;
-    }
-
-    private static bool TryAssignFallbackRolesToActiveInterrupters(
-        HashSet<string> fallbackRoles,
-        Dictionary<uint, List<uint>> interruptersByRootPort,
-        uint maxIntrs,
-        Dictionary<uint, HashSet<string>> rolesByInterrupter,
-        out string detail)
-    {
-        List<uint> activeInterrupters = interruptersByRootPort
-            .Values
-            .SelectMany(static intrs => intrs)
-            .Where(intr => intr < maxIntrs)
-            .Distinct()
-            .OrderBy(static intr => intr)
-            .ToList();
-
-        if (activeInterrupters.Count == 0)
-        {
-            detail = "no active xHCI interrupters were discovered";
-            return false;
-        }
-
-        List<string> orderedRoles = AdaptiveRolePriority
-            .Where(role => fallbackRoles.Contains(role))
-            .ToList();
-
-        foreach (string role in fallbackRoles.OrderBy(static role => role, StringComparer.OrdinalIgnoreCase))
-        {
-            if (!orderedRoles.Contains(role, StringComparer.OrdinalIgnoreCase))
-            {
-                orderedRoles.Add(role);
-            }
-        }
-
-        for (int i = 0; i < orderedRoles.Count; i++)
-        {
-            uint intr = activeInterrupters[Math.Min(i, activeInterrupters.Count - 1)];
-            if (!rolesByInterrupter.TryGetValue(intr, out HashSet<string>? roles))
-            {
-                roles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                rolesByInterrupter[intr] = roles;
-            }
-
-            roles.Add(orderedRoles[i]);
-        }
-
-        detail = string.Join(", ", rolesByInterrupter
-            .OrderBy(static kvp => kvp.Key)
-            .Select(kvp => $"intr{kvp.Key}={string.Join("+", kvp.Value.OrderBy(static role => role, StringComparer.OrdinalIgnoreCase))}"));
-        return rolesByInterrupter.Count > 0;
-    }
-
-    private static void AddAdaptiveRolesFromText(string? text, HashSet<string> roles)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return;
-        }
-
-        if (text.Contains("Mouse", StringComparison.OrdinalIgnoreCase))
-        {
-            roles.Add("Mouse");
-        }
-
-        if (text.Contains("Keyboard", StringComparison.OrdinalIgnoreCase))
-        {
-            roles.Add("Keyboard");
-        }
-
-        if (text.Contains("Audio", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("Microphone", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("Speaker", StringComparison.OrdinalIgnoreCase))
-        {
-            roles.Add("Audio");
-        }
-
-        if (text.Contains("Gamepad", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("Joystick", StringComparison.OrdinalIgnoreCase))
-        {
-            roles.Add("Gamepad");
-        }
-
-        if (text.Contains("Camera", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("Webcam", StringComparison.OrdinalIgnoreCase))
-        {
-            roles.Add("Webcam");
-        }
     }
 
     private static bool TryReadXhciTopology(
@@ -1869,143 +1222,6 @@ public sealed partial class MainForm
 
         detail = $"ok; endpointTargets={topology.EndpointTargetCount}, slotTargets={topology.SlotTargetCount}";
         return true;
-    }
-
-    private static readonly string[] AdaptiveRolePriority = DeviceTweakerImodRuntime.AdaptiveRolePriority;
-
-    private static bool HostControllerPathMatchesDeviceId(string hostControllerPath, string controllerDeviceId)
-    {
-        string pathKey = CompactDeviceMatchText(hostControllerPath.Replace('#', '\\'));
-        string idKey = CompactDeviceMatchText(controllerDeviceId);
-        return pathKey.Length > 0 && idKey.Length > 0 && pathKey.Contains(idKey, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string CompactDeviceMatchText(string text)
-    {
-        StringBuilder sb = new(text.Length);
-        foreach (char ch in text)
-        {
-            if (char.IsLetterOrDigit(ch))
-            {
-                sb.Append(char.ToUpperInvariant(ch));
-            }
-        }
-
-        return sb.ToString();
-    }
-
-    private static bool TryGetUsbRootPort(string topologyPath, out uint rootPort)
-    {
-        rootPort = 0;
-        if (string.IsNullOrWhiteSpace(topologyPath))
-        {
-            return false;
-        }
-
-        foreach (string segment in topologyPath.Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            if (!segment.StartsWith("Port", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            string suffix = segment[4..];
-            int end = 0;
-            while (end < suffix.Length && char.IsDigit(suffix[end]))
-            {
-                end++;
-            }
-
-            if (end > 0 && uint.TryParse(suffix[..end], out rootPort) && rootPort > 0)
-            {
-                return true;
-            }
-        }
-
-        int index = 0;
-        while (index >= 0 && index < topologyPath.Length)
-        {
-            index = topologyPath.IndexOf(".P", index, StringComparison.OrdinalIgnoreCase);
-            if (index < 0)
-            {
-                break;
-            }
-
-            int start = index + 2;
-            int end = start;
-            while (end < topologyPath.Length && char.IsDigit(topologyPath[end]))
-            {
-                end++;
-            }
-
-            if (end > start && uint.TryParse(topologyPath[start..end], out rootPort) && rootPort > 0)
-            {
-                return true;
-            }
-
-            index = start;
-        }
-
-        return false;
-    }
-
-    private static bool TryClassifyAdaptiveUsbRole(UsbEndpointInfo endpoint, out string role)
-    {
-        role = string.Empty;
-        string cls = endpoint.InterfaceClass.Trim();
-        string sub = endpoint.InterfaceSubClass.Trim();
-        string proto = endpoint.InterfaceProtocol.Trim();
-
-        if (IsUsbDescriptorValue(cls, "03") || cls.Contains("HID", StringComparison.OrdinalIgnoreCase))
-        {
-            if (IsUsbDescriptorValue(proto, "02") || proto.Contains("Mouse", StringComparison.OrdinalIgnoreCase))
-            {
-                role = "Mouse";
-                return true;
-            }
-
-            if (IsUsbDescriptorValue(proto, "01") || proto.Contains("Keyboard", StringComparison.OrdinalIgnoreCase))
-            {
-                role = "Keyboard";
-                return true;
-            }
-
-            if (!IsUsbDescriptorValue(sub, "01"))
-            {
-                role = "Gamepad";
-                return true;
-            }
-        }
-
-        if (IsUsbDescriptorValue(cls, "01") || cls.Contains("Audio", StringComparison.OrdinalIgnoreCase))
-        {
-            role = "Audio";
-            return true;
-        }
-
-        if (IsUsbDescriptorValue(cls, "0E") || cls.Contains("Video", StringComparison.OrdinalIgnoreCase))
-        {
-            role = "Webcam";
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool IsUsbDescriptorValue(string text, string expectedHex)
-    {
-        string compact = new string(text.Where(Uri.IsHexDigit).ToArray()).TrimStart('0');
-        string expected = expectedHex.TrimStart('0');
-        if (compact.Length == 0)
-        {
-            compact = "0";
-        }
-        if (expected.Length == 0)
-        {
-            expected = "0";
-        }
-
-        return string.Equals(compact, expected, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsAdministrator()
