@@ -362,6 +362,8 @@ public sealed partial class MainForm
         }
 
         NormalizeNicItrTextBox(block, profile, values);
+        // Pair the parsed values with the editor version before backup can yield.
+        int writeEditGeneration = block.NicItrEditGeneration;
         if (block.Device.IsTestDevice)
         {
             EnsureTestDeviceState(block.Device).NicItrValue = FormatNicItrValueList(values, profile);
@@ -398,7 +400,6 @@ public sealed partial class MainForm
         }
 
         int generation = ++block.NicItrOperationGeneration;
-        int writeEditGeneration = block.NicItrEditGeneration;
         block.NicItrStatusLabel.Text = "current: applying...";
         block.NicItrStatusLabel.ForeColor = _statusInactive;
         if (block.NicItrApplyButton is not null)

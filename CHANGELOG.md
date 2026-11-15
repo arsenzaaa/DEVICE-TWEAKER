@@ -26,6 +26,8 @@ Source comparison: [v0.0.4 → v0.1.0](https://github.com/arsenzaaa/DEVICE-TWEAK
 
 ### Startup, restore and diagnostics
 
+- Failed startup-task registration no longer replaces the saved USB IMOD / NIC ITR profile.
+- NIC ITR readback preserves edits made while its automatic backup is being created.
 - Task Scheduler XML is staged in the protected startup folder. Registration checks the stored task's action count, command and arguments, rather than looking for the script path as a substring.
 - A second launch no longer selects an Explorer window opened on a folder named DEVICE TWEAKER.
 - Translated restore results, device-scan failures and power-plan diagnostics that remained English in the Russian interface.

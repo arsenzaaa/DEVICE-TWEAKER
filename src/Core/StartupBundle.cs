@@ -116,12 +116,14 @@ internal sealed class StartupBundle(
             throw new IOException("The startup loader could not be prepared: " + loaderError);
         }
 
-        AtomicFile.WriteAllText(layout.ProfilePath, profileJson, new UTF8Encoding(false));
         if (!tasks.Register(layout.ScriptPath, log, out string? taskError))
         {
             throw new InvalidOperationException("The startup task could not be registered: " + taskError);
         }
 
+        // Publish new settings only after registration and verification succeed.
+        // An existing task must retain its previous profile on registration failure.
+        AtomicFile.WriteAllText(layout.ProfilePath, profileJson, new UTF8Encoding(false));
         RemoveLegacy(report: null);
     }
 

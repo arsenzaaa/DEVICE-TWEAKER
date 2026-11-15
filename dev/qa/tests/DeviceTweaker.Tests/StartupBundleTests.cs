@@ -52,7 +52,7 @@ public sealed class StartupBundleTests : IDisposable
     }
 
     [Fact]
-    public void InstallWritesEveryFileThenRegistersTheTask()
+    public void InstallWritesPayloadProfileAndRegistersTask()
     {
         Bundle().Install("{\"schemaVersion\":1}");
         StartupBundleLayout layout = Layout;
@@ -132,9 +132,42 @@ public sealed class StartupBundleTests : IDisposable
         InvalidOperationException error = Assert.Throws<InvalidOperationException>(() => Bundle().Install("{}"));
 
         Assert.Equal("The startup task could not be registered: access denied", error.Message);
-        Assert.True(File.Exists(Layout.ProfilePath));
+        Assert.False(File.Exists(Layout.ProfilePath));
         Assert.True(File.Exists(Layout.LegacyStartupScriptPath));
         Assert.Equal(0, _legacyRunEntryRemovals);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TaskRegistrationFailureDoesNotPublishNewSettings(bool existingProfile)
+    {
+        const string previous = "{\"usb\":\"previous\"}";
+        if (existingProfile) Bundle().Install(previous);
+        _tasks.RegisterError = "query failed after registration";
+
+        Assert.Throws<InvalidOperationException>(() => Bundle().Install("{\"usb\":\"new\"}"));
+
+        Assert.Equal(existingProfile, File.Exists(Layout.ProfilePath));
+        if (existingProfile) Assert.Equal(previous, File.ReadAllText(Layout.ProfilePath));
+    }
+
+    [Fact]
+    public void ProfileWriteFailurePreservesPreviousSettingsAndLegacyFiles()
+    {
+        Bundle().Install("previous settings");
+        Directory.CreateDirectory(Layout.LegacyStartupFolder);
+        File.WriteAllText(Layout.LegacyStartupScriptPath, "legacy settings");
+        int removals = _legacyRunEntryRemovals;
+        using FileStream lockedProfile = new(Layout.ProfilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+        Exception? error = Record.Exception(() => Bundle().Install("new settings"));
+        Assert.True(error is IOException or UnauthorizedAccessException, error?.ToString() ?? "Expected a file replacement error.");
+
+        Assert.Equal("previous settings", File.ReadAllText(Layout.ProfilePath));
+        Assert.True(File.Exists(Layout.LegacyStartupScriptPath));
+        Assert.Equal(removals, _legacyRunEntryRemovals);
+        Assert.Empty(Directory.GetFiles(Layout.Root, ".profile.json.*.tmp"));
     }
 
     [Fact]
