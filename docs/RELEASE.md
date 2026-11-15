@@ -59,7 +59,7 @@ Changes to older tags, release pages or public history require a separate migrat
 
 ## Maintain the project page
 
-The README uses the theme-aware wordmark and text navigation. Full application windows belong in the [gallery](./SCREENSHOTS.md). Capture them from the read-only developer build on a hidden desktop:
+The README uses a native Markdown heading and text navigation. Full application windows belong in the [gallery](./SCREENSHOTS.md). Capture them from the read-only developer build on a hidden desktop:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-DevSession.ps1 -Scenario .\dev\qa\Scenarios\gallery-intel-gpu.json -OutputRoot .\local\screenshots

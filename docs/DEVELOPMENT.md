@@ -96,6 +96,10 @@ Driver session ownership is in `src/Core/ImodDriverContext.cs`, with device/SCM 
 
 `DriverIdentity.cs` keeps device/service names and the loaded legacy-device preflight. `DriverRuntime.cs` contains loader selection and app/startup coordination; `ImodDriverContext` calls the selection policy exercised by unit tests. Existing-device readback does not invoke loading.
 
+`ImodDriverFiles.cs` verifies and stages embedded hardware components. `KduDriverLoader.cs` owns the loader process, captured output and uncertain-outcome handling. `ImodReadbackService.cs` reads a complete indexed series of IMOD values; an incomplete series is not published as a device map. `ImodRoleMap.cs` assigns USB roles from captured topology, while `ImodMapText.cs` formats the result.
+
+`StartupBundle.cs` manages startup files and task registration. `BackupStore.cs` handles snapshot files and retention; `BackupRegistry.cs` handles backed-up registry and power-plan values. MainForm coordinates these components with user choices and operation reports. The shared hardware runtime stays in `src/Startup` so the EXE and PowerShell script use the same register algorithms.
+
 `src/Devices/NdisRssSettingsWriter.cs` owns RSS registry write and clear sequences. MainForm keeps the write authorization and operation coordination; the Windows key factory independently enforces the immutable QA write block. Tests use disposable fake registry keys. Per-value logs record completed writes and the exact failed step; active adapter readback remains separate from registry-write success.
 
 - `src/Affinity` - CPU topology, affinity masks, ReservedCpuSets
