@@ -9,13 +9,17 @@ namespace DeviceTweakerCS;
 internal static class StartupTask
 {
     internal const string TaskName = @"\DEVICE TWEAKER\IMOD";
+    internal const string PowerShellCommand = @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe";
     private static readonly XNamespace Ns = "http://schemas.microsoft.com/windows/2004/02/mit/task";
+
+    internal static string BuildArguments(string scriptPath)
+        => "-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass"
+            + $" -File \"{scriptPath}\" -TriggerDevice \"$(Device)\"";
 
     internal static string BuildXml(string scriptPath)
     {
-        string powerShell = @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe";
-        string arguments = "-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass"
-            + $" -File \"{scriptPath}\" -TriggerDevice \"$(Device)\"";
+        string powerShell = PowerShellCommand;
+        string arguments = BuildArguments(scriptPath);
 
         XElement EventTrigger(string delay, string logPath, string selector, bool passDevice)
         {
@@ -86,23 +90,84 @@ internal static class StartupTask
         return writer.ToString();
     }
 
+    // Checks the task Windows actually stored: exactly one action, the expected
+    // PowerShell command and arguments, nothing else that SYSTEM would run.
+    internal static string? VerifyRegisteredXml(string registeredXml, string scriptPath)
+    {
+        XDocument document;
+        try
+        {
+            document = XDocument.Parse(registeredXml);
+        }
+        catch (System.Xml.XmlException ex)
+        {
+            return $"the registered task XML could not be parsed: {ex.Message}";
+        }
+
+        List<XElement> actionLists = document.Descendants(Ns + "Actions").ToList();
+        if (actionLists.Count != 1)
+        {
+            return $"the registered task has {actionLists.Count} action lists, expected 1";
+        }
+
+        List<XElement> actions = actionLists[0].Elements().ToList();
+        if (actions.Count != 1 || actions[0].Name != Ns + "Exec")
+        {
+            return $"the registered task has {actions.Count} actions ({string.Join(",", actions.Select(a => a.Name.LocalName))}), expected one Exec";
+        }
+
+        string? command = actions[0].Element(Ns + "Command")?.Value.Trim();
+        string? arguments = actions[0].Element(Ns + "Arguments")?.Value.Trim();
+        if (!string.Equals(command, PowerShellCommand, StringComparison.OrdinalIgnoreCase))
+        {
+            return $"the registered task runs an unexpected command: {command}";
+        }
+
+        if (!string.Equals(arguments, BuildArguments(scriptPath), StringComparison.Ordinal))
+        {
+            return $"the registered task has unexpected arguments: {arguments}";
+        }
+
+        return null;
+    }
+
     internal static bool Register(string scriptPath, Action<string> log, out string? error)
     {
         QaRun.DemandWrite("StartupTask.Register");
-        string xmlPath = Path.Combine(Path.GetTempPath(), $"DEVICE-TWEAKER-task-{Guid.NewGuid():N}.xml");
+        // The XML is staged next to the script, in the folder only administrators and SYSTEM
+        // can change, so another process cannot edit it before schtasks reads it.
+        string? stagingDirectory = Path.GetDirectoryName(Path.GetFullPath(scriptPath));
+        if (string.IsNullOrWhiteSpace(stagingDirectory))
+        {
+            error = $"cannot resolve the startup folder for {scriptPath}";
+            return false;
+        }
+
+        string xmlPath = Path.Combine(stagingDirectory, $".task-{Guid.NewGuid():N}.xml");
         try
         {
-            File.WriteAllText(xmlPath, BuildXml(scriptPath), Encoding.Unicode);
+            using (FileStream stream = new(xmlPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read))
+            using (StreamWriter writer = new(stream, Encoding.Unicode))
+            {
+                writer.Write(BuildXml(scriptPath));
+            }
+
             if (!RunSchtasks(["/Create", "/TN", TaskName, "/XML", xmlPath, "/F"], out string output))
             {
                 error = $"schtasks /Create failed: {output}";
                 return false;
             }
 
-            if (!RunSchtasks(["/Query", "/TN", TaskName, "/XML"], out string registered)
-                || registered.IndexOf(scriptPath, StringComparison.OrdinalIgnoreCase) < 0)
+            if (!RunSchtasks(["/Query", "/TN", TaskName, "/XML"], out string registered))
             {
-                error = "the registered task does not point to the startup script";
+                error = $"schtasks /Query failed after registration: {registered}";
+                return false;
+            }
+
+            string? verifyError = VerifyRegisteredXml(registered, scriptPath);
+            if (verifyError is not null)
+            {
+                error = verifyError;
                 return false;
             }
 
@@ -122,9 +187,9 @@ internal static class StartupTask
             {
                 File.Delete(xmlPath);
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                // A leftover temporary task XML is harmless.
+                // A leftover task XML in the protected startup folder is harmless.
             }
         }
     }

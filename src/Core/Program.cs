@@ -93,6 +93,7 @@ static class Program
     private static IntPtr FindMainWindow()
     {
         IntPtr result = IntPtr.Zero;
+        uint currentProcessId = (uint)Environment.ProcessId;
         NativeUser32.EnumWindows((window, _) =>
         {
             if (!NativeUser32.IsWindowVisible(window))
@@ -102,7 +103,10 @@ static class Program
 
             StringBuilder title = new(128);
             NativeUser32.GetWindowText(window, title, title.Capacity);
-            if (!string.Equals(title.ToString(), "DEVICE TWEAKER", StringComparison.Ordinal))
+            StringBuilder className = new(256);
+            NativeUser32.GetClassName(window, className, className.Capacity);
+            NativeUser32.GetWindowThreadProcessId(window, out uint windowProcessId);
+            if (!IsInstanceWindow(title.ToString(), className.ToString(), windowProcessId, currentProcessId))
             {
                 return true;
             }
@@ -112,6 +116,14 @@ static class Program
         }, IntPtr.Zero);
         return result;
     }
+
+    // An Explorer window opened on a folder named "DEVICE TWEAKER" has the same title,
+    // so the window must also be a WinForms window of another process.
+    internal static bool IsInstanceWindow(string title, string className, uint windowProcessId, uint currentProcessId)
+        => string.Equals(title, "DEVICE TWEAKER", StringComparison.Ordinal)
+            && className.StartsWith("WindowsForms10.", StringComparison.Ordinal)
+            && windowProcessId != 0
+            && windowProcessId != currentProcessId;
 
     private static void LogFatal(string source, Exception ex)
     {

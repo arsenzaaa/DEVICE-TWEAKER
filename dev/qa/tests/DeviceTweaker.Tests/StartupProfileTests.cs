@@ -195,4 +195,67 @@ public sealed class StartupTaskTests
 
         Assert.Contains($"-File \"{script}\"", task.Descendants(Ns + "Arguments").Single().Value);
     }
+
+    private const string Script = @"C:\ProgramData\DEVICE TWEAKER\Startup\ApplyIMOD.ps1";
+
+    private static string Registered(Action<XElement> change)
+    {
+        XDocument task = XDocument.Parse(StartupTask.BuildXml(Script));
+        change(task.Descendants(Ns + "Actions").Single());
+        return task.ToString();
+    }
+
+    [Fact]
+    public void RegisteredTaskMatchingTheBuiltXmlIsAccepted()
+    {
+        Assert.Null(StartupTask.VerifyRegisteredXml(StartupTask.BuildXml(Script), Script));
+    }
+
+    [Fact]
+    public void RegisteredTaskWithAnAddedActionIsRejected()
+    {
+        string xml = Registered(actions => actions.Add(new XElement(Ns + "Exec",
+            new XElement(Ns + "Command", @"C:\Windows\System32\cmd.exe"),
+            new XElement(Ns + "Arguments", "/c " + Script))));
+
+        Assert.Contains("2 actions", StartupTask.VerifyRegisteredXml(xml, Script));
+    }
+
+    [Fact]
+    public void RegisteredTaskWithANonExecActionIsRejected()
+    {
+        string xml = Registered(actions =>
+        {
+            actions.RemoveNodes();
+            actions.Add(new XElement(Ns + "ComHandler", new XElement(Ns + "ClassId", "{00000000-0000-0000-0000-000000000000}")));
+        });
+
+        Assert.Contains("expected one Exec", StartupTask.VerifyRegisteredXml(xml, Script));
+    }
+
+    [Fact]
+    public void RegisteredTaskWithChangedCommandOrArgumentsIsRejected()
+    {
+        string command = Registered(actions => actions.Descendants(Ns + "Command").Single().Value = @"C:\Temp\powershell.exe");
+        string arguments = Registered(actions => actions.Descendants(Ns + "Arguments").Single().Value
+            = StartupTask.BuildArguments(Script) + " -Command calc");
+
+        Assert.Contains("unexpected command", StartupTask.VerifyRegisteredXml(command, Script));
+        Assert.Contains("unexpected arguments", StartupTask.VerifyRegisteredXml(arguments, Script));
+    }
+
+    [Fact]
+    public void RegisteredTaskForAnotherScriptIsRejected()
+    {
+        string other = StartupTask.BuildXml(@"C:\Users\Public\ApplyIMOD.ps1");
+
+        Assert.Contains("unexpected arguments", StartupTask.VerifyRegisteredXml(other, Script));
+    }
+
+    [Fact]
+    public void MalformedRegisteredTaskXmlIsRejected()
+    {
+        Assert.Contains("could not be parsed", StartupTask.VerifyRegisteredXml("<Task>", Script));
+        Assert.Contains("0 action lists", StartupTask.VerifyRegisteredXml($"<Task xmlns=\"{Ns}\"/>", Script));
+    }
 }
