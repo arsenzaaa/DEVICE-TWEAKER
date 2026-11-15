@@ -891,4 +891,37 @@ Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IM
   <data name="Read.DeviceListChanged" xml:space="preserve">
     <value>Devices changed while refreshing. Press REFRESH to read the current list.</value>
   </data>
+  <data name="Message.Backup.restored.with.warnings.Open.DETAILS" xml:space="preserve">
+    <value>Backup restored with warnings. Open DETAILS.</value>
+  </data>
+  <data name="Message.Saved.settings.were.restored.but.some.live.power.settings" xml:space="preserve">
+    <value>Saved settings were restored, but some live power settings could not be applied. Open DETAILS.</value>
+  </data>
+  <data name="Message.Saved.settings.component" xml:space="preserve">
+    <value>Saved settings</value>
+  </data>
+  <data name="Message.Registry.and.startup.profile.restored.and.verified" xml:space="preserve">
+    <value>Registry and startup profile restored and verified.</value>
+  </data>
+  <data name="Message.Saved.setting.component" xml:space="preserve">
+    <value>Saved setting</value>
+  </data>
+  <data name="Message.The.original.backup.could.not.read.this.value" xml:space="preserve">
+    <value>The original backup could not read this value; it was left unchanged.</value>
+  </data>
+  <data name="Message.Power.scheme.component" xml:space="preserve">
+    <value>Power scheme</value>
+  </data>
+  <data name="Message.The.restored.power.scheme.could.not.be.activated" xml:space="preserve">
+    <value>The restored power scheme could not be activated.</value>
+  </data>
+  <data name="Message.Some.device.data.could.not.be.refreshed.within.the.time.limit" xml:space="preserve">
+    <value>Some device data could not be refreshed within the time limit.</value>
+  </data>
+  <data name="Message.Some.device.settings.could.not.be.applied" xml:space="preserve">
+    <value>Some device settings could not be applied.</value>
+  </data>
+  <data name="Message.The.device.list.could.not.be.refreshed" xml:space="preserve">
+    <value>The device list could not be refreshed.</value>
+  </data>
 </root>

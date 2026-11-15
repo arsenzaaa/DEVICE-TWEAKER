@@ -891,4 +891,37 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
   <data name="Read.DeviceListChanged" xml:space="preserve">
     <value>Состав устройств изменился во время обновления. Нажмите ОБНОВИТЬ, чтобы перечитать список.</value>
   </data>
+  <data name="Message.Backup.restored.with.warnings.Open.DETAILS" xml:space="preserve">
+    <value>Бекап восстановлен с предупреждениями. Откройте ПОДРОБНОСТИ.</value>
+  </data>
+  <data name="Message.Saved.settings.were.restored.but.some.live.power.settings" xml:space="preserve">
+    <value>Сохранённые настройки восстановлены, но часть текущих настроек электропитания применить не удалось. Откройте ПОДРОБНОСТИ.</value>
+  </data>
+  <data name="Message.Saved.settings.component" xml:space="preserve">
+    <value>Сохранённые настройки</value>
+  </data>
+  <data name="Message.Registry.and.startup.profile.restored.and.verified" xml:space="preserve">
+    <value>Реестр и профиль автозапуска восстановлены и проверены.</value>
+  </data>
+  <data name="Message.Saved.setting.component" xml:space="preserve">
+    <value>Сохранённый параметр</value>
+  </data>
+  <data name="Message.The.original.backup.could.not.read.this.value" xml:space="preserve">
+    <value>При создании бекапа это значение не удалось прочитать, поэтому оно оставлено без изменений.</value>
+  </data>
+  <data name="Message.Power.scheme.component" xml:space="preserve">
+    <value>Схема электропитания</value>
+  </data>
+  <data name="Message.The.restored.power.scheme.could.not.be.activated" xml:space="preserve">
+    <value>Не удалось активировать восстановленную схему электропитания.</value>
+  </data>
+  <data name="Message.Some.device.data.could.not.be.refreshed.within.the.time.limit" xml:space="preserve">
+    <value>Часть данных устройств не удалось обновить за отведённое время.</value>
+  </data>
+  <data name="Message.Some.device.settings.could.not.be.applied" xml:space="preserve">
+    <value>Не все настройки устройства удалось применить.</value>
+  </data>
+  <data name="Message.The.device.list.could.not.be.refreshed" xml:space="preserve">
+    <value>Не удалось обновить список устройств.</value>
+  </data>
 </root>

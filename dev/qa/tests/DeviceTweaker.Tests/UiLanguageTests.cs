@@ -68,6 +68,17 @@ public class UiLanguageTests
     [InlineData("current: 0x0 x8 · 14:02", "текущее: 0x0 x8 · 14:02")]
     [InlineData("current: 0x0 x8 · 14:02 · devices changed", "текущее: 0x0 x8 · 14:02 · устройства изменились")]
     [InlineData("Last read: 14:02", "Считано: 14:02")]
+    [InlineData("Backup restored with warnings. Open DETAILS.", "Бекап восстановлен с предупреждениями. Откройте ПОДРОБНОСТИ.")]
+    [InlineData("Saved settings were restored, but some live power settings could not be applied. Open DETAILS.", "часть текущих настроек электропитания")]
+    [InlineData("Saved settings", "Сохранённые настройки")]
+    [InlineData("Saved setting", "Сохранённый параметр")]
+    [InlineData("Registry and startup profile restored and verified.", "Реестр и профиль автозапуска восстановлены и проверены.")]
+    [InlineData("The original backup could not read this value; it was left unchanged.", "оставлено без изменений")]
+    [InlineData("Power scheme", "Схема электропитания")]
+    [InlineData("The restored power scheme could not be activated.", "Не удалось активировать восстановленную схему электропитания.")]
+    [InlineData("Some device data could not be refreshed within the time limit.", "за отведённое время")]
+    [InlineData("Some device settings could not be applied.", "Не все настройки устройства удалось применить.")]
+    [InlineData("The device list could not be refreshed.", "Не удалось обновить список устройств.")]
     public void UserStatusesTranslateWhilePreservingNumbersAndDiagnosticText(string source, string required)
     {
         var method = typeof(UiLanguage).GetMethod("TranslateRussian", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
