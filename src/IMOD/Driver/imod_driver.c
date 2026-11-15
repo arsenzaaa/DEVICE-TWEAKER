@@ -45,6 +45,17 @@ static NTSTATUS ImodOpenPciDevice(const WCHAR *pdoName, const WCHAR *instanceId,
 static BOOLEAN ImodResourcesContainRange(const UCHAR *list, ULONG bytes, ULONGLONG address, ULONG size);
 static NTSTATUS ImodWriteDevice(struct ImodDeviceWrite *request, struct ImodDeviceWriteReply *reply);
 static IO_WORKITEM_ROUTINE_EX ImodWriteDeviceWorker;
+static NTSTATUS ImodReadPciConfig(PDEVICE_OBJECT pdo, UCHAR *config);
+static NTSTATUS ImodReadPciClass(PDEVICE_OBJECT pdo, ULONG *classCode);
+static BOOLEAN ImodIsAllowedClass(ULONG classCode);
+static NTSTATUS ImodReadDevice(struct ImodDeviceWrite *request, struct ImodDeviceReadReply *reply);
+static NTSTATUS ImodQueryXhci(struct ImodXhciQuery *request, struct ImodXhciReply *reply);
+static IO_WORKITEM_ROUTINE_EX ImodReadDeviceWorker;
+static IO_WORKITEM_ROUTINE_EX ImodQueryXhciWorker;
+C_ASSERT(sizeof(struct ImodDeviceWrite) == 1048);
+C_ASSERT(sizeof(struct ImodXhciQuery) == 1048);
+C_ASSERT(sizeof(struct ImodDeviceReadReply) == 16);
+C_ASSERT(FIELD_OFFSET(struct ImodXhciReply, slots) == 28);
 C_ASSERT(sizeof(CM_PARTIAL_RESOURCE_DESCRIPTOR) == 20);
 C_ASSERT(FIELD_OFFSET(struct ImodPciReply, resources) == 276);
 // ImodResourcesContainRange walks CM_RESOURCE_LIST bytes with these offsets.
@@ -138,8 +149,6 @@ static NTSTATUS ImodDriverDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
     ULONG ioControlCode;
     PVOID ioBuffer = Irp->AssociatedIrp.SystemBuffer;
     NTSTATUS status = STATUS_SUCCESS;
-    struct tagPhysAccessStruct access;
-    PHYSICAL_ADDRESS physicalAddress;
 
     UNREFERENCED_PARAMETER(DeviceObject);
 
@@ -176,27 +185,24 @@ static NTSTATUS ImodDriverDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
             }
             break;
 
-        case IOCTL_IMOD_READ_PHYSICAL:
-            if (ioBuffer == NULL || inputLength < sizeof(access) || outputLength < sizeof(access))
+        case IOCTL_IMOD_READ_DEVICE:
+        case IOCTL_IMOD_QUERY_XHCI:
+            if (ioBuffer == NULL
+                || inputLength != sizeof(struct ImodDeviceWrite)
+                || outputLength < (ioControlCode == IOCTL_IMOD_READ_DEVICE
+                    ? sizeof(struct ImodDeviceReadReply) : sizeof(struct ImodXhciReply)))
             {
                 status = STATUS_INVALID_PARAMETER;
                 break;
             }
-
-            RtlCopyMemory(&access, ioBuffer, sizeof(access));
-
-            physicalAddress.QuadPart = (LONGLONG)(ULONG_PTR)access.physAddress;
-            status = ImodReadPhysicalMemory(
-                physicalAddress,
-                access.accessSizeInBytes,
-                &access.value);
-
-            if (NT_SUCCESS(status))
             {
-                RtlCopyMemory(ioBuffer, &access, sizeof(access));
-                Irp->IoStatus.Information = sizeof(access);
+                PIO_WORKITEM workItem = IoAllocateWorkItem(DeviceObject);
+                if (workItem == NULL) { status = STATUS_INSUFFICIENT_RESOURCES; break; }
+                IoMarkIrpPending(Irp);
+                IoQueueWorkItemEx(workItem, ioControlCode == IOCTL_IMOD_READ_DEVICE
+                    ? ImodReadDeviceWorker : ImodQueryXhciWorker, DelayedWorkQueue, Irp);
+                return STATUS_PENDING;
             }
-
             break;
 
         case IOCTL_IMOD_WRITE_DEVICE:
@@ -271,35 +277,21 @@ static VOID ImodQueryPciWorker(PVOID IoObject, PVOID Context, PIO_WORKITEM WorkI
     IoCompleteRequest(irp, IO_NO_INCREMENT);
 }
 
-static NTSTATUS ImodQueryPci(struct ImodPciQuery *query, struct ImodPciReply *reply)
+static NTSTATUS ImodReadPciConfig(PDEVICE_OBJECT pdo, UCHAR *config)
 {
-    PFILE_OBJECT fileObject = NULL;
-    PDEVICE_OBJECT pdo = NULL, target = NULL;
-    ULONG bytes = 0;
+    PDEVICE_OBJECT target = NULL;
     BUS_INTERFACE_STANDARD bus;
     NTSTATUS status;
+    ULONG configBytes = 0;
     KEVENT event;
     IO_STATUS_BLOCK ioStatus;
     PIRP irp;
     PIO_STACK_LOCATION stack;
-
-    if (KeGetCurrentIrql() != PASSIVE_LEVEL || query->version != IMOD_PCI_QUERY_VERSION)
-        return STATUS_INVALID_PARAMETER;
-    status = ImodOpenPciDevice(query->pdoName, query->instanceId, &fileObject, &pdo);
-    if (!NT_SUCCESS(status)) return status;
-
-    reply->version = IMOD_PCI_QUERY_VERSION;
-    reply->resourcesStatus = IoGetDeviceProperty(pdo, DevicePropertyAllocatedResources,
-        sizeof(reply->resources), reply->resources, &bytes);
-    if (NT_SUCCESS(reply->resourcesStatus) && bytes <= sizeof(reply->resources))
-        reply->resourcesBytes = bytes;
-    else if (NT_SUCCESS(reply->resourcesStatus)) reply->resourcesStatus = STATUS_DATA_ERROR;
-
     RtlZeroMemory(&bus, sizeof(bus));
     KeInitializeEvent(&event, NotificationEvent, FALSE);
     target = IoGetAttachedDeviceReference(pdo);
     irp = IoBuildSynchronousFsdRequest(IRP_MJ_PNP, target, NULL, 0, NULL, &event, &ioStatus);
-    if (irp == NULL) { reply->configStatus = STATUS_INSUFFICIENT_RESOURCES; goto Success; }
+    if (irp == NULL) { status = STATUS_INSUFFICIENT_RESOURCES; goto Done; }
     stack = IoGetNextIrpStackLocation(irp);
     stack->MinorFunction = IRP_MN_QUERY_INTERFACE;
     stack->Parameters.QueryInterface.InterfaceType = (LPGUID)&GUID_BUS_INTERFACE_STANDARD;
@@ -314,26 +306,45 @@ static NTSTATUS ImodQueryPci(struct ImodPciQuery *query, struct ImodPciReply *re
         KeWaitForSingleObject(&event, Executive, KernelMode, FALSE, NULL);
         status = ioStatus.Status;
     }
-    reply->configStatus = status;
     if (NT_SUCCESS(status))
     {
         if (bus.Size < sizeof(bus) || bus.Version != 1 || bus.GetBusData == NULL
             || bus.InterfaceDereference == NULL)
-            reply->configStatus = STATUS_NOT_SUPPORTED;
+            status = STATUS_NOT_SUPPORTED;
         else
         {
-            reply->configBytes = bus.GetBusData(bus.Context, PCI_WHICHSPACE_CONFIG,
-                reply->config, 0, sizeof(reply->config));
-            if (reply->configBytes != sizeof(reply->config)) reply->configStatus = STATUS_DEVICE_DATA_ERROR;
+            configBytes = bus.GetBusData(bus.Context, PCI_WHICHSPACE_CONFIG,
+                config, 0, IMOD_PCI_CONFIG_SIZE);
+            if (configBytes != IMOD_PCI_CONFIG_SIZE) status = STATUS_DEVICE_DATA_ERROR;
         }
         if (bus.InterfaceDereference != NULL) bus.InterfaceDereference(bus.Context);
     }
-Success:
-    status = STATUS_SUCCESS; // Per-source statuses remain in the reply.
+Done:
     if (target != NULL) ObDereferenceObject(target);
-    if (pdo != NULL) ObDereferenceObject(pdo);
-    if (fileObject != NULL) ObDereferenceObject(fileObject);
     return status;
+}
+
+static NTSTATUS ImodQueryPci(struct ImodPciQuery *query, struct ImodPciReply *reply)
+{
+    PFILE_OBJECT fileObject = NULL;
+    PDEVICE_OBJECT pdo = NULL;
+    ULONG bytes = 0;
+    NTSTATUS status;
+    if (KeGetCurrentIrql() != PASSIVE_LEVEL || query->version != IMOD_PCI_QUERY_VERSION)
+        return STATUS_INVALID_PARAMETER;
+    status = ImodOpenPciDevice(query->pdoName, query->instanceId, &fileObject, &pdo);
+    if (!NT_SUCCESS(status)) return status;
+    reply->version = IMOD_PCI_QUERY_VERSION;
+    reply->resourcesStatus = IoGetDeviceProperty(pdo, DevicePropertyAllocatedResources,
+        sizeof(reply->resources), reply->resources, &bytes);
+    if (NT_SUCCESS(reply->resourcesStatus) && bytes <= sizeof(reply->resources))
+        reply->resourcesBytes = bytes;
+    else if (NT_SUCCESS(reply->resourcesStatus)) reply->resourcesStatus = STATUS_DATA_ERROR;
+    reply->configStatus = ImodReadPciConfig(pdo, reply->config);
+    if (NT_SUCCESS(reply->configStatus)) reply->configBytes = IMOD_PCI_CONFIG_SIZE;
+    ObDereferenceObject(pdo);
+    ObDereferenceObject(fileObject);
+    return STATUS_SUCCESS;
 }
 
 // Opens an exact PCI devnode: the PDO name selects it and the instance ID,
@@ -414,6 +425,15 @@ static BOOLEAN ImodResourcesContainRange(const UCHAR *list, ULONG bytes, ULONGLO
             ULONGLONG start, length;
             ULONG length32;
 
+            if (descriptor[0] == CmResourceTypeDeviceSpecific)
+            {
+                ULONG dataSize;
+                RtlCopyMemory(&dataSize, descriptor + 4, sizeof(ULONG));
+                // A device-specific payload follows the last partial descriptor.
+                if (partial + 1 != partialCount || dataSize > bytes - offset - 20) return FALSE;
+                offset += dataSize;
+                continue;
+            }
             RtlCopyMemory(&flags, descriptor + 2, sizeof(USHORT));
             RtlCopyMemory(&start, descriptor + 4, sizeof(ULONGLONG));
             RtlCopyMemory(&length32, descriptor + 12, sizeof(ULONG));
@@ -468,7 +488,19 @@ static NTSTATUS ImodWriteDevice(struct ImodDeviceWrite *request, struct ImodDevi
     status = ImodOpenPciDevice(request->pdoName, request->instanceId, &fileObject, &pdo);
     if (!NT_SUCCESS(status)) return status;
 
-    // The device stays referenced, so its resources cannot change during the write.
+    // References keep the objects alive, not their PnP resources. This standalone
+    // driver does not synchronize surprise removal/power transitions with MMIO.
+    {
+        ULONG classCode = 0;
+        status = ImodReadPciClass(pdo, &classCode);
+        if (NT_SUCCESS(status) && !ImodIsAllowedClass(classCode)) status = STATUS_ACCESS_DENIED;
+        if (!NT_SUCCESS(status))
+        {
+            ObDereferenceObject(pdo);
+            ObDereferenceObject(fileObject);
+            return status;
+        }
+    }
     reply->version = IMOD_DEVICE_WRITE_VERSION;
     status = IoGetDeviceProperty(pdo, DevicePropertyAllocatedResources,
         sizeof(reply->resources), reply->resources, &bytes);
@@ -665,5 +697,224 @@ static NTSTATUS ImodWritePhysicalMemory(
     }
 
     (void)ImodUnmapPhysicalMemory(mappedBase, mappedSize);
+    return status;
+}
+
+// PCI class is read from the bus, not from a caller-supplied hardware ID.
+static NTSTATUS ImodReadPciClass(PDEVICE_OBJECT pdo, ULONG *classCode)
+{
+    UCHAR config[IMOD_PCI_CONFIG_SIZE];
+    NTSTATUS status = ImodReadPciConfig(pdo, config);
+    if (!NT_SUCCESS(status)) return status;
+    if ((config[0] == 0xFF && config[1] == 0xFF) || (config[0] == 0 && config[1] == 0))
+        return STATUS_DEVICE_NOT_CONNECTED;
+    *classCode = ((ULONG)config[11] << 16) | ((ULONG)config[10] << 8) | config[9];
+    return STATUS_SUCCESS;
+}
+
+static BOOLEAN ImodIsAllowedClass(ULONG classCode)
+{
+    return classCode == 0x0C0330 || (classCode >> 8) == 0x0200;
+}
+
+static NTSTATUS ImodOpenMemoryDevice(const WCHAR *name, const WCHAR *id,
+    PFILE_OBJECT *file, PDEVICE_OBJECT *pdo, UCHAR **resources, ULONG *bytes, ULONG *classCode)
+{
+    NTSTATUS status;
+    *resources = NULL;
+    status = ImodOpenPciDevice(name, id, file, pdo);
+    if (!NT_SUCCESS(status)) return status;
+    status = ImodReadPciClass(*pdo, classCode);
+    if (NT_SUCCESS(status) && !ImodIsAllowedClass(*classCode)) status = STATUS_ACCESS_DENIED;
+    if (NT_SUCCESS(status))
+    {
+        *resources = ExAllocatePool2(POOL_FLAG_PAGED, IMOD_PCI_RESOURCE_SIZE, 'rImD');
+        if (*resources == NULL) status = STATUS_INSUFFICIENT_RESOURCES;
+    }
+    if (NT_SUCCESS(status))
+    {
+        status = IoGetDeviceProperty(*pdo, DevicePropertyAllocatedResources,
+            IMOD_PCI_RESOURCE_SIZE, *resources, bytes);
+        if (NT_SUCCESS(status) && *bytes > IMOD_PCI_RESOURCE_SIZE) status = STATUS_DATA_ERROR;
+    }
+    if (!NT_SUCCESS(status))
+    {
+        if (*resources != NULL) ExFreePoolWithTag(*resources, 'rImD');
+        *resources = NULL;
+        ObDereferenceObject(*pdo);
+        ObDereferenceObject(*file);
+        *pdo = NULL;
+        *file = NULL;
+    }
+    return status;
+}
+
+static VOID ImodReadDeviceWorker(PVOID IoObject, PVOID Context, PIO_WORKITEM WorkItem)
+{
+    PIRP irp = Context;
+    struct ImodDeviceWrite request;
+    struct ImodDeviceReadReply *reply = irp->AssociatedIrp.SystemBuffer;
+    UNREFERENCED_PARAMETER(IoObject);
+    RtlCopyMemory(&request, reply, sizeof(request));
+    RtlZeroMemory(reply, sizeof(*reply));
+    irp->IoStatus.Status = irp->Cancel ? STATUS_CANCELLED : ImodReadDevice(&request, reply);
+    irp->IoStatus.Information = NT_SUCCESS(irp->IoStatus.Status) ? sizeof(*reply) : 0;
+    IoFreeWorkItem(WorkItem);
+    IoCompleteRequest(irp, IO_NO_INCREMENT);
+}
+
+static NTSTATUS ImodReadDevice(struct ImodDeviceWrite *request, struct ImodDeviceReadReply *reply)
+{
+    PFILE_OBJECT file = NULL;
+    PDEVICE_OBJECT pdo = NULL;
+    UCHAR *resources = NULL;
+    ULONG bytes = 0, classCode = 0;
+    PHYSICAL_ADDRESS address;
+    NTSTATUS status;
+    if (KeGetCurrentIrql() != PASSIVE_LEVEL || request->version != IMOD_DEVICE_WRITE_VERSION
+        || !ImodIsValidAccessSize(request->accessSize)) return STATUS_INVALID_PARAMETER;
+    status = ImodOpenMemoryDevice(request->pdoName, request->instanceId, &file, &pdo,
+        &resources, &bytes, &classCode);
+    if (!NT_SUCCESS(status)) return status;
+    if (!ImodResourcesContainRange(resources, bytes, request->physAddress, request->accessSize))
+        status = STATUS_ACCESS_DENIED;
+    else
+    {
+        address.QuadPart = (LONGLONG)request->physAddress;
+        status = ImodReadPhysicalMemory(address, request->accessSize, &reply->value);
+        if (NT_SUCCESS(status)) reply->version = IMOD_DEVICE_WRITE_VERSION;
+    }
+    ExFreePoolWithTag(resources, 'rImD');
+    ObDereferenceObject(pdo);
+    ObDereferenceObject(file);
+    return status;
+}
+
+// RAM is never mapped as device memory. Only the controller's bounded context
+// walk uses this internal helper; no IOCTL accepts a RAM address from user mode.
+static NTSTATUS ImodCopyContext(ULONGLONG address, PVOID target, SIZE_T size)
+{
+    MM_COPY_ADDRESS source;
+    SIZE_T copied = 0;
+    NTSTATUS status;
+    if (address == 0 || address > MAXLONGLONG || size > (ULONGLONG)MAXLONGLONG - address)
+        return STATUS_INVALID_PARAMETER;
+    source.PhysicalAddress.QuadPart = (LONGLONG)address;
+    status = MmCopyMemory(target, source, size, MM_COPY_MEMORY_PHYSICAL, &copied);
+    return NT_SUCCESS(status) && copied != size ? STATUS_PARTIAL_COPY : status;
+}
+
+static NTSTATUS ImodReadController32(const UCHAR *resources, ULONG bytes,
+    ULONGLONG base, ULONGLONG length, ULONGLONG offset, ULONG *value)
+{
+    ULONGLONG raw = 0;
+    PHYSICAL_ADDRESS address;
+    NTSTATUS status;
+    if (offset > length || sizeof(ULONG) > length - offset || base > MAXULONGLONG - offset
+        || !ImodResourcesContainRange(resources, bytes, base + offset, sizeof(ULONG)))
+        return STATUS_ACCESS_DENIED;
+    address.QuadPart = (LONGLONG)(base + offset);
+    status = ImodReadPhysicalMemory(address, sizeof(ULONG), &raw);
+    *value = (ULONG)raw;
+    return status;
+}
+
+static VOID ImodQueryXhciWorker(PVOID IoObject, PVOID Context, PIO_WORKITEM WorkItem)
+{
+    PIRP irp = Context;
+    struct ImodXhciQuery request;
+    struct ImodXhciReply *reply = irp->AssociatedIrp.SystemBuffer;
+    UNREFERENCED_PARAMETER(IoObject);
+    RtlCopyMemory(&request, reply, sizeof(request));
+    RtlZeroMemory(reply, sizeof(*reply));
+    irp->IoStatus.Status = irp->Cancel ? STATUS_CANCELLED : ImodQueryXhci(&request, reply);
+    irp->IoStatus.Information = NT_SUCCESS(irp->IoStatus.Status)
+        ? FIELD_OFFSET(struct ImodXhciReply, slots) + reply->count * sizeof(struct ImodXhciSlot) : 0;
+    IoFreeWorkItem(WorkItem);
+    IoCompleteRequest(irp, IO_NO_INCREMENT);
+}
+
+// Returns only root-port/address/interrupter tuples, never raw context memory.
+// The walk has the same slot/endpoint/TRB selection rules as the managed model.
+static NTSTATUS ImodQueryXhci(struct ImodXhciQuery *request, struct ImodXhciReply *reply)
+{
+    PFILE_OBJECT file = NULL;
+    PDEVICE_OBJECT pdo = NULL;
+    UCHAR *resources = NULL;
+    ULONG bytes = 0, classCode = 0, cap = 0, hcs = 0, hcc = 0, low = 0, high = 0, slot;
+    ULONGLONG dcbaa;
+    NTSTATUS status;
+    if (KeGetCurrentIrql() != PASSIVE_LEVEL || request->version != IMOD_XHCI_QUERY_VERSION
+        || request->capabilityAddress == 0 || request->memoryLength < 0x40) return STATUS_INVALID_PARAMETER;
+    status = ImodOpenMemoryDevice(request->pdoName, request->instanceId, &file, &pdo,
+        &resources, &bytes, &classCode);
+    if (!NT_SUCCESS(status)) return status;
+    if (classCode != 0x0C0330) { status = STATUS_ACCESS_DENIED; goto Done; }
+#define READ_CAP(off, val) ImodReadController32(resources, bytes, request->capabilityAddress, request->memoryLength, (off), &(val))
+    status = READ_CAP(0, cap);
+    if (!NT_SUCCESS(status)) goto Done;
+    if ((cap & 0xFF) < 0x20 || (cap >> 16) < 0x0090 || (cap >> 16) > 0x0120)
+        { status = STATUS_DEVICE_DATA_ERROR; goto Done; }
+    status = READ_CAP(request->hcsparamsOffset, hcs);
+    if (!NT_SUCCESS(status)) goto Done;
+    status = READ_CAP(0x10, hcc);
+    if (!NT_SUCCESS(status)) goto Done;
+    reply->maxSlots = hcs & 0xFF;
+    reply->maxIntrs = (hcs >> 8) & 0x7FF;
+    reply->contextSize = (hcc & 4) ? 64 : 32;
+    if (reply->maxSlots == 0 || reply->maxIntrs == 0)
+        { status = STATUS_DEVICE_DATA_ERROR; goto Done; }
+    status = READ_CAP((cap & 0xFF) + 0x30, low);
+    if (!NT_SUCCESS(status)) goto Done;
+    status = READ_CAP((cap & 0xFF) + 0x34, high);
+    if (!NT_SUCCESS(status)) goto Done;
+    dcbaa = (((ULONGLONG)high << 32) | low) & ~63ULL;
+    if (dcbaa == 0) { status = STATUS_DEVICE_DATA_ERROR; goto Done; }
+    for (slot = 1; slot <= reply->maxSlots; slot++)
+    {
+        ULONGLONG context = 0;
+        ULONG words[4], entries, state, port, deviceAddress, target, endpoint;
+        BOOLEAN endpointFound = FALSE;
+        if (dcbaa > MAXULONGLONG - (ULONGLONG)slot * 8
+            || !NT_SUCCESS(ImodCopyContext(dcbaa + (ULONGLONG)slot * 8, &context, sizeof(context)))) continue;
+        context &= ~63ULL;
+        if (!NT_SUCCESS(ImodCopyContext(context, words, sizeof(words)))) continue;
+        entries = (words[0] >> 27) & 31;
+        state = (words[3] >> 27) & 31;
+        port = (words[1] >> 16) & 255;
+        deviceAddress = words[3] & 255;
+        target = (words[2] >> 22) & 1023;
+        if (state < 2 || (words[0] & (1UL << 26)) || port == 0) continue;
+        for (endpoint = 2; endpoint <= entries; endpoint++)
+        {
+            ULONG ep[4], trb[4], type, candidate;
+            ULONGLONG ring, offset = (ULONGLONG)endpoint * reply->contextSize;
+            if (context > MAXULONGLONG - offset
+                || !NT_SUCCESS(ImodCopyContext(context + offset, ep, sizeof(ep)))) continue;
+            type = (ep[1] >> 3) & 7;
+            if ((ep[0] & 7) == 0 || (type != 3 && type != 5 && type != 7)) continue;
+            ring = (((ULONGLONG)ep[3] << 32) | ep[2]) & ~15ULL;
+            if (!NT_SUCCESS(ImodCopyContext(ring, trb, sizeof(trb)))) continue;
+            type = (trb[3] >> 10) & 63;
+            candidate = (trb[2] >> 22) & 1023;
+            if ((type == 1 || type == 3 || type == 5) && candidate < reply->maxIntrs)
+                { target = candidate; endpointFound = TRUE; break; }
+        }
+        if (endpointFound) reply->endpointTargets++; else reply->slotTargets++;
+        if (target < reply->maxIntrs)
+        {
+            struct ImodXhciSlot *entry = &reply->slots[reply->count++];
+            entry->rootPort = port;
+            entry->deviceAddress = deviceAddress;
+            entry->interrupter = target;
+        }
+    }
+    reply->version = IMOD_XHCI_QUERY_VERSION;
+    status = STATUS_SUCCESS;
+Done:
+#undef READ_CAP
+    ExFreePoolWithTag(resources, 'rImD');
+    ObDereferenceObject(pdo);
+    ObDereferenceObject(file);
     return status;
 }

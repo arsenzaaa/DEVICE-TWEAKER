@@ -14,7 +14,9 @@ $header = Join-Path $root 'src\IMOD\Driver\imod_driver.h'
 $text = Get-Content -LiteralPath $driver -Raw
 $functions = @('ImodDriverUnload','DriverEntry','ImodDriverCreateDriver','ImodDriverInitialize','ImodDriverDispatch',
     'ImodIsValidAccessSize','ImodMapPhysicalMemory','ImodUnmapPhysicalMemory','ImodReadPhysicalMemory','ImodWritePhysicalMemory',
-    'ImodResourcesContainRange','ImodWriteDeviceWorker','ImodWriteDevice')
+    'ImodResourcesContainRange','ImodWriteDeviceWorker','ImodWriteDevice',
+    'ImodReadPciClass','ImodIsAllowedClass','ImodOpenMemoryDevice','ImodReadDeviceWorker','ImodReadDevice',
+    'ImodCopyContext','ImodReadController32','ImodQueryXhciWorker','ImodQueryXhci')
 $bodies = foreach ($name in $functions) {
     $match = [regex]::Match($text, '(?m)^(?:static )?(?:NTSTATUS|BOOLEAN|VOID|void) '+$name+'\([^;]+?\)\s*\{')
     if (-not $match.Success) { throw "Native function missing: $name" }
@@ -60,6 +62,12 @@ $stub = @'
 #define STATUS_ACCESS_DENIED (-4)
 #define STATUS_CANCELLED (-5)
 #define STATUS_DATA_ERROR (-6)
+#define STATUS_DEVICE_NOT_CONNECTED (-7)
+#define STATUS_PARTIAL_COPY (-8)
+#define STATUS_DEVICE_DATA_ERROR (-9)
+#define CmResourceTypeDeviceSpecific 5
+#define POOL_FLAG_PAGED 1
+#define MM_COPY_MEMORY_PHYSICAL 1
 #define PASSIVE_LEVEL 0
 #define DevicePropertyAllocatedResources 1
 #define FIELD_OFFSET(t,f) ((ULONG)offsetof(t,f))
@@ -117,6 +125,28 @@ static int failOpen, failProperty, oversizeResources, currentIrql, fileObjectTok
 static int invalidateAfterQuery, modelInvalidated, staleMappings;
 static DEVICE device;
 static DRIVER created;
+static ULONG modelClass=0x0C0330;
+static int failClass,failPool,poolAllocations,poolFrees,contextCopies;
+static UCHAR dmaMemory[0x4000];
+typedef union { PHYSICAL_ADDRESS PhysicalAddress; PVOID VirtualAddress; } MM_COPY_ADDRESS;
+static PVOID ExAllocatePool2(ULONG flags,SIZE_T size,ULONG tag) {
+    (void)flags;(void)tag;if(failPool)return NULL;poolAllocations++;return malloc(size);
+}
+static void ExFreePoolWithTag(PVOID p,ULONG tag) { (void)tag;poolFrees++;free(p); }
+static NTSTATUS MmCopyMemory(PVOID target,MM_COPY_ADDRESS source,SIZE_T size,ULONG flags,SIZE_T *copied) {
+    ULONGLONG address=(ULONGLONG)source.PhysicalAddress.QuadPart;
+    assert(flags==MM_COPY_MEMORY_PHYSICAL);contextCopies++;*copied=0;
+    if(address<0x10000 || address>0x14000 || size>0x14000-address)return STATUS_DATA_ERROR;
+    memcpy(target,dmaMemory+(SIZE_T)(address-0x10000),size);*copied=size;return STATUS_SUCCESS;
+}
+static NTSTATUS ImodReadPciConfig(PDEVICE_OBJECT pdo,UCHAR *config) {
+    assert(pdo==&device);if(failClass)return STATUS_DATA_ERROR;
+    memset(config,0,256);config[0]=0x86;config[1]=0x80;
+    config[11]=(UCHAR)(modelClass>>16);config[10]=(UCHAR)(modelClass>>8);config[9]=(UCHAR)modelClass;
+    return STATUS_SUCCESS;
+}
+static NTSTATUS ImodReadPciClass(PDEVICE_OBJECT pdo,ULONG *classCode);
+static BOOLEAN ImodIsAllowedClass(ULONG classCode);
 static void RtlInitUnicodeString(PUNICODE_STRING s,const wchar_t *t) { s->text=t; }
 #define RtlCopyMemory memcpy
 #define RtlZeroMemory(p,n) memset((p),0,(n))
@@ -133,6 +163,8 @@ static void IoFreeWorkItem(PIO_WORKITEM item) { assert(item==&workItemToken);fre
 static void IoMarkIrpPending(PIRP i) { (void)i;markedPending++; }
 static void ImodQueryPciWorker(void *a,void *b,void *c) { (void)a;(void)b;(void)c; }
 static void ImodWriteDeviceWorker(void *a,void *b,void *c);
+static void ImodReadDeviceWorker(void *a,void *b,void *c);
+static void ImodQueryXhciWorker(void *a,void *b,void *c);
 // Synchronous fake queue: tests the production worker body, not kernel scheduling.
 static void IoQueueWorkItemEx(PIO_WORKITEM w,void (*fn)(void*,void*,void*),int q,void *c) { (void)q;fn(&device,c,w); }
 static int KeGetCurrentIrql(void) { return currentIrql; }
@@ -152,6 +184,11 @@ static NTSTATUS IoGetDeviceProperty(PDEVICE_OBJECT pdo,int property,ULONG capaci
 static void ObDereferenceObject(PVOID object) { assert(object==&device || object==&fileObjectToken);dereferences++; }
 struct ImodDeviceWrite;
 struct ImodDeviceWriteReply;
+struct ImodDeviceReadReply;
+struct ImodXhciQuery;
+struct ImodXhciReply;
+static NTSTATUS ImodReadDevice(struct ImodDeviceWrite *,struct ImodDeviceReadReply *);
+static NTSTATUS ImodQueryXhci(struct ImodXhciQuery *,struct ImodXhciReply *);
 static NTSTATUS ImodWriteDevice(struct ImodDeviceWrite *request,struct ImodDeviceWriteReply *reply);
 static void *MmMapIoSpace(PHYSICAL_ADDRESS a,SIZE_T n,int cache) { (void)a;(void)cache;assert(n==4096);mapCalls++;if(modelInvalidated)staleMappings++;return failMap?NULL:(modelInvalidated==2 ? reassignedMemory:memory); }
 static void MmUnmapIoSpace(void *p,SIZE_T n) { assert((p==memory || p==reassignedMemory) && n==4096);unmapCalls++; }
@@ -178,6 +215,7 @@ static void reset(void) {
     invalidateAfterQuery=modelInvalidated=staleMappings=0;
     allowWorkItem=freedWorkItems=markedPending=completions=openCalls=propertyCalls=dereferences=0;
     failOpen=failProperty=oversizeResources=currentIrql=0;
+    modelClass=0x0C0330;failClass=failPool=poolAllocations=poolFrees=contextCopies=0;
     memset(memory,0,sizeof(memory));
 }
 static void initTests(void) {
@@ -209,14 +247,15 @@ static void mmioTests(void) {
     a.QuadPart=0x1ffc; assert(ImodReadPhysicalMemory(a,4,&value)==0 && unmapCalls==1);
 }
 static void dispatchTests(void) {
-    IRP irp={0}; struct tagPhysAccessStruct access={0x1000,4,0,0};
-    assert(sizeof(access)==24 && offsetof(struct tagPhysAccessStruct,value)==16);
+    IRP irp={0}; UCHAR access[24]={0};
+    assert(sizeof(struct ImodDeviceReadReply)==16 && sizeof(struct ImodXhciQuery)==1048);
+    assert(offsetof(struct ImodXhciReply,slots)==28);
     irp.stack.MajorFunction=IRP_MJ_DEVICE_CONTROL;
     irp.AssociatedIrp.SystemBuffer=&access;
     irp.stack.Parameters.DeviceIoControl.InputBufferLength=sizeof(access);
     irp.stack.Parameters.DeviceIoControl.OutputBufferLength=sizeof(access);
-    irp.stack.Parameters.DeviceIoControl.IoControlCode=IOCTL_IMOD_READ_PHYSICAL;
-    reset();assert(ImodDriverDispatch(&device,&irp)==0 && irp.IoStatus.Information==sizeof(access) && reads==1);
+    irp.stack.Parameters.DeviceIoControl.IoControlCode=CTL_CODE(FILE_DEVICE_IMOD,IMOD_IOCTL_INDEX+2,METHOD_BUFFERED,FILE_ANY_ACCESS);
+    reset();assert(ImodDriverDispatch(&device,&irp)==STATUS_INVALID_DEVICE_REQUEST && irp.IoStatus.Information==0 && reads==0);
     irp.stack.Parameters.DeviceIoControl.OutputBufferLength=0;
     reset();assert(ImodDriverDispatch(&device,&irp)<0 && mapCalls==0);
     irp.stack.Parameters.DeviceIoControl.IoControlCode=IOCTL_IMOD_QUERY_PCI;
@@ -325,7 +364,105 @@ static void deviceWriteTests(void) {
     assert(dereferences==2 && writes==0 && mapCalls==0);
     put32(assignedResources,0,1);
 }
-int main(void) { _set_error_mode(_OUT_TO_STDERR);_set_abort_behavior(0,_WRITE_ABORT_MSG|_CALL_REPORTFAULT);initTests();mmioTests();rangeTests();dispatchTests();deviceWriteTests();puts("PASS: actual driver entry, unload assignment, MMIO width/map/unmap, device-scoped write worker, cancellation, cleanup and dispatch; fake kernel only; PCI lookup and PCI query worker stubbed");return 0; }
+static NTSTATUS dispatchDeviceRead(ULONGLONG address, ULONG width, ULONG version, int cancelled, ULONGLONG *value) {
+    union { struct ImodDeviceWrite request; struct ImodDeviceReadReply reply; } buffer;
+    IRP irp={0};memset(&buffer,0,sizeof(buffer));
+    buffer.request.version=version;buffer.request.accessSize=width;buffer.request.physAddress=address;
+    buffer.request.pdoName[0]='p';buffer.request.instanceId[0]='i';
+    irp.AssociatedIrp.SystemBuffer=&buffer;irp.Cancel=cancelled;irp.stack.MajorFunction=IRP_MJ_DEVICE_CONTROL;
+    irp.stack.Parameters.DeviceIoControl.InputBufferLength=sizeof(buffer.request);
+    irp.stack.Parameters.DeviceIoControl.OutputBufferLength=sizeof(buffer.reply);
+    irp.stack.Parameters.DeviceIoControl.IoControlCode=IOCTL_IMOD_READ_DEVICE;allowWorkItem=1;
+    assert(ImodDriverDispatch(&device,&irp)==STATUS_PENDING);
+    assert(markedPending==1 && freedWorkItems==1 && completions==1);
+    if(NT_SUCCESS(irp.IoStatus.Status)) {
+        assert(irp.IoStatus.Information==16 && buffer.reply.version==1 && buffer.reply.reserved==0);
+        *value=buffer.reply.value;
+    } else assert(irp.IoStatus.Information==0);
+    assert(poolAllocations==poolFrees);
+    return irp.IoStatus.Status;
+}
+static void setResource(void) {
+    ULONG n=put32(assignedResources,0,1);n=putFull(assignedResources,n,1);
+    assignedBytes=putPartial(assignedResources,n,CmResourceTypeMemory,0,0x1000,0x1000);
+}
+static void deviceReadTests(void) {
+    ULONGLONG value=0;
+    setResource();reset();memory[4]=0x78;memory[5]=0x56;
+    assert(dispatchDeviceRead(0x1004,2,1,0,&value)==0 && value==0x5678 && reads==1 && writes==0);
+    reset();assert(dispatchDeviceRead(0x2000,4,1,0,&value)==STATUS_ACCESS_DENIED && mapCalls==0);
+    reset();assert(dispatchDeviceRead(0x1ffe,4,1,0,&value)==STATUS_ACCESS_DENIED && mapCalls==0);
+    reset();assert(dispatchDeviceRead(0x10000,4,1,0,&value)==STATUS_ACCESS_DENIED && contextCopies==0);
+    reset();assert(dispatchDeviceRead(0x1004,4,1,1,&value)==STATUS_CANCELLED && openCalls==0);
+    reset();assert(dispatchDeviceRead(0x1004,4,99,0,&value)==STATUS_INVALID_PARAMETER && openCalls==0);
+    reset();failPool=1;assert(dispatchDeviceRead(0x1004,4,1,0,&value)==STATUS_INSUFFICIENT_RESOURCES && dereferences==2);
+    reset();failClass=1;assert(dispatchDeviceRead(0x1004,4,1,0,&value)<0 && propertyCalls==0 && reads==0);
+    reset();modelClass=0x030000;assert(dispatchDeviceRead(0x1004,4,1,0,&value)==STATUS_ACCESS_DENIED && reads==0);
+    reset();modelClass=0x010802;assert(dispatchDeviceWrite(0x1004,4,1,0)==STATUS_ACCESS_DENIED && writes==0);
+    reset();modelClass=0x028000;assert(dispatchDeviceRead(0x1004,4,1,0,&value)==STATUS_ACCESS_DENIED);
+    reset();modelClass=0x020000;assert(dispatchDeviceRead(0x1004,4,1,0,&value)==STATUS_SUCCESS);
+    reset();modelClass=0x020000;assert(dispatchDeviceWrite(0x1004,4,1,0)==STATUS_SUCCESS);
+}
+static void deviceSpecificTests(void) {
+    UCHAR list[256];ULONG n=put32(list,0,2);n=putFull(list,n,1);
+    n=putPartial(list,n,CmResourceTypeDeviceSpecific,0,7,0);
+    memset(list+n,0xAA,7);n+=7;
+    n=putFull(list,n,1);n=putPartial(list,n,CmResourceTypeMemory,0,0x1000,0x1000);
+    assert(ImodResourcesContainRange(list,n,0x1004,4));
+    assert(!ImodResourcesContainRange(list,n-1,0x1004,4));
+    put32(list,24,UINT32_MAX);assert(!ImodResourcesContainRange(list,n,0x1004,4));
+    n=put32(list,0,1);n=putFull(list,n,2);n=putPartial(list,n,CmResourceTypeDeviceSpecific,0,0,0);
+    n=putPartial(list,n,CmResourceTypeMemory,0,0x1000,0x1000);
+    assert(!ImodResourcesContainRange(list,n,0x1004,4)); /* payload must be last */
+}
+static void dma32(ULONG address,ULONG value) { assert(address>=0x10000 && address<0x14000);memcpy(dmaMemory+address-0x10000,&value,4); }
+static void mmio32(ULONG offset,ULONG value) { memcpy(memory+offset,&value,4); }
+static void topologyFixture(void) {
+    setResource();reset();memset(dmaMemory,0,sizeof(dmaMemory));
+    mmio32(0,0x01000020);mmio32(4,2|(8<<8));mmio32(0x10,0);
+    mmio32(0x50,0x10000);mmio32(0x54,0);
+    dma32(0x10008,0x11000);dma32(0x11000,2UL<<27);dma32(0x11004,3UL<<16);
+    dma32(0x11008,2UL<<22);dma32(0x1100C,(3UL<<27)|5);
+    dma32(0x11040,1);dma32(0x11044,7UL<<3);dma32(0x11048,0x12000);
+    dma32(0x12008,6UL<<22);dma32(0x1200C,1UL<<10);
+}
+static NTSTATUS dispatchTopology(struct ImodXhciReply *result, int cancelled) {
+    union { struct ImodXhciQuery query;struct ImodXhciReply reply; } buffer;
+    IRP irp={0};memset(&buffer,0,sizeof(buffer));
+    buffer.query.version=1;buffer.query.hcsparamsOffset=4;buffer.query.capabilityAddress=0x1000;buffer.query.memoryLength=0x1000;
+    buffer.query.pdoName[0]='p';buffer.query.instanceId[0]='i';
+    irp.AssociatedIrp.SystemBuffer=&buffer;irp.Cancel=cancelled;irp.stack.MajorFunction=IRP_MJ_DEVICE_CONTROL;
+    irp.stack.Parameters.DeviceIoControl.InputBufferLength=sizeof(buffer.query);
+    irp.stack.Parameters.DeviceIoControl.OutputBufferLength=sizeof(buffer.reply);
+    irp.stack.Parameters.DeviceIoControl.IoControlCode=IOCTL_IMOD_QUERY_XHCI;allowWorkItem=1;
+    assert(ImodDriverDispatch(&device,&irp)==STATUS_PENDING);
+    assert(markedPending==1 && freedWorkItems==1 && completions==1 && poolAllocations==poolFrees);
+    if(NT_SUCCESS(irp.IoStatus.Status)) {
+        assert(irp.IoStatus.Information==28+buffer.reply.count*12);*result=buffer.reply;
+    } else assert(irp.IoStatus.Information==0);
+    return irp.IoStatus.Status;
+}
+static void topologyTests(void) {
+    struct ImodXhciReply reply;
+    topologyFixture();assert(dispatchTopology(&reply,0)==0);
+    assert(reply.count==1 && reply.maxSlots==2 && reply.maxIntrs==8 && reply.contextSize==32);
+    assert(reply.endpointTargets==1 && reply.slotTargets==0);
+    assert(reply.slots[0].rootPort==3 && reply.slots[0].deviceAddress==5 && reply.slots[0].interrupter==6);
+    assert(writes==0 && contextCopies>0);
+    topologyFixture();dma32(0x11040,0);assert(dispatchTopology(&reply,0)==0);
+    assert(reply.slots[0].interrupter==2 && reply.slotTargets==1 && reply.endpointTargets==0);
+    topologyFixture();mmio32(0x10,4);dma32(0x11080,1);dma32(0x11084,7UL<<3);dma32(0x11088,0x12000);
+    assert(dispatchTopology(&reply,0)==0 && reply.contextSize==64 && reply.slots[0].interrupter==6);
+    topologyFixture();dma32(0x10008,0xFFFFF000);assert(dispatchTopology(&reply,0)==0 && reply.count==0);
+    topologyFixture();dma32(0x11000,(2UL<<27)|(1UL<<26));assert(dispatchTopology(&reply,0)==0 && reply.count==0);
+    topologyFixture();mmio32(0,0xFFFFFFFF);assert(dispatchTopology(&reply,0)==STATUS_DEVICE_DATA_ERROR && contextCopies==0);
+    topologyFixture();modelClass=0x020000;assert(dispatchTopology(&reply,0)==STATUS_ACCESS_DENIED && contextCopies==0);
+    topologyFixture();assert(dispatchTopology(&reply,1)==STATUS_CANCELLED && contextCopies==0 && openCalls==0);
+    topologyFixture();assignedBytes=putPartial(assignedResources,20,CmResourceTypeMemory,0,0x1000,0x40);
+    assert(dispatchTopology(&reply,0)==STATUS_ACCESS_DENIED && contextCopies==0);
+}
+
+int main(void) { _set_error_mode(_OUT_TO_STDERR);_set_abort_behavior(0,_WRITE_ABORT_MSG|_CALL_REPORTFAULT);initTests();mmioTests();rangeTests();dispatchTests();deviceWriteTests();deviceReadTests();deviceSpecificTests();topologyTests();puts("PASS: actual driver dispatch, device-scoped MMIO reads/writes, retired raw IOCTL rejection, PCI class filter, xHCI context walk, endpoint/slot selection, variable resource payloads and cleanup; fake kernel only; PCI lookup/config delivery and scheduling stubbed");return 0; }
 '@
 if ($ProbeRemovalRace) {
     $probe = @'

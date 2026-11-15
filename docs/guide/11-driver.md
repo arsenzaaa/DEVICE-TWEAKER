@@ -4,13 +4,15 @@
 
 ## Operations that need DTIMOD
 
-DTIMOD.sys provides hardware access to supported USB IMOD/NIC ITR registers and additional PCI information. Writes are restricted to checked MMIO ranges of the selected device; it exposes no general arbitrary physical-memory write interface.
+DTIMOD.sys provides hardware access to supported USB IMOD/NIC ITR registers and additional PCI information. Register reads and writes are bound to the exact PCI device, checked against its allocated MMIO ranges and restricted to xHCI (`0C0330`) and Ethernet (`0200`) classes. The former general physical-memory read and write requests are rejected. Read-only PCI configuration queries remain available for IRQ inspection on other device classes.
+
+The exact USB map uses a separate xHCI query. The driver follows the controller's DCBAA, device contexts and endpoint/TRB data and returns only root-port, USB-address and interrupter tuples. These structures are in system memory, so the internal walk uses [MmCopyMemory](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntddk/nf-ntddk-mmcopymemory), rather than mapping RAM as non-cached device memory. The query does not accept a caller-supplied RAM address or return raw context bytes. This remains privileged hardware access, not an isolation boundary against an administrator controlling the device.
 
 MSI, affinity, RSS, ReservedCpuSets, Mouse Throttle and available power settings do not require DTIMOD. Some IRQ Mode information comes from Windows resources without the driver; an available driver supplies additional evidence. Incomplete mode detection is distinct from a failed setting write.
 
 ## Controller lifecycle during register access
 
-DTIMOD checks each device-scoped write against a snapshot of the target device's allocated MMIO ranges. It does not coordinate register reads or writes with that controller's PnP and power transitions. The range check does not guarantee that resources remain valid during controller stop, removal or reassignment. An object reference preserves the device object, not its hardware resources: Windows can release resources during [surprise removal](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/handling-an-irp-mn-surprise-removal-request) or [stop/rebalance](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/handling-an-irp-mn-stop-device-request--windows-2000-and-later-).
+DTIMOD checks each device-scoped register access against a snapshot of the target device's allocated MMIO ranges. It does not coordinate register reads or writes with that controller's PnP and power transitions. The range check does not guarantee that resources remain valid during controller stop, removal or reassignment. An object reference preserves the device object, not its hardware resources: Windows can release resources during [surprise removal](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/handling-an-irp-mn-surprise-removal-request) or [stop/rebalance](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/handling-an-irp-mn-stop-device-request--windows-2000-and-later-).
 
 Avoid disabling, restarting or removing the target PCI controller during register operations, including saved-profile application outside the GUI. Unplugging a USB peripheral while its host controller remains present is a different event. Safe handling of concurrent controller removal or power transitions is not established for this driver.
 

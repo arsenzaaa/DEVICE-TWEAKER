@@ -47,7 +47,7 @@ public sealed class DriverIdentityTests
         foreach (string name in new[] { @"\Device\DeviceTweakerImod2", @"\DosDevices\DeviceTweakerImod2" })
             Assert.True(bytes.AsSpan().IndexOf(System.Text.Encoding.Unicode.GetBytes(name)) >= 0, name);
         Assert.True(bytes.AsSpan().IndexOf(System.Text.Encoding.Unicode.GetBytes(@"\Device\DTIMOD")) < 0);
-        Assert.Equal("F2BD92D5455F64CEB764CC4EFA4EA2D7F83DB6F7FDF8EE5FFA7247D733EA59FD", Convert.ToHexString(SHA256.HashData(bytes)));
+        Assert.Equal("BF83A50F17A688E3AB2D8D53814EC9AAC1C74702548E762E310329C328322770", Convert.ToHexString(SHA256.HashData(bytes)));
     }
 
     [Fact]

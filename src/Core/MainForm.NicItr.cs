@@ -584,6 +584,7 @@ public sealed partial class MainForm
             }
 
             using ImodDriverContext ctx = driverContext!;
+            if (!ctx.TrySetDeviceTarget(instanceId, out error)) return false;
             for (int q = 0; q < profile.MaxQueues; q++)
             {
                 ulong address = baseAddress + profile.BaseOffset + (profile.Stride * (uint)q);
@@ -635,7 +636,7 @@ public sealed partial class MainForm
             }
 
             using ImodDriverContext ctx = driverContext!;
-            if (!ctx.TrySetWriteTarget(instanceId, out error))
+            if (!ctx.TrySetDeviceTarget(instanceId, out error))
             {
                 return false;
             }

@@ -93,7 +93,7 @@ public sealed partial class MainForm
                     continue;
                 }
 
-                if (!imodDriver.TrySetWriteTarget(controller.DeviceId, out string? targetError))
+                if (!imodDriver.TrySetDeviceTarget(controller.DeviceId, out string? targetError))
                 {
                     stats.ControllersFailed++;
                     WriteLog($"IMOD: {controller.DeviceId} skipped: {targetError}");
@@ -809,6 +809,12 @@ public sealed partial class MainForm
                     continue;
                 }
 
+                if (!imodDriver.TrySetDeviceTarget(controller.DeviceId, out string? targetError))
+                {
+                    if (imodDriver.OlderDriverLoaded) { error = targetError; return false; }
+                    WriteLog($"IMOD.READBACK: target unavailable {controller.DeviceId}: {targetError}");
+                    continue;
+                }
                 uint hcsparamsOffset = config.GlobalHcsparamsOffset;
                 uint rtsoff = config.GlobalRtsoff;
 
@@ -847,18 +853,11 @@ public sealed partial class MainForm
                 }
 
                 uint readCount = Math.Min(maxIntrs, readbackLimit);
-                List<uint> values = [];
-
-                for (uint i = 0; i < readCount; i++)
+                if (!ImodReadbackService.TryRead(imodDriver.Registers, runtimeAddress, readCount,
+                        out List<uint> values, out string? readError))
                 {
-                    ulong interrupterAddress = runtimeAddress + 0x24 + (0x20 * i);
-                    if (!DeviceTweakerImodRuntime.TryRead32(imodDriver.Registers, interrupterAddress, out uint registerValue, out ioError))
-                    {
-                        WriteLog($"IMOD.READBACK: read failed {controller.DeviceId} @ {ToHex(interrupterAddress)}: {ioError}");
-                        continue;
-                    }
-
-                    values.Add(registerValue & 0xFFFF);
+                    WriteLog($"IMOD.READBACK: incomplete controller read {controller.DeviceId}: {readError}");
+                    continue;
                 }
 
                 if (values.Count > 0)

@@ -15,7 +15,7 @@ param(
     [string]$TriggerDevice
 )
 
-$imodScriptVersion = 31
+$imodScriptVersion = 32
 
 function Test-IsAdmin {
     try {
@@ -860,6 +860,7 @@ try {
                     Write-ImodLog ("usb adaptive role scan: id=$($controller.DeviceId) rootPorts=`"$rootPortRoles`"")
                     if (-not [string]::IsNullOrWhiteSpace($rootPortRoles)) {
                         $adaptiveResult = [DeviceTweakerImodRuntime]::TryBuildAdaptiveIntervals(
+                            [string]$controller.DeviceId,
                             [uint64]$controller.BaseAddress,
                             [uint64]$controller.MemoryLength,
                             $hcsparamsOffset,

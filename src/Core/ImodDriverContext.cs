@@ -8,22 +8,22 @@ internal delegate bool ImodDriverLoader(string path, Action<string>? log, out st
 
 internal sealed class ImodDriverContext : IDisposable
 {
-    internal const int StartupScriptVersion = 31;
+    internal const int StartupScriptVersion = 32;
     public IntPtr DriverHandle { get; private set; } = InvalidHandleValue;
     public bool ServiceCreated { get; private set; }
     public bool ServiceStartedByContext { get; private set; }
     public bool InitializedSuccessfully { get; private set; }
     public string DriverPath { get; }
-    // Device whose memory ranges DTIMOD accepts for writes.
-    public DeviceTweakerImodRuntime.DeviceWriteTarget? WriteTarget { get; private set; }
+    // Device whose MMIO ranges DTIMOD accepts for reads and writes.
+    public DeviceTweakerImodRuntime.DeviceWriteTarget? DeviceTarget { get; private set; }
     // Every DTIMOD read and write goes through here, so a read-only QA process stops
-    // before the driver. Without a target the shared runtime refuses writes; reads need none.
+    // before the driver. Without a target the shared runtime refuses both reads and writes.
     public IDeviceRegisters Registers
     {
         get
         {
             QaRun.DemandWrite("PUBLISHED PHYSICAL ACCESS");
-            return new DeviceTweakerImodRuntime.DtimodRegisters(DriverHandle, WriteTarget!);
+            return new DeviceTweakerImodRuntime.DtimodRegisters(DriverHandle, DeviceTarget!);
         }
     }
     private readonly Action<string>? _log;
@@ -33,9 +33,9 @@ internal sealed class ImodDriverContext : IDisposable
     public bool OlderDriverLoaded => _olderDriverLoaded ??= DeviceTweakerImodRuntime.IsOlderDriverLoaded(DriverHandle);
     private bool? _olderDriverLoaded;
 
-    public bool TrySetWriteTarget(string instanceId, out string? error)
+    public bool TrySetDeviceTarget(string instanceId, out string? error)
     {
-        WriteTarget = null;
+        DeviceTarget = null;
         if (OlderDriverLoaded)
         {
             error = DeviceTweakerImodRuntime.OlderDriverMessage;
@@ -47,7 +47,7 @@ internal sealed class ImodDriverContext : IDisposable
             return false;
         }
 
-        WriteTarget = target;
+        DeviceTarget = target;
         return true;
     }
 

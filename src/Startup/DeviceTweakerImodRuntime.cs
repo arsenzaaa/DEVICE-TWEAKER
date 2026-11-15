@@ -163,14 +163,15 @@ public static class DeviceTweakerImodRuntime
     private const uint FileDeviceImod = 0x00008010;
     private const uint ImodIoctlIndex = 0x810;
     private const uint MethodBuffered = 0;
-    private const uint FileAnyAccess = 0;
+    private const uint FileReadAccess = 1;
     private const uint FileWriteAccess = 2;
     private const int OpenRetryCount = 10;
     private const int OpenRetryDelayMs = 100;
     private const string ImodDriverDevicePath = "\\\\.\\DeviceTweakerImod2";
     private const string ImodDriverServiceName = "DeviceTweakerImod2";
     private static readonly IntPtr InvalidHandleValue = new IntPtr(-1);
-    private static readonly uint IoctlImodReadPhysicalMemory = CtlCode(FileDeviceImod, ImodIoctlIndex + 2, MethodBuffered, FileAnyAccess);
+    internal static readonly uint IoctlImodReadDevice = CtlCode(FileDeviceImod, ImodIoctlIndex + 6, MethodBuffered, FileReadAccess);
+    internal static readonly uint IoctlImodQueryXhci = CtlCode(FileDeviceImod, ImodIoctlIndex + 7, MethodBuffered, FileReadAccess);
     // DTIMOD writes only inside memory ranges Windows assigned to the named PCI devnode.
     internal static readonly uint IoctlImodWriteDevice = CtlCode(FileDeviceImod, ImodIoctlIndex + 5, MethodBuffered, FileWriteAccess);
     private const uint ImodDeviceWriteVersion = 1;
@@ -215,9 +216,6 @@ public static class DeviceTweakerImodRuntime
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr CreateFile(string fileName, uint desiredAccess, uint shareMode, IntPtr securityAttributes, uint creationDisposition, uint flagsAndAttributes, IntPtr templateFile);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool DeviceIoControl(IntPtr deviceHandle, uint ioControlCode, ref PhysAccessStruct inBuffer, int inBufferSize, ref PhysAccessStruct outBuffer, int outBufferSize, out int bytesReturned, IntPtr overlapped);
 
     [DllImport("kernel32.dll", SetLastError = true, EntryPoint = "DeviceIoControl")]
     private static extern bool DeviceIoControlBytes(IntPtr deviceHandle, uint ioControlCode, byte[] inBuffer, int inBufferSize, byte[] outBuffer, int outBufferSize, out int bytesReturned, IntPtr overlapped);
@@ -730,6 +728,7 @@ public static class DeviceTweakerImodRuntime
     }
 
     public static string TryBuildAdaptiveIntervals(
+        string deviceId,
         ulong capabilityAddress,
         ulong memoryLength,
         uint hcsparamsOffset,
@@ -754,6 +753,8 @@ public static class DeviceTweakerImodRuntime
             return "error: " + parseError;
         }
 
+        DeviceWriteTarget target;
+        if (!DeviceWriteTarget.TryResolve(deviceId, out target, out parseError)) return "error: " + parseError;
         IntPtr handle;
         string openError;
         if (!TryOpenDriverDevice(OpenRetryCount, out handle, out openError))
@@ -766,7 +767,7 @@ public static class DeviceTweakerImodRuntime
             uint maxIntrs;
             XhciInterrupterTopology topology;
             string topologyDetail;
-            if (!TryReadXhciInterrupterTopology(new DtimodRegisters(handle, null), capabilityAddress, memoryLength, hcsparamsOffset, out maxIntrs, out topology, out topologyDetail))
+            if (!TryReadXhciInterrupterTopology(new DtimodRegisters(handle, target), capabilityAddress, memoryLength, hcsparamsOffset, out maxIntrs, out topology, out topologyDetail))
             {
                 return "error: " + topologyDetail;
             }
@@ -1032,25 +1033,23 @@ public static class DeviceTweakerImodRuntime
         return true;
     }
 
-    internal static bool TryReadPhysicalMemory(IntPtr handle, ulong address, uint size, out ulong value, out string error)
+    internal static bool TryReadDeviceMemory(IntPtr handle, DeviceWriteTarget target, ulong address, uint size, out ulong value, out string error)
     {
         value = 0;
         error = null;
-        PhysAccessStruct access = new PhysAccessStruct();
-        access.physAddress = address;
-        access.accessSizeInBytes = size;
-        int bytesReturned;
-        if (!DeviceIoControl(handle, IoctlImodReadPhysicalMemory, ref access, Marshal.SizeOf(typeof(PhysAccessStruct)), ref access, Marshal.SizeOf(typeof(PhysAccessStruct)), out bytesReturned, IntPtr.Zero))
+        byte[] request = target == null ? null : BuildDeviceWriteRequest(target.PdoName, target.InstanceId, address, size, 0);
+        if (request == null) { error = "no valid target device was selected for the DTIMOD read"; return false; }
+        byte[] reply = new byte[16];
+        int returned;
+        if (!DeviceIoControlBytes(handle, IoctlImodReadDevice, request, request.Length, reply, reply.Length, out returned, IntPtr.Zero))
         {
-            error = GetWin32ErrorMessage(Marshal.GetLastWin32Error());
+            int code = Marshal.GetLastWin32Error();
+            error = code == 1 ? OlderDriverMessage : "DTIMOD device read failed: " + GetWin32ErrorMessage(code);
             return false;
         }
-        if (bytesReturned < Marshal.SizeOf(typeof(PhysAccessStruct)))
-        {
-            error = "incomplete DTIMOD read reply";
-            return false;
-        }
-        value = access.value;
+        if (returned != 16 || BitConverter.ToUInt32(reply, 0) != 1 || BitConverter.ToUInt32(reply, 4) != 0)
+        { error = "invalid DTIMOD device read reply"; return false; }
+        value = BitConverter.ToUInt64(reply, 8);
         return true;
     }
 
@@ -1097,7 +1096,7 @@ public static class DeviceTweakerImodRuntime
         }
     }
 
-    // DTIMOD access for one device: reads anywhere, writes only inside its memory.
+    // DTIMOD access is bound to one PCI device. RAM contexts are exposed only as topology tuples.
     public sealed class DtimodRegisters : IDeviceRegisters
     {
         private readonly IntPtr handle;
@@ -1111,7 +1110,13 @@ public static class DeviceTweakerImodRuntime
 
         public bool TryRead(ulong address, uint size, out ulong value, out string error)
         {
-            return TryReadPhysicalMemory(handle, address, size, out value, out error);
+            return TryReadDeviceMemory(handle, target, address, size, out value, out error);
+        }
+
+        internal bool TryReadTopology(ulong address, ulong length, uint hcsOffset,
+            out uint maxIntrs, out XhciInterrupterTopology topology, out string detail)
+        {
+            return TryReadNativeTopology(handle, target, address, length, hcsOffset, out maxIntrs, out topology, out detail);
         }
 
         public bool TryWrite(ulong address, uint size, ulong value, out string error)
@@ -1150,13 +1155,12 @@ public static class DeviceTweakerImodRuntime
 
     internal const string OlderDriverMessage = "An older DTIMOD driver is loaded. Restart Windows, then press CHECK again.";
 
-    // The DTIMOD build without device-checked writes is still in memory until Windows
-    // restarts. It does not know IOCTL_IMOD_WRITE_DEVICE (ERROR_INVALID_FUNCTION); the
-    // current driver refuses an empty request with ERROR_INVALID_PARAMETER. Nothing is written.
+    // The new MMIO read protocol distinguishes this driver from older builds.
+    // Empty input is rejected without touching hardware; unknown IOCTL means restart.
     public static bool IsOlderDriverLoaded(IntPtr handle)
     {
         int bytesReturned;
-        if (DeviceIoControlBytes(handle, IoctlImodWriteDevice, null, 0, null, 0, out bytesReturned, IntPtr.Zero))
+        if (DeviceIoControlBytes(handle, IoctlImodReadDevice, null, 0, null, 0, out bytesReturned, IntPtr.Zero))
         {
             return false;
         }
@@ -1393,6 +1397,10 @@ public static class DeviceTweakerImodRuntime
         out XhciInterrupterTopology topology,
         out string detail)
     {
+
+        DtimodRegisters live = registers as DtimodRegisters;
+        if (live != null) return live.TryReadTopology(capabilityAddress, memoryLength, hcsparamsOffset,
+            out maxIntrs, out topology, out detail);
         maxIntrs = 0;
         topology = new XhciInterrupterTopology();
         detail = null;
@@ -1538,15 +1546,67 @@ public static class DeviceTweakerImodRuntime
             return false;
         }
 
-        detail = "slots=" + maxSlots
+        detail = DescribeTopology(maxIntrs, topology);
+        return true;
+    }
+
+    private static string DescribeTopology(uint maxIntrs, XhciInterrupterTopology topology)
+    {
+        return "slots=" + topology.MaxSlots
             + ", intrs=" + maxIntrs
-            + ", ctx=" + contextSize
+            + ", ctx=" + topology.ContextSize
             + ", byAddress=" + topology.ByDeviceAddress.Count
             + ", byRootPort=" + topology.ByRootPort.Count
             + ", endpointTargets=" + topology.EndpointTargetCount
             + ", slotTargets=" + topology.SlotTargetCount
             + ", " + FormatInterrupterMap("addr", topology.ByDeviceAddress)
             + ", " + FormatInterrupterMap("rootPort", topology.ByRootPort);
+    }
+
+    private static bool TryReadNativeTopology(IntPtr handle, DeviceWriteTarget target, ulong address, ulong length, uint hcsOffset,
+        out uint maxIntrs, out XhciInterrupterTopology topology, out string error)
+    {
+        maxIntrs = 0; topology = new XhciInterrupterTopology(); error = null;
+        if (target == null) { error = "no target device was selected for the xHCI query"; return false; }
+        byte[] request = BuildDeviceWriteRequest(target.PdoName, target.InstanceId, address, 4, length);
+        if (request == null) { error = "invalid xHCI topology request"; return false; }
+        BitConverter.GetBytes(hcsOffset).CopyTo(request, 4);
+        byte[] reply = new byte[28 + 255 * 12];
+        int returned;
+        if (!DeviceIoControlBytes(handle, IoctlImodQueryXhci, request, request.Length, reply, reply.Length, out returned, IntPtr.Zero))
+        {
+            int code = Marshal.GetLastWin32Error();
+            error = code == 1 ? OlderDriverMessage : "DTIMOD xHCI query failed: " + GetWin32ErrorMessage(code);
+            return false;
+        }
+        return TryParseNativeTopology(reply, returned, out maxIntrs, out topology, out error);
+    }
+
+    internal static bool TryParseNativeTopology(byte[] reply, int returned, out uint maxIntrs,
+        out XhciInterrupterTopology topology, out string error)
+    {
+        maxIntrs = 0; topology = new XhciInterrupterTopology(); error = "invalid DTIMOD xHCI reply";
+        if (reply == null || returned < 28 || returned > reply.Length || BitConverter.ToUInt32(reply, 0) != 1) return false;
+        uint slots = BitConverter.ToUInt32(reply, 4), intrs = BitConverter.ToUInt32(reply, 8);
+        uint context = BitConverter.ToUInt32(reply, 12), count = BitConverter.ToUInt32(reply, 16);
+        uint endpoint = BitConverter.ToUInt32(reply, 20), slot = BitConverter.ToUInt32(reply, 24);
+        if (slots == 0 || slots > 255 || intrs == 0 || intrs > 2047 || (context != 32 && context != 64)
+            || count > slots || returned != 28 + count * 12 || endpoint > slots || slot > slots - endpoint
+            || endpoint + slot < count) return false;
+        XhciInterrupterTopology parsed = new XhciInterrupterTopology();
+        parsed.MaxSlots = slots; parsed.ContextSize = context;
+        parsed.EndpointTargetCount = (int)endpoint; parsed.SlotTargetCount = (int)slot;
+        for (uint i = 0; i < count; i++)
+        {
+            int offset = 28 + (int)i * 12;
+            uint port = BitConverter.ToUInt32(reply, offset), device = BitConverter.ToUInt32(reply, offset + 4);
+            uint target = BitConverter.ToUInt32(reply, offset + 8);
+            if (port == 0 || port > 255 || device > 255 || target >= intrs) return false;
+            AddUniqueInterrupter(parsed.ByRootPort, port, target);
+            if (device > 0) AddUniqueInterrupter(parsed.ByDeviceAddress, device, target);
+        }
+        if (count == 0) { error = "no active xHCI device/interrupter topology was found"; return false; }
+        topology = parsed; maxIntrs = intrs; error = DescribeTopology(intrs, parsed);
         return true;
     }
 
@@ -2023,14 +2083,6 @@ public static class DeviceTweakerImodRuntime
     {
         public Guid fmtid;
         public uint pid;
-    }
-
-    private struct PhysAccessStruct
-    {
-        public ulong physAddress;
-        public uint accessSizeInBytes;
-        public uint reserved;
-        public ulong value;
     }
 
     [StructLayout(LayoutKind.Sequential)]

@@ -3,8 +3,7 @@
 #define FILE_DEVICE_IMOD 0x00008010
 #define IMOD_IOCTL_INDEX 0x810
 
-#define IOCTL_IMOD_READ_PHYSICAL \
-    CTL_CODE(FILE_DEVICE_IMOD, IMOD_IOCTL_INDEX + 2, METHOD_BUFFERED, FILE_ANY_ACCESS)
+// Indices + 2 (unrestricted reads) and + 3 (unrestricted writes) are retired.
 
 // Index + 3 was an unrestricted physical write; it is no longer accepted.
 
@@ -53,14 +52,40 @@ struct ImodDeviceWriteReply {
     UCHAR resources[IMOD_PCI_RESOURCE_SIZE];
 };
 
-#pragma pack(push, 1)
-
-struct tagPhysAccessStruct
-{
-    ULONGLONG physAddress;
-    ULONG accessSizeInBytes;
+// Device-scoped MMIO reads use ImodDeviceWrite as their request layout.
+#define IOCTL_IMOD_READ_DEVICE \
+    CTL_CODE(FILE_DEVICE_IMOD, IMOD_IOCTL_INDEX + 6, METHOD_BUFFERED, FILE_READ_ACCESS)
+struct ImodDeviceReadReply {
+    ULONG version;
     ULONG reserved;
     ULONGLONG value;
 };
 
-#pragma pack(pop)
+// Controller contexts are read internally; callers cannot supply a RAM address.
+#define IOCTL_IMOD_QUERY_XHCI \
+    CTL_CODE(FILE_DEVICE_IMOD, IMOD_IOCTL_INDEX + 7, METHOD_BUFFERED, FILE_READ_ACCESS)
+#define IMOD_XHCI_QUERY_VERSION 1
+#define IMOD_XHCI_MAX_SLOTS 255
+struct ImodXhciQuery {
+    ULONG version;
+    ULONG hcsparamsOffset;
+    ULONGLONG capabilityAddress;
+    ULONGLONG memoryLength;
+    WCHAR pdoName[256];
+    WCHAR instanceId[256];
+};
+struct ImodXhciSlot {
+    ULONG rootPort;
+    ULONG deviceAddress;
+    ULONG interrupter;
+};
+struct ImodXhciReply {
+    ULONG version;
+    ULONG maxSlots;
+    ULONG maxIntrs;
+    ULONG contextSize;
+    ULONG count;
+    ULONG endpointTargets;
+    ULONG slotTargets;
+    struct ImodXhciSlot slots[IMOD_XHCI_MAX_SLOTS];
+};
