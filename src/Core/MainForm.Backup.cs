@@ -1,18 +1,14 @@
 ﻿using Microsoft.Win32;
-using System.Globalization;
-using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 
 namespace DeviceTweakerCS;
 
+// Which settings a backup holds, the restore dialog flow and write authorization.
+// BackupStore owns the files and BackupRegistry reads and writes the values.
 public sealed partial class MainForm
 {
-    private const int DeviceTweakerBackupVersion = 1;
     private const string BackupFolderName = "Backups";
-    private const string BackupFilePrefix = "DeviceTweakerBackup_";
     private string? _lastBackupPath;
-    private const string OriginalBackupFileName = BackupFileRetention.OriginalFileName;
 
     private enum BackupLocation
     {
@@ -37,31 +33,11 @@ public sealed partial class MainForm
         DeleteBackup,
     }
 
-    private sealed class BackupSnapshotInfo
-    {
-        public required string Path { get; init; }
-        public required string Location { get; init; }
-        public required DateTime LastWriteUtc { get; init; }
-        public string Reason { get; init; } = string.Empty;
-        public DateTime? CreatedAt { get; init; }
-        public bool IsOriginal { get; init; }
+    private BackupStore CreateBackupStore()
+        => new(GetBackupDirectory(BackupLocation.Local), GetBackupDirectory(BackupLocation.Roaming),
+            ValidateDeviceTweakerBackup, WriteLog);
 
-        public override string ToString()
-        {
-            DateTime stamp = CreatedAt ?? LastWriteUtc.ToLocalTime();
-            string reason = BackupReasonLabel.Get(IsOriginal ? "original-state" : Reason);
-            return $"{stamp:yyyy-MM-dd HH:mm:ss} [{Location}] {reason}";
-        }
-    }
-
-    private sealed record BackupValidationResult(
-        int ValueCount,
-        int ExistingCount,
-        int MissingCount,
-        int ReadErrorCount,
-        string ImodScriptState,
-        long Bytes,
-        string Sha256);
+    private BackupRegistry CreateBackupRegistry() => new(WriteLog);
 
     private string GetBackupDirectory()
     {
@@ -103,24 +79,7 @@ public sealed partial class MainForm
 
             DeviceTweakerBackup backup = CaptureDeviceTweakerBackup(reason, targets);
             string directory = GetBackupDirectory(location);
-            Directory.CreateDirectory(directory);
-
-            string safeReason = MakeBackupFileReason(reason);
-            string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture);
-            string path = Path.Combine(directory, $"{BackupFilePrefix}{stamp}_{safeReason}.json");
-            if (File.Exists(path))
-            {
-                path = Path.Combine(directory, $"{BackupFilePrefix}{stamp}_{safeReason}_{Guid.NewGuid().ToString("N")[..8]}.json");
-            }
-            JsonSerializerOptions options = new() { WriteIndented = true };
-            ValidateCapturedBackupForWrite(backup);
-            WriteAllTextAtomic(path, JsonSerializer.Serialize(backup, options), Encoding.UTF8);
-            BackupValidationResult validation = ValidateWrittenBackup(path, backup);
-            WriteLog(
-                $"BACKUP.VALIDATION: status=passed schema={backup.Version} values={validation.ValueCount} " +
-                $"existing={validation.ExistingCount} missing={validation.MissingCount} readErrors={validation.ReadErrorCount} " +
-                $"imodScript={validation.ImodScriptState} bytes={validation.Bytes} sha256={validation.Sha256}");
-            WriteLog($"BACKUP: saved location={location} path={path} values={backup.RegistryValues.Count} reason={reason} atomic=true validated=true");
+            string path = CreateBackupStore().Save(directory, location.ToString(), reason, backup);
             PruneDeviceTweakerBackups(directory, keepLatest: 10, protectedPaths: new[] { path, protectedPath ?? path });
             return new(path, null);
         }
@@ -130,83 +89,8 @@ public sealed partial class MainForm
     private bool EnsureOriginalDeviceTweakerBackupCore(BackupLocation preferredLocation, IReadOnlyList<BackupDeviceTarget> targets)
     {
         DemandRealWrite("CREATE ORIGINAL BACKUP");
-        foreach (string directory in EnumerateBackupDirectories())
-        {
-            string existingPath = Path.Combine(directory, OriginalBackupFileName);
-            if (!File.Exists(existingPath))
-            {
-                continue;
-            }
-
-            try
-            {
-                string json = File.ReadAllText(existingPath, Encoding.UTF8);
-                DeviceTweakerBackup? existing = JsonSerializer.Deserialize<DeviceTweakerBackup>(json);
-                if (existing is null)
-                {
-                    WriteLog($"BACKUP.ORIGINAL.ERROR: invalid snapshot path={existingPath}");
-                    return false;
-                }
-
-                ValidateDeviceTweakerBackup(existing);
-
-                BackupValidationResult validation = ValidateWrittenBackup(existingPath, existing);
-                WriteLog(
-                    $"BACKUP.ORIGINAL.VALIDATION: status=passed schema={existing.Version} values={validation.ValueCount} " +
-                    $"existing={validation.ExistingCount} missing={validation.MissingCount} readErrors={validation.ReadErrorCount} " +
-                    $"imodScript={validation.ImodScriptState} bytes={validation.Bytes} sha256={validation.Sha256}");
-                WriteLog($"BACKUP.ORIGINAL: existing path={existingPath} created={existing.CreatedAt:O} validated=true");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                WriteLog($"BACKUP.ORIGINAL.ERROR: validation failed path={existingPath} error=\"{FlattenLogText(ex.ToString())}\"");
-                return false;
-            }
-        }
-
-        try
-        {
-            string directory = GetBackupDirectory(preferredLocation);
-            Directory.CreateDirectory(directory);
-            string path = Path.Combine(directory, OriginalBackupFileName);
-
-            DeviceTweakerBackup? original = null;
-            BackupSnapshotInfo? oldestKnown = GetBackupSnapshots()
-                .Where(snapshot => !snapshot.IsOriginal)
-                .OrderBy(snapshot => snapshot.CreatedAt ?? snapshot.LastWriteUtc.ToLocalTime())
-                .FirstOrDefault();
-            if (oldestKnown is not null)
-            {
-                string oldestJson = File.ReadAllText(oldestKnown.Path, Encoding.UTF8);
-                original = JsonSerializer.Deserialize<DeviceTweakerBackup>(oldestJson);
-                if (original is null)
-                {
-                    throw new InvalidOperationException($"The oldest known backup is invalid: {oldestKnown.Path}");
-                }
-
-                ValidateDeviceTweakerBackup(original);
-
-                WriteLog($"BACKUP.ORIGINAL: importing oldest known snapshot path={oldestKnown.Path} created={original.CreatedAt:O}");
-            }
-
-            original ??= CaptureDeviceTweakerBackup("original-state", targets);
-            ValidateCapturedBackupForWrite(original);
-            string json = JsonSerializer.Serialize(original, new JsonSerializerOptions { WriteIndented = true });
-            WriteAllTextAtomic(path, json, Encoding.UTF8);
-            BackupValidationResult validation = ValidateWrittenBackup(path, original);
-            WriteLog(
-                $"BACKUP.ORIGINAL.VALIDATION: status=passed schema={original.Version} values={validation.ValueCount} " +
-                $"existing={validation.ExistingCount} missing={validation.MissingCount} readErrors={validation.ReadErrorCount} " +
-                $"imodScript={validation.ImodScriptState} bytes={validation.Bytes} sha256={validation.Sha256}");
-            WriteLog($"BACKUP.ORIGINAL: created location={preferredLocation} path={path} values={original.RegistryValues.Count} atomic=true validated=true");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"BACKUP.ORIGINAL.ERROR: creation failed location={preferredLocation} error=\"{FlattenLogText(ex.ToString())}\"");
-            return false;
-        }
+        return CreateBackupStore().EnsureOriginal(GetBackupDirectory(preferredLocation), preferredLocation.ToString(),
+            () => CaptureDeviceTweakerBackup("original-state", targets));
     }
 
     private DeviceTweakerBackup CaptureDeviceTweakerBackup(string reason, IReadOnlyList<BackupDeviceTarget> targets)
@@ -343,49 +227,7 @@ public sealed partial class MainForm
     }
 
     private RegistryValueBackup CaptureRegistryValue(RegistryHive hive, string path, string name)
-    {
-        RegistryValueBackup backup = new()
-        {
-            Hive = hive == RegistryHive.CurrentUser ? "HKCU" : "HKLM",
-            Path = path,
-            Name = name,
-            Exists = false,
-        };
-
-        try
-        {
-            if (UsbSelectiveSuspendPolicy.TryParsePowerPlanTarget(backup.Hive, path, name, out Guid scheme, out bool ac))
-            {
-                backup.Exists = true;
-                backup.Kind = RegistryValueKind.DWord.ToString();
-                backup.Data = UsbSelectiveSuspendPolicy.ReadPowerPlanIndex(scheme, ac).ToString(CultureInfo.InvariantCulture);
-                return backup;
-            }
-            using RegistryKey baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
-            using RegistryKey? key = baseKey.OpenSubKey(path);
-            object? value = key?.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
-            if (key is null || value is null)
-            {
-                return backup;
-            }
-
-            RegistryValueKind kind = key.GetValueKind(name);
-            backup.Exists = true;
-            backup.Kind = kind.ToString();
-            backup.Data = EncodeRegistryValue(value, kind);
-        }
-        catch (Exception ex)
-        {
-            backup.Kind = "ReadError";
-            backup.Data = ex.Message;
-            backup.Exists = true; // must not look like "absent" - restore deletes Exists=false
-            WriteLog($"BACKUP.REG: read failed {backup.Hive}\\{path}\\{name}: {ex.Message}");
-        }
-
-        return backup;
-    }
-
-    private static string EncodeRegistryValue(object value, RegistryValueKind kind) => BackupFormat.EncodeRegistryValue(value, kind);
+        => CreateBackupRegistry().Capture(hive, path, name);
 
     private async Task RestoreLatestDeviceTweakerBackup()
     {
@@ -531,161 +373,20 @@ public sealed partial class MainForm
         }
     }
 
-    private List<BackupSnapshotInfo> GetBackupSnapshots()
-    {
-        List<BackupSnapshotInfo> backups = [];
-        foreach (string directory in EnumerateBackupDirectories())
-        {
-            try
-            {
-                if (!Directory.Exists(directory))
-                {
-                    WriteLog($"BACKUP.SCAN: directory={directory} exists=false count=0");
-                    continue;
-                }
+    private List<BackupSnapshotInfo> GetBackupSnapshots() => CreateBackupStore().GetSnapshots();
 
-                int before = backups.Count;
-                foreach (string path in Directory.EnumerateFiles(directory, $"{BackupFilePrefix}*.json"))
-                {
-                    BackupSnapshotInfo? info = CreateBackupSnapshotInfo(path, directory);
-                    if (info is not null)
-                    {
-                        backups.Add(info);
-                    }
-                }
-
-                WriteLog($"BACKUP.SCAN: directory={directory} exists=true count={backups.Count - before}");
-            }
-            catch (Exception ex)
-            {
-                WriteLog($"BACKUP.SCAN.WARN: directory={directory} failed={ex.Message}");
-            }
-        }
-
-        return backups
-            .OrderByDescending(info => info.CreatedAt ?? info.LastWriteUtc.ToLocalTime())
-            .ThenByDescending(info => info.LastWriteUtc)
-            .ToList();
-    }
-
-    private IEnumerable<string> EnumerateBackupDirectories()
-    {
-        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
-        foreach (BackupLocation location in new[] { BackupLocation.Local, BackupLocation.Roaming })
-        {
-            string directory = GetBackupDirectory(location);
-            if (seen.Add(directory))
-            {
-                yield return directory;
-            }
-        }
-    }
-
-    private BackupSnapshotInfo? CreateBackupSnapshotInfo(string path, string directory)
-    {
-        try
-        {
-            FileInfo file = new(path);
-            DeviceTweakerBackup? backup = null;
-            try
-            {
-                string json = File.ReadAllText(path, Encoding.UTF8);
-                backup = JsonSerializer.Deserialize<DeviceTweakerBackup>(json);
-                if (backup is null)
-                {
-                    throw new InvalidDataException("Backup JSON is empty.");
-                }
-
-                ValidateDeviceTweakerBackup(backup);
-            }
-            catch (Exception ex)
-            {
-                WriteLog($"BACKUP.SCAN.WARN: invalid backup excluded path={path} error=\"{FlattenLogText(ex.ToString())}\"");
-                return null;
-            }
-
-            string location = string.Equals(directory, GetBackupDirectory(BackupLocation.Roaming), StringComparison.OrdinalIgnoreCase)
-                ? "APPDATA"
-                : "EXE";
-
-            return new BackupSnapshotInfo
-            {
-                Path = path,
-                Location = location,
-                LastWriteUtc = file.LastWriteTimeUtc,
-                CreatedAt = backup?.CreatedAt,
-                Reason = backup?.Reason ?? string.Empty,
-                IsOriginal = string.Equals(file.Name, OriginalBackupFileName, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(backup?.Reason, "original-state", StringComparison.OrdinalIgnoreCase),
-            };
-        }
-        catch
-        {
-            return null;
-        }
-    }
+    private IEnumerable<string> EnumerateBackupDirectories() => CreateBackupStore().Directories();
 
     private int DeleteDeviceTweakerBackups(IReadOnlyList<BackupSnapshotInfo> backups)
     {
         DemandRealWrite("DeleteDeviceTweakerBackups");
-        int deleted = 0;
-        foreach (BackupSnapshotInfo backup in backups)
-        {
-            if (backup.IsOriginal)
-            {
-                WriteLog($"BACKUP.DELETE: protected original snapshot path={backup.Path}");
-                continue;
-            }
-
-            try
-            {
-                if (File.Exists(backup.Path))
-                {
-                    File.Delete(backup.Path);
-                    deleted++;
-                }
-            }
-            catch (Exception ex)
-            {
-                WriteLog($"BACKUP.DELETE: failed path={backup.Path}: {ex.Message}");
-            }
-        }
-
-        return deleted;
+        return CreateBackupStore().Delete(backups);
     }
 
     private void PruneDeviceTweakerBackups(string directory, int keepLatest, IEnumerable<string>? protectedPaths = null)
     {
         DemandRealWrite("PruneDeviceTweakerBackups");
-        try
-        {
-            if (!Directory.Exists(directory))
-            {
-                return;
-            }
-
-            BackupFileEntry[] files = Directory.EnumerateFiles(directory, $"{BackupFilePrefix}*.json")
-                .Select(path => new FileInfo(path))
-                .Select(file => new BackupFileEntry(file.FullName, file.LastWriteTimeUtc))
-                .ToArray();
-
-            foreach (string path in BackupFileRetention.SelectForRemoval(files, keepLatest, protectedPaths))
-            {
-                try
-                {
-                    File.Delete(path);
-                    WriteLog($"BACKUP.PRUNE: deleted old backup path={path}");
-                }
-                catch (Exception ex)
-                {
-                    WriteLog($"BACKUP.PRUNE.WARN: failed path={path}: {ex.Message}");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"BACKUP.PRUNE.WARN: failed directory={directory}: {ex.Message}");
-        }
+        CreateBackupStore().Prune(directory, keepLatest, protectedPaths);
     }
 
     private AutoBackupChoice PromptBackupLocationForAuto()
@@ -697,14 +398,7 @@ public sealed partial class MainForm
 
     private DeviceTweakerBackup ReadDeviceTweakerBackup(string path)
     {
-        string json = File.ReadAllText(path, Encoding.UTF8);
-        DeviceTweakerBackup? backup = JsonSerializer.Deserialize<DeviceTweakerBackup>(json);
-        if (backup is null)
-        {
-            throw new InvalidOperationException("Backup file is empty or invalid.");
-        }
-
-        ValidateDeviceTweakerBackup(backup);
+        DeviceTweakerBackup backup = CreateBackupStore().Read(path);
         NormalizeStartupProfileBackup(backup);
         return backup;
     }
@@ -717,14 +411,10 @@ public sealed partial class MainForm
         using DriverLoadGate gate = DriverLoadGate.Enter();
         DriverLoadGate.AssertLoaderIdle();
 
+        BackupRegistry registry = CreateBackupRegistry();
         BackupRestoreService service = new(
             ValidateDeviceTweakerBackup,
-            value =>
-            {
-                if (!TryGetBackupHive(value.Hive, out RegistryHive hive))
-                    throw new InvalidOperationException($"Unsupported registry hive: {value.Hive}.");
-                return CaptureRegistryValue(hive, value.Path, value.Name);
-            },
+            registry.Capture,
             RestoreRegistryValue,
             CaptureStartupProfileFile,
             RestoreStartupProfile,
@@ -745,128 +435,11 @@ public sealed partial class MainForm
     private void ValidateDeviceTweakerBackup(DeviceTweakerBackup backup)
         => BackupFormat.ValidateDocument(backup, IsManagedImodScriptPath);
 
-    private void ValidateCapturedBackupForWrite(DeviceTweakerBackup backup)
-    {
-        ValidateDeviceTweakerBackup(backup);
-        List<RegistryValueBackup> readErrors = backup.RegistryValues
-            .Where(value => string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        if (readErrors.Count == 0)
-        {
-            return;
-        }
-
-        string targets = string.Join(
-            " | ",
-            readErrors.Take(5).Select(value => $"{value.Hive}\\{value.Path}\\{value.Name}"));
-        throw new InvalidOperationException(
-            $"Backup capture is incomplete: {readErrors.Count} registry value(s) could not be read. {targets}");
-    }
-
-    private BackupValidationResult ValidateWrittenBackup(string path, DeviceTweakerBackup expected)
-    {
-        FileInfo file = new(path);
-        if (!file.Exists || file.Length <= 0)
-        {
-            throw new InvalidOperationException($"The written backup is missing or empty: {path}");
-        }
-
-        string json = File.ReadAllText(path, Encoding.UTF8);
-        DeviceTweakerBackup? actual = JsonSerializer.Deserialize<DeviceTweakerBackup>(json);
-        if (actual is null)
-        {
-            throw new InvalidOperationException($"The written backup could not be read back: {path}");
-        }
-
-        ValidateDeviceTweakerBackup(actual);
-        string expectedPayload = JsonSerializer.Serialize(expected);
-        string actualPayload = JsonSerializer.Serialize(actual);
-        if (!string.Equals(actualPayload, expectedPayload, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException($"The written backup does not match the captured snapshot: {path}");
-        }
-
-        int existing = actual.RegistryValues.Count(value => value.Exists);
-        int readErrors = actual.RegistryValues.Count(value =>
-            string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase));
-        using FileStream stream = file.Open(FileMode.Open, FileAccess.Read, FileShare.Read);
-        string sha256 = Convert.ToHexString(SHA256.HashData(stream));
-        string imodScriptState = actual.StartupProfile switch
-        {
-            null => "not-captured",
-            { Exists: true } => "present",
-            _ => "absent",
-        };
-
-        return new BackupValidationResult(
-            actual.RegistryValues.Count,
-            existing,
-            actual.RegistryValues.Count - existing,
-            readErrors,
-            imodScriptState,
-            file.Length,
-            sha256);
-    }
-
-    private static void ValidateRegistryValueBackup(RegistryValueBackup value) => BackupFormat.ValidateRegistryValueBackup(value);
-
-    private static bool IsManagedBackupRegistryValue(RegistryValueBackup value) => BackupFormat.IsManagedBackupRegistryValue(value);
-
     private void RestoreRegistryValue(RegistryValueBackup value)
     {
         DemandRealWrite("RestoreRegistryValue");
-        if (!TryGetBackupHive(value.Hive, out RegistryHive hive))
-        {
-            throw new InvalidOperationException($"Unsupported registry hive for restore: {value.Hive}.");
-        }
-
-        if (UsbSelectiveSuspendPolicy.TryParsePowerPlanTarget(value.Hive, value.Path, value.Name, out Guid scheme, out bool ac))
-        {
-            uint index = value.Exists
-                ? uint.Parse(value.Data ?? string.Empty, CultureInfo.InvariantCulture)
-                : UsbSelectiveSuspendPolicy.ReadPowerPlanDefaultIndex(scheme, ac);
-            UsbSelectiveSuspendPolicy.RestorePowerPlanIndex(scheme, ac, index);
-            WriteLog($"BACKUP.RESTORE.POWER: scheme={scheme:D} source={(ac ? "AC" : "DC")} index={index} readback=verified");
-            return;
-        }
-
-        using RegistryKey baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
-        using RegistryKey? key = baseKey.CreateSubKey(value.Path, writable: true);
-        if (key is null)
-        {
-            throw new InvalidOperationException(
-                $"Failed to open registry key for restore: {value.Hive}\\{value.Path}");
-        }
-
-        if (!value.Exists)
-        {
-            key.DeleteValue(value.Name, throwOnMissingValue: false);
-            WriteLog($"BACKUP.RESTORE.REG: deleted {value.Hive}\\{value.Path}\\{value.Name}");
-            return;
-        }
-
-        if (string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase))
-        {
-            WriteLog($"BACKUP.RESTORE.REG: skipped {value.Hive}\\{value.Path}\\{value.Name} kind=ReadError");
-            return;
-        }
-
-        if (!TryParseRegistryValueKind(value.Kind, out RegistryValueKind kind))
-        {
-            throw new InvalidOperationException(
-                $"Unsupported registry value kind for restore: {value.Hive}\\{value.Path}\\{value.Name} kind={value.Kind}");
-        }
-
-        object data = DecodeRegistryValue(value.Data, kind);
-        key.SetValue(value.Name, data, kind);
-        WriteLog($"BACKUP.RESTORE.REG: set {value.Hive}\\{value.Path}\\{value.Name} kind={kind}");
+        CreateBackupRegistry().Restore(value);
     }
-
-    private static bool TryGetBackupHive(string text, out RegistryHive hive) => BackupFormat.TryGetBackupHive(text, out hive);
-
-    private static bool TryParseRegistryValueKind(string text, out RegistryValueKind kind) => BackupFormat.TryParseRegistryValueKind(text, out kind);
-
-    private static object DecodeRegistryValue(string? data, RegistryValueKind kind) => BackupFormat.DecodeRegistryValue(data, kind);
 
     private static FileBackup CaptureStartupProfileFile()
     {
@@ -926,24 +499,5 @@ public sealed partial class MainForm
         }
 
         InstallStartupBundle(ConvertStartupProfile(StartupProfile.FromJson(backup.Text)));
-    }
-
-    private static string MakeBackupFileReason(string reason)
-    {
-        if (string.IsNullOrWhiteSpace(reason))
-        {
-            return "manual";
-        }
-
-        StringBuilder sb = new(reason.Length);
-        foreach (char ch in reason.Trim())
-        {
-            if (char.IsLetterOrDigit(ch) || ch is '-' or '_')
-            {
-                sb.Append(ch);
-            }
-        }
-
-        return sb.Length > 0 ? sb.ToString() : "manual";
     }
 }

@@ -477,19 +477,7 @@ public sealed partial class MainForm : Form
             + detail);
     }
 
-    private static string FlattenLogText(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        return value
-            .Replace("\r\n", " | ")
-            .Replace("\n", " | ")
-            .Replace("\r", " | ")
-            .Trim();
-    }
+    private static string FlattenLogText(string? value) => LogText.Flatten(value);
 
     private static string GetAppVersion()
         => AppBuildIdentity.VersionText;
