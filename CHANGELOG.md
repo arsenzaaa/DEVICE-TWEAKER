@@ -17,6 +17,8 @@ Source comparison: [v0.0.4 → v0.1.0](https://github.com/arsenzaaa/DEVICE-TWEAK
 
 ### Interface and responsiveness
 
+- Centered action rows in result, information and backup-location dialogs to align with their centered messages.
+
 - REFRESH reuses compatible device cards after a fresh scan instead of rebuilding every card. Pending edits and viewport state are restored for compatible devices; topology changes invalidate reuse.
 - Mouse event-rate calculations reuse their results while the sample buffers remain unchanged. Sample history is bounded; display confirmation timing is preserved.
 - Animations share a frame clock with at most one pending UI callback. The clock stops when there are no active animations and does not change Windows timer resolution or display settings.

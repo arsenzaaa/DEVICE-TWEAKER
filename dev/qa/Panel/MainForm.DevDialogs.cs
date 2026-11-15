@@ -29,7 +29,15 @@ public sealed partial class MainForm
             int bottomInset = window.ClientSize.Height - footer.Bottom + footer.Height - actions.Max(b => b.Bottom);
             int rightInset = footer.ClientSize.Width - actions.Max(b => b.Right);
             if (Math.Abs(bottomInset - UiScale(20)) > 1) defects.Add($"Action row bottom inset: {bottomInset}, expected {UiScale(20)}.");
-            if (Math.Abs(rightInset - UiScale(20)) > 1) defects.Add($"Action row right inset: {rightInset}, expected {UiScale(20)}.");
+            bool centered = window.Name is "INFO_DIALOG" or "OPERATION_RESULT_DIALOG" or "AUTO_BACKUP_DIALOG";
+            int leftInset = actions.Min(b => b.Left);
+            if (centered)
+            {
+                if (Math.Abs(leftInset - rightInset) > 1)
+                    defects.Add($"Action row is not centered: left={leftInset}, right={rightInset}.");
+            }
+            else if (Math.Abs(rightInset - UiScale(20)) > 1)
+                defects.Add($"Action row right inset: {rightInset}, expected {UiScale(20)}.");
             if (actions.Any(b => b.Top != actions[0].Top)) defects.Add("Action buttons do not share a baseline.");
         }
         string relative = "state/" + id + ".layout.json";
@@ -98,6 +106,11 @@ public sealed partial class MainForm
                     CreatedAt = new DateTime(2026, 10, 25, 9, 0, 0).AddMinutes(-index),
                     LastWriteUtc = new DateTime(2026, 10, 25, 6, 0, 0, DateTimeKind.Utc).AddMinutes(-index),
                 }).ToArray(), out _);
+                break;
+            case "reset-success":
+                ShowOperationResult(new OperationReport { IsDeveloperPreview = true },
+                    "Supported tweaks were reset.\nPlease reboot your PC to restore runtime hardware defaults.",
+                    string.Empty, "RESET WINDOWS DEFAULT");
                 break;
             case "success":
             case "warnings":

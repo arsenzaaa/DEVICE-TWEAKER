@@ -52,7 +52,7 @@ public sealed partial class MainForm
 
     private int DialogFooterHeight => UiScale(52);
 
-    private Panel AttachThemedDialogFooter(Form dialog, IReadOnlyList<Button> buttons)
+    private Panel AttachThemedDialogFooter(Form dialog, IReadOnlyList<Button> buttons, bool centerActions = false)
     {
         int footerHeight = DialogFooterHeight;
         Panel footerPanel = new()
@@ -67,7 +67,9 @@ public sealed partial class MainForm
         {
             int buttonGap = UiScale(12);
             int totalWidth = buttons.Sum(b => b.Width) + Math.Max(0, buttons.Count - 1) * buttonGap;
-            int startX = Math.Max(UiScale(20), footerPanel.ClientSize.Width - UiScale(20) - totalWidth);
+            int startX = Math.Max(UiScale(20), centerActions
+                ? (footerPanel.ClientSize.Width - totalWidth) / 2
+                : footerPanel.ClientSize.Width - UiScale(20) - totalWidth);
             int currentX = startX;
             // Content owns the gap above actions; keep a full inset below them.
             int btnY = Math.Max(0, footerPanel.ClientSize.Height - UiScale(20) - buttons.Select(b => b.Height).DefaultIfEmpty(UiScale(32)).Max());
@@ -132,7 +134,7 @@ public sealed partial class MainForm
             folder.Click += (_, _) => TryOpenResultFolder(ResolveResultBackupFolder(filePath), "UI.BACKUP.FOLDER");
             buttons.Add(folder);
         }
-        AttachThemedDialogFooter(dialog, buttons);
+        AttachThemedDialogFooter(dialog, buttons, centerActions: true);
         dialog.ClientSize = new Size(width, y + UiScale(8) + DialogFooterHeight);
         dialog.AcceptButton = ok; dialog.CancelButton = ok;
         ShowDialogDimmed(dialog);
@@ -429,7 +431,7 @@ public sealed partial class MainForm
                         : "See DETAILS and LOGS for the error."), innerWidth, padding, ref currentY, _mutedText);
         }
 
-        AttachThemedDialogFooter(dialog, visibleButtons);
+        AttachThemedDialogFooter(dialog, visibleButtons, centerActions: true);
         int compactHeight = currentY + UiScale(12) + footerHeight;
         dialog.ClientSize = new Size(clientWidth, Math.Min(compactHeight, workingArea.Height - UiScale(60)));
         logsButton.Click += (_, _) => TryOpenResultFolder(logsFolder, "UI.RESULT.LOGS");
@@ -1371,7 +1373,7 @@ public sealed partial class MainForm
             dialog.Close();
         };
 
-        AttachThemedDialogFooter(dialog, [exeButton, appDataButton, skipButton]);
+        AttachThemedDialogFooter(dialog, [exeButton, appDataButton, skipButton], centerActions: true);
 
         dialog.ClientSize = new Size(clientWidth, currentY + footerHeight);
         dialog.AcceptButton = exeButton;
