@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Microsoft.Win32;
 
 using static DeviceTweakerCS.ImodDriverNative;
+using static DeviceTweakerCS.KduDriverLoader;
 
 namespace DeviceTweakerCS;
 

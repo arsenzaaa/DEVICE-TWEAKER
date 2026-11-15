@@ -101,7 +101,7 @@ public sealed partial class MainForm
                 progress.Report(UiText.IrqPreparing);
                 // An explicit refresh prepares the current payload if it has not been staged yet.
                 if (!EnsureImodDriverOnDisk(persistDriver: true, out string driverPath, out string? error)
-                    || !ImodDriverContext.TryInitialize(driverPath, WriteLog, TryLoadImodDriverWithKduFallback, out ImodDriverContext? context, out error))
+                    || !ImodDriverContext.TryInitialize(driverPath, WriteLog, KduDriverLoader.TryLoadImodDriverWithKduFallback, out ImodDriverContext? context, out error))
                     return Failed(error ?? "DTIMOD load failed");
                 progress.Report(UiText.IrqReading);
                 using (context)

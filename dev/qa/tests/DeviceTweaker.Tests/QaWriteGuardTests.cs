@@ -133,7 +133,9 @@ public sealed class QaWriteGuardTests
         object context = RuntimeHelpers.GetUninitializedObject(ctx);
         var registers = Assert.Throws<TargetInvocationException>(() => ctx.GetProperty("Registers")!.GetValue(context));
         Assert.IsType<QaWriteBlockedException>(registers.InnerException);
-        AssertBlocked("RunImodKduMap", "", "", null, null);
+        MethodInfo load = typeof(KduDriverLoader).GetMethod("RunImodKduMap", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var loadError = Assert.Throws<TargetInvocationException>(() => load.Invoke(null, ["", "", null, null]));
+        Assert.IsType<QaWriteBlockedException>(loadError.InnerException);
     }
 
     [Fact]

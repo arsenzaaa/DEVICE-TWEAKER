@@ -905,7 +905,7 @@ public sealed partial class MainForm
 
     private static string ComputeEmbeddedImodResourceHash(string exactName, string suffix)
     {
-        using Stream? stream = OpenManifestResourceStreamExactOrSuffix(exactName, suffix);
+        using Stream? stream = ImodDriverFiles.OpenManifestResourceStreamExactOrSuffix(exactName, suffix);
         return stream is null
             ? string.Empty
             : Convert.ToHexString(SHA256.HashData(stream));

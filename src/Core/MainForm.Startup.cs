@@ -1,6 +1,7 @@
 using System.Text;
 
 using static DeviceTweakerCS.ImodDriverNative;
+using static DeviceTweakerCS.ImodDriverFiles;
 
 namespace DeviceTweakerCS;
 
