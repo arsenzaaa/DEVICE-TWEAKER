@@ -66,7 +66,7 @@ $stub = @'
 #define STATUS_PARTIAL_COPY (-8)
 #define STATUS_DEVICE_DATA_ERROR (-9)
 #define CmResourceTypeDeviceSpecific 5
-#define POOL_FLAG_PAGED 1
+#define PagedPool 1
 #define MM_COPY_MEMORY_PHYSICAL 1
 #define PASSIVE_LEVEL 0
 #define DevicePropertyAllocatedResources 1
@@ -129,7 +129,7 @@ static ULONG modelClass=0x0C0330;
 static int failClass,failPool,poolAllocations,poolFrees,contextCopies;
 static UCHAR dmaMemory[0x4000];
 typedef union { PHYSICAL_ADDRESS PhysicalAddress; PVOID VirtualAddress; } MM_COPY_ADDRESS;
-static PVOID ExAllocatePool2(ULONG flags,SIZE_T size,ULONG tag) {
+static PVOID ExAllocatePoolWithTag(ULONG flags,SIZE_T size,ULONG tag) {
     (void)flags;(void)tag;if(failPool)return NULL;poolAllocations++;return malloc(size);
 }
 static void ExFreePoolWithTag(PVOID p,ULONG tag) { (void)tag;poolFrees++;free(p); }
@@ -462,8 +462,12 @@ static void topologyTests(void) {
     assert(dispatchTopology(&reply,0)==STATUS_ACCESS_DENIED && contextCopies==0);
 }
 
-int main(void) { _set_error_mode(_OUT_TO_STDERR);_set_abort_behavior(0,_WRITE_ABORT_MSG|_CALL_REPORTFAULT);initTests();mmioTests();rangeTests();dispatchTests();deviceWriteTests();deviceReadTests();deviceSpecificTests();topologyTests();puts("PASS: actual driver dispatch, device-scoped MMIO reads/writes, retired raw IOCTL rejection, PCI class filter, xHCI context walk, endpoint/slot selection, variable resource payloads and cleanup; fake kernel only; PCI lookup/config delivery and scheduling stubbed");return 0; }
+int main(void) { _set_error_mode(_OUT_TO_STDERR);_set_abort_behavior(0,_WRITE_ABORT_MSG|_CALL_REPORTFAULT);initTests();mmioTests();rangeTests();dispatchTests();deviceWriteTests();deviceReadTests();deviceSpecificTests();topologyTests();/* NATIVE_DIAGNOSTIC_CASES */puts("PASS: actual driver dispatch, device-scoped MMIO reads/writes, retired raw IOCTL rejection, PCI class filter, xHCI context walk, endpoint/slot selection, variable resource payloads and cleanup; fake kernel only; PCI lookup/config delivery and scheduling stubbed");return 0; }
 '@
+if (($ProbeRemovalRace -or $ProbeDeviceLifecycle) -and
+    [regex]::Matches($main, '/\* NATIVE_DIAGNOSTIC_CASES \*/').Count -ne 1) {
+    throw 'Native diagnostic entry point must occur once'
+}
 if ($ProbeRemovalRace) {
     $probe = @'
 static void removalRaceTests(void) {
@@ -482,7 +486,7 @@ static void removalRaceTests(void) {
 }
 '@
     $main = $main.Replace('int main(void)', $probe + "`nint main(void)")
-    $main = $main.Replace('deviceWriteTests();puts(', 'deviceWriteTests();removalRaceTests();puts(')
+    $main = $main.Replace('/* NATIVE_DIAGNOSTIC_CASES */', 'removalRaceTests();')
 }
 if ($ProbeDeviceLifecycle) {
     $lifecycleHooks = Join-Path $PSScriptRoot 'NativeDriverLifecycle.h'
@@ -505,7 +509,7 @@ if ($ProbeDeviceLifecycle) {
         'LifecycleReset();mapCalls=unmapCalls=reads=writes=failMap=0;')
     $testInclude = '#include "' + $lifecycleTests.Replace('\','/') + '"'
     $main = $main.Replace('int main(void)', $testInclude + "`nint main(void)")
-    $main = $main.Replace('deviceWriteTests();puts(', 'deviceWriteTests();deviceLifecycleTests();puts(')
+    $main = $main.Replace('/* NATIVE_DIAGNOSTIC_CASES */', 'deviceLifecycleTests();')
 }
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 $OutputDirectory = (Resolve-Path $OutputDirectory).Path
@@ -543,7 +547,7 @@ if ($ProbeDeviceLifecycle) {
         'write-old-range-rejected','write-new-range-accepted','write-removed-after-access','read-stopped-after-access')
     foreach ($change in @('removed','reassigned','stopped')) {
         foreach ($point in @('after-query','before-map','after-map')) { $expected += "write-$change-$point" }
-        foreach ($point in @('before-map','after-map')) { $expected += "read-$change-$point" }
+        foreach ($point in @('after-query','before-map','after-map')) { $expected += "read-$change-$point" }
     }
     if ($cases.Count -ne $expected.Count -or @($cases.name | Select-Object -Unique).Count -ne $expected.Count -or
         @(Compare-Object $expected @($cases.name)).Count) { throw 'Incomplete or duplicate lifecycle cases' }

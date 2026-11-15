@@ -728,8 +728,11 @@ static NTSTATUS ImodOpenMemoryDevice(const WCHAR *name, const WCHAR *id,
     if (NT_SUCCESS(status) && !ImodIsAllowedClass(*classCode)) status = STATUS_ACCESS_DENIED;
     if (NT_SUCCESS(status))
     {
-        *resources = ExAllocatePool2(POOL_FLAG_PAGED, IMOD_PCI_RESOURCE_SIZE, 'rImD');
+        // Keep the driver loadable on Windows 10 releases before 2004.
+#pragma warning(suppress: 4996)
+        *resources = ExAllocatePoolWithTag(PagedPool, IMOD_PCI_RESOURCE_SIZE, 'rImD');
         if (*resources == NULL) status = STATUS_INSUFFICIENT_RESOURCES;
+        else RtlZeroMemory(*resources, IMOD_PCI_RESOURCE_SIZE);
     }
     if (NT_SUCCESS(status))
     {

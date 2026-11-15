@@ -10,22 +10,10 @@ static void LifecycleResources(ULONGLONG start)
 
 static NTSTATUS LifecycleReadRequest(ULONGLONG address)
 {
-    IRP irp = {0};
-    struct tagPhysAccessStruct access = {0};
-    NTSTATUS status;
-    access.physAddress = address; access.accessSizeInBytes = 4;
-    irp.stack.MajorFunction = IRP_MJ_DEVICE_CONTROL;
-    irp.AssociatedIrp.SystemBuffer = &access;
-    irp.stack.Parameters.DeviceIoControl.InputBufferLength = sizeof(access);
-    irp.stack.Parameters.DeviceIoControl.OutputBufferLength = sizeof(access);
-    irp.stack.Parameters.DeviceIoControl.IoControlCode = IOCTL_IMOD_READ_PHYSICAL;
-    status = ImodDriverDispatch(&device, &irp);
-    assert(completions == 1);
-    if (NT_SUCCESS(status)) {
-        assert(irp.IoStatus.Information == sizeof(access));
-        if (lifecycleInvalid && lifecycleChange == LifecycleReassigned
-            && lifecyclePoint != LifecycleAfterAccess) assert(access.value == 0xA5A5A5A5ull);
-    } else assert(irp.IoStatus.Information == 0);
+    ULONGLONG value = 0;
+    NTSTATUS status = dispatchDeviceRead(address, 4, IMOD_DEVICE_WRITE_VERSION, 0, &value);
+    if (NT_SUCCESS(status) && lifecycleInvalid && lifecycleChange == LifecycleReassigned
+        && lifecyclePoint != LifecycleAfterAccess) assert(value == 0xA5A5A5A5ull);
     return status;
 }
 
@@ -101,12 +89,12 @@ static void deviceLifecycleTests(void)
             sprintf_s(name, sizeof(name), "write-%s-%s", changes[change], points[point]);
             assert(status == STATUS_SUCCESS); LifecycleReport(name, status, 1, 1, 1);
         }
-        /* The raw physical-read IOCTL does not query a device's resources. */
-        for (point = LifecycleBeforeMap; point <= LifecycleAfterMap; point++) {
+        /* Reads now validate the exact device/resources, but the later PnP gap remains. */
+        for (point = LifecycleAfterQuery; point <= LifecycleAfterMap; point++) {
             LifecycleBegin(); lifecyclePoint = point; lifecycleChange = change;
             status = LifecycleReadRequest(0x1004);
             sprintf_s(name, sizeof(name), "read-%s-%s", changes[change], points[point]);
-            assert(status == STATUS_SUCCESS && openCalls == 0 && propertyCalls == 0);
+            assert(status == STATUS_SUCCESS && openCalls == 1 && propertyCalls == 1);
             LifecycleReport(name, status, 1, 1, 1);
         }
     }
