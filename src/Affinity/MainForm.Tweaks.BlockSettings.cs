@@ -1040,6 +1040,26 @@ public sealed partial class MainForm
                 && value is >= 1 and <= 2048);
     }
 
+    // MSISupported=0 leaves a device without line-based (INTx) support with no interrupt at all;
+    // for the boot NVMe controller that is INACCESSIBLE_BOOT_DEVICE. Unknown capability
+    // (Windows published nothing) and line-only devices are not restricted.
+    internal static bool TryValidateMsiDisable(PciInterruptCapabilities? capabilities, out string error)
+    {
+        if (capabilities is not null)
+        {
+            PciInterruptSupport support = capabilities.Support;
+            bool messageCapable = (support & (PciInterruptSupport.Msi | PciInterruptSupport.MsiX)) != 0;
+            if (messageCapable && (support & PciInterruptSupport.LineBased) == 0)
+            {
+                error = "Windows reports that this PCI device has no line-based (INTx) interrupt; with MSI disabled it would have no interrupt at all. The MSI setting was not changed.";
+                return false;
+            }
+        }
+
+        error = string.Empty;
+        return true;
+    }
+
     internal static bool TryValidateMsiLimitInput(
         string? input,
         PciInterruptCapabilities? capabilities,

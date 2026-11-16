@@ -572,8 +572,9 @@ public sealed partial class MainForm
             return false;
         }
 
-        if (!TryGetPciMemoryRangeByInstanceId(instanceId, out ulong baseAddress, out ulong memoryLength, out error)
-            || !TryValidateNicItrMemoryRange(profile, memoryLength, out error))
+        // Cheap precheck before touching the driver: the device must have memory at all.
+        if (!TryGetPciMemoryRangeByInstanceId(instanceId, out _, out ulong largestLength, out error)
+            || !TryValidateNicItrMemoryRange(profile, largestLength, out error))
         {
             return false;
         }
@@ -587,6 +588,7 @@ public sealed partial class MainForm
 
             using ImodDriverContext ctx = driverContext!;
             if (!ctx.TrySetDeviceTarget(instanceId, out error)) return false;
+            if (!TryResolveNicItrRegisters(ctx, instanceId, profile, "read", out ulong baseAddress, out error)) return false;
             for (int q = 0; q < profile.MaxQueues; q++)
             {
                 ulong address = baseAddress + profile.BaseOffset + (profile.Stride * (uint)q);
@@ -617,8 +619,9 @@ public sealed partial class MainForm
             return false;
         }
 
-        if (!TryGetPciMemoryRangeByInstanceId(instanceId, out ulong baseAddress, out ulong memoryLength, out error)
-            || !TryValidateNicItrMemoryRange(profile, memoryLength, out error))
+        // Cheap precheck before loading the driver: the device must have memory at all.
+        if (!TryGetPciMemoryRangeByInstanceId(instanceId, out _, out ulong largestLength, out error)
+            || !TryValidateNicItrMemoryRange(profile, largestLength, out error))
         {
             return false;
         }
@@ -638,7 +641,8 @@ public sealed partial class MainForm
             }
 
             using ImodDriverContext ctx = driverContext!;
-            if (!ctx.TrySetDeviceTarget(instanceId, out error))
+            if (!ctx.TrySetDeviceTarget(instanceId, out error)
+                || !TryResolveNicItrRegisters(ctx, instanceId, profile, "write", out ulong baseAddress, out error))
             {
                 return false;
             }
@@ -671,6 +675,23 @@ public sealed partial class MainForm
         EnsureImodConfigLoaded();
         return _imodConfigCache is not null
             && (_imodConfigCache.StartupReadError is not null || _imodConfigCache.HasScript || HasCustomImod(_imodConfigCache));
+    }
+
+    // Logs every input of the BAR decision (BARs, MSI-X layout, Windows ranges) on success and failure.
+    private bool TryResolveNicItrRegisters(ImodDriverContext ctx, string instanceId, NicItrProfile profile, string operation,
+        out ulong baseAddress, out string? error)
+    {
+        bool resolved = ctx.TryResolveNicRegisterRange(profile.BaseOffset, NicItrService.GetNicItrRegisterSpan(profile),
+            out baseAddress, out ulong memoryLength, out string detail, out string? barError);
+        WriteLog($"NIC.ITR.BAR: {instanceId} operation={operation} profile=\"{profile.FamilyName}\" "
+            + (resolved ? "result=ok " : $"result=failed error=\"{barError}\" ") + detail);
+        if (!resolved)
+        {
+            error = "register BAR not resolved: " + barError;
+            return false;
+        }
+
+        return TryValidateNicItrMemoryRange(profile, memoryLength, out error);
     }
 
     private static bool TryValidateNicItrMemoryRange(NicItrProfile profile, ulong memoryLength, out string? error)

@@ -37,9 +37,11 @@ internal static class NicItrService
         new("Intel 82576 (EITR)", "8086", ["1516", "1518", "1526"], 0x1680, 0x4, 25, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr),
         new("Killer E3100 (EITR)", "8086", ["3100", "3101", "3102"], 0x1680, 0x4, 5, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr, ["Other", "IRQ0", "IRQ1", "IRQ2", "IRQ3"]),
         new("Intel I219 (ITR)", "8086", ["15B7", "15B8", "15B9", "15D7", "15D8", "15E3", "15BB", "15BC", "15BD", "15BE", "0D4C", "0D4D", "0D4E", "0D4F", "0D53", "0D55", "0D5C", "0D5D", "0D5E", "0D5F", "15FB", "15FC", "1A1E", "1A1F", "550A", "550B", "550C", "550D", "550E", "550F", "0DC5", "0DC6", "0DC7", "0DC8", "1A1C", "1A1D", "15F9", "15FA", "3166", "3167", "3197", "3198", "4DF4", "4B33", "4B34", "4DC2", "4DC3", "54B4", "54B5", "54B6", "54B7", "0126", "153A", "153B", "1559", "155A", "156F", "1570", "15D6"], 0x00C4, 0x0, 1, 32, 0x0000FFFF, 0, NicItrTimingKind.IntelItr),
-        new("Realtek RTL8111/8168", "10EC", ["8168", "8161", "8136", "8167", "8169"], 0x00E2, 0x0, 1, 16, 0xFFFF, 0, NicItrTimingKind.RealtekIntrMit),
-        new("Realtek RTL8125/8126", "10EC", ["8125", "8162", "8126"], 0x0A00, 0x8, 4, 32, 0x7F7F7F7F, 0, NicItrTimingKind.RealtekIntrMitV2),
-        new("Realtek RTL8168KB", "10EC", ["3000"], 0x00E2, 0x0, 1, 16, 0xFFFF, 0, NicItrTimingKind.RealtekIntrMit),
+        // Families follow Realtek's own INF (rt640x64.inf): DEV_8162 installs the RTL8168H / RTL8118AS
+        // sections (gigabit, 8168 register map); DEV_3000 is the Killer E3000 and installs RTL8125.ndi.
+        new("Realtek RTL8111/8168", "10EC", ["8168", "8161", "8162", "8136", "8167", "8169"], 0x00E2, 0x0, 1, 16, 0xFFFF, 0, NicItrTimingKind.RealtekIntrMit),
+        new("Realtek RTL8125/8126", "10EC", ["8125", "8126"], 0x0A00, 0x8, 4, 32, 0x7F7F7F7F, 0, NicItrTimingKind.RealtekIntrMitV2),
+        new("Killer E3000 (RTL8125)", "10EC", ["3000"], 0x0A00, 0x8, 4, 32, 0x7F7F7F7F, 0, NicItrTimingKind.RealtekIntrMitV2),
         new("Killer E2500/E2600", "10EC", ["2600", "2502", "2500"], 0x00E2, 0x0, 1, 16, 0xFFFF, 0, NicItrTimingKind.RealtekIntrMit),
     ];
 
@@ -73,6 +75,10 @@ internal static class NicItrService
             registers, baseAddress, profile.BaseOffset, profile.Stride, (uint)profile.MaxQueues,
             (uint)(profile.ReadWidth / 8), profile.ReadMask, profile.WriteOrBits, [.. values], labels, out error);
     }
+
+    // Bytes from BaseOffset to the end of the last queue register.
+    internal static uint GetNicItrRegisterSpan(NicItrProfile profile)
+        => ((uint)Math.Max(0, profile.MaxQueues - 1) * profile.Stride) + (uint)(profile.ReadWidth / 8);
 
     internal static bool TryValidateNicItrMemoryRange(NicItrProfile profile, ulong memoryLength, out string? error)
     {

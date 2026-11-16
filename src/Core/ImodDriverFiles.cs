@@ -1,7 +1,5 @@
 using System.Reflection;
-using System.Security.AccessControl;
 using System.Security.Cryptography;
-using System.Security.Principal;
 using System.Text;
 using static DeviceTweakerCS.ImodDriverNative;
 
@@ -116,6 +114,10 @@ internal static class ImodDriverFiles
         }
     }
 
+    // Same protection as the startup folder (StartupBundle.SecureFolder): a real directory, owned by
+    // Administrators, changeable only by Administrators and SYSTEM. A folder pre-created by a standard
+    // user would otherwise stay owned by that user, who could then grant itself write access and swap
+    // kdu.exe between its hash check and its elevated start.
     internal static bool TrySecureImodDriverDirectory(string directoryPath, out string? error)
     {
         QaRun.DemandWrite("TrySecureImodDriverDirectory");
@@ -123,30 +125,12 @@ internal static class ImodDriverFiles
 
         try
         {
-            Directory.CreateDirectory(directoryPath);
-
-            DirectorySecurity security = new();
-            security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
-
-            void AddRule(WellKnownSidType sidType)
-            {
-                security.AddAccessRule(new FileSystemAccessRule(
-                    new SecurityIdentifier(sidType, null),
-                    FileSystemRights.FullControl,
-                    InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
-                    PropagationFlags.None,
-                    AccessControlType.Allow));
-            }
-
-            AddRule(WellKnownSidType.LocalSystemSid);
-            AddRule(WellKnownSidType.BuiltinAdministratorsSid);
-
-            new DirectoryInfo(directoryPath).SetAccessControl(security);
+            StartupBundle.SecureFolder(directoryPath);
             return true;
         }
         catch (Exception ex)
         {
-            error = $"failed to secure IMOD temp directory {directoryPath}: {ex.Message}";
+            error = $"failed to secure IMOD directory {directoryPath}: {ex.Message}";
             return false;
         }
     }
@@ -248,18 +232,37 @@ internal static class ImodDriverFiles
         kduPath = string.Empty;
         error = null;
 
-        string commonData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-        if (string.IsNullOrWhiteSpace(commonData))
+        string parentDirectory;
+        try
         {
-            commonData = Path.GetTempPath();
+            parentDirectory = StartupBundleLayout.CurrentParentDirectory();
+        }
+        catch (InvalidOperationException ex)
+        {
+            error = ex.Message;
+            log?.Invoke($"IMOD.DRIVER.KDU: embedded payload unavailable error={CompactLogValue(error)}");
+            return false;
         }
 
-        string payloadRoot = Path.Combine(commonData, "DEVICE TWEAKER", "IMOD", "Loader");
+        // Every level is secured: the parent and IMOD folders are where a junction or a
+        // user-owned directory could be planted before the first run.
+        string imodDirectory = Path.Combine(parentDirectory, "IMOD");
+        string payloadRoot = Path.Combine(imodDirectory, "Loader");
         string kduTarget = Path.Combine(payloadRoot, ImodKduFileName);
         string dbTarget = Path.Combine(payloadRoot, ImodKduDatabaseFileName);
 
-        if (TrySecureImodDriverDirectory(payloadRoot, out error)
-            && TryWriteEmbeddedImodResource("DeviceTweakerCS.IMOD.Loader.kdu.exe", ".kdu.exe", kduTarget, out error)
+        foreach (string directory in new[] { parentDirectory, imodDirectory, payloadRoot })
+        {
+            if (!TrySecureImodDriverDirectory(directory, out error))
+            {
+                log?.Invoke($"IMOD.DRIVER.KDU.SECURE: failed path=\"{directory}\" error={CompactLogValue(error)}");
+                log?.Invoke($"IMOD.DRIVER.KDU: embedded payload unavailable error={CompactLogValue(error)}");
+                return false;
+            }
+        }
+        log?.Invoke($"IMOD.DRIVER.KDU.SECURE: ok path=\"{payloadRoot}\" owner=Administrators acl=SYSTEM,Administrators:full;Users:read reparse=none");
+
+        if (TryWriteEmbeddedImodResource("DeviceTweakerCS.IMOD.Loader.kdu.exe", ".kdu.exe", kduTarget, out error)
             && TryWriteEmbeddedImodResource("DeviceTweakerCS.IMOD.Loader.drv64.dll", ".drv64.dll", dbTarget, out error))
         {
             kduPath = kduTarget;

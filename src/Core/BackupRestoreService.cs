@@ -11,6 +11,8 @@ internal sealed class DeviceTweakerBackup
     // Older backups: the whole ApplyIMOD.ps1 with its settings inside. Converted to
     // StartupProfile before restore.
     public FileBackup? ImodScript { get; set; }
+    // Restore diagnostics only; not part of the serialized backup format.
+    internal List<string> SkippedNicItrEntries { get; } = [];
 }
 
 internal sealed class RegistryValueBackup
@@ -38,7 +40,8 @@ internal sealed class BackupRestoreService(
     Action<RegistryValueBackup> restoreValue,
     Func<FileBackup> captureProfile,
     Action<FileBackup> restoreProfile,
-    Action<string> log)
+    Action<string> log,
+    Func<FileBackup, FileBackup>? prepareRollbackProfile = null)
 {
     internal void Restore(DeviceTweakerBackup backup)
     {
@@ -52,6 +55,8 @@ internal sealed class BackupRestoreService(
             if (string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException($"Cannot capture rollback value: {value.Hive}\\{value.Path}\\{value.Name}. {value.Data}");
         FileBackup? profile = backup.StartupProfile is null ? null : captureProfile();
+        if (profile is not null && prepareRollbackProfile is not null)
+            profile = prepareRollbackProfile(profile);
         var attempted = new List<RegistryValueBackup>();
         bool profileAttempted = false;
         try

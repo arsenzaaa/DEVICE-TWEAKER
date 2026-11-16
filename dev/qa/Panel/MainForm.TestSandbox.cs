@@ -51,7 +51,17 @@ public sealed partial class MainForm
             return false;
         }
 
-        state.MsiEnabled = string.Equals(block.MsiCombo.SelectedItem?.ToString(), "Enabled", StringComparison.OrdinalIgnoreCase);
+        bool msiRequested = string.Equals(block.MsiCombo.SelectedItem?.ToString(), "Enabled", StringComparison.OrdinalIgnoreCase);
+        if (!msiRequested && !TryValidateMsiDisable(block.InterruptCapabilities, out string msiDisableError))
+        {
+            report?.AddError($"{block.Device.Name}: MSI", msiDisableError,
+                $"Requested value=Disabled; hardware={FormatInterruptCapabilities(block.InterruptCapabilities)}");
+            WriteLog($"TEST.SANDBOX.WRITE.ERROR: id={block.Device.InstanceId} setting=MSI value=Disabled action=skipped-write");
+        }
+        else
+        {
+            state.MsiEnabled = msiRequested;
+        }
         _testSandbox.VirtualWrites++;
         if (autoMsiOnly)
         {

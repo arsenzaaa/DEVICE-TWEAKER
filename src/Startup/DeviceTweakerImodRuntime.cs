@@ -170,6 +170,12 @@ public static class DeviceTweakerImodRuntime
     private const string ImodDriverDevicePath = "\\\\.\\DeviceTweakerImod2";
     private const string ImodDriverServiceName = "DeviceTweakerImod2";
     private static readonly IntPtr InvalidHandleValue = new IntPtr(-1);
+    // Read-only config space + allocated resources of one exact PCI devnode (struct ImodPciQuery / ImodPciReply).
+    internal static readonly uint IoctlImodQueryPci = CtlCode(FileDeviceImod, ImodIoctlIndex + 4, MethodBuffered, FileReadAccess);
+    private const int ImodPciQueryRequestSize = 4 + 512 + 512;
+    private const int ImodPciReplyHeaderSize = 276;
+    private const int ImodPciReplySize = ImodPciReplyHeaderSize + 65536;
+    private const int PciConfigSize = 256;
     internal static readonly uint IoctlImodReadDevice = CtlCode(FileDeviceImod, ImodIoctlIndex + 6, MethodBuffered, FileReadAccess);
     internal static readonly uint IoctlImodQueryXhci = CtlCode(FileDeviceImod, ImodIoctlIndex + 7, MethodBuffered, FileReadAccess);
     // DTIMOD writes only inside memory ranges Windows assigned to the named PCI devnode.
@@ -579,6 +585,341 @@ public static class DeviceTweakerImodRuntime
         return TryGetDeviceMemoryRange(devInst, out baseAddress, out memoryLength, out error);
     }
 
+    public sealed class PciMemoryRange
+    {
+        public readonly ulong Base;
+        public readonly ulong Length;
+
+        public PciMemoryRange(ulong baseAddress, ulong length)
+        {
+            Base = baseAddress;
+            Length = length;
+        }
+    }
+
+    // All memory ranges of one exact PCI devnode, as Windows allocated them.
+    public static bool TryGetPciMemoryRanges(string instanceId, out PciMemoryRange[] ranges, out string error)
+    {
+        ranges = new PciMemoryRange[0];
+        uint devInst;
+        int cr = CM_Locate_DevNodeW(out devInst, instanceId, 0);
+        if (cr != CrSuccess)
+        {
+            error = "PCI device not found: " + instanceId + " (CM 0x" + cr.ToString("X", CultureInfo.InvariantCulture) + ")";
+            return false;
+        }
+
+        List<PciMemoryRange> list;
+        if (!TryGetDeviceMemoryRanges(devInst, out list, out error))
+        {
+            return false;
+        }
+        ranges = list.ToArray();
+        return true;
+    }
+
+    // Register window for NIC ITR. NIC drivers map their registers from the first memory BAR
+    // (Linux r8169: first memory BAR; igb/igc/e1000e: BAR0). The largest range is not reliable:
+    // RTL8111/8168 has 4 KB of registers in BAR2 and a 16 KB MSI-X table in BAR4. The BAR is read
+    // from PCI config space through DTIMOD and must equal a range Windows allocated; anything
+    // unexpected is an error, never a guess. detail is one log line describing every input.
+    public static bool TryResolveNicRegisterRange(IntPtr handle, DeviceWriteTarget target, uint registerOffset, uint registerSpan,
+        out ulong baseAddress, out ulong memoryLength, out string detail, out string error)
+    {
+        baseAddress = 0;
+        memoryLength = 0;
+        detail = string.Empty;
+        if (target == null)
+        {
+            error = "no target device was selected for the NIC register lookup";
+            return false;
+        }
+
+        PciMemoryRange[] ranges;
+        if (!TryGetPciMemoryRanges(target.InstanceId, out ranges, out error))
+        {
+            error = "Windows memory ranges unavailable: " + error;
+            return false;
+        }
+
+        byte[] config;
+        if (!TryQueryPciConfig(handle, target, out config, out error))
+        {
+            detail = "ranges=" + FormatMemoryRanges(ranges);
+            return false;
+        }
+
+        return TrySelectNicRegisterRange(config, target.InstanceId, ranges, registerOffset, registerSpan,
+            out baseAddress, out memoryLength, out detail, out error);
+    }
+
+    internal static bool TrySelectNicRegisterRange(byte[] config, string instanceId, PciMemoryRange[] ranges,
+        uint registerOffset, uint registerSpan, out ulong baseAddress, out ulong memoryLength, out string detail, out string error)
+    {
+        baseAddress = 0;
+        memoryLength = 0;
+        error = null;
+        if (ranges == null)
+        {
+            ranges = new PciMemoryRange[0];
+        }
+        string rangeText = FormatMemoryRanges(ranges);
+        string windowText = "window=" + Hex(registerOffset) + "-" + Hex((ulong)registerOffset + registerSpan - (registerSpan > 0 ? 1UL : 0UL));
+        detail = windowText + " ranges=" + rangeText;
+        if (config == null || config.Length != PciConfigSize)
+        {
+            error = "PCI configuration must contain 256 bytes";
+            return false;
+        }
+
+        ushort vendor = BitConverter.ToUInt16(config, 0);
+        ushort device = BitConverter.ToUInt16(config, 2);
+        string configId = string.Format(CultureInfo.InvariantCulture, "VEN_{0:X4}&DEV_{1:X4}", vendor, device);
+        if (vendor == 0 || vendor == 0xFFFF || instanceId == null
+            || instanceId.IndexOf(configId, StringComparison.OrdinalIgnoreCase) < 0)
+        {
+            error = "PCI configuration (" + configId + ") does not belong to " + instanceId;
+            return false;
+        }
+
+        int headerType = config[0x0E] & 0x7F;
+        if (headerType != 0)
+        {
+            error = "PCI header type " + headerType.ToString(CultureInfo.InvariantCulture) + " is not an endpoint";
+            return false;
+        }
+
+        StringBuilder bars = new StringBuilder();
+        int registerBar = -1;
+        ulong registerBase = 0;
+        for (int bar = 0; bar < 6; bar++)
+        {
+            uint low = BitConverter.ToUInt32(config, 0x10 + (bar * 4));
+            if (low == 0)
+            {
+                continue;
+            }
+
+            if (bars.Length > 0)
+            {
+                bars.Append("; ");
+            }
+            if ((low & 1U) != 0)
+            {
+                bars.Append("BAR").Append(bar.ToString(CultureInfo.InvariantCulture)).Append(" io ").Append(Hex(low & 0xFFFFFFFCU));
+                continue;
+            }
+
+            int index = bar;
+            uint type = (low >> 1) & 3U;
+            ulong address = low & 0xFFFFFFF0U;
+            string kind = "mem32";
+            if (type == 2U)
+            {
+                if (bar == 5)
+                {
+                    detail = windowText + " bars=[" + bars.ToString() + "] ranges=" + rangeText;
+                    error = "BAR5 declares a 64-bit address without an upper half";
+                    return false;
+                }
+                address |= (ulong)BitConverter.ToUInt32(config, 0x10 + ((bar + 1) * 4)) << 32;
+                kind = "mem64";
+                bar++;
+            }
+            else if (type == 3U)
+            {
+                detail = windowText + " bars=[" + bars.ToString() + "] ranges=" + rangeText;
+                error = "BAR" + index.ToString(CultureInfo.InvariantCulture) + " has a reserved memory type";
+                return false;
+            }
+
+            bars.Append("BAR").Append(index.ToString(CultureInfo.InvariantCulture)).Append(' ').Append(kind)
+                .Append((low & 8U) != 0 ? " pf " : " ").Append(Hex(address));
+            if (registerBar < 0 && address != 0)
+            {
+                registerBar = index;
+                registerBase = address;
+            }
+        }
+
+        string msixText = "none";
+        int msixTableBar = -1;
+        int msixPbaBar = -1;
+        ulong tableStart = 0, tableEnd = 0, pbaStart = 0, pbaEnd = 0;
+        if ((BitConverter.ToUInt16(config, 6) & 0x10) != 0)
+        {
+            int offset = config[0x34] & 0xFC;
+            int visited = 0;
+            while (offset != 0)
+            {
+                if (offset < 0x40 || offset > 0xFC || ++visited > 48)
+                {
+                    detail = windowText + " bars=[" + bars.ToString() + "] ranges=" + rangeText;
+                    error = "PCI capability list is invalid or cyclic";
+                    return false;
+                }
+                if (config[offset] == 0x11)
+                {
+                    if (offset > 0xF4)
+                    {
+                        detail = windowText + " bars=[" + bars.ToString() + "] ranges=" + rangeText;
+                        error = "PCI MSI-X capability is truncated";
+                        return false;
+                    }
+                    uint entries = (uint)(BitConverter.ToUInt16(config, offset + 2) & 0x7FF) + 1U;
+                    uint table = BitConverter.ToUInt32(config, offset + 4);
+                    uint pba = BitConverter.ToUInt32(config, offset + 8);
+                    msixTableBar = (int)(table & 7U);
+                    tableStart = table & ~7U;
+                    tableEnd = tableStart + ((ulong)entries * 16UL);
+                    msixPbaBar = (int)(pba & 7U);
+                    pbaStart = pba & ~7U;
+                    pbaEnd = pbaStart + (((ulong)entries + 63UL) / 64UL * 8UL);
+                    msixText = "table BAR" + msixTableBar.ToString(CultureInfo.InvariantCulture) + " " + Hex(tableStart) + "-" + Hex(tableEnd - 1UL)
+                        + " entries=" + entries.ToString(CultureInfo.InvariantCulture)
+                        + "; pba BAR" + msixPbaBar.ToString(CultureInfo.InvariantCulture) + " " + Hex(pbaStart) + "-" + Hex(pbaEnd - 1UL);
+                    break;
+                }
+                offset = config[offset + 1] & 0xFC;
+            }
+        }
+
+        PciMemoryRange largest = null;
+        foreach (PciMemoryRange range in ranges)
+        {
+            if (largest == null || range.Length > largest.Length)
+            {
+                largest = range;
+            }
+        }
+
+        string inputs = windowText + " bars=[" + bars.ToString() + "] msix=[" + msixText + "] ranges=" + rangeText;
+        if (registerBar < 0)
+        {
+            detail = inputs;
+            error = "the PCI configuration declares no memory BAR";
+            return false;
+        }
+
+        PciMemoryRange selected = null;
+        foreach (PciMemoryRange range in ranges)
+        {
+            if (range.Base == registerBase)
+            {
+                selected = range;
+                break;
+            }
+        }
+
+        string barName = "BAR" + registerBar.ToString(CultureInfo.InvariantCulture);
+        if (selected == null)
+        {
+            detail = "selected=" + barName + " " + Hex(registerBase) + " " + inputs;
+            error = barName + " " + Hex(registerBase) + " is not among the memory ranges Windows allocated";
+            return false;
+        }
+
+        string largestText = largest == null ? "none" : FormatMemoryRange(largest)
+            + (largest.Base == selected.Base ? " (same)" : " (differs; not used)");
+        detail = "selected=" + barName + " " + FormatMemoryRange(selected) + " largest=" + largestText + " " + inputs;
+
+        ulong windowStart = registerOffset;
+        ulong windowEnd = windowStart + registerSpan;
+        if (registerSpan == 0 || windowEnd > selected.Length)
+        {
+            error = "NIC ITR registers " + Hex(windowStart) + "-" + Hex(windowEnd - 1UL) + " exceed " + barName + " length " + Hex(selected.Length);
+            return false;
+        }
+        if (msixTableBar == registerBar && windowStart < tableEnd && tableStart < windowEnd)
+        {
+            error = "NIC ITR registers " + Hex(windowStart) + "-" + Hex(windowEnd - 1UL) + " overlap the MSI-X table in " + barName;
+            return false;
+        }
+        if (msixPbaBar == registerBar && windowStart < pbaEnd && pbaStart < windowEnd)
+        {
+            error = "NIC ITR registers " + Hex(windowStart) + "-" + Hex(windowEnd - 1UL) + " overlap the MSI-X PBA in " + barName;
+            return false;
+        }
+
+        baseAddress = selected.Base;
+        memoryLength = selected.Length;
+        return true;
+    }
+
+    // Reads the 256-byte PCI configuration header of the exact devnode through DTIMOD.
+    internal static bool TryQueryPciConfig(IntPtr handle, DeviceWriteTarget target, out byte[] config, out string error)
+    {
+        config = null;
+        error = null;
+        if (target == null || target.PdoName == null || target.InstanceId == null
+            || !target.PdoName.StartsWith("\\Device\\", StringComparison.OrdinalIgnoreCase)
+            || !target.InstanceId.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase)
+            || target.PdoName.Length >= 256 || target.InstanceId.Length >= 256
+            || target.PdoName.IndexOf('\0') >= 0 || target.InstanceId.IndexOf('\0') >= 0)
+        {
+            error = "invalid DTIMOD PCI query target";
+            return false;
+        }
+
+        byte[] request = new byte[ImodPciQueryRequestSize];
+        BitConverter.GetBytes(1U).CopyTo(request, 0);
+        Encoding.Unicode.GetBytes(target.PdoName).CopyTo(request, 4);
+        Encoding.Unicode.GetBytes(target.InstanceId).CopyTo(request, 516);
+        byte[] reply = new byte[ImodPciReplySize];
+        int returned;
+        if (!DeviceIoControlBytes(handle, IoctlImodQueryPci, request, request.Length, reply, reply.Length, out returned, IntPtr.Zero))
+        {
+            int code = Marshal.GetLastWin32Error();
+            error = code == 1 || code == 50
+                ? OlderDriverMessage
+                : "DTIMOD PCI query failed: " + GetWin32ErrorMessage(code) + " (code " + code.ToString(CultureInfo.InvariantCulture) + ")";
+            return false;
+        }
+
+        if (returned < ImodPciReplyHeaderSize || BitConverter.ToUInt32(reply, 0) != 1U)
+        {
+            error = "invalid DTIMOD PCI query reply (bytes=" + returned.ToString(CultureInfo.InvariantCulture) + ")";
+            return false;
+        }
+
+        uint configStatus = BitConverter.ToUInt32(reply, 4);
+        uint configBytes = BitConverter.ToUInt32(reply, 12);
+        if (configStatus != 0 || configBytes != PciConfigSize)
+        {
+            error = "PCI configuration read failed: NTSTATUS 0x" + configStatus.ToString("X8", CultureInfo.InvariantCulture)
+                + " bytes=" + configBytes.ToString(CultureInfo.InvariantCulture);
+            return false;
+        }
+
+        config = new byte[PciConfigSize];
+        Buffer.BlockCopy(reply, 20, config, 0, PciConfigSize);
+        return true;
+    }
+
+    private static string FormatMemoryRanges(PciMemoryRange[] ranges)
+    {
+        StringBuilder text = new StringBuilder("[");
+        for (int i = 0; ranges != null && i < ranges.Length; i++)
+        {
+            if (i > 0)
+            {
+                text.Append("; ");
+            }
+            text.Append(FormatMemoryRange(ranges[i]));
+        }
+        return text.Append(']').ToString();
+    }
+
+    private static string FormatMemoryRange(PciMemoryRange range)
+    {
+        return Hex(range.Base) + "+" + Hex(range.Length);
+    }
+
+    private static string Hex(ulong value)
+    {
+        return "0x" + value.ToString("X", CultureInfo.InvariantCulture);
+    }
+
     private static bool RangeContains(ulong memoryLength, uint offset, ulong size)
     {
         ulong value = offset;
@@ -841,7 +1182,9 @@ public static class DeviceTweakerImodRuntime
         }
     }
 
-    public static string ApplyNicItr(string deviceId, ulong baseAddress, ulong memoryLength, uint baseOffset, uint stride, uint queues, uint width, ulong mask, ulong orBits, ulong[] values)
+    // The register BAR is resolved here from PCI config space (TryResolveNicRegisterRange);
+    // the result line carries that decision so a startup log shows which window was written.
+    public static string ApplyNicItr(string deviceId, uint baseOffset, uint stride, uint queues, uint width, ulong mask, ulong orBits, ulong[] values)
     {
         if (queues == 0)
         {
@@ -851,15 +1194,14 @@ public static class DeviceTweakerImodRuntime
         {
             return "error: unsupported width=" + width;
         }
-        ulong registerWidth = width / 8U;
-        ulong lastOffset = (ulong)baseOffset + ((ulong)(queues - 1U) * stride);
-        if (baseAddress == 0 || memoryLength == 0 || lastOffset > memoryLength || registerWidth > memoryLength - lastOffset)
-        {
-            return "error: NIC ITR register range exceeds PCI memory resource";
-        }
         if (values == null || values.Length == 0)
         {
             return "error: no values";
+        }
+        ulong registerSpan = ((ulong)(queues - 1U) * stride) + (width / 8U);
+        if ((ulong)baseOffset + registerSpan > uint.MaxValue)
+        {
+            return "error: NIC ITR register window is too large";
         }
 
         DeviceWriteTarget target;
@@ -883,6 +1225,15 @@ public static class DeviceTweakerImodRuntime
                 return "error: " + OlderDriverMessage;
             }
 
+            ulong baseAddress;
+            ulong memoryLength;
+            string barDetail;
+            string barError;
+            if (!TryResolveNicRegisterRange(handle, target, baseOffset, (uint)registerSpan, out baseAddress, out memoryLength, out barDetail, out barError))
+            {
+                return "error: register BAR not resolved: " + barError + " bar=[" + barDetail + "]";
+            }
+
             uint size = width == 16 ? 2U : 4U;
             StringBuilder applied = new StringBuilder();
             for (uint q = 0; q < queues; q++)
@@ -899,10 +1250,10 @@ public static class DeviceTweakerImodRuntime
             string ioError;
             if (!TryProgramNicItr(new DtimodRegisters(handle, target), baseAddress, baseOffset, stride, queues, size, mask, orBits, values, null, out ioError))
             {
-                return "error: " + ioError + " values=[" + applied.ToString() + "]";
+                return "error: " + ioError + " values=[" + applied.ToString() + "] bar=[" + barDetail + "]";
             }
 
-            return "writes=" + queues + " width=" + width + " values=[" + applied.ToString() + "] verified";
+            return "writes=" + queues + " width=" + width + " values=[" + applied.ToString() + "] verified bar=[" + barDetail + "]";
         }
         finally
         {
@@ -1802,10 +2153,33 @@ public static class DeviceTweakerImodRuntime
         return true;
     }
 
+    // Largest memory range of the devnode. Correct for xHCI (one MMIO BAR); NIC ITR selects
+    // its register BAR from PCI config space instead (TryResolveNicRegisterRange).
     private static bool TryGetDeviceMemoryRange(uint devInst, out ulong baseAddress, out ulong length, out string error)
     {
         baseAddress = 0;
         length = 0;
+        List<PciMemoryRange> ranges;
+        if (!TryGetDeviceMemoryRanges(devInst, out ranges, out error))
+        {
+            return false;
+        }
+
+        foreach (PciMemoryRange range in ranges)
+        {
+            if (range.Length > length)
+            {
+                baseAddress = range.Base;
+                length = range.Length;
+            }
+        }
+        return true;
+    }
+
+    // Every memory range Windows allocated to the devnode, in Mem then MemLarge order.
+    private static bool TryGetDeviceMemoryRanges(uint devInst, out List<PciMemoryRange> ranges, out string error)
+    {
+        ranges = new List<PciMemoryRange>();
         error = null;
         IntPtr logConf;
         int cr = CM_Get_First_Log_Conf(out logConf, devInst, AllocLogConf);
@@ -1839,11 +2213,7 @@ public static class DeviceTweakerImodRuntime
                             ulong candidateLength;
                             if (TryExtractMemoryRangeFromResource(resType, buffer, out candidate, out candidateLength))
                             {
-                                if (candidateLength > length)
-                                {
-                                    baseAddress = candidate;
-                                    length = candidateLength;
-                                }
+                                ranges.Add(new PciMemoryRange(candidate, candidateLength));
                             }
                         }
                     }
@@ -1856,7 +2226,7 @@ public static class DeviceTweakerImodRuntime
                 }
             }
 
-            if (baseAddress == 0 || length == 0)
+            if (ranges.Count == 0)
             {
                 error = "no memory resource found";
                 return false;

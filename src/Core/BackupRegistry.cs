@@ -76,24 +76,34 @@ internal sealed class BackupRegistry(Action<string> log)
         }
 
         using RegistryKey baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
+        if (value.Exists && string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase))
+        {
+            log($"BACKUP.RESTORE.REG: skipped {value.Hive}\\{value.Path}\\{value.Name} kind=ReadError");
+            return;
+        }
+
+        if (!value.Exists)
+        {
+            // An absent value needs no key. Creating one here would leave empty keys behind and,
+            // for a device removed since the backup, a skeleton instance key under Enum.
+            using RegistryKey? existing = baseKey.OpenSubKey(value.Path, writable: true);
+            if (existing is null)
+            {
+                log($"BACKUP.RESTORE.REG: absent {value.Hive}\\{value.Path}\\{value.Name} key=missing action=none");
+                return;
+            }
+
+            bool hadValue = existing.GetValue(value.Name, null, RegistryValueOptions.DoNotExpandEnvironmentNames) is not null;
+            existing.DeleteValue(value.Name, throwOnMissingValue: false);
+            log($"BACKUP.RESTORE.REG: {(hadValue ? "deleted" : "absent")} {value.Hive}\\{value.Path}\\{value.Name}");
+            return;
+        }
+
         using RegistryKey? key = baseKey.CreateSubKey(value.Path, writable: true);
         if (key is null)
         {
             throw new InvalidOperationException(
                 $"Failed to open registry key for restore: {value.Hive}\\{value.Path}");
-        }
-
-        if (!value.Exists)
-        {
-            key.DeleteValue(value.Name, throwOnMissingValue: false);
-            log($"BACKUP.RESTORE.REG: deleted {value.Hive}\\{value.Path}\\{value.Name}");
-            return;
-        }
-
-        if (string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase))
-        {
-            log($"BACKUP.RESTORE.REG: skipped {value.Hive}\\{value.Path}\\{value.Name} kind=ReadError");
-            return;
         }
 
         if (!BackupFormat.TryParseRegistryValueKind(value.Kind, out RegistryValueKind kind))

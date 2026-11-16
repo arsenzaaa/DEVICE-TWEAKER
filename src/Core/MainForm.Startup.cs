@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 using static DeviceTweakerCS.ImodDriverNative;
@@ -116,7 +117,8 @@ public sealed partial class MainForm
         try
         {
             bool legacy = !string.Equals(source, GetStartupProfilePath(), StringComparison.OrdinalIgnoreCase);
-            if (legacy || !IsStartupBundleCurrent())
+            bool staleNic = config.NicItrEntries.Any(entry => DescribeStaleNicItrEntry(entry) is not null);
+            if (legacy || staleNic || !IsStartupBundleCurrent())
             {
                 InstallStartupBundle(config);
                 WriteLog($"IMOD.STARTUP.{(legacy ? "MIGRATE" : "UPDATE")}: source=\"{source}\" target=\"{GetStartupRoot()}\" status=success");
@@ -142,6 +144,11 @@ public sealed partial class MainForm
             throw new IOException("DTIMOD.sys could not be staged: " + driverError);
         }
 
+        foreach (string removed in RemoveStaleNicItrEntries(config))
+        {
+            WriteLog($"IMOD.STARTUP.NIC.REMOVED: {removed} action=not-saved; set NIC ITR again for this adapter");
+        }
+
         StartupProfile profile = BuildStartupProfile(config, driverPath);
         string profileJson = profile.ToJson();
         _ = ConvertStartupProfile(StartupProfile.FromJson(profileJson));
@@ -156,6 +163,38 @@ public sealed partial class MainForm
         DemandRealWrite("RemoveStartupBundle");
         CreateStartupBundle().Remove(report);
     }
+
+    // A saved NIC entry carries its register layout. After a profile-table correction an entry
+    // saved with the old layout must not reach the startup script; its values were encoded for
+    // other registers, so it is removed rather than converted.
+    internal static List<string> RemoveStaleNicItrEntries(ImodConfig config)
+    {
+        List<string> removed = [];
+        config.NicItrEntries.RemoveAll(entry =>
+        {
+            string? reason = DescribeStaleNicItrEntry(entry);
+            if (reason is null) return false;
+            removed.Add($"hwid={entry.Hwid} family=\"{entry.FamilyName}\" {reason}");
+            return true;
+        });
+        return removed;
+    }
+
+    // Null when the entry matches the current profile for its PCI ID, or when its key is not a PCI ID.
+    internal static string? DescribeStaleNicItrEntry(NicItrConfigEntry entry)
+    {
+        if (!NicItrService.TryGetPciVenDev(entry.Hwid, out _, out _)) return null;
+        string saved = FormatNicItrLayout(entry.BaseOffset, entry.Stride, entry.Queues, entry.Width, entry.Mask, entry.OrBits);
+        NicItrProfile? profile = NicItrService.TryGetNicItrProfile(entry.Hwid);
+        if (profile is null) return $"reason=no-current-profile saved=[{saved}]";
+        string current = FormatNicItrLayout(profile.BaseOffset, profile.Stride, profile.MaxQueues, profile.ReadWidth, profile.ReadMask, profile.WriteOrBits);
+        return string.Equals(saved, current, StringComparison.Ordinal)
+            ? null
+            : $"reason=layout-changed saved=[{saved}] current=[{current}] currentFamily=\"{profile.FamilyName}\"";
+    }
+
+    private static string FormatNicItrLayout(uint offset, uint stride, int queues, int width, ulong mask, ulong orBits)
+        => string.Create(CultureInfo.InvariantCulture, $"offset=0x{offset:X} stride=0x{stride:X} queues={queues} width={width} mask=0x{mask:X} or=0x{orBits:X}");
 
     internal static StartupProfile BuildStartupProfile(ImodConfig config, string driverPath)
     {

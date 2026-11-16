@@ -8,7 +8,7 @@ internal delegate bool ImodDriverLoader(string path, Action<string>? log, out st
 
 internal sealed class ImodDriverContext : IDisposable
 {
-    internal const int StartupScriptVersion = 32;
+    internal const int StartupScriptVersion = 33;
     public IntPtr DriverHandle { get; private set; } = InvalidHandleValue;
     public bool ServiceCreated { get; private set; }
     public bool ServiceStartedByContext { get; private set; }
@@ -29,6 +29,15 @@ internal sealed class ImodDriverContext : IDisposable
     private readonly Action<string>? _log;
     private ImodDriverLoader? _loadDriver;
     private int _disposed;
+
+    // NIC register window of the current target, chosen from its PCI configuration (read through DTIMOD).
+    public bool TryResolveNicRegisterRange(uint registerOffset, uint registerSpan,
+        out ulong baseAddress, out ulong memoryLength, out string detail, out string? error)
+    {
+        QaRun.DemandWrite("PUBLISHED PHYSICAL ACCESS");
+        return DeviceTweakerImodRuntime.TryResolveNicRegisterRange(DriverHandle, DeviceTarget!, registerOffset, registerSpan,
+            out baseAddress, out memoryLength, out detail, out error);
+    }
 
     public bool OlderDriverLoaded => _olderDriverLoaded ??= DeviceTweakerImodRuntime.IsOlderDriverLoaded(DriverHandle);
     private bool? _olderDriverLoaded;

@@ -15,7 +15,7 @@ param(
     [string]$TriggerDevice
 )
 
-$imodScriptVersion = 32
+$imodScriptVersion = 33
 
 function Test-IsAdmin {
     try {
@@ -920,7 +920,8 @@ try {
                 continue
             }
             $targetBaseText = if ($target.HasBase) { Format-ImodHex ([uint64]$target.BaseAddress) } else { '-' }
-            Write-ImodLog ("nic itr matched: hwid=$hwid id=$($target.DeviceId) caption=$(Format-ImodText $target.Caption) problem=$($target.ProblemCode) hasBase=$($target.HasBase) base=$targetBaseText")
+            # largestRange is informational only; ApplyNicItr selects the register BAR from PCI config space.
+            Write-ImodLog ("nic itr matched: hwid=$hwid id=$($target.DeviceId) caption=$(Format-ImodText $target.Caption) problem=$($target.ProblemCode) hasBase=$($target.HasBase) largestRange=$targetBaseText+$(Format-ImodHex ([uint64]$target.MemoryLength))")
             if ([DeviceTweakerImodRuntime]::IsDisabledProblem([uint32]$target.ProblemCode)) {
                 Write-ImodLog ("nic itr skip disabled " + $target.DeviceId)
                 continue
@@ -933,8 +934,6 @@ try {
             $values = [uint64[]]@($nic['VALUES'] | ForEach-Object { [uint64]$_ })
             $result = [DeviceTweakerImodRuntime]::ApplyNicItr(
                 [string]$target.DeviceId,
-                [uint64]$target.BaseAddress,
-                [uint64]$target.MemoryLength,
                 [uint32]$nic['BASE_OFFSET'],
                 [uint32]$nic['STRIDE'],
                 [uint32]$nic['QUEUES'],

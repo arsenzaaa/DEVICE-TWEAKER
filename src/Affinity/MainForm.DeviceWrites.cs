@@ -39,20 +39,30 @@ public sealed partial class MainForm
 
         string mode = plan.MsiMode;
         int msiVal = mode == "Enabled" ? 1 : 0;
-        try
+        if (msiVal == 0 && !TryValidateMsiDisable(plan.InterruptCapabilities, out string msiDisableError))
         {
-            using RegistryKey? msiKey = Registry.LocalMachine.OpenSubKey(msiPath, writable: true);
-            if (msiKey is null)
-            {
-                throw new InvalidOperationException("MSI registry key could not be opened for writing");
-            }
-
-            DeviceSettingsWriter.SetMsi(new WindowsRegistryValues(msiKey), msiVal == 1);
+            WriteLog($"APPLY.VALIDATION.ERROR: {plan.InstanceId} setting=MSI value={mode} hardware=\"{FormatInterruptCapabilities(plan.InterruptCapabilities)}\" action=skipped-write error=\"{FlattenLogText(msiDisableError)}\"");
+            report.AddError($"{plan.DeviceName}: MSI", msiDisableError,
+                $"Requested value={mode}; hardware={FormatInterruptCapabilities(plan.InterruptCapabilities)}");
+            mode = "unchanged";
         }
-        catch (Exception ex)
+        else
         {
-            WriteLog($"APPLY.REG.ERROR: {plan.InstanceId} operation=set-msi value={msiVal} path=HKLM\\{msiPath} error=\"{FlattenLogText(ex.ToString())}\"");
-            RecordError("set MSI mode", ex);
+            try
+            {
+                using RegistryKey? msiKey = Registry.LocalMachine.OpenSubKey(msiPath, writable: true);
+                if (msiKey is null)
+                {
+                    throw new InvalidOperationException("MSI registry key could not be opened for writing");
+                }
+
+                DeviceSettingsWriter.SetMsi(new WindowsRegistryValues(msiKey), msiVal == 1);
+            }
+            catch (Exception ex)
+            {
+                WriteLog($"APPLY.REG.ERROR: {plan.InstanceId} operation=set-msi value={msiVal} path=HKLM\\{msiPath} error=\"{FlattenLogText(ex.ToString())}\"");
+                RecordError("set MSI mode", ex);
+            }
         }
 
         if (plan.AutoMsiOnly)

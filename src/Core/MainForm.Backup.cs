@@ -418,17 +418,27 @@ public sealed partial class MainForm
             RestoreRegistryValue,
             CaptureStartupProfileFile,
             RestoreStartupProfile,
-            WriteLog);
+            WriteLog,
+            PrepareRollbackStartupProfile);
         service.Restore(backup);
 
         WriteLog($"BACKUP.RESTORE: restored path={path} values={backup.RegistryValues.Count} reason={backup.Reason}");
+        OperationReport report = CreateBackupRestoreReport(backup);
+        report.MergeIssues(SyncLivePowerManagementAfterRestore(backup, targets));
+        return report;
+    }
+
+    internal static OperationReport CreateBackupRestoreReport(DeviceTweakerBackup backup)
+    {
         OperationReport report = new();
         report.AddSuccess("Saved settings", "Registry and startup profile restored and verified.");
+        foreach (string skipped in backup.SkippedNicItrEntries)
+            report.AddWarning("NIC ITR startup profile",
+                "An outdated NIC ITR startup setting was skipped. Save NIC ITR again for this adapter.", skipped);
         foreach (RegistryValueBackup skipped in backup.RegistryValues.Where(value =>
             string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase)))
             report.AddSkipped("Saved setting", "The original backup could not read this value; it was left unchanged.",
                 $"{skipped.Hive}\\{skipped.Path}\\{skipped.Name}: {skipped.Data}");
-        report.MergeIssues(SyncLivePowerManagementAfterRestore(backup, targets));
         return report;
     }
 
@@ -453,6 +463,7 @@ public sealed partial class MainForm
     // hashes and paths of this build so the restored file matches what is installed.
     private void NormalizeStartupProfileBackup(DeviceTweakerBackup backup)
     {
+        backup.SkippedNicItrEntries.Clear();
         backup.RegistryValues.RemoveAll(value =>
             string.Equals(value.Hive, "HKCU", StringComparison.OrdinalIgnoreCase)
             && string.Equals(value.Path.Trim('\\'), ImodStartupRunKeyPath, StringComparison.OrdinalIgnoreCase)
@@ -476,12 +487,26 @@ public sealed partial class MainForm
         ImodConfig config = legacyScript
             ? ParseImodScriptText(source.Text)
             : ConvertStartupProfile(StartupProfile.FromJson(source.Text));
+        foreach (string removed in RemoveStaleNicItrEntries(config))
+        {
+            backup.SkippedNicItrEntries.Add(removed);
+            WriteLog($"BACKUP.RESTORE.NIC.SKIPPED: {removed} action=not-restored; set NIC ITR again for this adapter");
+        }
         backup.StartupProfile = new FileBackup
         {
             Path = GetStartupProfilePath(),
             Exists = true,
             Text = BuildStartupProfile(config, GetImodDriverSystemPath()).ToJson(),
         };
+    }
+
+    // Rollback must use the same supported layout and current payload hashes as installation.
+    // Readback itself stays raw so verification cannot hide an incorrectly written profile.
+    private FileBackup PrepareRollbackStartupProfile(FileBackup profile)
+    {
+        DeviceTweakerBackup rollback = new() { StartupProfile = profile };
+        NormalizeStartupProfileBackup(rollback);
+        return rollback.StartupProfile!;
     }
 
     private void RestoreStartupProfile(FileBackup backup)

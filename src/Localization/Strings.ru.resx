@@ -924,4 +924,13 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
   <data name="Message.The.device.list.could.not.be.refreshed" xml:space="preserve">
     <value>Не удалось обновить список устройств.</value>
   </data>
+  <data name="Validation.MsiDisableNoLineBased" xml:space="preserve">
+    <value>Windows сообщает, что это PCI-устройство не поддерживает линейные прерывания (INTx). Отключение MSI оставило бы его без прерываний. Настройка MSI не изменена.</value>
+  </data>
+  <data name="Restore.NicItrSkipped" xml:space="preserve">
+    <value>Устаревшая настройка автозапуска NIC ITR пропущена. Сохраните NIC ITR для этого адаптера заново.</value>
+  </data>
+  <data name="Restore.NicItrProfile" xml:space="preserve">
+    <value>Профиль автозапуска NIC ITR</value>
+  </data>
 </root>

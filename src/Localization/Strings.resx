@@ -924,4 +924,13 @@ Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IM
   <data name="Message.The.device.list.could.not.be.refreshed" xml:space="preserve">
     <value>The device list could not be refreshed.</value>
   </data>
+  <data name="Validation.MsiDisableNoLineBased" xml:space="preserve">
+    <value>Windows reports that this PCI device has no line-based (INTx) interrupt; with MSI disabled it would have no interrupt at all. The MSI setting was not changed.</value>
+  </data>
+  <data name="Restore.NicItrSkipped" xml:space="preserve">
+    <value>An outdated NIC ITR startup setting was skipped. Save NIC ITR again for this adapter.</value>
+  </data>
+  <data name="Restore.NicItrProfile" xml:space="preserve">
+    <value>NIC ITR startup profile</value>
+  </data>
 </root>
