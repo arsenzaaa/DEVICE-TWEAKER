@@ -43,6 +43,8 @@ The runtime is shared with Windows PowerShell 5.1. Its SHA-256 is checked before
 
 The task runs independently of the EXE. Profile read or parse errors stop changes to the profile. **DELETE** in the IMOD block removes the shared startup configuration for USB IMOD and NIC ITR, including the scheduled task.
 
+The NIC layouts for Killer E3000 (`10EC:3000`, RTL8125 family) and RTL8118AS (`10EC:8162`, RTL8168 family) have been corrected. When a saved NIC ITR entry no longer matches the supported layout for its PCI ID, profile installation and backup restoration omit that entry. Restore reports the omission as a warning and records the old and current layout in the log. Other supported entries are retained; the backup file is unchanged. Save NIC ITR again for the affected adapter to create a current startup entry.
+
 ## Verification and recovery
 
 Compare an EXE's SHA-256 with `SHA256SUMS.txt` from the same release package. The source commit in the release description identifies the corresponding code. Matching hashes establish package consistency, not hardware behavior.

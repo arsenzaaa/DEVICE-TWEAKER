@@ -18,7 +18,6 @@ Source comparison: [v0.0.4 → v0.1.0](https://github.com/arsenzaaa/DEVICE-TWEAK
 ### Interface and responsiveness
 
 - Centered action rows in result, information and backup-location dialogs to align with their centered messages.
-
 - REFRESH reuses compatible device cards after a fresh scan instead of rebuilding every card. Pending edits and viewport state are restored for compatible devices; topology changes invalidate reuse.
 - Mouse event-rate calculations reuse their results while the sample buffers remain unchanged. Sample history is bounded; display confirmation timing is preserved.
 - Animations share a frame clock with at most one pending UI callback. The clock stops when there are no active animations and does not change Windows timer resolution or display settings.
@@ -31,6 +30,10 @@ Source comparison: [v0.0.4 → v0.1.0](https://github.com/arsenzaaa/DEVICE-TWEAK
 - Task Scheduler XML is staged in the protected startup folder. Registration checks the stored task's action count, command and arguments, rather than looking for the script path as a substring.
 - A second launch no longer selects an Explorer window opened on a folder named DEVICE TWEAKER.
 - Translated restore results, device-scan failures and power-plan diagnostics that remained English in the Russian interface.
+- NIC ITR resolves its register bank from PCI BAR configuration, verifies Windows resource ranges and rejects MSI-X table/PBA overlap. Corrected Killer E3000 (`10EC:3000`) and RTL8118AS (`10EC:8162`) register layouts.
+- Backup restoration and startup installation now agree on outdated NIC ITR entries: incompatible entries are skipped, with a restore warning and layout details in the log. Other entries and the source backup are preserved.
+- MSI cannot be disabled when PCI capabilities explicitly report message interrupts without line-based INTx support. The refusal is translated in both interface languages.
+- Restoring an absent registry value no longer creates a key. Loader preparation applies the protected startup-folder permissions without falling back to a temporary directory.
 
 ### Maintenance and QA
 

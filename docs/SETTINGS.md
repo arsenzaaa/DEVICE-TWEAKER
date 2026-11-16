@@ -16,7 +16,7 @@ The interface language is saved in `%LOCALAPPDATA%\DEVICE TWEAKER\settings.json`
 
 ### MSI / MSI-X
 
-**MSI Mode** writes `MSISupported` for the selected device. [MSI/MSI-X](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/enabling-message-signaled-interrupts-in-the-registry) use messages instead of an interrupt line; MSI-X permits multiple vectors with different CPU affinities. MSI-X capability does not mean the driver uses every available vector.
+**MSI Mode** writes `MSISupported` for the selected device. [MSI/MSI-X](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/enabling-message-signaled-interrupts-in-the-registry) use messages instead of an interrupt line; MSI-X permits multiple vectors with different CPU affinities. MSI-X capability does not mean the driver uses every available vector. Disabling MSI is refused when PCI capabilities explicitly report message interrupts without line-based INTx support.
 
 The **READ IRQ MODE** button at the top reads all PCI devices in the list through DTIMOD.sys, loading the driver if needed. Cards hidden by filters are included. The query reads Windows allocated interrupt resources and the `MSI Enable` / `MSI-X Enable` bits in PCI configuration space. Reading these bits successfully distinguishes MSI from MSI-X even with one IRQ. The query applies no settings. The button shows progress while reading and the readable/total device count when finished. Hover over it for the summary. Per-device results appear in **IRQ Mode**.
 
@@ -126,5 +126,7 @@ The **MOUSE**, **KEYBOARD**, **USB**, **GPU**, **NETWORK**, and **STORAGE** butt
 Assignments without a suitable core or a reliably detected role are skipped with a reason in the report. If CPU topology cannot be determined reliably, affinity masks are not written. For NDIS adapters, the RSS/IRQ mode is chosen using the detected runtime state. USB IMOD tuning can be included when starting intelligent auto-optimization; NIC ITR remains manual.
 
 A validated backup is created before the main manual apply, IMOD / NIC ITR **SET**, NIC ITR **SAVE**, backup restoration, and the main reset. Intelligent auto-optimization requires an original-settings snapshot; an extra backup is optional. No write begins if a required snapshot cannot be created. Saved backups can be selected under **RESTORE**.
+
+Restoring a backup with an outdated NIC ITR layout skips the incompatible startup entry and reports a warning. The other supported settings are restored. Save NIC ITR again for that adapter; see [NIC ITR compatibility](./guide/06-network.md#nic-itr).
 
 The main reset preserves MSI Mode / MSI Limit and Wi-Fi settings.

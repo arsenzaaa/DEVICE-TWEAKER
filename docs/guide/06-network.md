@@ -31,6 +31,10 @@ Intel EITR/ITR and Realtek IntrMit profiles use different registers and units. F
 
 Adaptive driver moderation can overwrite a manually applied ITR. The application accounts for available driver settings and returns control to the driver when the saved profile is removed. Operation results retain details and unconfirmed steps.
 
+NIC ITR selects the register bank from PCI configuration and checks it against the memory ranges allocated by Windows. It rejects inaccessible or inconsistent resources and register spans overlapping an MSI-X table or pending-bit array.
+
+The NIC layouts for Killer E3000 (`10EC:3000`, RTL8125 family) and RTL8118AS (`10EC:8162`, RTL8168 family) have been corrected. When a saved NIC ITR entry no longer matches the supported layout for its PCI ID, profile installation and backup restoration omit that entry. Restore reports the omission as a warning and records the old and current layout in the log. Other supported entries are retained; the backup file is unchanged. Save NIC ITR again for the affected adapter to create a current startup entry.
+
 ## Verification
 
 Wi-Fi is excluded from AUTO and supported wired-setting resets. Compare active RSS, ITR readback, packet loss, CPU load and latency under the same traffic. Less moderation can increase interrupt rate and CPU load.

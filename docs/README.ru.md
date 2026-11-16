@@ -18,7 +18,7 @@
 - **[Сеть](./guide/06-network.ru.md)** - RSS, NDIS/NetAdapterCx и NIC ITR.
 - **[Процессор](./guide/07-cpu-topology.ru.md)** - P/E-ядра, CPPC, CCD/CCX и ReservedCpuSets.
 - **[Ввод](./guide/08-input.ru.md)** - Polling Rate, Raw Input и Mouse Throttle.
-- **[Энергосбережение](./guide/09-power.ru.md)** - USB selective suspend и отключение устройств.
+- **[Энергосбережение](./guide/09-power.ru.md)** - USB selective suspend и разрешение Windows отключать устройство для экономии энергии.
 
 ## Драйвер и автозапуск
 

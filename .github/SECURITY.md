@@ -19,8 +19,9 @@ Publication and credit will be coordinated after a fix is available.
 `DTIMOD.sys` runs in kernel mode and the current artifact is test-signed, not publicly trusted. HVCI, Microsoft Vulnerable Driver Blocklist, endpoint security, or anti-cheat may block it. The application reports loading failures and does not offer to disable Windows protections. A successful load or a read-only system check does not establish anti-cheat compatibility.
 
 - The driver's device object is open only to SYSTEM and Administrators.
-- Reads cover physical memory and PCI configuration space.
-- A write names the target PCI device by instance ID and PDO. The driver checks that the device exists and that the address range lies inside memory Windows allocated to that device; anything else, including I/O ports, is refused. There is no general physical-memory write.
-- `%ProgramData%\DEVICE TWEAKER\Startup` (startup script, runtime, profile, loader) is writable only by SYSTEM and Administrators, and the script verifies the SHA-256 of the runtime, driver, and loader recorded in `profile.json` before loading anything.
+- MMIO reads and writes name the target PCI device by instance ID and PDO. The driver checks the device identity, PCI class and allocated memory range. These operations are limited to xHCI and Ethernet devices; general physical-memory read/write requests and I/O-port access are rejected.
+- Read-only PCI configuration queries remain available for IRQ inspection on other device classes. A separate xHCI query reads controller contexts internally and returns decoded USB topology, not raw system-memory contents.
+- The resource check does not synchronize MMIO access with controller removal or power transitions. See the [driver lifecycle limitation](../docs/guide/11-driver.md#controller-lifecycle-during-register-access).
+- `%ProgramData%\DEVICE TWEAKER\Startup` is writable only by SYSTEM and Administrators. The startup script checks the runtime SHA-256 from `profile.json` before compilation. When loading DTIMOD through KDU, it also checks `DTIMOD.sys`, `kdu.exe` and `drv64.dll`; these file checks are skipped when an existing driver device is available.
 
 Reports about bypassing any of these checks are in scope.
