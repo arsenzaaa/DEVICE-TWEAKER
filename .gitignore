@@ -32,9 +32,14 @@ src/**/*.lastbuildstate
 *.sln.docstates
 
 # Secrets
-src/**/*.pfx
-src/**/*.p12
-src/**/*.snk
+*.pfx
+*.p12
+*.snk
+*.pvk
+*.pem
+*.key
+.env
+.env.*
 
 # Runtime data and local documentation
 src/tmp/
