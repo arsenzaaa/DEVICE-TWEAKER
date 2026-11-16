@@ -107,6 +107,20 @@ public sealed partial class MainForm
                     LastWriteUtc = new DateTime(2026, 10, 25, 6, 0, 0, DateTimeKind.Utc).AddMinutes(-index),
                 }).ToArray(), out _);
                 break;
+            case "msi-disable":
+                TryValidateMsiDisable(new PciInterruptCapabilities(PciInterruptSupport.MsiX, 8), out string msiError);
+                OperationReport msiReport = new() { IsDeveloperPreview = true };
+                msiReport.MarkNoChangesMade();
+                msiReport.AddError("MSI", msiError, "Requested value=Disabled; hardware=MSI-X; INTx=false");
+                ShowOperationResult(msiReport, string.Empty, "The operation stopped before any changes were made.", "APPLY");
+                break;
+            case "restore-nic-skipped":
+                DeviceTweakerBackup restored = new();
+                restored.SkippedNicItrEntries.Add("hwid=VEN_10EC&DEV_3000 reason=layout-changed saved=[offset=0xE2] current=[offset=0xA00]");
+                OperationReport restoreReport = new() { IsDeveloperPreview = true };
+                restoreReport.MergeIssues(CreateBackupRestoreReport(restored));
+                ShowOperationResult(restoreReport, "Backup restored with warnings. Open DETAILS.", string.Empty, "RESTORE");
+                break;
             case "reset-success":
                 ShowOperationResult(new OperationReport { IsDeveloperPreview = true },
                     "Supported tweaks were reset.\nPlease reboot your PC to restore runtime hardware defaults.",

@@ -112,6 +112,8 @@ Registry, power plans, startup and drivers are neither changed nor completely em
 
 `ui-controls` compares glyph pixels in editors and the "Аудио" caption with taller native controls. It covers 0xFA0, Latin/Cyrillic descenders and 100/125/150% size/font models; intentionally clipped controls must differ. This checks glyph completeness, not font quality or actual Windows DPI transitions.
 
+The native reference editor is created and given a message-loop turn before glyph capture. An empty reference remains a failure. `restore-nic-msi-messages.json` checks the MSI refusal and skipped NIC restore warning in EN/RU at modeled layout scales of 96, 120 and 144 DPI; this does not change Windows DPI.
+
 `text-fields-*` checks actual search, MSI Limit, IMOD, role-based IMOD, NIC ITR and RSS fields across Intel, AMD, IMOD and NIC device sets. Each scenario uses EN at 1200×900 and RU after narrowing to 1000×720. The inner editor is compared with a taller field of identical width, text, font and colours: vertical glyph completeness, not capacity for arbitrary long input. Bounds are checked separately against the viewport; context captures support visual layout review.
 
 ## Dialogs and menus

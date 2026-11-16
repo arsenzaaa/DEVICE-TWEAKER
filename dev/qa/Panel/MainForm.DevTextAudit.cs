@@ -48,6 +48,10 @@ public sealed partial class MainForm
             };
             Controls.Add(reference);
             reference.BringToFront();
+            // A newly parented native EDIT needs a message-loop turn before it can
+            // serve as a glyph reference. Keep the empty-reference failure strict.
+            reference.CreateControl();
+            await YieldDeviceUiAsync();
             using Bitmap complete = NativeGlyphEvidence.Capture(reference, DevArtifact(paths[2]));
             string expected = NativeGlyphEvidence.Signature(complete);
             bool same = NativeGlyphEvidence.Signature(actual) == expected;
