@@ -5,8 +5,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        The log is in the `logs` folder next to the EXE. Remove personal paths and names before posting.
-        Лог лежит в папке `logs` рядом с EXE. Перед отправкой уберите из него личные пути и имена.
+        The log is in the `logs` folder next to the EXE. For startup IMOD or NIC ITR, also attach `%ProgramData%\DEVICE TWEAKER\Startup\logs`; for restore problems, `Backups` next to the EXE and `%APPDATA%\DEVICE TWEAKER\Backups`. Remove personal paths and names before posting.
+        Лог лежит в папке `logs` рядом с EXE. Если IMOD или NIC ITR применяется при запуске, приложите также `%ProgramData%\DEVICE TWEAKER\Startup\logs`, при проблеме с восстановлением - `Backups` рядом с EXE и `%APPDATA%\DEVICE TWEAKER\Backups`. Перед отправкой уберите личные пути и имена.
 
         For questions about settings, check the [guide](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/README.md) first.
         Описание настроек: [руководство на русском](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/README.ru.md).
@@ -51,5 +51,10 @@ body:
     id: log
     attributes:
       label: Log / Лог
-      description: Relevant lines or the whole file / Строки, относящиеся к ошибке, или файл целиком
+      description: Relevant lines from the log / Строки лога, относящиеся к ошибке
       render: text
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Files / Файлы
+      description: Whole log files or a zip of the folders / Файлы логов целиком или архив папок

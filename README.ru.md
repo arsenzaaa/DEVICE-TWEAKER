@@ -8,6 +8,8 @@
 
 **[Скачать для Windows](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.SelfContained.exe)** · [Руководство](./docs/guide/README.ru.md) · [Скриншоты](./docs/SCREENSHOTS.ru.md) · [История изменений](./CHANGELOG.ru.md)
 
+[![DEVICE TWEAKER на Intel Core i9-14900K](./assets/screenshots/intel-affinity.ru.png)](./docs/SCREENSHOTS.ru.md)
+
 ## Возможности
 
 ### Прерывания и привязка к ядрам
@@ -34,11 +36,13 @@ USB IMOD настраивается для контроллера целиком
 
 1. Запустите EXE от имени администратора и выберите устройство в списке.
 2. Измените нужные параметры и нажмите **ПРИМЕНИТЬ** либо используйте **АВТООПТИМИЗАЦИЮ** для автоматического подбора.
-3. После изменения MSI или Interrupt Affinity перезагрузите Windows. Порядок проверки описан в [руководстве](./docs/guide/10-verification.ru.md).
+3. После изменения MSI, Interrupt Affinity или ReservedCpuSets перезагрузите Windows. Порядок проверки описан в [руководстве](./docs/guide/10-verification.ru.md).
 
 Сохранённые копии доступны через **ВОССТАНОВЛЕНИЕ**, а логи находятся в папке `logs` рядом с EXE. Все файлы выпуска и контрольные суммы размещены на [странице выпусков](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest).
 
-**Совместимость драйвера.** Для IMOD, NIC ITR и чтения конфигурации PCI используется DTIMOD.sys с загрузкой через KDU. Он может конфликтовать с античитами, включая EAC, Vanguard и FACEIT. Закрытие приложения не выгружает драйвер. Условия загрузки и поведение сохранённых профилей описаны в [руководстве по драйверу](./docs/guide/11-driver.ru.md).
+**Совместимость драйвера.** Для IMOD, NIC ITR и чтения конфигурации PCI используется DTIMOD.sys с загрузкой через KDU; MSI, привязка к ядрам, RSS, ReservedCpuSets и остальные настройки работают без него. Драйвер может конфликтовать с античитами, включая EAC, Vanguard и FACEIT. Закрытие приложения не выгружает драйвер. Условия загрузки и поведение сохранённых профилей описаны в [руководстве по драйверу](./docs/guide/11-driver.ru.md).
+
+**Предупреждения антивируса.** Microsoft Defender и другие антивирусы могут определять KDU как HackTool. Сверьте EXE с `SHA256SUMS.txt` из выпуска и добавьте в исключения папку программы и `%ProgramData%\DEVICE TWEAKER`, не отключая защиту целиком.
 
 ## Документация
 
@@ -48,7 +52,7 @@ USB IMOD настраивается для контроллера целиком
 
 ## Обратная связь и поддержка
 
-Ошибки и предложения можно оставить в [Issues](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues). Результатами проверки на своём оборудовании можно поделиться через [форму отчёта](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=hardware_report.yml). Для прямой связи доступен [Telegram](https://t.me/arsenzaa).
+Ошибки и предложения можно оставить в [Issues](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues); к сообщению об ошибке приложите папку `logs`. Результатами проверки на своём оборудовании можно поделиться через [форму отчёта](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=hardware_report.yml). Новости проекта публикуются в [Telegram-канале](https://t.me/arsenzaa).
 
 Поддержать развитие DEVICE TWEAKER можно на [Boosty](https://boosty.to/arsenza).
 

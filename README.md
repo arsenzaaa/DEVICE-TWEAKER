@@ -8,6 +8,8 @@ Configure device interrupts manually, or use automatic optimization to select CP
 
 **[Download for Windows](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.SelfContained.exe)** · [Guide](./docs/guide/README.md) · [Screenshots](./docs/SCREENSHOTS.md) · [Changelog](./CHANGELOG.md)
 
+[![DEVICE TWEAKER on an Intel Core i9-14900K](./assets/screenshots/intel-affinity.en.png)](./docs/SCREENSHOTS.md)
+
 ## Features
 
 ### Interrupts and CPU affinity
@@ -34,11 +36,13 @@ The **[self-contained build](https://github.com/arsenzaaa/DEVICE-TWEAKER/release
 
 1. Run the EXE as administrator and select a device.
 2. Adjust its settings and click **APPLY**, or use **AUTO-OPTIMIZATION** to select settings automatically.
-3. Restart Windows after changing MSI or Interrupt Affinity. See the [verification guide](./docs/guide/10-verification.md) for checking the result.
+3. Restart Windows after changing MSI, Interrupt Affinity or ReservedCpuSets. See the [verification guide](./docs/guide/10-verification.md) for checking the result.
 
 Open **RESTORE** to access saved backups. Logs are stored in the `logs` folder next to the EXE. All release files and checksums are on the [releases page](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest).
 
-**Driver compatibility.** IMOD, NIC ITR and PCI configuration reads use DTIMOD.sys, loaded through KDU. It may conflict with anti-cheat software, including EAC, Vanguard and FACEIT. Closing the application does not unload the driver. Loading requirements and startup profile behavior are covered in the [driver guide](./docs/guide/11-driver.md).
+**Driver compatibility.** IMOD, NIC ITR and PCI configuration reads use DTIMOD.sys, loaded through KDU; MSI, affinity, RSS, ReservedCpuSets and the other settings work without it. The driver may conflict with anti-cheat software, including EAC, Vanguard and FACEIT. Closing the application does not unload the driver. Loading requirements and startup profile behavior are covered in the [driver guide](./docs/guide/11-driver.md).
+
+**Antivirus warnings.** Microsoft Defender and other antivirus software may flag KDU as a hacking tool. Check the EXE against `SHA256SUMS.txt` from the release and add the program folder and `%ProgramData%\DEVICE TWEAKER` to exclusions instead of disabling protection.
 
 ## Documentation
 
@@ -48,7 +52,7 @@ Open **RESTORE** to access saved backups. Logs are stored in the `logs` folder n
 
 ## Feedback and support
 
-Report bugs and suggest improvements through [Issues](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues). Use the [hardware report form](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=hardware_report.yml) to share results from your system. For direct contact, use [Telegram](https://t.me/arsenzaa).
+Report bugs and suggest improvements through [Issues](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues); attach the `logs` folder to bug reports. Use the [hardware report form](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=hardware_report.yml) to share results from your system. Project news is posted in the [Telegram channel](https://t.me/arsenzaa).
 
 Support the development of DEVICE TWEAKER on [Boosty](https://boosty.to/arsenza).
 
