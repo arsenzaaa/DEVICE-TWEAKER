@@ -6,6 +6,6 @@ contact_links:
   - name: Security vulnerability / Уязвимость
     url: https://github.com/arsenzaaa/DEVICE-TWEAKER/security/advisories/new
     about: Report privately. / Сообщить приватно
-  - name: Questions and discussion / Вопросы и обсуждение
+  - name: Project news / Новости проекта
     url: https://t.me/arsenzaa
-    about: Project Telegram channel. / Telegram проекта
+    about: News and release announcements. / Новости и анонсы выпусков

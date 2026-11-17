@@ -84,7 +84,7 @@ UiLanguage retains an adapter for dynamic diagnostic phrases. Update both cultur
 
 ## Screenshots
 
-Capture the read-only developer build with `dev/qa/Capture-Showcase.ps1`. The [screenshot gallery](./SCREENSHOTS.md) uses full application windows, with no added frame or shadow. Label demonstration hardware and keep the displayed controls and readback consistent. Capture commands are in the [release guide](./RELEASE.md#maintain-the-project-page).
+Use `dev/qa/Invoke-DevSession.ps1` with the reusable `gallery-*` scenarios in `dev/qa/Scenarios`. The [gallery](./SCREENSHOTS.md) includes full windows and dialogs, with demonstration data and links to original PNGs. Review captures before adding them to `assets/screenshots`; keep EN/RU pairs consistent. Commands are in the [release guide](./RELEASE.md#maintain-the-project-page).
 
 ## Release automation
 

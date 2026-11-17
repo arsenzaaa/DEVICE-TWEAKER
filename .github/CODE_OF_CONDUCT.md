@@ -9,4 +9,4 @@ In issues, pull requests and project discussions:
 - do not post other people's personal data, keys or files without permission;
 - no insults, harassment, discrimination or spam.
 
-Messages that break these rules may be hidden or removed, and their authors blocked from the repository. Report a violation to the project author via [Telegram](https://t.me/arsenzaa).
+Messages that break these rules may be hidden or removed, and their authors blocked from the repository. Report a violation to the project author via [Telegram](https://t.me/arsenzaaaa).

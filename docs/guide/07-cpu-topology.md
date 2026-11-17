@@ -16,18 +16,18 @@ AUTO changes device settings while leaving SMT, E-cores and game-thread affinity
 
 ## ReservedCpuSets
 
-The separate panel manages this value:
+The **Reserved CPU Sets** panel selects CPUs that Windows should try to leave aside during ordinary thread scheduling. Checking a CPU in this panel reserves it; checking a CPU in a device card assigns that device's interrupt affinity. These are separate settings.
+
+The reservation mask is stored here:
 
 ```text
 HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Kernel
   ReservedCpuSets  REG_BINARY
 ```
 
-Edits remain pending until **APPLY**, after a backup. A failed write preserves the pending state. The panel is unavailable without reliable CPU Set IDs.
+Choose the CPUs in the panel and click **APPLY**. The program creates a backup before writing the mask; restart Windows to check its effect. If writing fails, the edits remain available for another attempt. The panel is disabled when CPU Set IDs cannot be determined reliably.
 
-Do not equate this value with per-process CPU Set assignment APIs. The [CPU Sets documentation](https://learn.microsoft.com/en-us/windows/win32/procthread/cpu-sets) describes IDs, affinity constraints and reservation policies; it does not establish isolation of all ISR/DPC activity through this registry setting.
-
-Reservation does not prove that system events disappeared from a CPU or that a game automatically received the intended cores. Check scheduling and interrupts on your Windows build, preserve the original mask and verify post-reboot behavior.
+This system-wide mask does not assign the selected CPUs to a particular game. Check actual thread scheduling and ISR/DPC activity after rebooting, and keep the original mask for restoration. The [CPU Sets API documentation](https://learn.microsoft.com/en-us/windows/win32/procthread/cpu-sets) describes per-process assignments and CPU Set IDs; those APIs are distinct from this registry setting.
 
 ## Practical verification
 

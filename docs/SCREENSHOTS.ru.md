@@ -2,64 +2,128 @@
 
 [Документация](./README.ru.md) / Скриншоты · [English](./SCREENSHOTS.md)
 
-Примеры интерфейса на моделях Intel и AMD. Устройства, значения и результаты операций показаны на демонстрационных данных.
+Основные панели и состояния интерфейса на моделях Intel и AMD. Устройства, настройки и результаты операций используют демонстрационные данные. Нажмите на снимок, чтобы открыть оригинал.
 
-## Intel: гибридный CPU
+[CPU и GPU](#cpu-и-gpu) · [USB IMOD](#usb-imod) · [Сетевые адаптеры](#сетевые-адаптеры) · [Reserved CPU Sets](#reserved-cpu-sets) · [Накопители](#накопители) · [Бэкапы и восстановление](#бэкапы-и-восстановление) · [Результаты операций](#результаты-операций) · [Драйвер](#драйвер)
 
-P/E-ядра, MSI-X и явная маска привязки к CPU.
+## CPU и GPU
 
-[![Intel: гибридный CPU](../assets/screenshots/intel-affinity.ru.png)](../assets/screenshots/intel-affinity.ru.png)
+### Гибридный Intel
 
-<details>
-<summary>AMD: два CCD</summary>
+P/E-ядра, MSI-X и вручную выбранная маска affinity.
 
-Два CCD и оценки CPPC в списке процессоров.
+[![Гибридный Intel](../assets/screenshots/intel-affinity.ru.png)](../assets/screenshots/intel-affinity.ru.png)
 
-[![AMD: два CCD](../assets/screenshots/amd-topology.ru.png)](../assets/screenshots/amd-topology.ru.png)
+### AMD с двумя CCD
 
-</details>
+Расположение ядер по CCD и CPPC-рейтинг в списке CPU.
 
-## Роли USB-устройств
+[![AMD с двумя CCD](../assets/screenshots/amd-topology.ru.png)](../assets/screenshots/amd-topology.ru.png)
 
-Отдельные интервалы для мыши, клавиатуры, геймпада и аудио на одном контроллере.
+## USB IMOD
 
-[![Роли USB-устройств](../assets/screenshots/usb-roles.ru.png)](../assets/screenshots/usb-roles.ru.png)
+### Общее значение контроллера
 
-<details>
-<summary>Индексы USB interrupter</summary>
+Режим XHCI задаёт общее значение IMOD для контроллера. Рядом находятся Mouse Throttle и управление энергосбережением.
 
-Редактирование IMOD по индексам interrupter.
+[![Общее значение контроллера](../assets/screenshots/usb-xhci.ru.png)](../assets/screenshots/usb-xhci.ru.png)
 
-[![Индексы USB interrupter](../assets/screenshots/usb-interrupters.ru.png)](../assets/screenshots/usb-interrupters.ru.png)
+### Роли устройств
 
-</details>
+Отдельные поля интервалов мыши, клавиатуры, геймпада и аудио на одном контроллере.
 
-## RSS и NIC ITR
+[![Роли устройств](../assets/screenshots/usb-roles.ru.png)](../assets/screenshots/usb-roles.ru.png)
 
-Выбор CPU для RSS, число очередей и настройки NIC ITR.
+### Индексы interrupter
 
-[![RSS и NIC ITR](../assets/screenshots/network-rss.ru.png)](../assets/screenshots/network-rss.ru.png)
+Ручные значения регистров по индексам interrupter.
 
-## Выбор бекапа
+[![Индексы interrupter](../assets/screenshots/usb-interrupters.ru.png)](../assets/screenshots/usb-interrupters.ru.png)
 
-Сохранённые бекапы и защищённая копия исходных настроек устройств.
+## Сетевые адаптеры
 
-[![Выбор бекапа](../assets/screenshots/restore.ru.png)](../assets/screenshots/restore.ru.png)
+### Intel: RSS и ITR
 
-<details>
-<summary>Результат операции</summary>
+CPU обработки входящих пакетов, число очередей и настройка NIC ITR Intel.
 
-Итог применения, замечания, переход к логам и бекапам.
+[![Intel: RSS и ITR](../assets/screenshots/network-rss.ru.png)](../assets/screenshots/network-rss.ru.png)
 
-[![Результат операции](../assets/screenshots/operation-report.ru.png)](../assets/screenshots/operation-report.ru.png)
+### Realtek: NIC ITR
 
-</details>
+Настройки RTL8125 и раздельное чтение модерации RX/TX.
 
-<details>
-<summary>Сведения о драйвере</summary>
+[![Realtek: NIC ITR](../assets/screenshots/network-realtek.ru.png)](../assets/screenshots/network-realtek.ru.png)
 
-Назначение драйвера, автозапуск, ограничения античитов и проверка Windows без загрузки драйвера.
+### NetAdapterCx: Realtek 5G
+
+Карточка RTL8126 без выбора режима NDIS, с настройками affinity и чтением четырёх очередей NIC ITR.
+
+[![NetAdapterCx: Realtek 5G](../assets/screenshots/network-netadaptercx.ru.png)](../assets/screenshots/network-netadaptercx.ru.png)
+
+## Reserved CPU Sets
+
+Системное резервирование логических CPU на Ryzen 7 7800X3D. Эта панель задаёт отдельную маску ReservedCpuSets.
+
+[![Reserved CPU Sets](../assets/screenshots/reserved-cpu-sets.ru.png)](../assets/screenshots/reserved-cpu-sets.ru.png)
+
+## Накопители
+
+### Контроллер NVMe
+
+Samsung 990 PRO с affinity по умолчанию Windows и сведениями о ресурсах MSI-X.
+
+[![Контроллер NVMe](../assets/screenshots/storage.ru.png)](../assets/screenshots/storage.ru.png)
+
+## Бэкапы и восстановление
+
+### Расположение бэкапа
+
+Выбор места дополнительной резервной копии перед автооптимизацией.
+
+[![Расположение бэкапа](../assets/screenshots/backup-location.ru.png)](../assets/screenshots/backup-location.ru.png)
+
+### Выбор для восстановления
+
+Сохранённые снимки и защищённая копия исходных настроек.
+
+[![Выбор для восстановления](../assets/screenshots/restore.ru.png)](../assets/screenshots/restore.ru.png)
+
+## Результаты операций
+
+### Завершённая операция
+
+Предложение перезагрузки с переходом к логам и бэкапам.
+
+[![Завершённая операция](../assets/screenshots/operation-success.ru.png)](../assets/screenshots/operation-success.ru.png)
+
+### Предупреждения
+
+В результате операции перечислены настройки, требующие внимания.
+
+[![Предупреждения](../assets/screenshots/operation-report.ru.png)](../assets/screenshots/operation-report.ru.png)
+
+### Частичный результат
+
+Выполненные изменения сохранены; неподтверждённый шаг USB IMOD отмечен отдельно.
+
+[![Частичный результат](../assets/screenshots/operation-partial.ru.png)](../assets/screenshots/operation-partial.ru.png)
+
+### Подробности шагов
+
+Подробный результат отделяет выполненные настройки от несовпадения при чтении регистра.
+
+[![Подробности шагов](../assets/screenshots/operation-details.ru.png)](../assets/screenshots/operation-details.ru.png)
+
+## Драйвер
+
+### Перед загрузкой DTIMOD
+
+Уведомление о совместимости перед действием, требующим драйвера.
+
+[![Перед загрузкой DTIMOD](../assets/screenshots/driver-warning.ru.png)](../assets/screenshots/driver-warning.ru.png)
+
+### Сведения о драйвере
+
+Чтение настроек Windows и состояния служб. Совместимость с античитами эта проверка не определяет.
 
 [![Сведения о драйвере](../assets/screenshots/system-check.ru.png)](../assets/screenshots/system-check.ru.png)
-
-</details>

@@ -242,6 +242,7 @@ public sealed partial class MainForm
 
         Label systemPresetLabel = NewDialogLabel("System preset:");
         ThemedDropDownPicker systemPresetCombo = NewDialogCombo(460);
+        systemPresetCombo.Name = "TEST_ADMIN_SYSTEM_PRESET";
         systemPresetCombo.MaxDropDownItems = 12;
         systemPresetCombo.DropDownWidth = 560;
         systemPresetCombo.Items.AddRange(new object[]

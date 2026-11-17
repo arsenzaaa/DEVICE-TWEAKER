@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "id": "gallery-network-cx",
+  "preset": "DevicePalette",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "fixture-open",
+      "action": "gallery"
+    },
+    {
+      "id": "fixture-ready",
+      "action": "wait",
+      "target": "active:id:TEST_ADMIN_NAV_CPU",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "fixture-cpu",
+      "action": "click",
+      "target": "active:id:TEST_ADMIN_NAV_CPU"
+    },
+    {
+      "id": "fixture-reveal",
+      "action": "reveal",
+      "target": "active:id:TEST_ADMIN_SYSTEM_PRESET"
+    },
+    {
+      "id": "fixture-system",
+      "action": "select",
+      "target": "active:id:TEST_ADMIN_SYSTEM_PRESET",
+      "value": "Full PC | X870E | Ryzen 9 9950X3D | RTX 5090 | Realtek 5G"
+    },
+    {
+      "id": "fixture-close",
+      "action": "click",
+      "target": "active:id:TEST_ADMIN_CLOSE"
+    },
+    {
+      "id": "en-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en-filter",
+      "action": "text",
+      "target": "@search",
+      "value": "8126"
+    },
+    {
+      "id": "en-home",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "en-device",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_8126",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "en",
+      "action": "capture"
+    },
+    {
+      "id": "ru-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru-filter",
+      "action": "text",
+      "target": "@search",
+      "value": "8126"
+    },
+    {
+      "id": "ru-home",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "ru-device",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_8126",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "ru",
+      "action": "capture"
+    }
+  ]
+}

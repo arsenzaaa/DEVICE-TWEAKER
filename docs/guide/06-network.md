@@ -8,6 +8,8 @@ DEVICE TWEAKER distinguishes NDIS and NetAdapterCx and exposes the settings avai
 
 RSS and Interrupt Affinity are not mutually exclusive: one distributes network processing, the other controls interrupt assignment. Their interaction depends on the NIC and driver.
 
+For an NDIS adapter, choose **RSS** to configure receive-processing CPUs and queues, **IRQ** for interrupt affinity, or **BOTH** for both when RSS is supported. Select the CPUs and queue count, then click **APPLY**. NetAdapterCx cards expose the controls available for that adapter type. NIC ITR has separate SET/SAVE commands, described below.
+
 ## What RSS does
 
 RSS distributes receive processing across CPUs using hashing and an indirection table. Capabilities vary: Microsoft describes single-queue, multiple-queue and MSI hardware support. See [Introduction to receive-side scaling](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-receive-side-scaling).

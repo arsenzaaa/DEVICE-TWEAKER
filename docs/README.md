@@ -6,10 +6,10 @@ Device configuration, Windows interrupt handling and DEVICE TWEAKER development.
 
 ## Getting started
 
-- [Screenshots](./SCREENSHOTS.md) - GPU, USB and network settings.
+- [Screenshots](./SCREENSHOTS.md) - CPU/GPU, USB modes, network adapters, backups and operation results.
 - [Settings reference](./SETTINGS.md) - fields, controls, applying changes and restoring settings.
 - [Guide](./guide/README.md) - 11 chapters from ISR/DPC and MSI to IMOD and RSS.
-- [Logs and verification](./guide/10-verification.md) - saved settings, registers and system behaviour.
+- [Logs and verification](./guide/10-verification.md) - finding operation logs, rereading settings and comparing before/after results.
 
 ## By device
 

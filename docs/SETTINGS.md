@@ -14,37 +14,21 @@ The interface language is saved in `%LOCALAPPDATA%\DEVICE TWEAKER\settings.json`
 
 ## Interrupts
 
-### MSI / MSI-X
+### MSI / MSI-X
 
-**MSI Mode** writes `MSISupported` for the selected device. [MSI/MSI-X](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/enabling-message-signaled-interrupts-in-the-registry) use messages instead of an interrupt line; MSI-X permits multiple vectors with different CPU affinities. MSI-X capability does not mean the driver uses every available vector. Disabling MSI is refused when PCI capabilities explicitly report message interrupts without line-based INTx support.
+**MSI Mode** selects the saved interrupt setting. Changing the dropdown creates a pending edit; **APPLY** writes `MSISupported` to the device's registry key. Restart Windows before checking whether its driver uses the new setting. Disabling MSI is refused when PCI capabilities explicitly report message interrupts without line-based INTx support.
 
-The **READ IRQ MODE** button at the top reads all PCI devices in the list through DTIMOD.sys, loading the driver if needed. Cards hidden by filters are included. The query reads Windows allocated interrupt resources and the `MSI Enable` / `MSI-X Enable` bits in PCI configuration space. Reading these bits successfully distinguishes MSI from MSI-X even with one IRQ. The query applies no settings. The button shows progress while reading and the readable/total device count when finished. Hover over it for the summary. Per-device results appear in **IRQ Mode**.
+**IRQ Mode** reports the current mode: Line, MSI, MSI-X, or MSI/MSI-X when the available data cannot distinguish the two message modes. A saved **Enabled** setting alongside **Line** can mean a reboot is still needed or the device driver did not use the setting. [Chapter 2](./guide/02-msi.md) explains the difference.
 
-**HW** shows device capability; `MSISupported` is the registry setting.
+**READ IRQ MODE** queries every PCI device in the list, including cards hidden by filters. It reads allocated Windows interrupt resources and, through DTIMOD, the PCI `MSI Enable` / `MSI-X Enable` bits. Reading these bits distinguishes MSI from MSI-X even with one IRQ. The command can load DTIMOD; it does not apply settings. Progress and the final readable/total count appear on the button, with a summary in its tooltip.
 
-Once loaded, DTIMOD stays in memory until Windows restarts. Closing the application closes its connection. IMOD / ITR values remain in the registers until the device driver changes them, the controller resets, or Windows restarts. Background IRQ Mode reads use an already loaded DTIMOD or Windows resources without loading the driver.
+Opening the program or pressing **REFRESH** also starts background reads, using Windows resources or an already loaded DTIMOD. These reads do not load the driver. The old result is cleared before rereading; unavailable data, read errors and conflicting evidence are shown separately and logged. **No IRQ** means no allocated interrupt resources. A successful read describes the state at that moment: [MSI-X routing can change at runtime](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/dynamically-configuring-msi-x).
 
-- **MSI Mode**. Registry: `MSISupported`.
+**HW** lists the device's supported interrupt modes and message limit, not the capabilities of its parent controller. The adjacent **IRQ** count comes from Windows resource information; it is neither the device's maximum nor a count of interrupts per second.
 
-  Saved setting; a change selected in the dropdown is written when settings are applied.
+**MSI Limit** sets `MessageNumberLimit`. **Unlimited** removes the custom registry limit so Windows and the driver can select the count. Numeric input is checked against detected capabilities. See [enabling MSI](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/enabling-message-signaled-interrupts-in-the-registry).
 
-- **IRQ Mode**. Windows resources; also PCI configuration through DTIMOD.
-
-  Current Line / MSI / MSI-X mode; MSI/MSI-X when the data cannot distinguish the two.
-
-- **HW**. Device hardware capabilities.
-
-  Supported modes.
-
-A failed IRQ Mode read is not replaced with the registry value. MSI Mode and IRQ Mode may differ before a restart or because of how the device driver uses the setting.
-
-The registry is sufficient to configure MSI. IRQ Mode is a separate check of the current state. [MSI-X table entries and message routing can change at runtime](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/dynamically-configuring-msi-x), so the result describes the state when it was read.
-
-`HW: Line/MSI/MSI-X` lists the device's supported modes. Parent-controller capabilities are not substituted. IRQ count comes from WMI and does not identify the mode.
-
-Before reading, IRQ Mode shows "not read". On opening or refreshing the list, the application queries an already loaded DTIMOD. If it is absent, it reads Windows resources without loading the driver. Windows resources distinguish MSI from MSI-X when the message allocation and hardware capabilities allow it. Otherwise, the result is `MSI/MSI-X`, with the reason in the tooltip. The same label remains if DTIMOD confirms message interrupts but cannot read PCI configuration. "No IRQ" means no allocated interrupt resources. Read errors and conflicting evidence are shown separately and logged. Refresh discards the previous result and reads again.
-
-**MSI Limit** sets `MessageNumberLimit`. **Unlimited** removes the registry limit; numeric input is checked against MSI/MSI-X capabilities when they can be detected. **[IRQ Priority](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_priority)** sets `DevicePriority`, which Windows considers when assigning hardware interrupt priority. It does not change game priority, set DPC priority, or guarantee a fixed latency.
+**IRQ Priority** writes `DevicePriority`, which Windows considers when assigning hardware interrupt priority. It does not change the game's thread priority or DPC queue priority. See [IRQ_PRIORITY](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_priority).
 
 ### Interrupt Affinity
 
@@ -117,7 +101,7 @@ On supported Windows 11 builds, **Mouse Throttle** changes `RawMouseThrottleDu
 
 **Raw Input measurements** estimate event rates from the intervals between processed events. Mouse measurements need a stream of movement events; message delivery and processing by the program also affect the result. Keyboard events represent key presses and releases, so pressing several keys or holding a key does not reliably reveal the keyboard's USB polling rate. Raw Input event rate, USB polling rate, and the keyboard's internal scan rate are different quantities.
 
-The **MOUSE**, **KEYBOARD**, **USB**, **GPU**, **NETWORK**, and **STORAGE** buttons jump to matching devices in the full list. Text search hides nonmatching devices.
+The **MOUSE**, **KEYBOARD**, **GAMEPAD**, **USB**, **GPU**, **NETWORK**, **AUDIO**, and **STORAGE** category buttons jump to matching devices in the full list. Text search hides nonmatching devices.
 
 ## Intelligent auto-optimization and restore
 

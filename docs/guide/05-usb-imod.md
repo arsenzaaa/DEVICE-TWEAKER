@@ -2,37 +2,33 @@
 
 [Documentation](../README.md) / [Guide](./README.md) / 05 · [Русский](./05-usb-imod.ru.md)
 
-## IMOD belongs to an interrupter
+## Controller and interrupters
 
-USB events are handled by the host controller. An xHCI interrupter has an Event Ring and an IMOD register. Several devices can share an interrupter, so separate role values do not necessarily provide independent control of each physical device.
+An xHCI controller handles the devices attached to its USB ports. Its interrupters have their own Event Rings and IMOD registers. Several USB devices can share one interrupter, so the device map matters when assigning different values to mouse, keyboard or audio.
 
-IMODI specifies a minimum inter-interrupt interval in 250 ns units. `0x0` disables this moderation, `0xC8` represents 50 microseconds, and `0xFA0` represents 1 millisecond. Interrupt-generation conditions are defined in section 5.5.2.2 of the [xHCI specification](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/extensible-host-controler-interface-usb-xhci.pdf). The interval is not a fixed addition to every USB report's latency.
+The IMOD interval uses 250 ns steps: `0x0` disables moderation, `0xC8` is 50 microseconds, and `0xFA0` is 1 millisecond. `0xC8` is the application's baseline value; a controller or its Windows driver can use a different default. See section 5.5.2.2 of the [xHCI specification](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/extensible-host-controler-interface-usb-xhci.pdf).
 
-`0xC8` is DEVICE TWEAKER's baseline interval, not an invariant default for every controller and Windows version.
+## Choose a mode
 
-## Card modes
+Use **XHCI** to apply one value across the controller's interrupters. Select **Devices** to enter values for detected roles such as mouse, keyboard, gamepad and audio. The program maps these roles to interrupters; when a reliable map is unavailable, it uses a common controller value. **Interrupters** exposes values by index for manual configuration.
 
-| Mode | Configuration |
-| :--- | :--- |
-| XHCI | A common controller value. |
-| Devices | Recognized role values using the current mapping. |
-| Interrupters | Values by interrupter index. |
+Click **CHECK** to read the controller before editing it. Expand the details to inspect device assignments and register values. After reconnect, sleep or reboot, read the map again: an earlier interrupter index may no longer belong to the same device. The current-value tooltip includes the last read time.
 
-Device mappings can change after reconnect, sleep or reboot. The application rereads available xHCI information and shows mapping and diagnostics. The current value tooltip includes the last read time. With incomplete information, inspect the applied common value and limitation rather than assuming an old index remains exact.
+See the [USB examples](../SCREENSHOTS.md#usb-imod) for all three modes.
 
-**CHECK** reads the registers. **SET** applies values and saves the startup profile. **DELETE** removes the shared IMOD/NIC ITR startup profile and restores network-driver moderation. It resets USB controls to `0xC8`; live writes require an already loaded DTIMOD and are skipped while the configuration contains only saved NIC ITR entries. Restart Windows to complete the reset. Deletion does not create a separate automatic backup.
+## Apply and save
 
-## AUTO policy
+Enter the values for the selected mode and click **SET**. The program creates a backup, writes the registers, reads them back and saves the configuration for startup. The main **APPLY** button is not required for this command.
 
-For detected roles, AUTO proposes `0x0` for the mouse, `0xC8` for keyboard/gamepad, and `0xFA0` for USB audio/microphone. Check audio stability and input responsiveness before keeping these values.
+The startup task reapplies the saved configuration after logon, resume and relevant device events. The EXE can be closed. Loading requirements and startup files are described in [chapter 11](./11-driver.md).
 
-Less moderation can increase interrupt rate and CPU load; more moderation changes processing batches. Check input, audio, lost events and load on your controller. When comparing ports on different controllers, record the device mapping for each run.
+AUTO proposes `0x0` for a detected mouse, `0xC8` for keyboard/gamepad, and `0xFA0` for USB audio/microphone. Check input, audio stability and CPU load under your normal workload. Less moderation can increase the interrupt rate; the configured interval is not a fixed delay added to every USB report.
 
-## Startup and recovery
+## Delete or restore
 
-Registers can be reinitialized by reboot, sleep or device reset. A PowerShell task reapplies saved settings; the EXE need not stay open. See [chapter 11](./11-driver.md).
+**DELETE** removes the shared USB IMOD/NIC ITR startup configuration and restores the network-driver moderation settings managed by NIC ITR **SAVE**. USB fields return to `0xC8`. If DTIMOD is already loaded, the program can also reset IMOD registers; USB writes are skipped when the configuration contains only saved NIC ITR entries. Restart Windows to complete the reset.
 
-Readback confirms the value read from a register. It does not measure input latency or replace physical sleep, resume and reconnect checks.
+DELETE does not create an extra backup. To return to a particular saved configuration, select its backup through **RESTORE**. After restoration, check the register values and normal device operation.
 
 ---
 

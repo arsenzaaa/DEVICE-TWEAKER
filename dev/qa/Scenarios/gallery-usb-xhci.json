@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "id": "gallery-usb-xhci",
+  "preset": "Imod",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "en-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en-0",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "en-1",
+      "action": "select",
+      "target": "role:imod-mode",
+      "device": "DEV_15B6",
+      "value": "XHCI"
+    },
+    {
+      "id": "en",
+      "action": "capture"
+    },
+    {
+      "id": "ru-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru-0",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "ru-1",
+      "action": "select",
+      "target": "role:imod-mode",
+      "device": "DEV_15B6",
+      "value": "XHCI"
+    },
+    {
+      "id": "ru",
+      "action": "capture"
+    }
+  ]
+}

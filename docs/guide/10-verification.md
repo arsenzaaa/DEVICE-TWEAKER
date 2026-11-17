@@ -2,47 +2,46 @@
 
 [Documentation](../README.md) / [Guide](./README.md) / 10 · [Русский](./10-verification.ru.md)
 
-## Three kinds of evidence
+## After applying settings
 
-| Check | What it establishes |
-| :--- | :--- |
-| Log and backup | Requested steps, captured values and retained errors. |
-| Readback | A current accessible registry, resource, WMI or hardware-register value. |
-| Trace and measurements | Where processing ran, its duration and the measured workload outcome. |
+Read the operation summary before closing it. It distinguishes completed changes, warnings and partial failures. **DETAILS** identifies the affected setting and stage; **LOGS** and **BACKUPS** open the files needed to inspect or restore the operation.
 
-These checks complement each other. Matching an IMOD register to an entered value is not a mouse-latency measurement. Saved affinity does not establish where every DPC runs.
+For MSI, Interrupt Affinity and ReservedCpuSets, restart Windows before checking runtime behavior. Read **IRQ Mode** again after changing MSI. For USB IMOD and NIC ITR, use **CHECK** to read the current registers. Saved-profile users should also check the startup log after a reboot.
 
-## ISR/DPC with ETW
+## Logs and backups
 
-Install Windows Performance Toolkit. A short recording can be made from an elevated console:
+Application logs are stored in `logs` beside the EXE. Startup logs are in `%ProgramData%\DEVICE TWEAKER\Startup\logs`. When reporting a problem, include the session in which it happened, the device, the action and what you observed. The log records build identity, requested values, completed stages and errors.
 
-```powershell
-xperf -on PROC_THREAD+LOADER+INTERRUPT+DPC
-# Reproduce a short, predefined workload.
-xperf -d trace.etl
-xperf -i trace.etl -a dpcisr > report.txt
+A backup stores settings for restoration. A register readback shows the value returned at that moment. To check where interrupt processing ran, collect an ETW trace: the saved mask and readback do not contain an ISR/DPC execution history.
+
+## Compare before and after
+
+1. Keep the original backup and record Windows, device and driver versions.
+2. Use the same game scene or workload and the same measurement tool. Choose a useful metric: frame-time distribution, CPU load, packet loss or device latency.
+3. Change one setting, restart when required, and repeat comparable runs. Keep regressions as well as improvements.
+
+Compare several runs so ordinary variation is visible. For an affinity change, inspect the relevant driver's ISR/DPC activity alongside application threads and frame times.
+
+## Inspecting a trace
+
+Windows Performance Recorder and Analyzer can help inspect execution time and processor placement. The Windows Performance Toolkit is available through the [Windows ADK](https://learn.microsoft.com/en-us/windows-hardware/get-started/adk-install).
+
+With [xperf](https://learn.microsoft.com/en-us/windows-hardware/test/wpt/xperf-command-line-reference) installed, start and stop a basic DPC/ISR capture from an elevated terminal:
+
+```text
+xperf -on latency
+xperf -d interrupts.etl
 ```
 
-The `dpcisr` action produces ISR/DPC summaries: [Microsoft documentation](https://learn.microsoft.com/en-us/previous-versions/windows/desktop/xperf/the-dpc-isr-action). Open the ETL in Windows Performance Analyzer for individual events and CPUs. Do not assume that the text summary alone proves complete per-core placement.
+Run the workload between the two commands. Inspect the relevant modules, processor numbers and durations in the resulting trace. The exact analysis depends on the driver and Windows build; retain the trace when asking for help.
 
-Compare active modules, execution times, CPUs and application-thread activity. Fixed thread names, handler durations or IRQ counts are not universal reference values across Windows and driver versions.
+## If the result differs from expectations
 
-## A fair comparison
+Check the device instance, saved policy and whether a required reboot occurred. For IMOD, reread the map after reconnecting a USB device. For networking, compare active RSS settings as well as interrupt affinity.
 
-1. Record Windows and driver versions, settings and the original backup.
-2. Define a repeatable workload and a measurable outcome: frame-time distribution, CPU use, packet loss or device latency.
-3. Change one factor, reboot where required and repeat several comparable runs.
-4. Preserve traces and results, including regressions and instability.
+If the device becomes unstable, use **RESTORE** with the appropriate backup and check operation again. Include the operation log and the workload conditions in a [bug report](../../.github/ISSUE_TEMPLATE/bug_report.yml).
 
-Use repeated runs to distinguish a consistent change from normal variation. For unexpected CPU placement, check the device instance, applied policy and driver behaviour against the trace.
-
-## Project QA
-
-The developer workbench exercises device models, write guards and the UI in read-only mode. Screenshots establish only the displayed state and require inspection. MATCH means pixel equality.
-
-Virtual runs do not validate real driver loading, physical MMIO/readback, Windows-setting writes, reboot or device resume. The workbench's 100/125/150% sizes model layout rather than actual Windows DPI transitions. Test windows are constrained to the available display, with their sizes recorded explicitly.
-
-See [development](../DEVELOPMENT.md). Physical hardware requires separate validation with a known baseline and recovery procedure.
+Project QA uses read-only models to check application decisions and interface behavior. Physical driver loading, register access, sleep and reconnect still need checks on the actual system. Developer workflows are described in [Development](../DEVELOPMENT.md).
 
 ---
 

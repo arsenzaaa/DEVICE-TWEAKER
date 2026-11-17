@@ -65,6 +65,6 @@ The README uses a native Markdown heading, text navigation and one application s
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-DevSession.ps1 -Scenario .\dev\qa\Scenarios\gallery-intel-gpu.json -OutputRoot .\local\screenshots
 ```
 
-The `gallery-*` scenarios cover Intel/AMD affinity, USB roles/interrupters, networking, restore, operation reports and system checks. Each records EN/RU captures. Select the reviewed `images/en.png` and `images/ru.png` for the matching gallery asset; keep the session and build reference locally. `Capture-Showcase.ps1 -ReadmeOnly` produces older capture names and does not regenerate this gallery.
+The `gallery-*` scenarios cover Intel/AMD affinity, all three USB modes, network adapters, storage, backups, operation results and driver notices. Each records EN/RU captures. Use the matching images from the session's `images` directory: most scenarios name them `en.png` and `ru.png`; operation outcomes include the state in the filename. Keep the session and build reference locally.
 
 Inspect both languages, label demonstration data and check agreement between controls, summaries and readback. Use the original captures without decorative frames. Keep the GitHub About description aligned with the English overview.

@@ -2,56 +2,53 @@
 
 [Documentation](../README.md) / [Guide](./README.md) / 03 · [Русский](./03-affinity.ru.md)
 
-## What Interrupt Affinity changes
-
-A device policy controls the processor assignment of its interrupts. **SpecCPU** uses the selected mask; it does not pin every DPC and driver thread to those CPUs. Microsoft recommends the default policy where appropriate. See [Interrupt affinity](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/interrupt-affinity-and-priority).
-
 ## Choosing CPUs
 
-Interrupt and DPC work can compete with latency-sensitive game threads on a busy CPU even when total CPU usage is low. Moving a device's interrupt processing to an underused physical core can reduce that competition. This is especially relevant when several busy drivers share a processor, including CPU 0; it does not mean every device uses CPU 0 by default.
+Interrupt Affinity selects the logical CPUs allowed to service a device's interrupts. Moving that work away from a busy game core can reduce competition for CPU time. Start with the device and workload you want to tune, then compare the result with the original configuration.
 
-Inspect per-module ISR/DPC activity under the intended workload, choose CPUs using the actual SMT and CCD topology, and compare frame times and processing placement before and after the change. Check both interrupt and DPC placement: a saved mask alone does not prove that the driver's work moved. Keep network RSS and interrupt policies consistent with the [adapter type](./06-network.md).
+Use the topology labels in the CPU list: two SMT siblings share a physical core. On a hybrid processor, distinguish P-cores and E-cores; on a multi-CCD processor, check which CCD contains the selected cores. [Chapter 7](./07-cpu-topology.md) explains the labels.
+
+For manual selection, tick the required CPUs and use **SpecCPU**. Click **APPLY** to save the policy and mask, then restart Windows. AUTO can choose cores using the detected topology; [GPU](./04-gpu.md) and [network](./06-network.md) settings have their own allocation rules.
 
 ## Policies
 
-| Application | Code | CPU selection |
-| :--- | :--- | :--- |
-| MachineDefault | 0 | Windows default |
-| AllClose | 1 | Close to device |
-| Single | 2 | One close CPU |
-| All | 3 | All available |
-| SpecCPU | 4 | Selected mask |
-| SpreadMessages | 5 | Different CPUs for messages |
+**SpecCPU** uses the CPUs selected in the card. **MachineDefault** returns processor selection to Windows. Clearing the CPU selection on an ordinary device removes its affinity override when applied; network cards have separate RSS/IRQ controls.
 
-See [IRQ_DEVICE_POLICY](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_device_policy). SpreadMessages spreads existing messages when possible; it does not create extra vectors.
+The other policies ask Windows to choose processors according to a rule:
 
-## Mask and persistence
+- **AllClose** uses processors close to the device in the NUMA topology. On a non-NUMA system it behaves like **All**.
+- **Single** requests one close processor; on a non-NUMA system Windows can choose any processor.
+- **All** allows assignment across the machine's processors.
+- **SpreadMessages** requests distribution of different interrupt messages across processors where possible. It uses the messages the device and driver allocate.
+
+See [IRQ_DEVICE_POLICY](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_device_policy) for Windows policy definitions.
+
+## Affinity mask
+
+The program calculates the mask from the checked CPUs. Bit N represents logical CPU N in processor group 0, up to 64 logical processors. For example, CPUs 8 and 9 produce `0x300`.
+
+The saved values are under the device's registry key:
 
 ```text
-...\Device Parameters\
-  Interrupt Management\Affinity Policy
+Device Parameters\Interrupt Management\Affinity Policy
   DevicePolicy           REG_DWORD
   AssignmentSetOverride  REG_BINARY
   DevicePriority         REG_DWORD
 ```
 
-In DEVICE TWEAKER, mask bit N represents logical CPU N in supported processor group 0. CPUs 8 and 9 give `0x300`, stored as `00 03 00 00 00 00 00 00`. The application calculates the mask from the selected CPUs. Clearing the selection for an ordinary device restores MachineDefault and removes the override. Network devices have separate [RSS/IRQ modes](./06-network.md).
-
-Saved policy and actual processing placement can differ. Compare readback and an ETW trace after rebooting.
+`AssignmentSetOverride` stores that example as `00 03 00 00 00 00 00 00` in little-endian order. See [Interrupt affinity](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/interrupt-affinity-and-priority) for the registry format.
 
 ## IRQ Priority
 
-Undefined, Low, Normal and High express interrupt servicing preference. Windows considers it when assigning IRQLs for the platform and device resources. This is neither application thread priority nor DPC queue priority. See [IRQ_PRIORITY](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_priority).
+**Undefined**, **Low**, **Normal** and **High** express a preference for interrupt servicing. Windows considers it when assigning IRQLs for the platform and device resources. AUTO uses **High** for devices it configures. This setting does not change the game's thread priority or a DPC's queue priority. See [IRQ_PRIORITY](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_priority).
 
-AUTO uses High for the devices it configures. Evaluate the effect under your workload.
+## Check the result
 
-## Unexpected results
+After rebooting, compare the card's saved policy and mask with the log. Use an ETW trace to see where the driver's ISR, DPCs and worker threads actually run: a driver can target them separately. [Chapter 10](./10-verification.md) describes this check.
 
-Check the device instance, policy, mask, reboot and current interrupt mode. Then distinguish ISR, DPC and worker-thread activity in a trace: the driver can distribute them differently. A single busy CPU under a two-CPU mask does not by itself establish a fault.
+If the result differs from expectations, first check the device instance, selected CPUs and current IRQ mode. A two-CPU mask permits both CPUs; it does not require an equal load split.
 
-Preserve settings, versions and the trace for further diagnosis. Firmware management is outside DEVICE TWEAKER; examine interrupt behavior through Windows resources and the driver.
-
-AUTO leaves storage-device affinity to Windows. Manual changes should be recoverable experiments with boot, I/O and stability checks; another device's profile is not a universal setting.
+AUTO leaves storage-device affinity to Windows. For manual storage changes, keep a recovery backup and check boot, I/O and stability.
 
 ---
 

@@ -1,0 +1,209 @@
+{
+  "schemaVersion": 1,
+  "id": "gallery-operation-outcomes",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "en-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en-success-open",
+      "action": "dialog",
+      "value": "success"
+    },
+    {
+      "id": "en-success-ready",
+      "action": "wait",
+      "target": "active:id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en-success-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en-success",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en-success-close",
+      "action": "click",
+      "target": "active:id:OK"
+    },
+    {
+      "id": "en-success-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en-partial-open",
+      "action": "dialog",
+      "value": "partial"
+    },
+    {
+      "id": "en-partial-ready",
+      "action": "wait",
+      "target": "active:id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en-partial-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en-partial",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en-details-open",
+      "action": "click",
+      "target": "active:id:DETAILS"
+    },
+    {
+      "id": "en-details-ready",
+      "action": "wait",
+      "target": "@active",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en-details",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en-details-close",
+      "action": "key",
+      "target": "@active",
+      "value": "Escape"
+    },
+    {
+      "id": "en-partial-close",
+      "action": "click",
+      "target": "active:id:OK"
+    },
+    {
+      "id": "en-partial-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru-success-open",
+      "action": "dialog",
+      "value": "success"
+    },
+    {
+      "id": "ru-success-ready",
+      "action": "wait",
+      "target": "active:id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru-success-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru-success",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru-success-close",
+      "action": "click",
+      "target": "active:id:OK"
+    },
+    {
+      "id": "ru-success-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru-partial-open",
+      "action": "dialog",
+      "value": "partial"
+    },
+    {
+      "id": "ru-partial-ready",
+      "action": "wait",
+      "target": "active:id:OK",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru-partial-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru-partial",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru-details-open",
+      "action": "click",
+      "target": "active:id:DETAILS"
+    },
+    {
+      "id": "ru-details-ready",
+      "action": "wait",
+      "target": "@active",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru-details",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru-details-close",
+      "action": "key",
+      "target": "@active",
+      "value": "Escape"
+    },
+    {
+      "id": "ru-partial-close",
+      "action": "click",
+      "target": "active:id:OK"
+    },
+    {
+      "id": "ru-partial-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    }
+  ]
+}
