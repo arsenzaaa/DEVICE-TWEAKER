@@ -4,27 +4,25 @@
 
 **DEVICE TWEAKER** combines the controls familiar from MSI Utility V3 and Interrupt Affinity Policy Tool with ReservedCpuSets and USB IMOD in one Windows utility.
 
-Configure device interrupts manually, or use automatic optimization to select CPU cores based on your processor's topology. Inspect the current state, apply changes and restore saved settings from the same interface.
-
 **[Download for Windows](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.SelfContained.exe)** · [Guide](./docs/guide/README.md) · [Screenshots](./docs/SCREENSHOTS.md) · [Changelog](./CHANGELOG.md)
 
 ## Features
 
 ### Interrupts and CPU affinity
 
-Adjust MSI Mode, MSI Limit, IRQ Priority and interrupt affinity for each device. Inspect the current IRQ mode alongside the saved configuration and manage ReservedCpuSets separately.
+Each device card provides MSI Mode, MSI Limit, IRQ Priority and interrupt-affinity controls, together with the current IRQ mode. A separate panel configures ReservedCpuSets.
 
 ### Topology-aware automatic optimization
 
-Select cores for the GPU, input devices and network adapters automatically. Selection accounts for physical cores and SMT siblings, P/E cores, CCDs and available CPPC rankings. Individual device settings remain available for manual adjustment.
+Automatic optimization assigns cores to graphics cards, input devices and network adapters using physical-core topology, SMT, P/E cores, CCDs and available CPPC rankings. Every assignment can be adjusted manually.
 
 ### USB and network tuning
 
-Set USB IMOD for a controller, by device role or by interrupter index. Configure RSS processors and queues, and NIC ITR on supported Intel and Realtek adapters. IMOD and NIC ITR support register readback and saved startup profiles.
+USB IMOD supports controller-wide values, device-role profiles and individual interrupter settings. Network controls include RSS processor and queue selection, plus NIC ITR on supported Intel and Realtek adapters. IMOD and NIC ITR include register readback and startup profiles.
 
 ### Backups and diagnostics
 
-Preserve original device settings and restore saved backups. Operation logs record the build, target device, requested values and the result of each stage. Built-in tools measure mouse event rates and provide Mouse Throttle and device power-saving controls.
+Original device settings and later backups are available through RESTORE. Operation logs record the build, device, requested values and completed steps. Additional controls cover mouse event-rate measurement, Mouse Throttle and device power saving.
 
 ## Getting started
 
@@ -38,9 +36,7 @@ The **[self-contained build](https://github.com/arsenzaaa/DEVICE-TWEAKER/release
 
 Open **RESTORE** to access saved backups. Logs are stored in the `logs` folder next to the EXE. All release files and checksums are on the [releases page](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest).
 
-**Driver compatibility.** IMOD, NIC ITR and PCI configuration reads use DTIMOD.sys, loaded through KDU; MSI, affinity, RSS, ReservedCpuSets and the other settings work without it. The driver may conflict with anti-cheat software, including EAC, Vanguard and FACEIT. Closing the application does not unload the driver. Loading requirements and startup profile behavior are covered in the [driver guide](./docs/guide/11-driver.md).
-
-**Antivirus warnings.** Microsoft Defender and other antivirus software may flag KDU as a hacking tool. If loading is blocked, review the detection and check the EXE against `SHA256SUMS.txt` from the release. If you choose to allow the component, use a targeted exception for the blocked file.
+USB IMOD, NIC ITR and hardware PCI reads use DTIMOD.sys through KDU. The other settings work independently of this driver. DTIMOD can conflict with anti-cheat software; loading requirements and startup behavior are described in the [driver guide](./docs/guide/11-driver.md).
 
 ## Documentation
 

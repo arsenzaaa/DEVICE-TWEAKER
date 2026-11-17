@@ -41,8 +41,6 @@ Check the device instance, saved policy and whether a required reboot occurred. 
 
 If the device becomes unstable, use **RESTORE** with the appropriate backup and check operation again. Include the operation log and the workload conditions in a [bug report](../../.github/ISSUE_TEMPLATE/bug_report.yml).
 
-Project QA uses read-only models to check application decisions and interface behavior. Physical driver loading, register access, sleep and reconnect still need checks on the actual system. Developer workflows are described in [Development](../DEVELOPMENT.md).
-
 ---
 
 [Previous: Power saving](./09-power.md) · [Guide](./README.md) · [Next: Driver and startup](./11-driver.md)

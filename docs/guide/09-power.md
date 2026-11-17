@@ -12,7 +12,7 @@ AUTO disables power saving for the devices it configures. Compare responsiveness
 
 For USB, the application handles the controller and associated root hubs, available Device Parameters, PnPCapabilities and WMI. The power plan's global USB selective-suspend setting is applied separately from device settings.
 
-For supported wired adapters, the application changes permission for Windows to power down the device. PnPCapabilities is handled as a bit field, preserving unrelated flags; one number is not a universal value for every driver. Wi-Fi is excluded from automatic changes.
+For supported wired adapters, the application changes permission for Windows to power down the device. PnPCapabilities changes preserve unrelated flags. Wi-Fi is excluded from automatic changes.
 
 ## Confirming the outcome
 
@@ -22,7 +22,7 @@ After a change, check sustained use, idle, sleep and resume. Restore the origina
 
 ## Restoration
 
-Restore uses values from the selected backup rather than current UI checkboxes. USB selective suspend is restored through the Windows Power API for AC (plugged in) and DC (battery) and read back; the current power scheme is not replaced with another. If the running device does not accept a restored setting, the result reports that step separately even when registry restoration succeeded.
+Restore applies values from the selected backup. USB selective suspend is restored through the Windows Power API for AC (plugged in) and DC (battery) in the current power scheme, then verified by reading it back. If the running device does not accept a restored setting, the result reports that step separately even when registry restoration succeeded.
 
 ---
 

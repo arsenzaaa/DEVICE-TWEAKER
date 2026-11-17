@@ -14,7 +14,7 @@ A PCI device can signal an event through an interrupt line or a message. MSI use
 
 For example, **MSI Mode: Enabled** with **IRQ Mode: Line** means the saved configuration and the current mode differ. If you have just applied MSI, restart and read the mode again. If they still differ, check the device and driver rather than treating the registry value as confirmation that MSI is active.
 
-The **HW** part of the card lists hardware capabilities and the available maximum number of messages. The nearby **IRQ** number comes from allocated interrupt resources. A device can use one allocated resource while supporting many messages; this number is not an interrupt-rate counter. If the available data only establishes message-based operation, the card shows **MSI/MSI-X** until PCI configuration can distinguish the two.
+The **HW** part of the card lists hardware capabilities and the available maximum number of messages. The nearby **IRQ** number comes from allocated interrupt resources. A device can use one allocated resource while supporting many messages. If the available data only establishes message-based operation, the card shows **MSI/MSI-X** until PCI configuration can distinguish the two.
 
 ## MSI Limit
 

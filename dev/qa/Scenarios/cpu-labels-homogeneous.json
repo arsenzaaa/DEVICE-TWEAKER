@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "cpu-labels-homogeneous",
+  "preset": "Imod",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1320,
+  "height": 1280,
+  "steps": [
+    {
+      "id": "before-check",
+      "action": "capture-control",
+      "target": "role:card",
+      "device": "DEV_15B6"
+    },
+    {
+      "id": "core-label",
+      "action": "assert",
+      "target": "id:CPU_0",
+      "device": "DEV_15B6",
+      "property": "text",
+      "value": "CPU 0 (Core, CCD0, R140, Pref)"
+    },
+    {
+      "id": "smt-label",
+      "action": "assert",
+      "target": "id:CPU_1",
+      "device": "DEV_15B6",
+      "property": "text",
+      "value": "CPU 1 (Core/SMT, CCD0, R140, Pref)"
+    }
+  ]
+}

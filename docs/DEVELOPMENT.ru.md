@@ -86,7 +86,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-DevSessi
 
 ## Скриншоты
 
-Используйте `dev/qa/Invoke-DevSession.ps1` и сценарии `gallery-*` из `dev/qa/Scenarios`. В [галерее](./SCREENSHOTS.ru.md) показаны окна и диалоги с демонстрационными данными и ссылками на исходные PNG. Перед добавлением в `assets/screenshots` просмотрите снимки и сверьте EN/RU. Команды приведены в [инструкции выпуска](./RELEASE.ru.md#страница-проекта).
+`dev/qa/Export-Gallery.ps1` выполняет выбранные сценарии из `dev/qa/Scenarios/Gallery/catalog.json` на скрытом desktop. В [публичной галерее](./SCREENSHOTS.ru.md) показаны главное окно и целые карточки USB и сети. Дополнительные сценарии доступны для разработческих проверок.
+
+Перед копированием в `assets/screenshots` просмотрите исходные PNG и сверьте английскую и русскую пары. Команды съёмки приведены в [инструкции выпуска](./RELEASE.ru.md#страница-проекта).
 
 ## Автоматизация выпуска
 

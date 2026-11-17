@@ -2,6 +2,12 @@
 
 [DEVICE TWEAKER](./README.md) / Changelog · [Русский](./CHANGELOG.ru.md)
 
+## Unreleased
+
+- Corrected CPU labels on homogeneous processors: Core and Core/SMT replace P-Core and P-Core/HT. Hybrid-CPU labels and core-allocation rules are unchanged.
+- Retained driver-advertised RSS queue counts on adapters without MSI-X. Queue count is tracked separately from processor count, including readback diagnostics. AUTO retains its single-queue profile.
+- Reworked the English and Russian guide and settings reference, removed repeated explanations and corrected gallery descriptions. Updated interface examples with the corrected CPU labels.
+
 ## 0.1.0
 
 **DEVICE TWEAKER REWORK**.
@@ -13,7 +19,7 @@ Source comparison: [v0.0.4 → v0.1.0](https://github.com/arsenzaaa/DEVICE-TWEAK
 - Removed DTIMOD's general physical-memory read request. Register reads now identify an exact PCI device and are checked against its allocated MMIO ranges. MMIO reads and writes are limited to xHCI and Ethernet device classes.
 - Kept the exact USB interrupter map through a separate controller-context query that returns decoded port/address/interrupter tuples. System-memory contexts are read with `MmCopyMemory`, rather than mapped as non-cached device memory.
 - Fixed parsing of variable-length device-specific resource data. Corrected the comment that incorrectly claimed a device reference prevents resources from changing; the [PnP/power limitation](./docs/guide/11-driver.md) remains.
-- The application and startup runtime recognize older loaded DTIMOD builds and require a restart. The SYS, embedded hash and source manifest are updated together. Anti-cheat compatibility is not established by this update.
+- The application and startup runtime recognize older loaded DTIMOD builds and require a restart. The SYS, embedded hash and source manifest are updated together.
 
 ### Interface and responsiveness
 
@@ -80,7 +86,7 @@ Source comparison: [v0.0.3 → v0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAK
 
 - Moved application sources to src and QA tools to dev/qa. The test panel is included only in DeveloperQa builds and excluded from the normal EXE.
 - Updated the application and build tools to .NET 10. The framework-dependent build requires .NET 10 Desktop Runtime x64; the self-contained build includes the runtime.
-- The release workflow builds a selected source commit without publishing by default. Replacing 0.0.4 is a separate action with backup and download verification.
+- The release workflow builds a selected source commit for package review before publication.
 
 ## [0.0.3](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.3) - 2026-10-01
 

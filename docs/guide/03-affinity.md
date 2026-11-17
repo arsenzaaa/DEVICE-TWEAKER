@@ -46,7 +46,7 @@ Device Parameters\Interrupt Management\Affinity Policy
 
 After rebooting, compare the card's saved policy and mask with the log. Use an ETW trace to see where the driver's ISR, DPCs and worker threads actually run: a driver can target them separately. [Chapter 10](./10-verification.md) describes this check.
 
-If the result differs from expectations, first check the device instance, selected CPUs and current IRQ mode. A two-CPU mask permits both CPUs; it does not require an equal load split.
+The mask defines the CPUs available for interrupts; the device driver determines how work is distributed within that set.
 
 AUTO leaves storage-device affinity to Windows. For manual storage changes, keep a recovery backup and check boot, I/O and stability.
 

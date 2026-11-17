@@ -4,21 +4,19 @@
 
 ## Operations that need DTIMOD
 
-DTIMOD is used for USB IMOD, NIC ITR and additional PCI configuration reads. MSI, interrupt affinity, RSS, ReservedCpuSets, Mouse Throttle and device power settings work without it. [IRQ Mode](./02-msi.md) can obtain some information from Windows resources; the driver supplies additional device information.
+USB IMOD, NIC ITR and hardware PCI queries use DTIMOD. MSI, interrupt affinity, RSS, ReservedCpuSets, Mouse Throttle and device power settings use Windows interfaces. [IRQ Mode](./02-msi.md) combines Windows resource information with additional PCI data when the driver is available.
 
 ## Loading through KDU
 
-DTIMOD has no public Microsoft signature for ordinary loading. The project uses a pinned [KDU](../../src/IMOD/KDU/README.md) version that relies on a vulnerable signed driver. This is a highly privileged hardware tool; antivirus, HVCI, Vulnerable Driver Blocklist and anti-cheat software can prevent it from working.
+DTIMOD has no public Microsoft signature for ordinary loading. The bundled [KDU](../../src/IMOD/KDU/README.md) loader uses a vulnerable signed helper driver to load it. HVCI, the Windows driver blocklist and antivirus software can block this loading method; Microsoft Defender may identify KDU as HackTool. Loading errors are recorded in the operation details and log.
 
-DTIMOD can conflict with Easy Anti-Cheat, Riot Vanguard, FACEIT Anti-Cheat and other protection software. Successful driver loading does not confirm compatibility: a game may disconnect you while the driver is loaded. EAC may report `Forbidden Tool` while DTIMOD is loaded. Compatibility with Vanguard and FACEIT has not been established.
+Anti-cheat software can block DTIMOD or disconnect a game while it is loaded. EAC can report `Forbidden Tool`; compatibility with Vanguard and FACEIT is not established. Closing DEVICE TWEAKER closes its connection to DTIMOD. Restart Windows to unload the driver or replace a previously loaded build.
 
-The application shows a notice once per session before driver use or saving/restoring a driver profile. AUTO includes the notice in its IMOD question. **DRIVER INFO** reads available Windows settings and selected service information without loading DTIMOD. It does not test compatibility, and absence of a registry value or service does not prove that the system permits the driver. Details are written to the log. The application does not offer to disable Windows protections after a loading error.
-
-The application checks pinned file hashes and blocks fallback loading after an uncertain load outcome. Inspect the operation details for the reason. Restart Windows to replace an already loaded older driver or unload DTIMOD; closing the EXE only closes its connection.
+The application asks for confirmation once per session before driver use or saving/restoring a driver profile. AUTO includes this in its USB IMOD prompt. **DRIVER INFO** reads HVCI, the driver-blocklist registry setting and FACEIT/Vanguard service states. This is a system-status report, not a driver-loading or compatibility test.
 
 ## Saved profile
 
-The `\DEVICE TWEAKER\IMOD` SYSTEM task has logon, resume and relevant PnP triggers. Its files are stored here:
+The `\DEVICE TWEAKER\IMOD` task runs as SYSTEM at sign-in, after resume and on relevant USB/HID device events. It reapplies the saved USB IMOD and NIC ITR settings independently of the application.
 
 ```text
 %ProgramData%\DEVICE TWEAKER\Startup
@@ -29,29 +27,25 @@ The `\DEVICE TWEAKER\IMOD` SYSTEM task has logon, resume and relevant PnP trigge
   logs\
 ```
 
-The runtime is shared with Windows PowerShell 5.1. Its SHA-256 is checked before compilation; DTIMOD and loader files are checked when loading the driver. A shared mutex prevents simultaneous loading by the application and startup script. Administrator/SYSTEM permissions protect the directory. Startup logs retain the latest 14 files.
+`profile.json` stores register settings and component hashes. The script checks the shared runtime's SHA-256 before compilation, then checks DTIMOD and the loader files when loading the driver. The application and script share a load mutex. Only administrators and SYSTEM can modify the directory; startup logs retain the latest 14 files.
 
-The task runs independently of the EXE. Profile read or parse errors stop changes to the profile. **DELETE** in the IMOD block removes the shared startup configuration for USB IMOD and NIC ITR, including the scheduled task.
-
-When an older NIC ITR entry no longer matches its supported register layout, restoring the backup skips that entry with a warning. Save NIC ITR again for the affected adapter. See [NIC profile compatibility](./06-network.md#nic-itr).
+Profile read or parse errors leave the saved configuration unchanged. **DELETE** in the IMOD block removes the shared USB IMOD/NIC ITR startup configuration and scheduled task. Compatibility of older NIC entries is covered in the [network chapter](./06-network.md#nic-itr).
 
 ## Controller lifecycle during register access
 
-Keep the target PCI controller present and running during register access, including startup-profile application. Unplugging a mouse or keyboard while its USB controller remains present is a different event.
+The target PCI controller must remain connected and powered during register access, including startup-profile application. Reconnecting a USB peripheral normally leaves its host controller present.
 
-DTIMOD checks addresses against the controller's allocated MMIO ranges, but does not synchronize access with Windows PnP and power transitions. Resources can change during [surprise removal](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/handling-an-irp-mn-surprise-removal-request) or [stop/rebalance](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/handling-an-irp-mn-stop-device-request--windows-2000-and-later-). Concurrent controller removal or power transitions are not covered by that range check.
+DTIMOD validates addresses against the controller's allocated MMIO ranges. It does not coordinate access with Windows PnP or power transitions: resources may change during [surprise removal](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/handling-an-irp-mn-surprise-removal-request) or [stop/rebalance](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/handling-an-irp-mn-stop-device-request--windows-2000-and-later-).
 
 ## Register access and USB mapping
 
-Register reads and writes identify the PCI device, stay within its allocated MMIO ranges and are restricted to xHCI (`0C0330`) and Ethernet (`0200`) classes. Read-only PCI configuration queries also support IRQ inspection on other device classes.
+Register operations identify the PCI device and use its allocated MMIO ranges. They support xHCI (`0C0330`) and Ethernet (`0200`) classes. Read-only PCI configuration queries also supply IRQ information for other device classes.
 
-For the exact USB map, a separate xHCI query returns root-port, USB-address and interrupter tuples. Its internal walk reads controller contexts and transfer-ring data from system memory through [MmCopyMemory](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntddk/nf-ntddk-mmcopymemory). The request accepts no caller-supplied RAM address and returns decoded topology. Further access boundaries are described in the [security policy](../../.github/SECURITY.md).
+The USB map contains root-port, USB-address and interrupter tuples decoded from xHCI contexts. The driver reads system-memory contexts with [MmCopyMemory](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntddk/nf-ntddk-mmcopymemory). Driver access permissions and request validation are described in the [security policy](../../.github/SECURITY.md).
 
-## Verification and recovery
+## Release files and verification
 
-Compare an EXE's SHA-256 with `SHA256SUMS.txt` from the same release package. The source commit in the release description identifies the corresponding code. Matching hashes establish package consistency, not hardware behavior.
-
-Hardware changes need readback and device checks, including sleep and reconnect. Local QA does not perform these: it uses models and real write blocking. Preserve the original profile and a recovery backup before experimenting.
+`SHA256SUMS.txt` identifies the EXEs in a release; the source SHA in the release description identifies their code. Register readback, startup logs and device checks are described in [chapter 10](./10-verification.md).
 
 ---
 

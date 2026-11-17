@@ -24,7 +24,8 @@ internal sealed record NicItrProfile(
     ulong WriteOrBits,
     NicItrTimingKind TimingKind,
     string[]? VectorLabels = null,
-    uint IntelEitrUnitUs = 2);
+    uint IntelEitrUnitUs = 2,
+    int? RssProcessorLimit = null);
 
 internal static class NicItrService
 {
@@ -36,7 +37,7 @@ internal static class NicItrService
         new("Intel 82580 (EITR)", "8086", ["150E", "150F", "1510", "1511"], 0x1680, 0x4, 10, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr),
         new("Intel 82576 (EITR)", "8086", ["1516", "1518", "1526"], 0x1680, 0x4, 25, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr),
         new("Killer E3100 (EITR)", "8086", ["3100", "3101", "3102"], 0x1680, 0x4, 5, 32, 0x00007FFC, 0x80000000, NicItrTimingKind.IntelEitr, ["Other", "IRQ0", "IRQ1", "IRQ2", "IRQ3"]),
-        new("Intel I219 (ITR)", "8086", ["15B7", "15B8", "15B9", "15D7", "15D8", "15E3", "15BB", "15BC", "15BD", "15BE", "0D4C", "0D4D", "0D4E", "0D4F", "0D53", "0D55", "0D5C", "0D5D", "0D5E", "0D5F", "15FB", "15FC", "1A1E", "1A1F", "550A", "550B", "550C", "550D", "550E", "550F", "0DC5", "0DC6", "0DC7", "0DC8", "1A1C", "1A1D", "15F9", "15FA", "3166", "3167", "3197", "3198", "4DF4", "4B33", "4B34", "4DC2", "4DC3", "54B4", "54B5", "54B6", "54B7", "0126", "153A", "153B", "1559", "155A", "156F", "1570", "15D6"], 0x00C4, 0x0, 1, 32, 0x0000FFFF, 0, NicItrTimingKind.IntelItr),
+        new("Intel I219 (ITR)", "8086", ["15B7", "15B8", "15B9", "15D7", "15D8", "15E3", "15BB", "15BC", "15BD", "15BE", "0D4C", "0D4D", "0D4E", "0D4F", "0D53", "0D55", "0D5C", "0D5D", "0D5E", "0D5F", "15FB", "15FC", "1A1E", "1A1F", "550A", "550B", "550C", "550D", "550E", "550F", "0DC5", "0DC6", "0DC7", "0DC8", "1A1C", "1A1D", "15F9", "15FA", "3166", "3167", "3197", "3198", "4DF4", "4B33", "4B34", "4DC2", "4DC3", "54B4", "54B5", "54B6", "54B7", "0126", "153A", "153B", "1559", "155A", "156F", "1570", "15D6"], 0x00C4, 0x0, 1, 32, 0x0000FFFF, 0, NicItrTimingKind.IntelItr, RssProcessorLimit: 1),
         // Families follow Realtek's own INF (rt640x64.inf): DEV_8162 installs the RTL8168H / RTL8118AS
         // sections (gigabit, 8168 register map); DEV_3000 is the Killer E3000 and installs RTL8125.ndi.
         new("Realtek RTL8111/8168", "10EC", ["8168", "8161", "8162", "8136", "8167", "8169"], 0x00E2, 0x0, 1, 16, 0xFFFF, 0, NicItrTimingKind.RealtekIntrMit),

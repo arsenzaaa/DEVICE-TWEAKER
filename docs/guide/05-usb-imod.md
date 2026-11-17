@@ -14,11 +14,11 @@ Use **XHCI** to apply one value across the controller's interrupters. Select **D
 
 Click **CHECK** to read the controller before editing it. Expand the details to inspect device assignments and register values. After reconnect, sleep or reboot, read the map again: an earlier interrupter index may no longer belong to the same device. The current-value tooltip includes the last read time.
 
-See the [USB examples](../SCREENSHOTS.md#usb-controller) for all three modes.
+The [gallery](../SCREENSHOTS.md#usb-controller) shows a complete USB controller card in XHCI mode.
 
 ## Apply and save
 
-Enter the values for the selected mode and click **SET**. The program creates a backup, writes the registers, reads them back and saves the configuration for startup. The main **APPLY** button is not required for this command.
+Enter the values for the selected mode and click **SET**. The program creates a backup, writes the registers, reads them back and saves the configuration for startup. **SET** completes this operation independently of the main **APPLY** button.
 
 The startup task reapplies the saved configuration after logon, resume and relevant device events. The EXE can be closed. Loading requirements and startup files are described in [chapter 11](./11-driver.md).
 

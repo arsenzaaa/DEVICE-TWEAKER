@@ -86,7 +86,9 @@ UiLanguage retains an adapter for dynamic diagnostic phrases. Update both cultur
 
 ## Screenshots
 
-Use `dev/qa/Invoke-DevSession.ps1` with the reusable `gallery-*` scenarios in `dev/qa/Scenarios`. The [gallery](./SCREENSHOTS.md) includes full windows and dialogs, with demonstration data and links to original PNGs. Review captures before adding them to `assets/screenshots`; keep EN/RU pairs consistent. Commands are in the [release guide](./RELEASE.md#maintain-the-project-page).
+`dev/qa/Export-Gallery.ps1` runs the selected scenarios from `dev/qa/Scenarios/Gallery/catalog.json` on the hidden desktop. The [public gallery](./SCREENSHOTS.md) contains a main-window example and complete USB and network cards. Additional scenarios are available for development checks.
+
+Review the original PNGs before copying them into `assets/screenshots`, keeping English and Russian pairs consistent. Capture commands are in the [release guide](./RELEASE.md#maintain-the-project-page).
 
 ## Release automation
 

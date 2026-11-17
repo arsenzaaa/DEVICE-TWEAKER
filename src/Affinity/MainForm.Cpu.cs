@@ -1143,7 +1143,8 @@ public sealed partial class MainForm
         int ccdId = _cpuInfo.CcdMap.TryGetValue(lpIndex, out int cid) ? cid : 0;
         int ccxId = _cpuInfo.CcxMap.TryGetValue(lpIndex, out int xid) ? xid : 0;
 
-        string coreType = "P-Core";
+        bool hybrid = HasHybridCpu();
+        string coreType = hybrid ? "P-Core" : "Core";
         Color textColor = _cpuTextP;
         if (IsEfficiencyCore(lpInfo))
         {
@@ -1152,7 +1153,7 @@ public sealed partial class MainForm
         }
         else if (isHyper)
         {
-            coreType = "P-Core/HT";
+            coreType = hybrid ? "P-Core/HT" : "Core/SMT";
             textColor = _cpuTextSmt;
         }
 
@@ -1192,6 +1193,7 @@ public sealed partial class MainForm
             }
         }
 
+        cb.Name = $"CPU_{lpIndex}";
         cb.Text = $"CPU {lpIndex} ({string.Join(", ", cpuLabelParts)})";
         cb.Font = _blockFont;
         cb.AutoSize = true;
@@ -1219,6 +1221,6 @@ public sealed partial class MainForm
         }
         _copyToolTip?.SetToolTip(
             cb,
-            $"CPU {lpIndex}: {(IsEfficiencyCore(lpInfo) ? "E-core" : isHyper ? "P-core SMT sibling" : "P-core")}{ccdTooltip}{ccxTooltip}{l3Tooltip}, Group {lpInfo.Group}, Core {lpInfo.Core}, Local {lpInfo.LocalIndex}. {cppcTooltip}");
+            $"CPU {lpIndex}: {coreType}{ccdTooltip}{ccxTooltip}{l3Tooltip}, Group {lpInfo.Group}, Core {lpInfo.Core}, Local {lpInfo.LocalIndex}. {cppcTooltip}");
     }
 }

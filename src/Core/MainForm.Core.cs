@@ -395,7 +395,9 @@ public sealed partial class MainForm : Form
                 int ccxId = _cpuInfo.CcxMap.TryGetValue(e.LP, out int xid) ? xid : 0;
                 string localText = e.LocalIndex >= 0 ? $" Local={e.LocalIndex}" : string.Empty;
                 string idText = e.CpuSetId >= 0 ? $" Id={e.CpuSetId}" : string.Empty;
-                string typeText = IsEfficiencyCore(e) ? "E" : isSecondaryThread ? "P/HT" : "P";
+                string typeText = IsEfficiencyCore(e) ? "E"
+                    : HasHybridCpu() ? (isSecondaryThread ? "P/HT" : "P")
+                    : isSecondaryThread ? "Core/SMT" : "Core";
                 string cppcText = _cppcRanks.TryGetValue(e.LP, out int rank)
                     ? _cppcRatings.TryGetValue(e.LP, out int rating)
                         ? $" CPPC=R{rating}/#{rank} Preferred={(rank == 1 ? 1 : 0)}"

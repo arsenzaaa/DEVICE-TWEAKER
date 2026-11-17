@@ -6,11 +6,11 @@
 
 USB transfer rate, delivered Raw Input event rate and a game's input-processing time are different quantities. The driver, message queue and application affect when received data is used. See [Raw Input overview](https://learn.microsoft.com/en-us/windows/win32/inputdev/about-raw-input).
 
-DEVICE TWEAKER displays available polling information and measures mouse event frequency through Raw Input. Move the mouse during measurement. The result is neither an exact USB packet rate nor end-to-end screen latency. Sparse key press/release events cannot reliably establish keyboard polling rate.
+DEVICE TWEAKER displays available polling information and measures mouse event frequency through Raw Input. Move the mouse during measurement. The counter reflects event delivery to the application. Mouse movement supplies a stream of samples; keyboard press/release events are too sparse for a reliable polling-rate estimate.
 
 ## How applications read input
 
-Windows provides individual-message reads and [GetRawInputBuffer](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getrawinputbuffer) for accumulated data. Buffering and dedicated input threads are implemented by each application. At high report rates, compare frame-time stability and responsiveness in the game you use.
+Windows provides individual-message reads and [GetRawInputBuffer](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getrawinputbuffer) for accumulated data. Each application implements its own buffering and input threads.
 
 Higher report rates increase the amount of event processing. Compare available mouse modes in the actual game, including frame-time consistency and responsiveness.
 
@@ -31,7 +31,7 @@ Turning the switch off removes the custom `RawMouseThrottleDuration` value and r
 
 ## Applying changes
 
-Choose an interval and click **APPLY** to save it after a backup. If writing fails, the edit remains pending. Measuring event frequency and changing the setting are separate actions.
+Choose an interval and click **APPLY** to save it after a backup. If writing fails, the edit remains pending.
 
 ---
 

@@ -255,7 +255,7 @@ public sealed partial class MainForm
             NdisRssLayout.Layout layout = plan.RssLayout
                 ?? throw new InvalidOperationException("Missing RSS layout in the write plan.");
             int baseCore = layout.BaseProcessor;
-            int queues = layout.Processors.Count;
+            int queues = layout.QueueCount;
             NdisAffinityMode ndisMode = plan.NdisMode;
             if (ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both)
             {
@@ -279,12 +279,13 @@ public sealed partial class MainForm
                 ClearNdisIrqPolicy(plan, report);
             }
 
-            WriteLog($"APPLY: NET_NDIS {plan.InstanceId} mode={FormatNdisAffinityMode(ndisMode)} baseCore={baseCore} queues={queues} mask=0x{plan.AffinityMask:X}");
+            WriteLog($"APPLY: NET_NDIS {plan.InstanceId} mode={FormatNdisAffinityMode(ndisMode)} baseCore={baseCore} queues={queues} processors={layout.Processors.Count} mask=0x{plan.AffinityMask:X}");
             result.RssRuntime = ReadNdisRssRuntimeState(plan.InstanceId);
             WriteLog($"APPLY.RSS.ACTIVE: {plan.InstanceId} {FormatNdisRssRuntimeState(result.RssRuntime)}");
             int? appliedRssBase = ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both ? baseCore : null;
             int? appliedRssQueues = ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both ? queues : null;
-            LogNdisRssComparison("APPLY", plan.InstanceId, result.RssRuntime, appliedRssBase, appliedRssQueues, appliedRssQueues);
+            int? appliedRssProcessors = ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both ? layout.Processors.Count : null;
+            LogNdisRssComparison("APPLY", plan.InstanceId, result.RssRuntime, appliedRssBase, appliedRssQueues, appliedRssProcessors);
             return;
         }
 

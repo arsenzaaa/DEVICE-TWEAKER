@@ -4,9 +4,9 @@
 
 ## Reading the CPU list
 
-Cards show logical CPUs, physical cores, SMT siblings and available P/E-core, CCD/CCX and CPPC information. For example, `CPU 6 (P-Core, R131, #4)` and `CPU 7 (P-Core/HT, R131, #4)` belong to one physical core.
+Cards show logical CPUs, physical cores, SMT siblings and available CCD/CCX and CPPC information. Homogeneous CPUs use Core and Core/SMT labels; hybrid topologies use P-Core and E-Core labels. For example, `CPU 6 (Core, R131, #4)` and `CPU 7 (Core/SMT, R131, #4)` belong to one physical core.
 
-A CPPC rating is relative firmware guidance, not an application benchmark. CCD/CCX and cache information describe topology; moving work between them has no single fixed cost across processors and workloads.
+CPPC ratings describe the firmware's relative core-performance ranking. CCD/CCX labels identify chiplets and core groups; cache information helps distinguish their roles on multi-CCD processors.
 
 ## How AUTO uses topology
 
@@ -29,9 +29,9 @@ Choose the CPUs in the panel and click **APPLY**. The program creates a backup b
 
 This system-wide mask does not assign the selected CPUs to a particular game. Check actual thread scheduling and ISR/DPC activity after rebooting, and keep the original mask for restoration. The [CPU Sets API documentation](https://learn.microsoft.com/en-us/windows/win32/procthread/cpu-sets) describes per-process assignments and CPU Set IDs; those APIs are distinct from this registry setting.
 
-## Practical verification
+## Checking the selection
 
-Confirm how selected CPUs map to physical cores, then compare ISR/DPC and application-thread placement. Two SMT siblings are not two independent physical cores. Measure contention under your own workload.
+Use core and CCD/CCX labels to check which physical cores are selected. The [verification chapter](./10-verification.md) describes how to inspect thread scheduling and interrupt processing after rebooting.
 
 ---
 

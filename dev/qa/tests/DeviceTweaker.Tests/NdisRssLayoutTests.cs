@@ -67,12 +67,13 @@ public class NdisRssLayoutTests
     }
 
     [Fact]
-    public void Select_ClampsQueuesToPhysicalCoreCount()
+    public void Select_ClampsProcessorsToPhysicalCoreCount()
     {
         NdisRssLayout.Layout layout = NdisRssLayout.Select(AdjacentSmt(4), 8, requestedBase: 0, queues: 8);
 
         Assert.Equal([0, 2, 4, 6], layout.Processors);
         Assert.Equal(4, NdisRssLayout.GetMaxQueues(AdjacentSmt(4), 8));
+        Assert.Equal(8, layout.QueueCount);
     }
 
     [Fact]
@@ -84,20 +85,74 @@ public class NdisRssLayoutTests
     }
 
     [Fact]
-    public void AllowedQueues_UseDriverEnumWithinCoreLimit()
+    public void AllowedQueues_UseDriverEnumIndependentlyOfProcessorCount()
     {
         PciInterruptCapabilities msix = new(PciInterruptSupport.Msi | PciInterruptSupport.MsiX, 5);
 
         Assert.Equal([1, 2, 4], NdisRssLayout.GetAllowedQueueCounts([4, 1, 2], msix, maxQueues: 8));
-        Assert.Equal([1, 2], NdisRssLayout.GetAllowedQueueCounts([1, 2, 4], msix, maxQueues: 2));
+        Assert.Equal([1, 2, 4], NdisRssLayout.GetAllowedQueueCounts([1, 2, 4], msix, maxQueues: 2));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(8)]
+    public void AllowedQueues_WithoutMsiX_RetainDriverAdvertisedReceiveQueues(int physicalCores)
+    {
+        // Intel 82579/I217/I218/I219 support two receive queues on one CPU core.
+        // Queue count and the interrupt-processing CPU count are separate limits.
+        PciInterruptCapabilities msiOnly = new(PciInterruptSupport.LineBased | PciInterruptSupport.Msi, 1);
+        Assert.Equal([1, 2], NdisRssLayout.GetAllowedQueueCounts([1, 2], msiOnly, physicalCores));
     }
 
     [Fact]
-    public void AllowedQueues_WithoutMsiX_AreSingleQueue()
+    public void AllowedQueues_WithoutMsiX_WithoutDriverOptions_AreSingleQueue()
     {
         PciInterruptCapabilities msiOnly = new(PciInterruptSupport.LineBased | PciInterruptSupport.Msi, 1);
 
-        Assert.Equal([1], NdisRssLayout.GetAllowedQueueCounts([1, 2], msiOnly, maxQueues: 8));
+        Assert.Equal([1], NdisRssLayout.GetAllowedQueueCounts(null, msiOnly, maxQueues: 8));
+    }
+
+    [Fact]
+    public void Select_I219_TwoQueuesUseOnePhysicalCore()
+    {
+        var adapter = NicItrService.TryGetNicItrProfile(@"PCI\VEN_8086&DEV_15B8");
+        Assert.NotNull(adapter);
+        NdisRssLayout.Layout layout = NdisRssLayout.Select(AdjacentSmt(8), 16, 9, 2, adapter.RssProcessorLimit);
+        Assert.Equal(2, layout.QueueCount);
+        Assert.Equal([8], layout.Processors);
+        Assert.Equal(8, layout.BaseProcessor);
+        Assert.Equal(8, layout.MaxProcessor);
+    }
+
+    [Theory]
+    [InlineData("PCI\\VEN_8086&DEV_15B8", 1)]
+    [InlineData("PCI\\VEN_8086&DEV_153A", 1)]
+    [InlineData("PCI\\VEN_8086&DEV_125C", null)]
+    [InlineData("PCI\\VEN_10EC&DEV_8125", null)]
+    public void ProcessorLimit_IsDeviceSpecific(string instance, int? expected)
+    {
+        Assert.Equal(expected, NicItrService.TryGetNicItrProfile(instance)?.RssProcessorLimit);
+    }
+
+    [Fact]
+    public void Select_GenericSharedInterrupt_DoesNotImposeI219CpuLimit()
+    {
+        PciInterruptCapabilities msiOnly = new(PciInterruptSupport.Msi, 1);
+        Assert.Equal([1, 2], NdisRssLayout.GetAllowedQueueCounts([1, 2], msiOnly, 8));
+        var layout = NdisRssLayout.Select(AdjacentSmt(8), 16, 8, 2);
+        Assert.Equal(2, layout.QueueCount);
+        Assert.Equal([8, 10], layout.Processors);
+    }
+
+    [Fact]
+    public void Select_WithSmt_DoesNotDoubleQueuesForSiblingThreads()
+    {
+        var single = NdisRssLayout.Select(AdjacentSmt(8), 16, 8, 1);
+        var pair = NdisRssLayout.Select(AdjacentSmt(8), 16, 8, 2);
+        Assert.Equal(1, single.QueueCount);
+        Assert.Equal([8], single.Processors);
+        Assert.Equal(2, pair.QueueCount);
+        Assert.Equal([8, 10], pair.Processors);
     }
 
     [Fact]

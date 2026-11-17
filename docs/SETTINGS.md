@@ -24,11 +24,11 @@ The interface language is saved in `%LOCALAPPDATA%\DEVICE TWEAKER\settings.json`
 
 Opening the program or pressing **REFRESH** also starts background reads, using Windows resources or an already loaded DTIMOD. These reads do not load the driver. The old result is cleared before rereading; unavailable data, read errors and conflicting evidence are shown separately and logged. **No IRQ** means no allocated interrupt resources. A successful read describes the state at that moment: [MSI-X routing can change at runtime](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/dynamically-configuring-msi-x).
 
-**HW** lists the device's supported interrupt modes and message limit, not the capabilities of its parent controller. The adjacent **IRQ** count comes from Windows resource information; it is neither the device's maximum nor a count of interrupts per second.
+**HW** lists the device's supported interrupt modes and message limit. **IRQ** shows its allocated Windows interrupt-resource count.
 
 **MSI Limit** sets `MessageNumberLimit`. **Unlimited** removes the custom registry limit so Windows and the driver can select the count. Numeric input is checked against detected capabilities. See [enabling MSI](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/enabling-message-signaled-interrupts-in-the-registry).
 
-**IRQ Priority** writes `DevicePriority`, which Windows considers when assigning hardware interrupt priority. It does not change the game's thread priority or DPC queue priority. See [IRQ_PRIORITY](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_priority).
+**IRQ Priority** writes `DevicePriority`, the hardware interrupt-priority preference used by Windows. Values and policy behavior are covered in the [affinity chapter](./guide/03-affinity.md#irq-priority).
 
 ### Interrupt Affinity
 
@@ -36,23 +36,23 @@ Opening the program or pressing **REFRESH** also starts background reads, using 
 
 **SpecCPU** writes `DevicePolicy` and `AssignmentSetOverride`. Clearing the CPU selection for a regular device writes `DevicePolicy=0` (`MachineDefault`) and removes `AssignmentSetOverride`; NDIS adapters follow the selected RSS/IRQ mode.
 
-The current mask covers processor group 0, up to 64 logical processors. It controls interrupt routing; a driver can queue [DPCs](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/organization-of-dpc-queues) on another CPU or change [MSI-X](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/changing-the-cpu-affinity-of-msi-x-table-entries) vector affinity at runtime. Actual ISR/DPC placement must be verified with a trace, not inferred from the registry mask.
+The mask covers processor group 0, up to 64 logical processors. [Chapter 3](./guide/03-affinity.md) describes processor selection; [chapter 10](./guide/10-verification.md) covers ISR/DPC traces.
 
 **Policy** also offers `MachineDefault`, `All`, `AllClose`, `Single`, and [`SpreadMessages`](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_device_policy). Only `SpecCPU` uses the CPUs selected in the list as a mask. The other policies leave processor selection to Windows; `SpreadMessages` can place different messages on different CPUs when the device and driver use multiple MSI-X vectors. The policy itself does not create additional vectors.
 
 ## USB xHCI IMOD
 
-Before using DTIMOD, the program shows a compatibility notice once per application session. AUTO includes it in the USB IMOD question. **DRIVER INFO** shows a read-only summary of HVCI, the driver-blocklist registry setting and detected FACEIT/Vanguard services. It does not load DTIMOD or test anti-cheat compatibility; an absent registry value or service is not a compatibility verdict. Technical states are recorded in the log.
+USB IMOD uses DTIMOD. The application requests confirmation once per session; AUTO includes it in the USB IMOD prompt. **DRIVER INFO** displays HVCI, the driver-blocklist registry setting and FACEIT/Vanguard service states. Loading and compatibility are described in the [driver chapter](./guide/11-driver.md).
 
-The AUTO profile sets mouse IMOD to 0 regardless of polling rate, disabling interrupt moderation. This is a profile rule, not a latency measurement or a change to USB polling frequency. Manual IMOD is configured separately.
+AUTO sets mouse IMOD to `0x0`, disabling moderation regardless of polling rate. Manual values are configured separately.
 
 **[IMOD](https://cdrdv2-public.intel.com/625472/625472_xHCI_Rev1_2b.pdf)** sets the xHCI interrupt-moderation interval. The register belongs to a controller *interrupter* with its own Event Ring, not to an individual mouse or keyboard. Each step is 250 ns: `0xC8` is 50 µs, `0xFA0` is 1 ms, and `0x0` disables moderation.
 
 **Devices** builds a profile for detected mice, keyboards, gamepads, and USB audio, then attempts to map them to interrupters through the xHCI topology. If a reliable map is unavailable, it applies one controller-wide value. **XHCI** writes one value to all interrupters; **Interrupters** opens per-index control. The details show the controller's first 64 interrupters.
 
-The device map is read from the xHCI contexts in memory: for each attached device, the interrupter named in the TRBs of its transfer ring is used, or the Slot Context target if the ring cannot be read. The last read time is shown in the current value's tooltip. After a device is attached or removed, the map is marked "devices changed"; **CHECK** reads it again.
+The current-value tooltip shows the last read time. After a device is attached or removed, the map is marked "devices changed"; **CHECK** rereads it.
 
-The buttons have different jobs:
+### Commands
 
 - **SET** writes the selected configuration and reads the registers back. The program saves custom values to the startup task (see below).
 - **CHECK** rereads the registers and loads DTIMOD if needed. **REFRESH** updates the device list and available current state; hardware reads use an already loaded DTIMOD.
@@ -62,16 +62,13 @@ The buttons have different jobs:
 
 The main **APPLY** button also applies USB IMOD along with the other device settings.
 
-The IMOD interval is not added to every USB report. An event after the interrupter has been idle and one arriving during an active countdown take different paths. Neither the register value nor mouse Polling Rate measures end-to-end input latency.
+The [USB chapter](./guide/05-usb-imod.md) explains interrupter mapping, moderation intervals and device-role profiles.
 
-### IMOD / NIC ITR at startup
+### IMOD / NIC ITR at startup
 
-Register values last until a restart, sleep, or controller reset, so a separate open script applies the saved settings. It works without `DEVICE TWEAKER.exe`: the program can be removed and the startup task keeps working.
+The saved profile is stored in `%ProgramData%\DEVICE TWEAKER\Startup`. The `\DEVICE TWEAKER\IMOD` task runs as SYSTEM at sign-in, after resume and on relevant USB/HID events. It applies settings independently of the EXE. The previous AppData/Run startup layout is migrated with its saved values.
 
-- Folder `%ProgramData%\DEVICE TWEAKER\Startup`: `ApplyIMOD.ps1` (a readable PowerShell script), `DeviceTweakerImodRuntime.cs` (register code shared with the program, compiled at run time), `profile.json` (saved values and SHA-256 of the runtime, DTIMOD and loader files), `Loader\` (KDU for loading DTIMOD.sys), and `logs\` (the latest 14 log files). Only administrators and SYSTEM can modify the folder.
-- The Task Scheduler task `\DEVICE TWEAKER\IMOD` runs the script as SYSTEM at sign-in, after resume and when a USB/HID device is attached. Before compiling the runtime, it checks its SHA-256 against `profile.json`. Loading DTIMOD also checks the driver, `kdu.exe` and `drv64.dll`; a mismatch stops the operation.
-- The script and the program share one DTIMOD load mutex, so they never load the driver at the same time.
-- The previous startup entry in `%AppData%` and the `Run` key is migrated automatically the first time the program starts, keeping the saved values.
+Files, hash checks, permissions and logs are described in the [driver chapter](./guide/11-driver.md#saved-profile).
 
 ## Network adapters
 
@@ -79,9 +76,9 @@ Register values last until a restart, sleep, or controller reset, so a separate 
 
 **[RSS](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-receive-side-scaling)** distributes incoming packet processing across CPUs using a hash and an indirection table. **RSS Queues** sets the requested receive-queue count; the base CPU is the starting point for processor selection. **NDIS Mode** applies RSS, Interrupt Affinity, or both.
 
-Queue choices in the application account for driver options and available vector information. These limits govern queue selection in DEVICE TWEAKER; RSS hardware support also includes configurations without MSI-X. Processors are selected one per physical core; `*MaxRssProcessors` and `*RssMaxProcNumber` are written with the base CPU. See the [network chapter](./guide/06-network.md).
+Queue choices follow the adapter's advertised driver options. RSS processor selection uses one logical processor per physical core, with `*MaxRssProcessors` and `*RssMaxProcNumber` defining the requested range. For adapters without MSI-X, multiple advertised queues can share one processor. AUTO requests one queue on one physical core; SMT does not double this count. The [network chapter](./guide/06-network.md) explains these settings.
 
-The written `*NumRssQueues` value is not the number of queues used by a particular workload. DEVICE TWEAKER displays saved parameters separately from the active `Get-NetAdapterRss` state and logs mismatches. [`NdisRssProfileBalanced`](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/standardized-inf-keywords-for-rss) does not allow manual base-CPU configuration. The adapter is not restarted automatically after an RSS write. RSS controls receive processing; Interrupt Affinity controls eligible CPUs for IRQs. Neither replaces the other.
+The card displays saved parameters and active `Get-NetAdapterRss` state, with differences recorded in the log. The [Balanced profile](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/standardized-inf-keywords-for-rss) manages processor placement automatically. RSS writes take effect through the adapter driver; the application leaves adapter restart to the user.
 
 ### NIC ITR
 
@@ -93,13 +90,13 @@ The driver's own adaptive moderation would overwrite the register, so **SAVE** t
 
 ## Additional settings
 
-**ReservedCpuSets** defines a system-wide mask of CPUs that Windows tries to avoid for ordinary scheduling. It is not hard isolation or a substitute for device Interrupt Affinity.
+**ReservedCpuSets** defines the system-wide CPU reservation mask. Selection and storage format are described in the [CPU chapter](./guide/07-cpu-topology.md#reservedcpusets).
 
 **Power Saving** controls available settings for the USB controller and its root hubs, including [USB selective suspend](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/usb-selective-suspend). For a wired network adapter, the switch changes whether Windows may turn off the device to save power. Availability depends on the driver.
 
 On supported Windows 11 builds, **Mouse Throttle** changes `RawMouseThrottleDuration`, a throttle interval for background [Raw Input](https://learn.microsoft.com/en-us/windows/win32/inputdev/raw-input) listeners to which Windows applies this mechanism. Some background registrations can bypass it. The setting does not change the mouse's USB polling rate or target the foreground window.
 
-**Raw Input measurements** estimate event rates from the intervals between processed events. Mouse measurements need a stream of movement events; message delivery and processing by the program also affect the result. Keyboard events represent key presses and releases, so pressing several keys or holding a key does not reliably reveal the keyboard's USB polling rate. Raw Input event rate, USB polling rate, and the keyboard's internal scan rate are different quantities.
+**Raw Input measurements** estimate the mouse event rate while the mouse is moving. The input chapter explains [event delivery and polling rate](./guide/08-input.md).
 
 The **MOUSE**, **KEYBOARD**, **GAMEPAD**, **USB**, **GPU**, **NETWORK**, **AUDIO**, and **STORAGE** category buttons jump to matching devices in the full list. Text search hides nonmatching devices.
 

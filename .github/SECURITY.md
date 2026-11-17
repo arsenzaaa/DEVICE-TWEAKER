@@ -8,15 +8,15 @@ Security fixes target the latest release.
 
 ## Reporting a vulnerability
 
-Please use [GitHub private vulnerability reporting](https://github.com/arsenzaaa/DEVICE-TWEAKER/security/advisories/new). Do not disclose a driver, privilege-boundary, arbitrary MMIO, path-validation, or restore vulnerability in a public issue before it is triaged.
+Report vulnerabilities through [GitHub private vulnerability reporting](https://github.com/arsenzaaa/DEVICE-TWEAKER/security/advisories/new).
 
-Include the affected version, Windows build, reproduction steps, impact, and the smallest safe proof of concept. Do not include private keys, certificates, personal data, or destructive payloads.
+Include the affected version, Windows build, reproduction steps, impact and a minimal example with personal data and private keys removed.
 
 Publication and credit will be coordinated after a fix is available.
 
-## Driver trust boundary
+## Driver access
 
-`DTIMOD.sys` runs in kernel mode and the current artifact is test-signed, not publicly trusted. HVCI, Microsoft Vulnerable Driver Blocklist, endpoint security, or anti-cheat may block it. The application reports loading failures and does not offer to disable Windows protections. A successful load or a read-only system check does not establish anti-cheat compatibility.
+`DTIMOD.sys` runs in kernel mode; the current artifact is signed with a test certificate. Loading requirements and compatibility are described in the [driver guide](../docs/guide/11-driver.md).
 
 - The driver's device object is open only to SYSTEM and Administrators.
 - MMIO reads and writes name the target PCI device by instance ID and PDO. The driver checks the device identity, PCI class and allocated memory range. These operations are limited to xHCI and Ethernet devices; general physical-memory read/write requests and I/O-port access are rejected.

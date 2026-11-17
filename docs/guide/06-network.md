@@ -6,7 +6,7 @@
 
 DEVICE TWEAKER distinguishes NDIS and NetAdapterCx and exposes the settings available for the adapter. NDIS supports RSS, IRQ and combined modes in the application. Feature availability and processing paths depend on the NIC and driver.
 
-RSS and Interrupt Affinity are not mutually exclusive: one distributes network processing, the other controls interrupt assignment. Their interaction depends on the NIC and driver.
+RSS distributes receive processing across CPUs, while Interrupt Affinity controls interrupt assignment. BOTH configures the two mechanisms together.
 
 For an NDIS adapter, choose **RSS** to configure receive-processing CPUs and queues, **IRQ** for interrupt affinity, or **BOTH** for both when RSS is supported. Select the CPUs and queue count, then click **APPLY**. NetAdapterCx cards expose the controls available for that adapter type. NIC ITR has separate SET/SAVE commands, described below.
 
@@ -16,7 +16,11 @@ RSS distributes receive processing across CPUs using hashing and an indirection 
 
 The driver can schedule receive DPCs on target processors. See [Receive-side scaling support](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/receive-scaling). Multiple queues do not imply that one connection will use them all.
 
-The application selects physical cores with SMT awareness, queue count and available adapter limits. Saved parameters are compared with active RSS state; a mismatch is not presented as confirmed success.
+The application selects physical cores with SMT awareness, queue count and available adapter limits. The card compares saved parameters with the active RSS state and reports differences.
+
+**RSS Queues** is a receive-queue count. DEVICE TWEAKER selects eligible physical cores for RSS, skipping SMT siblings and respecting known adapter limits. More queues can share the available cores. For example, if CPU 9 is CPU 8's SMT sibling, two queues select CPU 8 and CPU 10. AUTO uses one queue on one physical core when configuring RSS.
+
+Queue count can differ from processor count. [Intel I219 and related adapters](https://www.intel.com/content/www/us/en/support/articles/000017506/network-and-io.html) support up to two receive queues serviced by one CPU core. The application retains such driver-advertised queue options; without advertised options it uses a single-queue fallback for known non-MSI-X adapters.
 
 ```powershell
 Get-NetAdapterRss -Name "<adapter name>" |
@@ -29,19 +33,19 @@ More CPUs can add overhead without improving throughput. Select a count for the 
 
 ITR controls hardware interrupt moderation on supported controllers. **SET** applies a value now, **SAVE** writes the startup profile, and **CHECK** reads registers again. Writes are blocked for unknown PCI IDs.
 
-Intel EITR/ITR and Realtek IntrMit profiles use different registers and units. Follow the selected family's description and range instead of copying another adapter's numeric profile. Matching readback confirms a register value, not better network latency.
+Intel EITR/ITR and Realtek IntrMit profiles use different registers and units. The selected family's description defines the range; CHECK shows the current register values.
 
 Adaptive driver moderation can overwrite a manually applied ITR. The application accounts for available driver settings and returns control to the driver when the saved profile is removed. Operation results retain details and unconfirmed steps.
 
 NIC ITR selects the register bank from PCI configuration and checks it against the memory ranges allocated by Windows. It rejects inaccessible or inconsistent resources and register spans overlapping an MSI-X table or pending-bit array.
 
-The NIC layouts for Killer E3000 (`10EC:3000`, RTL8125 family) and RTL8118AS (`10EC:8162`, RTL8168 family) have been corrected. When a saved NIC ITR entry no longer matches the supported layout for its PCI ID, profile installation and backup restoration omit that entry. Restore reports the omission as a warning and records the old and current layout in the log. Other supported entries are retained; the backup file is unchanged. Save NIC ITR again for the affected adapter to create a current startup entry.
+Profile installation and backup restoration check saved NIC ITR entries against the current register layout for each PCI ID. Incompatible entries are skipped with a warning; the log records both layouts. Save NIC ITR again for the affected adapter to update its startup entry. Other supported entries and the original backup are preserved.
 
 ## Verification
 
 Wi-Fi is excluded from AUTO and supported wired-setting resets. Compare active RSS, ITR readback, packet loss, CPU load and latency under the same traffic. Less moderation can increase interrupt rate and CPU load.
 
-MMCSS and `NetworkThrottlingIndex` are outside the application's settings. Use a trace to inspect network worker-thread placement and priority for the installed driver.
+The [verification chapter](./10-verification.md) covers packet-processing traces and before/after comparisons.
 
 ---
 

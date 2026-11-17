@@ -58,21 +58,8 @@ public sealed partial class MainForm
     internal static int NormalizePolicyForSelection(int policy, ulong mask)
         => mask == 0 ? 0 : policy == 0 ? 4 : policy;
 
-    private int ClampRssQueueCount(int value)
-    {
-        if (value < 1)
-        {
-            value = 1;
-        }
-
-        int maxQueues = NdisRssLayout.GetMaxQueues(_cpuInfo?.Topology.LPs, _maxLogical);
-        if (value > maxQueues)
-        {
-            value = maxQueues;
-        }
-
-        return value;
-    }
+    // Per-adapter options bound queue counts; CPU count bounds the processor layout.
+    private static int ClampRssQueueCount(int value) => Math.Max(1, value);
 
     private int? GetFirstCheckedCore(DeviceBlock block)
     {
@@ -317,8 +304,9 @@ public sealed partial class MainForm
         }
     }
 
-    private NdisRssLayout.Layout GetNdisRssLayout(int baseCore, int queues)
-        => NdisRssLayout.Select(_cpuInfo?.Topology.LPs, _maxLogical, Math.Max(0, baseCore), ClampRssQueueCount(queues));
+    private NdisRssLayout.Layout GetNdisRssLayout(DeviceBlock block, int baseCore, int queues)
+        => NdisRssLayout.Select(_cpuInfo?.Topology.LPs, _maxLogical, Math.Max(0, baseCore),
+            ClampRssQueueCount(queues), TryGetNicItrProfile(block.Device.InstanceId)?.RssProcessorLimit);
 
     private void UpdateRssQueueOptions(DeviceBlock block)
     {
@@ -368,8 +356,8 @@ public sealed partial class MainForm
     private NdisRssLayout.Layout ApplyNdisSelection(DeviceBlock block, int baseCore, int queues)
     {
         int clampedQueues = FloorRssQueueCount(block, queues);
-        NdisRssLayout.Layout layout = GetNdisRssLayout(baseCore, clampedQueues);
-        clampedQueues = layout.Processors.Count;
+        NdisRssLayout.Layout layout = GetNdisRssLayout(block, baseCore, clampedQueues);
+        clampedQueues = layout.QueueCount;
         block.RssBaseCore = layout.BaseProcessor;
         block.RssQueueLast = clampedQueues;
 

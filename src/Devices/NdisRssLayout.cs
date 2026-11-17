@@ -1,10 +1,13 @@
 namespace DeviceTweakerCS;
 
-// NDIS RSS spreads queues over physical cores and skips SMT siblings, so the
-// processor range written to the class key must span `queues` cores, not LPs.
+// RSS queue count and processor count are separate settings. Selection uses
+// physical cores, skipping SMT siblings, within a documented device CPU limit.
 internal static class NdisRssLayout
 {
-    internal sealed record Layout(int BaseProcessor, int MaxProcessor, IReadOnlyList<int> Processors);
+    internal sealed record Layout(int BaseProcessor, int MaxProcessor, IReadOnlyList<int> Processors)
+    {
+        internal int QueueCount { get; init; } = Processors.Count;
+    }
 
     // First logical processor of every group-0 core below maxLogical, ascending.
     internal static List<int> GetCorePrimaryProcessors(IReadOnlyCollection<CpuLpInfo>? lps, int maxLogical)
@@ -26,27 +29,25 @@ internal static class NdisRssLayout
     internal static int GetMaxQueues(IReadOnlyCollection<CpuLpInfo>? lps, int maxLogical)
         => Math.Max(1, GetCorePrimaryProcessors(lps, maxLogical).Count);
 
-    // Queue counts the adapter can actually use: the driver's *NumRssQueues enum
-    // (when present), at most one queue per physical core, and a single queue
-    // without MSI-X because every queue would share one interrupt vector.
+    // Honor advertised queues even when they share one interrupt/CPU (Intel I219).
+    // Without an advertised count, retain a conservative single-queue fallback
+    // for known non-MSI-X devices.
     internal static List<int> GetAllowedQueueCounts(
         IEnumerable<int>? driverValues,
         PciInterruptCapabilities? capabilities,
         int maxQueues)
     {
         maxQueues = Math.Max(1, maxQueues);
-        if (capabilities is not null && (capabilities.Support & PciInterruptSupport.MsiX) == 0)
-        {
-            return [1];
-        }
+        List<int> driver = driverValues?.Where(value => value > 0).Distinct().ToList() ?? [];
+        if (driver.Count > 0) return driver.Append(1).Distinct().Order().ToList();
+        if (capabilities is not null && (capabilities.Support & PciInterruptSupport.MsiX) == 0) return [1];
 
         if (capabilities?.MessageMaximum is uint messages && messages > 0)
         {
             maxQueues = Math.Min(maxQueues, (int)Math.Min(messages, int.MaxValue));
         }
 
-        List<int> driver = driverValues?.Where(value => value > 0).Distinct().ToList() ?? [];
-        IEnumerable<int> candidates = driver.Count > 0 ? driver : Enumerable.Range(1, maxQueues);
+        IEnumerable<int> candidates = Enumerable.Range(1, maxQueues);
         List<int> allowed = candidates.Where(value => value <= maxQueues).Append(1).Distinct().Order().ToList();
         return allowed;
     }
@@ -80,7 +81,8 @@ internal static class NdisRssLayout
         return floor > 0 ? floor : allowed[0];
     }
 
-    internal static Layout Select(IReadOnlyCollection<CpuLpInfo>? lps, int maxLogical, int requestedBase, int queues)
+    internal static Layout Select(IReadOnlyCollection<CpuLpInfo>? lps, int maxLogical, int requestedBase, int queues,
+        int? processorLimit = null)
     {
         List<int> primaries = GetCorePrimaryProcessors(lps, maxLogical);
         if (primaries.Count == 0)
@@ -88,7 +90,9 @@ internal static class NdisRssLayout
             return new Layout(0, 0, [0]);
         }
 
-        queues = Math.Clamp(queues, 1, primaries.Count);
+        int queueCount = Math.Max(1, queues);
+        int processorCount = Math.Max(1, Math.Min(primaries.Count, processorLimit ?? int.MaxValue));
+        queues = Math.Clamp(queueCount, 1, processorCount);
         int baseCorePrimary = GetCorePrimary(lps, requestedBase) ?? requestedBase;
 
         // Start at the core that holds the requested base; shift left when the
@@ -101,7 +105,10 @@ internal static class NdisRssLayout
 
         startIndex = Math.Min(startIndex, primaries.Count - queues);
         List<int> selected = primaries.GetRange(startIndex, queues);
-        return new Layout(selected[0], selected[^1], selected);
+        return new Layout(selected[0], selected[^1], selected)
+        {
+            QueueCount = queueCount,
+        };
     }
 
     private static int? GetCorePrimary(IReadOnlyCollection<CpuLpInfo>? lps, int lp)

@@ -14,17 +14,9 @@ The GPU card exposes CPU Affinity, MSI Mode/Limit, IRQ Priority and Policy. Rebo
 
 Compare the original behavior with AUTO first. For subsequent experiments, change one parameter and keep the game scene, FPS limiter, power mode and graphics settings consistent. Compare repeated runs rather than the best individual result.
 
-## What to inspect in a trace
+## Checking the result
 
-Inspect actual graphics-stack ISR/DPC and worker-thread activity. Interrupt Affinity does not set the affinity of every GPU-driver thread; the driver can select a DPC's target CPU separately. See [DPC queue organization](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/organization-of-dpc-queues).
-
-Record module names and execution times together with the driver version, GPU, HAGS state and workload.
-
-## HAGS and BIOS
-
-The application does not manage HAGS, graphics-driver threads or firmware. Comparing HAGS is a separate experiment with its own measurement conditions.
-
-Judge the outcome by stability and reproducible measurements on your system. Use **RESTORE** if behavior gets worse.
+Compare frame times and graphics-driver ISR/DPC activity using the method in [chapter 10](./10-verification.md). Record the GPU model, driver version, HAGS state and workload with each result. Saved settings are available through **RESTORE**.
 
 ---
 
