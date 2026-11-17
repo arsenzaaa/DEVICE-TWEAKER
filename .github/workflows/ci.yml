@@ -42,24 +42,24 @@ jobs:
 
       - name: Check build user-data recovery
         shell: powershell
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File dev/qa/Test-BuildUserData.ps1
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File dev/qa/Checks/Test-BuildUserData.ps1
 
       - name: Check QA build cache contracts
         shell: powershell
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File dev/qa/Test-QaBuildCache.ps1
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File dev/qa/Checks/Test-QaBuildCache.ps1
 
       - name: Check bounded QA preparation
         shell: powershell
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File dev/qa/Test-QaDevPreparation.ps1 -OutputDirectory local/qa-preparation
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File dev/qa/Checks/Test-QaDevPreparation.ps1 -OutputDirectory local/qa-preparation
 
       - name: Check release application identities
         shell: powershell
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File dev/qa/Test-PackageIdentity.ps1
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File dev/qa/Checks/Test-PackageIdentity.ps1
 
       - name: Build developer workbench from checkout
         shell: powershell
         run: |
-          . ./dev/qa/Build-Cache.ps1
+          . ./dev/qa/Support/Build-Cache.ps1
           $build = Get-QaDevBuild (Get-Location).Path
           Write-Output ('Verified QA build: ' + $build.key)
 

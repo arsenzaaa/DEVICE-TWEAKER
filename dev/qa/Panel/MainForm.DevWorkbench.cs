@@ -121,9 +121,13 @@ public sealed partial class MainForm
     private void DevResize(int width, int height)
     {
         Rectangle screen = Screen.FromControl(this).WorkingArea;
-        if (width < 700 || height < 500 || width > screen.Width - 32 || height > screen.Height - 64)
-            throw new InvalidOperationException($"Requested client {width}x{height} does not fit private desktop {screen.Size}");
+        if (width is < 700 or > 2400 || height is < 500 or > 2000)
+            throw new InvalidOperationException("Requested client exceeds the workbench canvas limits");
+        // The owned hidden window can render a larger client than this host's monitor.
+        // This is a layout canvas, not a physical display / DPI test.
+        MaximumSize = new Size(width + 64, height + 128);
         WindowState = FormWindowState.Normal; ClientSize = new Size(width, height);
+        if (ClientSize != new Size(width, height)) throw new InvalidOperationException("Native window rejected the requested client size");
         Location = new Point(screen.Left + 8, screen.Top + 8); PerformLayout(); Refresh();
     }
     private Form DevActiveForm() => Application.OpenForms.Cast<Form>().LastOrDefault(f => f.Visible && (f == this || DevOwned(f))) ?? this;
@@ -140,6 +144,7 @@ public sealed partial class MainForm
     private Control DevTarget(DevStep step)
     {
         if (step.Target == "@main") return this;
+        if (step.Target == "@reserved-cpu") return _reservedCpuPanel ?? throw new InvalidOperationException("Reserved CPU panel is unavailable");
         if (step.Target == "@active") return DevActiveForm();
         if (step.Target == "@search") return _searchFilterBox.Inner;
         if (step.Target == "@clear-filter") return _btnFilterClear;
@@ -153,6 +158,9 @@ public sealed partial class MainForm
             DeviceBlock b = DevBlock(step.Device);
             return step.Target[5..] switch
             {
+                "card" => b.Group,
+                "settings" => b.SettingsPanel!,
+                "imod-details" => b.ImodDetailsButton!,
                 "title" => b.TitleLabel,
                 "msi" => b.MsiCombo, "limit" => b.LimitBox, "priority" => b.PrioCombo, "policy" => b.PolicyCombo,
                 "imod" => b.ImodBox, "imod-toggle" => b.ImodAutoCheck, "imod-check" => b.ImodCheckButton!,
@@ -218,6 +226,7 @@ public sealed partial class MainForm
 
     private string DevProperty(Control control, string property) => property switch
     {
+        "language" when control == this => UiLanguage.IsRussian ? "RU" : "EN",
         "visibleDevices" when control == this => _blocks.Count(b => b.Group.Visible).ToString(),
         "irq-action-count" when control == this => DevDescendants(this).Count(item => item.Name == "IRQ_MODE_CHECK").ToString(),
         "top-action-count" when control == this => _btnApplyRef!.Parent!.Controls.OfType<Button>().Count().ToString(),
@@ -336,6 +345,9 @@ public sealed partial class MainForm
             case "measure-ui-latency": await DevMeasureUiLatencyAsync(step.Id); break;
             case "measure-raw-polling": await DevMeasureRawPollingAsync(step.Id, step.Value == "budget"); break;
             case "measure-frame-pacing": await DevMeasureFramePacingAsync(step.Id, step.Value == "budget"); break;
+            case "capture-control":
+                await DevWaitForSettledPresentation();
+                DevCaptureWindow(step.Id, step.Target, false, step.Device, region: true); break;
             case "capture":
                 if (!observeTransition) await DevWaitForSettledPresentation();
                 DevCaptureWindow(step.Id, step.Target, false, step.Device); break;
@@ -623,14 +635,30 @@ public sealed partial class MainForm
         }
         public void Delete(string name) { _values.Remove(name); DevFiles.Write(path, _values); }
     }
-    private Bitmap DevCaptureClient(Form window)
+    private Bitmap DevCaptureClient(Control window)
     {
         Bitmap bitmap = new(window.ClientSize.Width, window.ClientSize.Height, PixelFormat.Format32bppArgb);
-        using Graphics graphics = Graphics.FromImage(bitmap);
-        IntPtr dc = graphics.GetHdc();
-        try { if (!DevPrintWindow(window.Handle, dc, 3)) throw new InvalidOperationException("PrintWindow client capture failed"); }
-        finally { graphics.ReleaseHdc(dc); }
-        return bitmap;
+        try
+        {
+            bool controlCapture = window is not Form;
+            using (Graphics graphics = Graphics.FromImage(bitmap))
+            {
+                // Unpainted pixels must fail, not become a black margin.
+                if (controlCapture) graphics.Clear(Color.Magenta);
+                IntPtr dc = graphics.GetHdc();
+                try
+                {
+                    if (controlCapture)
+                        DevSendMessage(window.Handle, 0x0317, dc, new IntPtr(0x02 | 0x04 | 0x08 | 0x10)); // WM_PRINT: border, client, erase, children.
+                    else if (!DevPrintWindow(window.Handle, dc, 3))
+                        throw new InvalidOperationException("PrintWindow client capture failed");
+                }
+                finally { graphics.ReleaseHdc(dc); }
+            }
+            if (controlCapture) NativeGlyphEvidence.RequirePainted(bitmap);
+            return bitmap;
+        }
+        catch { bitmap.Dispose(); throw; }
     }
 
     private static bool DevIsBlankCapture(Bitmap bitmap)
@@ -645,12 +673,14 @@ public sealed partial class MainForm
         return max - min < 45 || visible < 15 || white / (double)samples > .6;
     }
 
-    private void DevCaptureWindow(string id, string selector, bool timeline, string device = "")
+    private void DevCaptureWindow(string id, string selector, bool timeline, string device = "", bool region = false)
     {
         DevFiles.Id(id);
         Control control = DevTarget(new() { Target = selector, Device = device });
         Form window = control as Form ?? control.FindForm() ?? throw new InvalidOperationException("Capture target has no window");
         if (!window.Visible || (window != this && !DevOwned(window))) throw new InvalidOperationException("Capture window is not owned / visible");
+        if (!region && !Screen.FromControl(window).WorkingArea.Contains(window.RectangleToScreen(window.ClientRectangle)))
+            throw new InvalidOperationException("Window capture exceeds the native display bounds; resize or use capture-control for a panel.");
         // Windows inherits keyboard cue visibility from prior input. Set the owned
         // window's real UI state explicitly; never hide focus differences in PNGs.
         // UIS_CLEAR | ((UISF_HIDEFOCUS | UISF_HIDEACCEL) << 16).
@@ -658,8 +688,17 @@ public sealed partial class MainForm
         int uiState = DevSendMessage(window.Handle, 0x0129, IntPtr.Zero, IntPtr.Zero).ToInt32();
         if ((uiState & 3) != 0) throw new InvalidOperationException("Owned capture window did not expose keyboard focus cues");
         window.Refresh();
+        Rectangle? captureRegion = null;
+        if (region)
+        {
+            if (control == window || !DevInViewport(control))
+                throw new InvalidOperationException("Control capture requires a fully visible child control; resize / reveal it first.");
+            captureRegion = window.RectangleToClient(control.RectangleToScreen(control.ClientRectangle));
+            DevFiles.ValidateCaptureRegion(captureRegion.Value, window.ClientSize);
+        }
+        Control nativeTarget = region ? control : window;
         double captureTime = _devClock.Elapsed.TotalMilliseconds;
-        Bitmap captured = DevCaptureClient(window);
+        Bitmap captured = DevCaptureClient(nativeTarget);
         // A dialog that has just opened can still be unpainted: two short retries, then
         // a blank image is a failure.
         for (int attempt = 1; DevIsBlankCapture(captured) && attempt < 3; attempt++)
@@ -669,7 +708,7 @@ public sealed partial class MainForm
             Thread.Sleep(150);
             window.Refresh();
             captureTime = _devClock.Elapsed.TotalMilliseconds;
-            captured = DevCaptureClient(window);
+            captured = DevCaptureClient(nativeTarget);
         }
         using Bitmap bitmap = captured;
         string png = "images/" + id + ".png", tree = "trees/" + id + ".json";
@@ -681,6 +720,7 @@ public sealed partial class MainForm
                 field.Inner.PreferredHeight, fontHeight=field.Inner.Font.Height } : null,
             selected = c is ThemedDropDownPicker picker ? picker.SelectedItem?.ToString() : null }).ToArray();
         DevFiles.Write(DevArtifact(tree), new { method = "WinForms control tree", uiState, client = window.ClientSize.ToString(),
+            captureRegion, captureTarget = region ? selector : null,
             scrolling = new { value = _devicesScroll.Value, target = _devicesScroll.TargetValue,
                 maximum = _devicesScroll.Maximum, viewport = _devicesScroll.ViewportSize,
                 running = _devicesScroll.IsScrolling, panelTop = _devicesPanel.Top,
@@ -688,7 +728,7 @@ public sealed partial class MainForm
         if (DevIsBlankCapture(bitmap))
             throw new InvalidDataException("Native capture is blank / mostly white; retained for diagnosis");
         _devRun!.Captures.Add(new(id, png, DevFiles.Hash(DevArtifact(png)), bitmap.Width, bitmap.Height, captureTime,
-            tree, DevFiles.Hash(DevArtifact(tree)), timeline));
+            tree, DevFiles.Hash(DevArtifact(tree)), timeline, region ? "WM_PRINT.Control" : "PrintWindow.Client"));
         // Check each visible technical block, not only the whole window's white fraction.
         foreach (InfoTextBox info in DevDescendants(window).OfType<InfoTextBox>().Where(c => c.Visible))
         {
@@ -696,6 +736,7 @@ public sealed partial class MainForm
             Rectangle area = window.RectangleToClient(info.RectangleToScreen(info.ClientRectangle));
             for (Control? parent = info.Parent; parent is not null; parent = parent.Parent)
                 area.Intersect(window.RectangleToClient(parent.RectangleToScreen(parent.ClientRectangle)));
+            if (captureRegion is Rectangle crop) area.Offset(-crop.X, -crop.Y);
             area.Intersect(new Rectangle(Point.Empty, bitmap.Size));
             int light = 0, count = 0;
             for (int y = area.Top + 2; y < area.Bottom - 2; y += 4)

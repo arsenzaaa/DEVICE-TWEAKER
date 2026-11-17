@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "id": "gallery-usb-interrupters",
+  "preset": "Imod",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1320,
+  "height": 1280,
+  "steps": [
+    {
+      "id": "home",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "interrupters",
+      "action": "select",
+      "target": "role:imod-mode",
+      "device": "DEV_15B6",
+      "value": "Interrupters"
+    },
+    {
+      "id": "register-details-reveal",
+      "action": "reveal",
+      "target": "role:imod-details",
+      "device": "DEV_15B6"
+    },
+    {
+      "id": "register-details-open",
+      "action": "click",
+      "target": "role:imod-details",
+      "device": "DEV_15B6"
+    },
+    {
+      "id": "en-panel-reveal",
+      "action": "reveal",
+      "target": "role:settings",
+      "device": "DEV_15B6"
+    },
+    {
+      "id": "en-panel-visible",
+      "action": "assert",
+      "target": "role:settings",
+      "property": "viewport",
+      "value": "true",
+      "device": "DEV_15B6"
+    },
+    {
+      "id": "en-language-check",
+      "action": "assert",
+      "target": "@main",
+      "property": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en",
+      "action": "capture-control",
+      "target": "role:settings",
+      "device": "DEV_15B6"
+    },
+    {
+      "id": "russian",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "home-ru",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "ru-panel-reveal",
+      "action": "reveal",
+      "target": "role:settings",
+      "device": "DEV_15B6"
+    },
+    {
+      "id": "ru-panel-visible",
+      "action": "assert",
+      "target": "role:settings",
+      "property": "viewport",
+      "value": "true",
+      "device": "DEV_15B6"
+    },
+    {
+      "id": "ru-language-check",
+      "action": "assert",
+      "target": "@main",
+      "property": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru",
+      "action": "capture-control",
+      "target": "role:settings",
+      "device": "DEV_15B6"
+    }
+  ]
+}

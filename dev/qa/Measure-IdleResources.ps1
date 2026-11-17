@@ -5,7 +5,7 @@ param(
     [switch]$Worker
 )
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'Private-Desktop.ps1')
+. (Join-Path $PSScriptRoot 'Support\Private-Desktop.ps1')
 $exe = [IO.Path]::GetFullPath($ExePath)
 $output = [IO.Path]::GetFullPath($OutputDirectory)
 if (-not $Worker) {

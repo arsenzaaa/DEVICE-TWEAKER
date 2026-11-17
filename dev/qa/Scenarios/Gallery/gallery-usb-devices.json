@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "id": "gallery-usb-devices",
+  "preset": "UsbRoles",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1320,
+  "height": 1280,
+  "steps": [
+    {
+      "id": "home",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "devices",
+      "action": "select",
+      "target": "role:imod-mode",
+      "device": "USB_ROLE_ORDER",
+      "value": "Devices"
+    },
+    {
+      "id": "en-panel-reveal",
+      "action": "reveal",
+      "target": "role:settings",
+      "device": "USB_ROLE_ORDER"
+    },
+    {
+      "id": "en-panel-visible",
+      "action": "assert",
+      "target": "role:settings",
+      "property": "viewport",
+      "value": "true",
+      "device": "USB_ROLE_ORDER"
+    },
+    {
+      "id": "en-language-check",
+      "action": "assert",
+      "target": "@main",
+      "property": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en",
+      "action": "capture-control",
+      "target": "role:settings",
+      "device": "USB_ROLE_ORDER"
+    },
+    {
+      "id": "russian",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "home-ru",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "ru-panel-reveal",
+      "action": "reveal",
+      "target": "role:settings",
+      "device": "USB_ROLE_ORDER"
+    },
+    {
+      "id": "ru-panel-visible",
+      "action": "assert",
+      "target": "role:settings",
+      "property": "viewport",
+      "value": "true",
+      "device": "USB_ROLE_ORDER"
+    },
+    {
+      "id": "ru-language-check",
+      "action": "assert",
+      "target": "@main",
+      "property": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru",
+      "action": "capture-control",
+      "target": "role:settings",
+      "device": "USB_ROLE_ORDER"
+    }
+  ]
+}

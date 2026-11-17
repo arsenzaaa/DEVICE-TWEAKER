@@ -1,0 +1,23 @@
+[
+  {
+    "scenario": "gallery-intel-gpu",
+    "captures": {
+      "en": "intel-affinity.en.png",
+      "ru": "intel-affinity.ru.png"
+    }
+  },
+  {
+    "scenario": "gallery-usb-xhci",
+    "captures": {
+      "en": "usb-xhci.en.png",
+      "ru": "usb-xhci.ru.png"
+    }
+  },
+  {
+    "scenario": "gallery-network",
+    "captures": {
+      "en": "network-rss.en.png",
+      "ru": "network-rss.ru.png"
+    }
+  }
+]

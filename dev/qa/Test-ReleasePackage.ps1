@@ -1,7 +1,7 @@
 param([Parameter(Mandatory = $true)][string]$PackageDirectory, [string]$OutputDirectory)
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'Read-QaJson.ps1')
-. (Join-Path $PSScriptRoot 'Package-Identity.ps1')
+. (Join-Path $PSScriptRoot 'Support\Read-QaJson.ps1')
+. (Join-Path $PSScriptRoot 'Support\Package-Identity.ps1')
 $package = (Resolve-Path -LiteralPath $PackageDirectory).Path
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $package '..\validation' }
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)

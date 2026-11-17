@@ -29,7 +29,7 @@ internal sealed class DevScenario
             if (!DevStep.Actions.Contains(step.Action) || step.DurationMs is < 0 or > 10000 || step.IntervalMs is < 50 or > 1000)
                 throw new InvalidDataException("Invalid step: " + step.Id);
             if (step.Action == "transition" && (step.Trigger is null || !DevStep.Actions.Contains(step.Trigger.Action)
-                || step.Trigger.Action is "transition" or "capture" or "save-state" or "restore-state"))
+                || step.Trigger.Action is "transition" or "capture" or "capture-control" or "save-state" or "restore-state"))
                 throw new InvalidDataException("Transition requires one supported trigger");
         }
     }
@@ -37,7 +37,7 @@ internal sealed class DevScenario
 
 internal sealed class DevStep
 {
-    public static readonly HashSet<string> Actions = ["capture", "click", "hover", "leave", "focus", "select", "text", "toggle",
+    public static readonly HashSet<string> Actions = ["capture", "capture-control", "click", "hover", "leave", "focus", "select", "text", "toggle",
         "assert", "wait", "key", "language", "resize", "scroll", "reveal", "transition", "save-state", "restore-state", "apply-model", "model-error", "gallery", "audit-editors", "dialog", "audit-dialog", "irq-check-model", "refresh-readback-model", "display-read-model", "display-read-failure", "discovery-model", "card-title-model", "layout-rebind", "apply-completion-model", "expect-apply-errors", "unreadable-profile", "imod-map-stale", "audit-refresh-lifecycle", "audit-refresh-reuse", "measure-ui-latency", "measure-raw-polling", "measure-frame-pacing", "audit-toggle-motion", "audit-ui-motion", "audit-motion-lifecycle", "irq-click-burst", "audit-operation-feedback", "audit-snapshot-overlap", "audit-hardware-matrix"];
     public string Id { get; set; } = "";
     public string Action { get; set; } = "";
@@ -111,6 +111,11 @@ internal static class DevFiles
         if (!full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Artifact escapes run directory");
         return full;
     }
+    public static void ValidateCaptureRegion(System.Drawing.Rectangle region, System.Drawing.Size client)
+    {
+        if (region.Width <= 0 || region.Height <= 0 || !new System.Drawing.Rectangle(System.Drawing.Point.Empty, client).Contains(region))
+            throw new InvalidDataException("Capture region is clipped or outside the native client image");
+    }
     public static void Verify(string root, DevRun run)
     {
         if (run.SchemaVersion != 1 || run.Status != "PASS" || !run.ReadOnly || run.Captures.Count == 0
@@ -123,7 +128,13 @@ internal static class DevFiles
             throw new InvalidDataException("Executed step sequence differs from scenario");
         foreach (DevStep step in scenario.Steps)
         {
-            if (step.Action == "capture" && !run.Captures.Any(c => c.Id == step.Id && !c.Timeline)) throw new InvalidDataException("Missing checkpoint: " + step.Id);
+            if (step.Action is "capture" or "capture-control")
+            {
+                var checkpoint = run.Captures.SingleOrDefault(c => c.Id == step.Id && !c.Timeline);
+                string method = step.Action == "capture-control" ? "WM_PRINT.Control" : "PrintWindow.Client";
+                if (checkpoint is null || checkpoint.Method != method)
+                    throw new InvalidDataException("Missing checkpoint / wrong native capture method: " + step.Id);
+            }
             if (step.Action == "transition" && (run.Captures.Count(c => c.Timeline && c.Id.StartsWith(step.Id + "-frame-", StringComparison.Ordinal)) < 3
                 || !run.Captures.Any(c => c.Id == step.Id + "-settled" && !c.Timeline))) throw new InvalidDataException("Missing transition evidence");
         }
@@ -133,8 +144,16 @@ internal static class DevFiles
             if (Hash(Inside(root, capture.Path)) != capture.Sha256 || Hash(Inside(root, capture.Tree)) != capture.TreeSha256)
                 throw new InvalidDataException("Missing / altered capture: " + capture.Id);
             using System.Drawing.Bitmap image = new(Inside(root, capture.Path));
-            if (image.Width != capture.Width || image.Height != capture.Height || capture.Method != "PrintWindow.Client")
+            if (image.Width != capture.Width || image.Height != capture.Height || capture.Method is not ("PrintWindow.Client" or "WM_PRINT.Control"))
                 throw new InvalidDataException("Capture dimensions / method do not match evidence");
+            if (capture.Method == "WM_PRINT.Control")
+            {
+                using JsonDocument tree = JsonDocument.Parse(File.ReadAllText(Inside(root, capture.Tree)));
+                var bounds = tree.RootElement.GetProperty("captureRegion");
+                if (bounds.GetProperty("width").GetInt32() != image.Width || bounds.GetProperty("height").GetInt32() != image.Height
+                    || string.IsNullOrEmpty(tree.RootElement.GetProperty("captureTarget").GetString()))
+                    throw new InvalidDataException("Control capture does not match its native region");
+            }
         }
         foreach (DevStateFile state in run.StateFiles)
             if (Hash(Inside(root, state.Path)) != state.Sha256) throw new InvalidDataException("Altered sandbox state");

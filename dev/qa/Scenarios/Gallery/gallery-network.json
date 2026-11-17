@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "id": "gallery-network",
+  "preset": "NicItr",
+  "language": "EN",
+  "filter": "NETWORK",
+  "width": 1320,
+  "height": 1280,
+  "steps": [
+    {
+      "id": "home",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "en-panel-reveal",
+      "action": "reveal",
+      "target": "role:card",
+      "device": "DEV_125C"
+    },
+    {
+      "id": "en-panel-visible",
+      "action": "assert",
+      "target": "role:card",
+      "property": "viewport",
+      "value": "true",
+      "device": "DEV_125C"
+    },
+    {
+      "id": "en-language-check",
+      "action": "assert",
+      "target": "@main",
+      "property": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en",
+      "action": "capture-control",
+      "target": "role:card",
+      "device": "DEV_125C"
+    },
+    {
+      "id": "russian",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "home-ru",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "ru-panel-reveal",
+      "action": "reveal",
+      "target": "role:card",
+      "device": "DEV_125C"
+    },
+    {
+      "id": "ru-panel-visible",
+      "action": "assert",
+      "target": "role:card",
+      "property": "viewport",
+      "value": "true",
+      "device": "DEV_125C"
+    },
+    {
+      "id": "ru-language-check",
+      "action": "assert",
+      "target": "@main",
+      "property": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru",
+      "action": "capture-control",
+      "target": "role:card",
+      "device": "DEV_125C"
+    }
+  ]
+}

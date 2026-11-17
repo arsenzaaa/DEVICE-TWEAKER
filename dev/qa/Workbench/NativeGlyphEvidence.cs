@@ -20,6 +20,15 @@ internal static class NativeGlyphEvidence
         return image;
     }
 
+    // WM_PRINT captures start magenta, so a partially painted image cannot pass as an empty margin.
+    internal static void RequirePainted(Bitmap image)
+    {
+        for (int y = 0; y < image.Height; y += 3)
+            for (int x = 0; x < image.Width; x += 3)
+                if (image.GetPixel(x, y).ToArgb() == Color.Magenta.ToArgb())
+                    throw new InvalidDataException("Native control capture contains an unpainted area");
+    }
+
     // Includes antialiasing colors, not just a bright-pixel threshold. Ignore translation only.
     internal static string Signature(Bitmap image)
     {

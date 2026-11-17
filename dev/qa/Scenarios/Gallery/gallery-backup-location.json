@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "id": "gallery-backup-location",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1320,
+  "height": 940,
+  "steps": [
+    {
+      "id": "en-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en-open",
+      "action": "dialog",
+      "value": "backup-location"
+    },
+    {
+      "id": "en-ready",
+      "action": "wait",
+      "target": "active:id:EXE FOLDER",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "en-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "en-language-check",
+      "action": "assert",
+      "target": "@main",
+      "property": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "en-close",
+      "action": "key",
+      "target": "@active",
+      "value": "Escape"
+    },
+    {
+      "id": "en-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru-open",
+      "action": "dialog",
+      "value": "backup-location"
+    },
+    {
+      "id": "ru-ready",
+      "action": "wait",
+      "target": "active:id:EXE FOLDER",
+      "property": "visible",
+      "value": "true",
+      "durationMs": 3000
+    },
+    {
+      "id": "ru-layout",
+      "action": "audit-dialog"
+    },
+    {
+      "id": "ru-language-check",
+      "action": "assert",
+      "target": "@main",
+      "property": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru",
+      "action": "capture",
+      "target": "@active"
+    },
+    {
+      "id": "ru-close",
+      "action": "key",
+      "target": "@active",
+      "value": "Escape"
+    },
+    {
+      "id": "ru-closed",
+      "action": "wait",
+      "target": "@main",
+      "property": "enabled",
+      "value": "true",
+      "durationMs": 3000
+    }
+  ]
+}

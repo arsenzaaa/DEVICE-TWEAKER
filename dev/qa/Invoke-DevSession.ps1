@@ -14,10 +14,10 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 if (-not $Scenario) { $Scenario = Join-Path $PSScriptRoot 'Scenarios\device-flow.json' }
-. (Join-Path $PSScriptRoot 'Private-Desktop.ps1')
-. (Join-Path $PSScriptRoot 'Input-Snapshot.ps1')
-. (Join-Path $PSScriptRoot 'Read-QaJson.ps1')
-. (Join-Path $PSScriptRoot 'Build-Cache.ps1')
+. (Join-Path $PSScriptRoot 'Support\Private-Desktop.ps1')
+. (Join-Path $PSScriptRoot 'Support\Input-Snapshot.ps1')
+. (Join-Path $PSScriptRoot 'Support\Read-QaJson.ps1')
+. (Join-Path $PSScriptRoot 'Support\Build-Cache.ps1')
 $qaWorkloadLease = if (-not $Worker) { [DeviceTweakerQaDesktop]::AcquireWorkload() } else { $null }
 try {
 if (-not $Worker) {
@@ -106,7 +106,7 @@ try {
     if (@(Get-ChildItem -LiteralPath $RunDirectory -Recurse -File -Filter 'crash_*.txt').Count) { throw 'Application crash report found after scenario' }
     $logs = @(Get-ChildItem -LiteralPath (Join-Path $RunDirectory 'logs') -File -Filter 'DeviceTweaker_*.log')
     if ($logs.Count -ne 1) { throw 'Expected exactly one application session log' }
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-QaLogErrors.ps1') `
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-QaLogErrors.ps1') `
         -LogPath $logs[0].FullName -ReportPath (Join-Path $RunDirectory 'runtime-errors.json') *> (Join-Path $RunDirectory 'runtime-errors.log')
     if ($LASTEXITCODE -ne 0) { throw 'Unexpected ERROR / FATAL in development session log' }
     & dotnet @inspectorArguments --dev-verify $RunDirectory *> (Join-Path $RunDirectory 'evidence.log')

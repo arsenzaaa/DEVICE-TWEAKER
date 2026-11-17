@@ -138,7 +138,7 @@ In `transition`, a nonempty `value` checks the target's selected `property` befo
 
 `irq-summary` checks the five-button top row: one global IRQ button outside the cards, no overlaps, caption capacity, EN/RU, success/failure/retry, complete PCI coverage, Space activation and 1200/1000 widths. layoutDpi 120/144 variants check scaling models.
 
-`irq-top-actions` retains comparisons of the former strip and the global READ IRQ MODE/СЧИТАТЬ IRQ button in the top row: EN/RU, reads, failure, retry, focus and 1200/1000 widths. `irq-summary` separately requires exactly five actions, fitting captions and absence of the previous strip.
+`irq-summary` covers the global READ IRQ MODE button in EN/RU: success, failure, retry, focus, keyboard activation and 1200/1000 widths, with five aligned actions and no former strip. The redundant `irq-top-actions` scenario has been removed.
 
 ## Interaction latency and motion
 
@@ -163,3 +163,11 @@ In `transition`, a nonempty `value` checks the target's selected `property` befo
 Ordinary checkpoints wait for active animations in the main window and owned dialogs to finish after painting their current targets. Transition steps keep recording the motion itself. Pixel tolerance and masks are unchanged.
 
 `dialog-result-alignment` covers reset completion, backup results and backup-location choices in EN/RU at 100/125/150% layout scaling.
+
+## Documentation images
+
+The public catalog contains a short selection of device, USB and network views. Other scenarios remain development checks; they are not an instruction to publish every state.
+
+`Export-Gallery.ps1` runs the catalog in `Scenarios/Gallery/catalog.json` sequentially and writes a review page, native PNGs and source-session hashes. `-Only gallery-usb-xhci` selects one scenario. It does not overwrite repository assets.
+
+`capture-control` renders a card or panel through WM_PRINT on its own HWND after checking visibility in the client area. Use `role:card` / `role:settings` with a device or `@reserved-cpu`; clipped targets fail. Panel coordinates within the window and selector remain in the control tree. Other `capture` steps still record the complete client window/dialog. The hidden canvas supports up to 2400 x 2000 client pixels, including sizes larger than the host monitor; this is a layout model, not a physical resolution or DPI test.

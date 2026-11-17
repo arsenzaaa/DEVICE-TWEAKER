@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "id": "gallery-storage",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "ALL",
+  "width": 1320,
+  "height": 1280,
+  "steps": [
+    {
+      "id": "en-language",
+      "action": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en-0",
+      "action": "text",
+      "target": "@search",
+      "value": "990 PRO"
+    },
+    {
+      "id": "en-1",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "en-2",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_A80C",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "en-panel-reveal",
+      "action": "reveal",
+      "target": "role:card",
+      "device": "DEV_A80C"
+    },
+    {
+      "id": "en-panel-visible",
+      "action": "assert",
+      "target": "role:card",
+      "property": "viewport",
+      "value": "true",
+      "device": "DEV_A80C"
+    },
+    {
+      "id": "en-language-check",
+      "action": "assert",
+      "target": "@main",
+      "property": "language",
+      "value": "EN"
+    },
+    {
+      "id": "en",
+      "action": "capture-control",
+      "target": "role:card",
+      "device": "DEV_A80C"
+    },
+    {
+      "id": "ru-language",
+      "action": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru-0",
+      "action": "text",
+      "target": "@search",
+      "value": "990 PRO"
+    },
+    {
+      "id": "ru-1",
+      "action": "scroll",
+      "value": "Home"
+    },
+    {
+      "id": "ru-2",
+      "action": "assert",
+      "target": "role:title",
+      "device": "DEV_A80C",
+      "property": "viewport",
+      "value": "true"
+    },
+    {
+      "id": "ru-panel-reveal",
+      "action": "reveal",
+      "target": "role:card",
+      "device": "DEV_A80C"
+    },
+    {
+      "id": "ru-panel-visible",
+      "action": "assert",
+      "target": "role:card",
+      "property": "viewport",
+      "value": "true",
+      "device": "DEV_A80C"
+    },
+    {
+      "id": "ru-language-check",
+      "action": "assert",
+      "target": "@main",
+      "property": "language",
+      "value": "RU"
+    },
+    {
+      "id": "ru",
+      "action": "capture-control",
+      "target": "role:card",
+      "device": "DEV_A80C"
+    }
+  ]
+}

@@ -13,9 +13,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'Private-Desktop.ps1')
-. (Join-Path $PSScriptRoot 'Input-Snapshot.ps1')
-. (Join-Path $PSScriptRoot 'Test-QaEvidence.ps1')
+. (Join-Path $PSScriptRoot 'Support\Private-Desktop.ps1')
+. (Join-Path $PSScriptRoot 'Support\Input-Snapshot.ps1')
+. (Join-Path $PSScriptRoot 'Support\Evidence.ps1')
 $qaWorkloadLease = if (-not $Worker) { [DeviceTweakerQaDesktop]::AcquireWorkload() } else { $null }
 try {
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..\src')).Path
@@ -129,20 +129,20 @@ try {
         [pscustomobject]@{ testClass = $_.Name; scope = $scope; passed = @($_.Group | Where-Object outcome -eq 'Passed').Count;
             failed = @($_.Group | Where-Object outcome -eq 'Failed').Count; total = $_.Count }
     })
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-QaSensitivity.ps1') `
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-QaSensitivity.ps1') `
         -OutputDirectory (Join-Path $runDir 'sensitivity')
     $sensitivityCode = $LASTEXITCODE
     $steps.Add([pscustomobject]@{ name = 'sensitivity'; status = $(if ($sensitivityCode -eq 0) { 'PASS' } else { 'FAIL' });
         exitCode = $sensitivityCode; report = (Join-Path $runDir 'sensitivity\sensitivity.json') })
     if ($sensitivityCode -ne 0) { throw 'QA sensitivity checks failed' }
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-QaScriptContracts.ps1') `
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-QaScriptContracts.ps1') `
         -OutputDirectory (Join-Path $runDir 'script-contracts')
     $contractCode = $LASTEXITCODE
     $steps.Add([pscustomobject]@{ name = 'script-contracts'; status = $(if ($contractCode -eq 0) { 'PASS' } else { 'FAIL' }); exitCode = $contractCode })
     if ($contractCode -ne 0) { throw 'QA script contracts failed' }
     $nativeCases = [ordered]@{ 'native-model' = $null; 'native-unload-mutant' = 'unload'; 'native-write-range-mutant' = 'write-past-device-end'; 'native-write-guard-mutant' = 'bypass-device-write-guard' }
     foreach ($nativeCase in $nativeCases.Keys) {
-        $nativeArguments = @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $PSScriptRoot 'Test-NativeDriverModel.ps1'),'-OutputDirectory',(Join-Path $runDir $nativeCase))
+        $nativeArguments = @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $PSScriptRoot 'Checks\Test-NativeDriverModel.ps1'),'-OutputDirectory',(Join-Path $runDir $nativeCase))
         if ($nativeCases[$nativeCase]) { $nativeArguments += @('-InjectRegression', $nativeCases[$nativeCase]) }
         & powershell.exe @nativeArguments *> (Join-Path $runDir ($nativeCase+'.log'))
         if ($LASTEXITCODE -ne 0) { throw "Native model stage failed: $nativeCase" }
@@ -153,7 +153,7 @@ try {
     Invoke-DotnetStep 'source-inventory' @('run', '--project', (Join-Path $PSScriptRoot 'Inspect\Inspect.csproj'), '--',
         (Split-Path $root), (Join-Path $root 'bin\Release\net10.0-windows\win-x64\DEVICE TWEAKER.dll'),
         (Join-Path $runDir 'source-ui-inventory.json'))
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-QaDesktopContracts.ps1') `
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-QaDesktopContracts.ps1') `
         -OutputDirectory (Join-Path $runDir 'desktop-contracts') `
         -ExePath (Join-Path $root 'bin\Release\net10.0-windows\win-x64\DEVICE TWEAKER.exe')
     if ($LASTEXITCODE -ne 0) { throw 'Private desktop launcher contracts failed' }
@@ -163,13 +163,13 @@ try {
         $status = 'PARTIAL'
         Test-QaInputSnapshot $runDir
     } else {
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-UiControls.ps1') `
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-UiControls.ps1') `
             -AssemblyPath (Join-Path $root 'bin\Release\net10.0-windows\win-x64\DEVICE TWEAKER.dll') `
             -OutputDirectory (Join-Path $runDir 'controls')
         if ($LASTEXITCODE -ne 0) { throw 'Production UI control contracts failed' }
         $steps.Add([pscustomobject]@{ name = 'ui-controls'; status = 'PASS'; report = (Join-Path $runDir 'controls\controls.json') })
         $exe = Join-Path $root 'bin\DeveloperQa\Release\net10.0-windows\win-x64\DEVICE TWEAKER QA.exe'
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-Workbench.ps1') `
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-Workbench.ps1') `
             -ExePath $exe -OutputDirectory (Join-Path $runDir 'workbench')
         if ($LASTEXITCODE -ne 0) { throw 'Development workbench failed' }
         $steps.Add([pscustomobject]@{ name = 'workbench'; status = 'PASS'; report = (Join-Path $runDir 'workbench\workbench.json');
@@ -177,7 +177,7 @@ try {
         $guiDebugArgs = @()
         if ($VisibleGui) { $guiDebugArgs += '-VisibleGui' }
         # Separate PowerShell process keeps the UI helper definitions and environment local.
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Smoke-SafeGui.ps1') `
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Smoke-SafeGui.ps1') `
             -ExePath $exe -OutputRoot (Join-Path $runDir 'gui') -Monitor $Monitor @guiDebugArgs
         $guiCode = $LASTEXITCODE
         $steps.Add([pscustomobject]@{ name = 'gui'; status = $(if ($guiCode -eq 0) { 'PASS' } else { 'FAIL' }); exitCode = $guiCode })
@@ -186,29 +186,29 @@ try {
             Where-Object { $_.Directory.Name -eq 'logs' })
         if ($guiLogs.Count -lt 3) { throw 'Expected startup, sandbox and Russian GUI session logs' }
         foreach ($sessionLog in $guiLogs) {
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-LogQuality.ps1') `
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-LogQuality.ps1') `
                 -LogPath $sessionLog.FullName -RequireSessionSummary -RequireBuildIdentity
             if ($LASTEXITCODE -ne 0) { throw "Log contract failed: $($sessionLog.FullName)" }
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-QaLogErrors.ps1') `
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-QaLogErrors.ps1') `
                 -LogPath $sessionLog.FullName -ReportPath (Join-Path $runDir ($sessionLog.BaseName + '-errors.json'))
             if ($LASTEXITCODE -ne 0) { throw "Unexpected errors: $($sessionLog.FullName)" }
 
         }
         $steps.Add([pscustomobject]@{ name = 'log-contract'; status = 'PASS'; sessions = $guiLogs.Count })
         $steps.Add([pscustomobject]@{ name = 'runtime-error-audit'; status = 'PASS'; sessions = $guiLogs.Count })
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-GuiLayout.ps1') `
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-GuiLayout.ps1') `
             -ExePath $exe -OutputDirectory (Join-Path $runDir 'layout')
         if ($LASTEXITCODE -ne 0) { throw 'GUI layout matrix failed' }
         $steps.Add([pscustomobject]@{ name = 'gui-layout'; status = 'PASS'; report = (Join-Path $runDir 'layout\layout.json') })
         foreach ($layoutLog in (Get-ChildItem -LiteralPath (Join-Path $runDir 'layout') -Recurse -File -Filter 'DeviceTweaker_*.log')) {
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-LogQuality.ps1') `
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-LogQuality.ps1') `
                 -LogPath $layoutLog.FullName -RequireSessionSummary -RequireBuildIdentity
             if ($LASTEXITCODE -ne 0) { throw 'Layout log did not complete correctly' }
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-QaLogErrors.ps1') `
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-QaLogErrors.ps1') `
                 -LogPath $layoutLog.FullName -ReportPath (Join-Path $layoutLog.Directory.FullName 'errors.json')
             if ($LASTEXITCODE -ne 0) { throw 'Unexpected layout scenario errors' }
         }
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-GuiResourceStability.ps1') `
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-GuiResourceStability.ps1') `
             -ExePath (Join-Path $root 'bin\Release\net10.0-windows\win-x64\DEVICE TWEAKER.exe') `
             -OutputDirectory (Join-Path $runDir 'resources') @guiDebugArgs
         $resourceCode = $LASTEXITCODE
@@ -217,10 +217,10 @@ try {
         if ($resourceCode -ne 0) { throw 'GUI resource stability failed' }
         $resourceLogs = @(Get-ChildItem -LiteralPath (Join-Path $runDir 'resources\processes\logs') -File -Filter 'DeviceTweaker_*.log')
         if ($resourceLogs.Count -ne 1) { throw 'Expected one production GUI resource session log' }
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-LogQuality.ps1') `
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-LogQuality.ps1') `
             -LogPath $resourceLogs[0].FullName -RequireSessionSummary -RequireBuildIdentity
         if ($LASTEXITCODE -ne 0) { throw 'Production GUI resource log contract failed' }
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Test-QaLogErrors.ps1') `
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-QaLogErrors.ps1') `
             -LogPath $resourceLogs[0].FullName -ReportPath (Join-Path $runDir 'resources\errors.json')
         if ($LASTEXITCODE -ne 0) { throw 'Unexpected production GUI resource errors' }
 

@@ -93,6 +93,37 @@ public sealed class WorkbenchTests : IDisposable
     public void ArtifactPathCannotEscapeTheSandbox(string path)
         => Assert.Throws<InvalidDataException>(() => DevFiles.Inside(Folder("paths"), path));
     [Fact]
+    public void NativeRenderRejectsAnUnpaintedLowerRegion()
+    {
+        using Bitmap image = new(24, 24);
+        using (Graphics graphics = Graphics.FromImage(image)) graphics.Clear(Color.Black);
+        NativeGlyphEvidence.RequirePainted(image);
+        using (Graphics graphics = Graphics.FromImage(image)) graphics.FillRectangle(Brushes.Magenta, 0, 18, 24, 6);
+        Assert.Throws<InvalidDataException>(() => NativeGlyphEvidence.RequirePainted(image));
+    }
+    [Fact]
+    public void NativeCaptureRegionMustFitTheOriginalWindow()
+    {
+        DevFiles.ValidateCaptureRegion(new Rectangle(10, 20, 200, 100), new Size(400, 300));
+        Assert.Throws<InvalidDataException>(() => DevFiles.ValidateCaptureRegion(new Rectangle(-1, 20, 200, 100), new Size(400, 300)));
+        Assert.Throws<InvalidDataException>(() => DevFiles.ValidateCaptureRegion(new Rectangle(300, 20, 200, 100), new Size(400, 300)));
+        Assert.Throws<InvalidDataException>(() => DevFiles.ValidateCaptureRegion(Rectangle.Empty, new Size(400, 300)));
+    }
+    [Fact]
+    public void ControlCaptureNeedsItsOwnCheckpointEvidence()
+    {
+        string root = Fixture("control-missing");
+        var scene = DevFiles.Read<DevScenario>(Path.Combine(root, "scenario.json"));
+        scene.Steps[0].Action = "capture-control";
+        DevFiles.Write(Path.Combine(root, "scenario.json"), scene);
+        var run = DevFiles.Read<DevRun>(Path.Combine(root, "session.json"));
+        run.ScenarioSha256 = DevFiles.Hash(Path.Combine(root, "scenario.json"));
+        run.Steps = [new("screen", "capture-control", "PASS", 10, "")];
+        Assert.Throws<InvalidDataException>(() => DevFiles.Verify(root, run)); // A whole-window PNG is not a panel checkpoint.
+        run.Captures.Clear();
+        Assert.Throws<InvalidDataException>(() => DevFiles.Verify(root, run));
+    }
+    [Fact]
     public void UnknownActionsAndDuplicateStepsAreRejected()
     {
         DevScenario scene = new() { Id = "bad", Steps = [new() { Id = "s", Action = "shell" }] };
