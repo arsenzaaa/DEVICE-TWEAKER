@@ -59,7 +59,7 @@ Get-FileHash -LiteralPath "$sourceRoot/$sourceName" -Algorithm SHA256
 
 ## Страница проекта
 
-README использует обычные Markdown-заголовки, текстовую навигацию и один снимок интерфейса. Дополнительные сценарии размещаются в [галерее](./SCREENSHOTS.ru.md). Снимки получаются из read-only сборки на скрытом desktop:
+README использует обычные Markdown-заголовки, краткое описание и текстовую навигацию. Примеры интерфейса размещаются в [галерее](./SCREENSHOTS.ru.md). Снимки получаются из read-only сборки на скрытом desktop:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-DevSession.ps1 -Scenario .\dev\qa\Scenarios\gallery-intel-gpu.json -OutputRoot .\local\screenshots

@@ -8,8 +8,6 @@
 
 **[Скачать для Windows](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.SelfContained.exe)** · [Руководство](./docs/guide/README.ru.md) · [Скриншоты](./docs/SCREENSHOTS.ru.md) · [История изменений](./CHANGELOG.ru.md)
 
-[![DEVICE TWEAKER на Intel Core i9-14900K](./assets/screenshots/intel-affinity.ru.png)](./docs/SCREENSHOTS.ru.md)
-
 ## Возможности
 
 ### Прерывания и привязка к ядрам
@@ -42,7 +40,7 @@ USB IMOD настраивается для контроллера целиком
 
 **Совместимость драйвера.** Для IMOD, NIC ITR и чтения конфигурации PCI используется DTIMOD.sys с загрузкой через KDU; MSI, привязка к ядрам, RSS, ReservedCpuSets и остальные настройки работают без него. Драйвер может конфликтовать с античитами, включая EAC, Vanguard и FACEIT. Закрытие приложения не выгружает драйвер. Условия загрузки и поведение сохранённых профилей описаны в [руководстве по драйверу](./docs/guide/11-driver.ru.md).
 
-**Предупреждения антивируса.** Microsoft Defender и другие антивирусы могут определять KDU как HackTool. Сверьте EXE с `SHA256SUMS.txt` из выпуска и добавьте в исключения папку программы и `%ProgramData%\DEVICE TWEAKER`, не отключая защиту целиком.
+**Предупреждения антивируса.** Microsoft Defender и другие антивирусы могут определять KDU как HackTool. Если загрузка заблокирована, проверьте причину обнаружения и сверьте EXE с `SHA256SUMS.txt` из выпуска. Если решите разрешить этот компонент, добавьте точечное исключение для заблокированного файла.
 
 ## Документация
 
@@ -52,7 +50,7 @@ USB IMOD настраивается для контроллера целиком
 
 ## Обратная связь и поддержка
 
-Ошибки и предложения можно оставить в [Issues](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues); к сообщению об ошибке приложите папку `logs`. Результатами проверки на своём оборудовании можно поделиться через [форму отчёта](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=hardware_report.yml). Новости проекта публикуются в [Telegram-канале](https://t.me/arsenzaa).
+Ошибки и предложения можно оставить в [Issues](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues). Приложите лог с нужной операцией, предварительно убрав личные пути и имена. Результатами проверки на своём оборудовании можно поделиться через [форму отчёта](https://github.com/arsenzaaa/DEVICE-TWEAKER/issues/new?template=hardware_report.yml). Новости проекта публикуются в [Telegram-канале](https://t.me/arsenzaa).
 
 Поддержать развитие DEVICE TWEAKER можно на [Boosty](https://boosty.to/arsenza).
 

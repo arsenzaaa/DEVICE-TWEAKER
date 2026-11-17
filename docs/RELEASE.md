@@ -59,7 +59,7 @@ Changes to older tags, release pages or public history require a separate migrat
 
 ## Maintain the project page
 
-The README uses a native Markdown heading, text navigation and one application screenshot. Additional scenarios belong in the [gallery](./SCREENSHOTS.md). Capture them from the read-only developer build on a hidden desktop:
+The README uses a native Markdown heading, a short overview and text navigation. Interface examples belong in the [gallery](./SCREENSHOTS.md). Capture them from the read-only developer build on a hidden desktop:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-DevSession.ps1 -Scenario .\dev\qa\Scenarios\gallery-intel-gpu.json -OutputRoot .\local\screenshots
