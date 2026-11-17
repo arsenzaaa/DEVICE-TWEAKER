@@ -61,6 +61,8 @@ The KDU loader is pinned to version 1.4.5.2512; its sources and manifests are in
 
 The full local QA - builds, tests, deliberate faults, the native driver model and UI checks on a hidden desktop - is described in [`dev/qa`](../dev/qa/README.md). It is read-only and never loads the driver.
 
+GitHub CI builds the application and developer workbench, checks Windows PowerShell 5.1 scripts and runs unit tests. CodeQL default setup is configured separately in the repository settings for **C#** and **GitHub Actions**; the published tree contains no Python files. When restoring these settings, select the languages present in the checkout. The native C/C++ driver is not covered by that CodeQL configuration; its model checks are described in the [QA guide](../dev/qa/README.md).
+
 ## Choosing checks
 
 Build and run checks that protect the changed behavior. Full QA belongs at integration points for cross-cutting changes; an expensive successful run need not be repeated after every text edit.
