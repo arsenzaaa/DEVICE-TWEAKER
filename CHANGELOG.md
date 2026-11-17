@@ -2,17 +2,17 @@
 
 [DEVICE TWEAKER](./README.md) / Changelog · [Русский](./CHANGELOG.ru.md)
 
-## Unreleased
-
-- Corrected CPU labels on homogeneous processors: Core and Core/SMT replace P-Core and P-Core/HT. Hybrid-CPU labels and core-allocation rules are unchanged.
-- Retained driver-advertised RSS queue counts on adapters without MSI-X. Queue count is tracked separately from processor count, including readback diagnostics. AUTO retains its single-queue profile.
-- Reworked the English and Russian guide and settings reference, removed repeated explanations and corrected gallery descriptions. Updated interface examples with the corrected CPU labels.
-
 ## 0.1.0
 
 **DEVICE TWEAKER REWORK**.
 
 Source comparison: [v0.0.4 → v0.1.0](https://github.com/arsenzaaa/DEVICE-TWEAKER/compare/v0.0.4...v0.1.0).
+
+### CPU labels, RSS and documentation
+
+- Corrected CPU labels on homogeneous processors: Core and Core/SMT replace P-Core and P-Core/HT. Hybrid-CPU labels and core-allocation rules are unchanged.
+- Retained driver-advertised RSS queue counts on adapters without MSI-X. Queue count is tracked separately from processor count, including readback diagnostics. AUTO retains its single-queue profile.
+- Reworked the English and Russian guide and settings reference, removed repeated explanations and corrected gallery descriptions. Updated interface examples with the corrected CPU labels.
 
 ### Driver access
 
