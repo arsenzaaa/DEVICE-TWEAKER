@@ -51,7 +51,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\src\publish-variants.ps1 -
 
 WDK signing targets могут создавать тестовые сертификаты; `-TrustImodDriverCert` явно меняет доверенные хранилища системы. Не используйте эту процедуру как обычную проверку GUI и не загружайте драйвер ради компиляции.
 
-Загрузчик KDU закреплён на версии 1.4.5.2512, его исходники и манифесты - в [`src/IMOD/KDU`](../src/IMOD/KDU/README.md).
+Загрузчик KDU закреплён на версии 1.4.5.2512, его исходники и манифесты - в [`src/IMOD/KDU`](../src/IMOD/KDU/README.ru.md).
 
 ## Автозапуск IMOD / NIC ITR
 

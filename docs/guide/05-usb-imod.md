@@ -6,7 +6,7 @@
 
 An xHCI controller handles the devices attached to its USB ports. Its interrupters have their own Event Rings and IMOD registers. Several USB devices can share one interrupter, so the device map matters when assigning different values to mouse, keyboard or audio.
 
-The IMOD interval uses 250 ns steps: `0x0` disables moderation, `0xC8` is 50 microseconds, and `0xFA0` is 1 millisecond. `0xC8` is the application's baseline value; a controller or its Windows driver can use a different default. See section 5.5.2.2 of the [xHCI specification](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/extensible-host-controler-interface-usb-xhci.pdf).
+The IMOD interval uses 250 ns steps: `0x0` disables moderation, `0xC8` is 50 microseconds, and `0xFA0` is 1 millisecond. `0xC8` is the application's baseline value; a controller or its Windows driver can use a different default. See section 5.5.2.2 of the [xHCI specification](https://cdrdv2-public.intel.com/625472/625472_xHCI_Rev1_2b.pdf).
 
 ## Choose a mode
 
