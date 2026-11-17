@@ -62,9 +62,9 @@ Changes to older tags, release pages or public history require a separate migrat
 The README uses a native Markdown heading, a short overview and text navigation. Interface examples belong in the [gallery](./SCREENSHOTS.md). Capture them from the read-only developer build on a hidden desktop:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-DevSession.ps1 -Scenario .\dev\qa\Scenarios\gallery-intel-gpu.json -OutputRoot .\local\screenshots
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Export-Gallery.ps1
 ```
 
-The `gallery-*` scenarios cover Intel/AMD affinity, all three USB modes, network adapters, storage, backups, operation results and driver notices. Each records EN/RU captures. Use the matching images from the session's `images` directory: most scenarios name them `en.png` and `ru.png`; operation outcomes include the state in the filename. Keep the session and build reference locally.
+The public gallery uses three examples in EN/RU: device settings, USB and networking. Additional read-only scenarios remain available for focused development checks. The output includes `index.html`, `gallery.json` and correctly named images. Review every original PNG before copying it into `assets/screenshots`. Keep sessions and their build references locally. Use `-Only gallery-usb-xhci` for a focused capture.
 
 Inspect both languages, label demonstration data and check agreement between controls, summaries and readback. Use the original captures without decorative frames. Keep the GitHub About description aligned with the English overview.

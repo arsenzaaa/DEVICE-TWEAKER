@@ -62,9 +62,9 @@ Get-FileHash -LiteralPath "$sourceRoot/$sourceName" -Algorithm SHA256
 README использует обычные Markdown-заголовки, краткое описание и текстовую навигацию. Примеры интерфейса размещаются в [галерее](./SCREENSHOTS.ru.md). Снимки получаются из read-only сборки на скрытом desktop:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-DevSession.ps1 -Scenario .\dev\qa\Scenarios\gallery-intel-gpu.json -OutputRoot .\local\screenshots
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Export-Gallery.ps1
 ```
 
-Сценарии `gallery-*` охватывают affinity Intel/AMD, три режима USB, сетевые адаптеры, накопители, бэкапы, результаты операций и уведомления драйвера. Каждый сохраняет снимки EN/RU в папку `images` своей сессии: обычно это `en.png` и `ru.png`, а у результатов операций имя также содержит состояние. Используйте соответствующие просмотренные кадры; сессию и ссылку на сборку оставьте локально.
+В публичной галерее три примера на EN/RU: настройки устройств, USB и сеть. Остальные read-only сценарии остаются для отдельных разработческих проверок. Результат содержит `index.html`, `gallery.json` и изображения с готовыми именами. Просмотрите каждый оригинальный PNG перед копированием в `assets/screenshots`. Сессии и ссылки на сборки оставьте локально. Для одного сценария используйте `-Only gallery-usb-xhci`.
 
 Просмотрите оба языка, подпишите демонстрационные данные и проверьте согласованность контролов, сводок и readback. Используйте исходные снимки без декоративных рамок. Описание About должно соответствовать английской главной странице.

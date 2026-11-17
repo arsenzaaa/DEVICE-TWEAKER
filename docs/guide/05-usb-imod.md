@@ -14,7 +14,7 @@ Use **XHCI** to apply one value across the controller's interrupters. Select **D
 
 Click **CHECK** to read the controller before editing it. Expand the details to inspect device assignments and register values. After reconnect, sleep or reboot, read the map again: an earlier interrupter index may no longer belong to the same device. The current-value tooltip includes the last read time.
 
-See the [USB examples](../SCREENSHOTS.md#usb-imod) for all three modes.
+See the [USB examples](../SCREENSHOTS.md#usb-controller) for all three modes.
 
 ## Apply and save
 
