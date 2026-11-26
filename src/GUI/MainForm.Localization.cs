@@ -356,16 +356,25 @@ public sealed partial class MainForm
         SetLocalizedControlText(control, state.SourceText);
     }
 
-    private int MeasureCardRowButtonWidth(Button button, int minimumUnscaledWidth, int horizontalPadding, string? sourceText = null)
+    private int MeasureCardRowButtonWidth(Button button, int minimumUnscaledWidth, int horizontalPadding, string? sourceText = null, string? busySourceText = null)
     {
-        string localizedText = UiLanguage.Text(sourceText ?? GetIdleControlSourceText(button));
-        return Math.Max(
-            UiScale(minimumUnscaledWidth),
-            TextRenderer.MeasureText(
-                localizedText,
-                button.Font,
-                Size.Empty,
-                TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width + UiScale(horizontalPadding));
+        int width = TextRenderer.MeasureText(
+            UiLanguage.Text(sourceText ?? GetIdleControlSourceText(button)),
+            button.Font,
+            Size.Empty,
+            TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width;
+        if (!string.IsNullOrEmpty(busySourceText))
+        {
+            width = Math.Max(
+                width,
+                TextRenderer.MeasureText(
+                    UiLanguage.Text(busySourceText),
+                    button.Font,
+                    Size.Empty,
+                    TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width);
+        }
+
+        return Math.Max(UiScale(minimumUnscaledWidth), width + UiScale(horizontalPadding));
     }
 
     private void SetLocalizedControlText(Control control, string sourceText)

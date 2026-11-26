@@ -800,6 +800,8 @@ public sealed partial class MainForm
             infoButton.Click += (_, _) => ShowDriverEnvironmentDetails(dialog,
                 QaRun.IsReadOnly ? driverEnvironment : CaptureDriverEnvironment());
             footer.Controls.Add(infoButton);
+            int minimumFooterWidth = padding + infoButton.Width + UiScale(16) + yesButton.Width + UiScale(10) + noButton.Width + padding;
+            clientWidth = Math.Max(clientWidth, minimumFooterWidth);
             void LayoutDriverActions()
             {
                 infoButton.Location = new Point(padding, yesButton.Top);
@@ -930,7 +932,7 @@ public sealed partial class MainForm
         string subText = hasBackup
             ? UiLanguage.Text("Device settings and the saved IMOD/NIC ITR profile.")
             : (UiLanguage.IsRussian
-                ? "Сброс возвращает поддерживаемые настройки к значениям Windows."
+                ? "Сброс возвращает поддерживаемые настройки к значениям Windows по умолчанию."
                 : "Reset restores supported settings to Windows defaults.");
 
         Label promptSub = new()

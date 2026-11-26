@@ -1250,6 +1250,7 @@ public sealed partial class MainForm
         if (targetBlock.Device.IsTestDevice)
         {
             RefreshTestImodPreview(targetBlock, "test-imod-set");
+            RevealImodCheckResult(targetBlock);
             return;
         }
 
@@ -1287,7 +1288,7 @@ public sealed partial class MainForm
             return;
         }
 
-        await AwaitBackgroundUiTasksAsync(report, RefreshImodCurrentValuesAsync(showReadingStatus: true, reason: "imod-set"));
+        await AwaitBackgroundUiTasksAsync(report, RefreshImodCurrentValuesAsync(showReadingStatus: true, reason: "imod-set", checkedBlock: targetBlock));
         if (IsDisposed || Disposing) return;
         AddImodResultToReport(report, outcome, note, technicalDetails);
 

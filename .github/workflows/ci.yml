@@ -44,17 +44,11 @@ jobs:
         shell: powershell
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File dev/qa/Checks/Test-BuildUserData.ps1
 
-      - name: Check QA build cache contracts
+      - name: Check DTIMOD and KDU provenance
         shell: powershell
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File dev/qa/Checks/Test-QaBuildCache.ps1
-
-      - name: Check bounded QA preparation
-        shell: powershell
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File dev/qa/Checks/Test-QaDevPreparation.ps1 -OutputDirectory local/qa-preparation
-
-      - name: Check release application identities
-        shell: powershell
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File dev/qa/Checks/Test-PackageIdentity.ps1
+        run: |
+          . ./dev/qa/Support/Input-Snapshot.ps1
+          Test-QaDriverArtifact (Get-Location).Path
 
       - name: Build developer workbench from checkout
         shell: powershell

@@ -24,13 +24,20 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Export-Gallery.
 
 Для логики приложения выбирайте соответствующие тесты из [tests/DeviceTweaker.Tests](tests/DeviceTweaker.Tests). Полный набор ниже нужен при сквозных изменениях. После каждой правки текста или небольшого визуального изменения его запускать не требуется.
 
-## Полный скрытый QA
+## Скрытый QA
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-Qa.ps1
+# Быстрая проверка (сборка Release, xUnit-тесты, целостность драйвера и KDU; ~15-20 сек):
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-Qa.ps1 -Mode Fast
+
+# Полная проверка (GUI на скрытом рабочем столе, сценарии Workbench, матрица DPI 96/120/144, стабильность ресурсов):
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-Qa.ps1 -Mode Full
+
+# С флагом -WithNative при правках C-кода драйвера:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-Qa.ps1 -Mode Full -WithNative
 ```
 
-Команда собирает снимок исходников и выполняет unit-тесты, проверки с намеренными отказами, модель нативного драйвера и проверки интерфейса на скрытом рабочем столе. Это может занять несколько минут. Области покрытия, требования и результаты описаны в [справочнике проверок](Checks/README.ru.md).
+Области покрытия, требования и результаты описаны в [справочнике проверок](Checks/README.ru.md).
 
 ## Остальные команды
 

@@ -282,7 +282,18 @@ public sealed partial class MainForm
 
     private void RevealImodCheckResult(DeviceBlock block)
     {
-        if (!block.ImodDetailsExpanded && block.ImodDetailsButton is { IsDisposed: false } details)
+        if (block.ImodDetailsExpanded) return;
+        block.ImodReadbackRequested = true;
+        if (block.RestoreImodDetailsExpansion is not null)
+        {
+            block.RestoreImodDetailsExpansion(true);
+            block.RelayoutAction?.Invoke();
+            LayoutBlocks();
+            WriteLog($"UI: IMOD details expanded device={block.Device.InstanceId}");
+            return;
+        }
+
+        if (block.ImodDetailsButton is { IsDisposed: false } details)
         {
             details.PerformClick();
         }
@@ -293,7 +304,11 @@ public sealed partial class MainForm
         _ = RefreshImodCurrentValuesAsync(showReadingStatus, reason);
     }
 
-    private async Task RefreshImodCurrentValuesAsync(bool showReadingStatus = true, string reason = "refresh", DeviceBlock? checkedBlock = null)
+    private async Task RefreshImodCurrentValuesAsync(
+        bool showReadingStatus = true,
+        string reason = "refresh",
+        DeviceBlock? checkedBlock = null,
+        IReadOnlySet<string>? revealInstanceIds = null)
     {
         List<DeviceBlock> testBlocks = _blocks
             .Where(b => IsUsbImodTarget(b.Device) && b.Device.IsTestDevice)
@@ -465,7 +480,8 @@ public sealed partial class MainForm
                 SetImodStatusTooltip(block.ImodMapLabel);
             }
             SetImodDetailsVisibility(block, forceVisible: false);
-            if (ReferenceEquals(block, checkedBlock))
+            if (ReferenceEquals(block, checkedBlock)
+                || (revealInstanceIds is not null && revealInstanceIds.Contains(block.Device.InstanceId)))
             {
                 RevealImodCheckResult(block);
             }

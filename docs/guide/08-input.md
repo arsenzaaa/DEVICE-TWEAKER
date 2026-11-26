@@ -23,7 +23,7 @@ HKCU\Control Panel\Mouse
   RawMouseThrottleDuration  REG_DWORD
 ```
 
-The UI offers presets of 1, 2, 4, 5, 8, 10 and 20 ms. The label uses `1000 / interval` to show the requested rate in Hz. It applies to background listeners whose event rate Windows limits. Verify the delivered rate in the receiving application, especially with the 1 and 2 ms presets.
+The UI offers presets of 1, 2, 4, 5, 8, 10 and 20 ms. The label uses `1000 / interval` to show the requested rate in Hz. The setting applies to background listeners whose event rate Windows limits. Verify the delivered rate in the receiving application, especially with the 1 and 2 ms presets.
 
 The switch is available starting with Windows 11 build 22621.1928, which included [high-report-rate mouse improvements](https://support.microsoft.com/en-us/servicing/os/windows-11/2023/06/june-27-2023-kb5027303-os-build-22621-1928-preview).
 

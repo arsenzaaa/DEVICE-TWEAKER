@@ -49,7 +49,7 @@ internal sealed class DeviceCard : UserControl
         {
             Size = new Size(Math.Max(1, Width - S(40)), S(24)), Location = new Point(S(18), S(8)),
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-            WrapContents = false, Margin = Padding.Empty, Padding = Padding.Empty, BackColor = Color.Transparent,
+            WrapContents = false, Margin = Padding.Empty, Padding = Padding.Empty, BackColor = style.Background,
         };
         _kind = new Label
         {

@@ -57,14 +57,16 @@ public sealed partial class MainForm
     private Icon? _appIcon;
     private bool _darkModeInitialized;
     private bool _uiDisposing;
+    private bool _displayReadLifetimeDisposed;
 
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
-            if (!_uiDisposing)
+            _uiDisposing = true;
+            if (!_displayReadLifetimeDisposed)
             {
-                _uiDisposing = true;
+                _displayReadLifetimeDisposed = true;
                 _displayReadLifetime.Cancel();
                 _displayReadLifetime.Dispose();
             }
@@ -74,6 +76,7 @@ public sealed partial class MainForm
             _layoutRefreshTimer?.Dispose();
             _copyToolTip?.Dispose();
             _appIcon?.Dispose();
+            SuspendLayout();
         }
 
         // Destroy child controls while their shared fonts are still alive.

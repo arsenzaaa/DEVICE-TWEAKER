@@ -16,6 +16,7 @@ internal sealed class UiFrameClock
     private volatile bool _failed;
     private volatile bool _hasWork;
     private double _periodMs = 1000.0 / 60;
+    private int _cachedRefreshRate;
     private int _pending;
     internal bool HighResolution => _timer.HighResolution;
 #if DEVELOPER_QA
@@ -30,6 +31,8 @@ internal sealed class UiFrameClock
     private UiFrameClock(Form form)
     {
         _form = form;
+        form.LocationChanged += OnDisplayContextChanged;
+        form.DpiChanged += OnDisplayContextChanged;
         form.Disposed += OnDisposed;
         new Thread(WaitForFrames) { IsBackground = true, Name = "DEVICE TWEAKER animation clock" }.Start();
     }
@@ -41,7 +44,12 @@ internal sealed class UiFrameClock
         {
             UiFrameClock clock = Clocks.GetValue(form, root => new(root));
             if (clock._disposed) return null;
-            int rate = NativeAnimationClock.ReadRefreshRate(owner);
+            int rate = clock._cachedRefreshRate;
+            if (rate <= 0)
+            {
+                rate = NativeAnimationClock.ReadRefreshRate(form);
+                clock._cachedRefreshRate = rate;
+            }
 #if DEVELOPER_QA
             rate = QaRefreshRate ?? rate;
 #endif
@@ -145,8 +153,24 @@ internal sealed class UiFrameClock
         if (!_disposed) Wake();
     }
 
+    internal static void StopAll(Form form)
+    {
+        if (!Clocks.TryGetValue(form, out UiFrameClock? clock)) return;
+        clock._disposed = true;
+        foreach (Subscription item in clock._active.ToArray()) item.Dispose();
+        clock.ReleasePending();
+        clock.Wake();
+    }
+
+    private void OnDisplayContextChanged(object? sender, EventArgs e)
+    {
+        _cachedRefreshRate = 0;
+    }
+
     private void OnDisposed(object? sender, EventArgs e)
     {
+        _form.LocationChanged -= OnDisplayContextChanged;
+        _form.DpiChanged -= OnDisplayContextChanged;
         _form.Disposed -= OnDisposed;
         _disposed = true;
         foreach (Subscription item in _active.ToArray()) item.Dispose();

@@ -1,4 +1,4 @@
-# Verifying changes
+# Verifying results
 
 [Documentation](../README.md) / [Guide](./README.md) / 10 · [Русский](./10-verification.ru.md)
 

@@ -14,7 +14,7 @@ For manual selection, tick the required CPUs and use **SpecCPU**. Click **APPLY*
 
 **SpecCPU** uses the CPUs selected in the card. **MachineDefault** returns processor selection to Windows. On devices with a manual IRQ affinity picker, choose **MachineDefault** and click **APPLY** to remove the override. For NDIS cards, use the network controls to choose **RSS**, **IRQ** or **BOTH**.
 
-Choose any of the following policies to let Windows select the processors. The card clears the manual CPU selection when you choose one of them:
+Choose any of the following policies to let Windows select the processors. The card clears the manual CPU selection when you select one of them:
 
 - **AllClose** uses processors close to the device in the NUMA topology. On a non-NUMA system it behaves like **All**.
 - **Single** requests one close processor; on a non-NUMA system Windows can choose any processor.

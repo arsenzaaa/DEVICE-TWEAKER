@@ -45,13 +45,13 @@
   <data name="Inline.0028.Unknown" xml:space="preserve"><value>Неизвестно</value></data>
   <data name="Inline.0029.Protection" xml:space="preserve"><value>Защита:</value></data>
   <data name="Inline.0030.Backup.files.deleted" xml:space="preserve"><value>Удалено файлов бэкапов:</value></data>
-  <data name="Inline.0031.Preparing.RESET.WINDOWS.DEFAULT" xml:space="preserve"><value>Подготовка сброса Windows...</value></data>
-  <data name="Inline.0032.Previewing.RESET.WINDOWS.DEFAULT" xml:space="preserve"><value>Предпросмотр сброса Windows...</value></data>
-  <data name="Inline.0033.Running.RESET.WINDOWS.DEFAULT" xml:space="preserve"><value>Выполняется сброс Windows...</value></data>
+  <data name="Inline.0031.Preparing.RESET.WINDOWS.DEFAULT" xml:space="preserve"><value>Подготовка сброса настроек...</value></data>
+  <data name="Inline.0032.Previewing.RESET.WINDOWS.DEFAULT" xml:space="preserve"><value>Предпросмотр сброса настроек...</value></data>
+  <data name="Inline.0033.Running.RESET.WINDOWS.DEFAULT" xml:space="preserve"><value>Выполняется сброс настроек...</value></data>
   <data name="Inline.0034.Resetting.device.settings" xml:space="preserve"><value>Сброс настроек устройств</value></data>
   <data name="Inline.0035.Resetting.reserved.CPU.sets" xml:space="preserve"><value>Сброс Reserved CPU Sets...</value></data>
-  <data name="Inline.0036.Removing.IMOD.persistence" xml:space="preserve"><value>Удаление IMOD Persistence...</value></data>
-  <data name="Inline.0037.Updating.IRQ.counts" xml:space="preserve"><value>Обновление IRQ...</value></data>
+  <data name="Inline.0036.Removing.IMOD.persistence" xml:space="preserve"><value>Удаление автозапуска IMOD...</value></data>
+  <data name="Inline.0037.Updating.IRQ.counts" xml:space="preserve"><value>Обновление количества IRQ...</value></data>
   <data name="Inline.0038.Ready" xml:space="preserve"><value>Готово</value></data>
   <data name="Inline.0039.MSI.Enabled" xml:space="preserve"><value>MSI: Включено</value></data>
   <data name="Inline.0040.MSI.Disabled" xml:space="preserve"><value>MSI: Выключено</value></data>
@@ -109,19 +109,19 @@
   <data name="Message.AUTOMATIC.BACKUP" xml:space="preserve"><value>АВТОМАТИЧЕСКИЙ БЭКАП</value></data>
   <data name="Message.Accepted.values.DWORD.1.20.ms" xml:space="preserve"><value>Пользовательский интервал: DWORD 1–20 мс.</value></data>
   <data name="Message.Add.fake.device.276f977a" xml:space="preserve"><value>Добавление тестового устройства</value></data>
-  <data name="Message.Affinity.mask.must.be.hexadecimal.for.example.0x3" xml:space="preserve"><value>Affinity mask должна быть шестнадцатеричной, например 0x3.</value></data>
+  <data name="Message.Affinity.mask.must.be.hexadecimal.for.example.0x3" xml:space="preserve"><value>Значение Affinity mask должно быть шестнадцатеричным, например 0x3.</value></data>
   <data name="Message.After.reboot.run.CHECK.or.AUTO.OPTIMIZATION.again" xml:space="preserve"><value>После перезагрузки снова нажмите ПРОВЕРИТЬ или АВТООПТИМИЗАЦИЮ, чтобы применить IMOD.</value></data>
   <data name="Message.AllCloseProcessors" xml:space="preserve"><value>AllCloseProcessors</value></data>
   <data name="Message.AllProcessorsInMachine" xml:space="preserve"><value>AllProcessorsInMachine</value></data>
   <data name="Message.An.older.DTIMOD.driver.is.loaded.Restart.Windows" xml:space="preserve"><value>Загружена предыдущая версия DTIMOD. Перезагрузите Windows, затем нажмите ПРОВЕРИТЬ.</value></data>
   <data name="Message.Anti.cheat.components.were.found.Compatibility.with.DTIMOD" xml:space="preserve"><value>Найдены компоненты античита. Совместимость с DTIMOD/KDU не подтверждена; конфликт возможен, но не обнаружен.</value></data>
-  <data name="Message.AppData.keeps.it.in.your.user.profile" xml:space="preserve"><value>В AppData он останется в профиле пользователя.</value></data>
+  <data name="Message.AppData.keeps.it.in.your.user.profile" xml:space="preserve"><value>В APPDATA бэкап сохраняется в профиле пользователя Windows.</value></data>
   <data name="Message.Applied" xml:space="preserve"><value>Применено</value></data>
   <data name="Message.Applied.steps.were.saved" xml:space="preserve"><value>Применённые настройки сохранены.</value></data>
   <data name="Message.Applied.steps.were.saved.One.optional.step.was" xml:space="preserve"><value>Настройки сохранены. Один дополнительный шаг не выполнен.</value></data>
-  <data name="Message.Applied.steps.were.saved.One.or.more.steps" xml:space="preserve"><value>Применённые настройки сохранены. Часть изменений не применена.</value></data>
+  <data name="Message.Applied.steps.were.saved.One.or.more.steps" xml:space="preserve"><value>Не все настройки удалось применить. Выполненные изменения сохранены.</value></data>
   <data name="Message.Applied.with.APPLY.AUTO.A.reboot.may.be" xml:space="preserve"><value>Применяется через ПРИМЕНИТЬ или АВТООПТИМИЗАЦИЮ. Может потребоваться перезагрузка.</value></data>
-  <data name="Message.Applied.with.warnings.Core.settings.were.successfully.configured" xml:space="preserve"><value>Основные настройки применены с замечаниями.</value></data>
+  <data name="Message.Applied.with.warnings.Core.settings.were.successfully.configured" xml:space="preserve"><value>Применено с предупреждениями. Основные настройки успешно заданы.</value></data>
   <data name="Message.Apply" xml:space="preserve"><value>Применение</value></data>
   <data name="Message.Apply.IMOD.and.re.read.the.values.to" xml:space="preserve"><value>Применить IMOD и повторно считать значения для проверки записи.</value></data>
   <data name="Message.Apply.USB.IMOD.during.AUTO.OPTIMIZATION" xml:space="preserve"><value>Применить USB IMOD при автооптимизации?</value></data>
@@ -130,7 +130,7 @@
   <data name="Message.Applying.USB.IMOD" xml:space="preserve"><value>Применение USB IMOD...</value></data>
   <data name="Message.Applying.USB.selective.suspend" xml:space="preserve"><value>Применение USB selective suspend...</value></data>
   <data name="Message.Applying.changes" xml:space="preserve"><value>Применение изменений...</value></data>
-  <data name="Message.AssignmentSetOverride.selects.CPUs.for.device.interrupts.The.driver" xml:space="preserve"><value>AssignmentSetOverride задает CPU для прерываний устройства. Драйвер может отправить DPC на другой CPU. Фактическое распределение ISR / DPC проверяется трассировкой.</value></data>
+  <data name="Message.AssignmentSetOverride.selects.CPUs.for.device.interrupts.The.driver" xml:space="preserve"><value>AssignmentSetOverride задаёт CPU для прерываний устройства. Драйвер может отправить DPC на другой CPU. Фактическое распределение ISR / DPC проверяется трассировкой.</value></data>
   <data name="Message.Audio.8a2b9bff" xml:space="preserve"><value>Аудио:</value></data>
   <data name="Message.Auto" xml:space="preserve"><value>Авто</value></data>
   <data name="Message.Auto.optimization.Ctrl.O" xml:space="preserve"><value>Автооптимизация (Ctrl+O)</value></data>
@@ -168,8 +168,8 @@
   <data name="Message.CONTINUE" xml:space="preserve"><value>ПРОДОЛЖИТЬ</value></data>
   <data name="Message.COPIED" xml:space="preserve"><value>СКОПИРОВАНО</value></data>
   <data name="Message.COPY" xml:space="preserve"><value>КОПИРОВАТЬ</value></data>
-  <data name="Message.COPY.REGISTRY" xml:space="preserve"><value>[ СКОПИРОВАТЬ РЕЕСТР ]</value></data>
-  <data name="Message.COPY.REGISTRY.94d5d02f" xml:space="preserve"><value>СКОПИРОВАТЬ РЕЕСТР</value></data>
+  <data name="Message.COPY.REGISTRY" xml:space="preserve"><value>[ КОПИРОВАТЬ ПУТЬ ]</value></data>
+  <data name="Message.COPY.REGISTRY.94d5d02f" xml:space="preserve"><value>КОПИРОВАТЬ ПУТЬ</value></data>
   <data name="Message.CPPC.ratings" xml:space="preserve"><value>Рейтинги CPPC:</value></data>
   <data name="Message.CPPC.ratings.are.invalid" xml:space="preserve"><value>Рейтинги CPPC указаны неверно.</value></data>
   <data name="Message.CPU.Affinity" xml:space="preserve"><value>CPU Affinity</value></data>
@@ -179,11 +179,11 @@
   <data name="Message.CPU.name" xml:space="preserve"><value>Название CPU:</value></data>
   <data name="Message.CPU.preset" xml:space="preserve"><value>Пресет CPU:</value></data>
   <data name="Message.Can.reduce.the.message.load.from.background.listeners" xml:space="preserve"><value>Может уменьшить нагрузку от обработки фоновых сообщений.</value></data>
-  <data name="Message.Change.the.explicit.Vulnerable.Driver.Blocklist.setting.to" xml:space="preserve"><value>Изменить параметр Vulnerable Driver Blocklist на выключенный? Это не гарантирует загрузку DTIMOD.</value></data>
+  <data name="Message.Change.the.explicit.Vulnerable.Driver.Blocklist.setting.to" xml:space="preserve"><value>Отключить параметр Vulnerable Driver Blocklist в реестре? Это не гарантирует загрузку DTIMOD.</value></data>
   <data name="Message.Choose.how.to.restore.DEVICE.TWEAKER.settings" xml:space="preserve"><value>Выберите способ восстановления настроек DEVICE TWEAKER.</value></data>
   <data name="Message.Clear.all.cores" xml:space="preserve"><value>Снять выбор со всех ядер</value></data>
   <data name="Message.Clearing.device.list" xml:space="preserve"><value>Очистка списка устройств...</value></data>
-  <data name="Message.Click.READ.IRQ.MODE.at.the.top.to" xml:space="preserve"><value>Нажмите СЧИТАТЬ IRQ вверху окна, чтобы считать режимы прерываний всех PCI-устройств. При необходимости загрузит DTIMOD.sys. Настройки устройства не меняются.</value></data>
+  <data name="Message.Click.READ.IRQ.MODE.at.the.top.to" xml:space="preserve"><value>Нажмите СЧИТАТЬ IRQ вверху окна, чтобы считать режимы прерываний всех PCI-устройств. При необходимости будет загружен DTIMOD.sys. Настройки устройств не меняются.</value></data>
   <data name="Message.Click.to.copy.the.registry.path" xml:space="preserve"><value>Нажмите, чтобы скопировать путь реестра.</value></data>
   <data name="Message.Click.to.use.the.default.IMOD.interval" xml:space="preserve"><value>Нажмите, чтобы подставить стандартный интервал IMOD.</value></data>
   <data name="Message.Close.X.cancel.AUTO.OPTIMIZATION" xml:space="preserve"><value>Закрытие окна (X) отменяет АВТООПТИМИЗАЦИЮ.</value></data>
@@ -205,15 +205,15 @@
   <data name="Message.DEVICE.TWEAKER.CRITICAL.ERROR" xml:space="preserve"><value>DEVICE TWEAKER: КРИТИЧЕСКАЯ ОШИБКА</value></data>
   <data name="Message.DEVICE.TWEAKER.accepts.DWORD.values.from.1.to" xml:space="preserve"><value>DEVICE TWEAKER принимает значения DWORD от 1 до 20 миллисекунд.</value></data>
   <data name="Message.DEVICE.TWEAKER.does.not.offer.this.setting.on" xml:space="preserve"><value>DEVICE TWEAKER не предлагает эту настройку в Windows 10 и старых сборках Windows 11 22H2 без необходимых обновлений.</value></data>
-  <data name="Message.DEVICE.TWEAKER.has.crashed.and.will.close" xml:space="preserve"><value>В DEVICE TWEAKER произошел сбой. Программа будет закрыта.</value></data>
-  <data name="Message.DEVICE.TWEAKER.has.crashed.and.will.close.A" xml:space="preserve"><value>В DEVICE TWEAKER произошел сбой. Программа будет закрыта.
+  <data name="Message.DEVICE.TWEAKER.has.crashed.and.will.close" xml:space="preserve"><value>В DEVICE TWEAKER произошёл сбой. Программа будет закрыта.</value></data>
+  <data name="Message.DEVICE.TWEAKER.has.crashed.and.will.close.A" xml:space="preserve"><value>В DEVICE TWEAKER произошёл сбой. Программа будет закрыта.
 
 Отчёт о сбое сохранён в папке logs. Новые настройки применяться не будут.</value></data>
   <data name="Message.DEVICE.TWEAKER.is.running.in.TEST.ADMIN.mode" xml:space="preserve"><value>DEVICE TWEAKER запущен в тестовом режиме администратора.
 
 Все аппаратные настройки и изменения реестра симулируются и полностью безопасны.</value></data>
   <data name="Message.DEVICES" xml:space="preserve"><value>УСТРОЙСТВА</value></data>
-  <data name="Message.DIAGNOSTIC.LOGGING.IS.UNAVAILABLE" xml:space="preserve"><value>НЕ УДАЕТСЯ ЗАПИСАТЬ ЛОГ</value></data>
+  <data name="Message.DIAGNOSTIC.LOGGING.IS.UNAVAILABLE" xml:space="preserve"><value>НЕ УДАЁТСЯ ЗАПИСАТЬ ЛОГ</value></data>
   <data name="Message.DIAGNOSTICS.SYSTEM.LOG" xml:space="preserve"><value>ДИАГНОСТИКА И СИСТЕМНЫЙ ЛОГ</value></data>
   <data name="Message.DISABLE" xml:space="preserve"><value>ОТКЛЮЧИТЬ</value></data>
   <data name="Message.DISABLE.TEST.MODE" xml:space="preserve"><value>ОТКЛЮЧИТЬ ТЕСТОВЫЙ РЕЖИМ</value></data>
@@ -239,14 +239,14 @@
   <data name="Message.Device.Manager.Power.Management.Allow.the.computer.to" xml:space="preserve"><value>Диспетчер устройств → Управление электропитанием → "Разрешить отключение этого устройства для экономии энергии".</value></data>
   <data name="Message.Device.preset" xml:space="preserve"><value>Пресет устройства:</value></data>
   <data name="Message.DevicePolicy.requests.how.Windows.assigns.processors.to.device" xml:space="preserve"><value>DevicePolicy задаёт политику выбора процессоров для прерываний устройства:
-• SpecCPU использует выбранную маску Affinity Mask
+• SpecCPU использует выбранную Affinity Mask
 • MachineDefault оставляет выбор Windows
 • AllClose / Single запрашивают близкие процессоры либо один процессор
 • SpreadMessages может распределять сообщения MSI-X, если устройство и драйвер используют несколько векторов.
 Драйвер может отдельно выбирать CPU для DPC.</value></data>
-  <data name="Message.DevicePriority.requests.interrupt.priority.High.applies.to.interrupts" xml:space="preserve"><value>DevicePriority задает запрашиваемый приоритет прерываний. High относится к прерываниям, а не приоритету игры / DPC. Фактическое выполнение зависит от Windows / драйвера.</value></data>
+  <data name="Message.DevicePriority.requests.interrupt.priority.High.applies.to.interrupts" xml:space="preserve"><value>DevicePriority задаёт запрашиваемый приоритет прерываний. High относится к прерываниям, а не к приоритету игры или DPC. Фактическое планирование зависит от Windows и драйвера.</value></data>
   <data name="Message.Devices.4ba5121d" xml:space="preserve"><value>Устройства</value></data>
-  <data name="Message.Devices.were.added.or.removed.after.this.read" xml:space="preserve"><value>После этого чтения устройства подключались или отключались. USB-устройство могло получить другой interrupter; нажмите ПРОВЕРИТЬ, чтобы прочитать заново.</value></data>
+  <data name="Message.Devices.were.added.or.removed.after.this.read" xml:space="preserve"><value>После последнего чтения состав устройств изменился. USB-устройство могло получить другой interrupter; нажмите ПРОВЕРИТЬ, чтобы считать данные заново.</value></data>
   <data name="Message.Disable.Vulnerable.Driver.Blocklist" xml:space="preserve"><value>Отключить Vulnerable Driver Blocklist?</value></data>
   <data name="Message.Disabled" xml:space="preserve"><value>Выключено</value></data>
   <data name="Message.Display.HDMI.audio.shares.PCIe.bus.with.the" xml:space="preserve"><value>Звук HDMI/DisplayPort делит шину PCIe с видеокартой и использует стандартную маршрутизацию прерываний Windows (0x0).</value></data>
@@ -313,23 +313,23 @@
   <data name="Message.INFORMATION" xml:space="preserve"><value>ИНФОРМАЦИЯ</value></data>
   <data name="Message.IRQ" xml:space="preserve"><value>IRQ</value></data>
   <data name="Message.IRQ.Mode" xml:space="preserve"><value>Режим IRQ:</value></data>
-  <data name="Message.IRQ.Mode.Windows.allocated.resources.PCI.MSI.Enable" xml:space="preserve"><value>Режим IRQ определяется по выделенным ресурсам Windows / битам MSI Enable и MSI-X Enable в PCI. HW показывает поддерживаемые режимы.</value></data>
+  <data name="Message.IRQ.Mode.Windows.allocated.resources.PCI.MSI.Enable" xml:space="preserve"><value>Режим IRQ определяется по выделенным ресурсам Windows и битам MSI Enable / MSI-X Enable в PCI. HW показывает поддерживаемые режимы, а не активный режим.</value></data>
   <data name="Message.IRQ.Priority" xml:space="preserve"><value>IRQ Priority:</value></data>
   <data name="Message.IRQ.count" xml:space="preserve"><value>IRQ count:</value></data>
-  <data name="Message.IRQ.count.WMI.data.HW.supported.modes.CHECK" xml:space="preserve"><value>Количество IRQ берется из WMI. HW показывает поддерживаемые режимы. Кнопка ПРОВЕРИТЬ рядом с IRQ Mode считывает текущий режим через DTIMOD.</value></data>
-  <data name="Message.IRQ.count.WMI.data.WMI.hint.MSI.MSI" xml:space="preserve"><value>Количество IRQ берется из WMI. WMI hint оценивает MSI / MSI-X по IRQ выше 999, но не определяет активный режим и не различает MSI и MSI-X. HW показывает возможности устройства.</value></data>
+  <data name="Message.IRQ.count.WMI.data.HW.supported.modes.CHECK" xml:space="preserve"><value>Количество IRQ берётся из WMI. HW показывает поддерживаемые режимы. Кнопка ПРОВЕРИТЬ рядом с «Режим IRQ» считывает текущий режим через DTIMOD.</value></data>
+  <data name="Message.IRQ.count.WMI.data.WMI.hint.MSI.MSI" xml:space="preserve"><value>Количество IRQ берётся из WMI. WMI hint оценивает MSI / MSI-X по IRQ выше 999, но не определяет активный режим и не различает MSI и MSI-X. HW показывает возможности устройства.</value></data>
   <data name="Message.IRQ.count.comes.from.WMI.HW.lists.supported" xml:space="preserve"><value>Количество IRQ берётся из WMI. HW показывает поддерживаемые режимы. Кнопка СЧИТАТЬ IRQ вверху окна считывает режимы всех PCI-устройств через DTIMOD.sys.</value></data>
   <data name="Message.IRQ.count.comes.from.WMI.IRQ.Mode.uses" xml:space="preserve"><value>IRQ показывает число ресурсов прерываний по данным WMI. Режим IRQ определяется по ресурсам Windows и доступным данным PCI. HW показывает поддерживаемые режимы. ОБНОВИТЬ считывает текущее состояние без загрузки DTIMOD.</value></data>
-  <data name="Message.IRQ.count.must.be.Auto.or.a.number" xml:space="preserve"><value>IRQ count должен быть Auto или числом от 0 до 64.</value></data>
+  <data name="Message.IRQ.count.must.be.Auto.or.a.number" xml:space="preserve"><value>Значение IRQ count должно быть Auto или числом от 0 до 64.</value></data>
   <data name="Message.ImodReadFailed" xml:space="preserve"><value>ImodReadFailed</value></data>
   <data name="Message.ImodVerificationMismatch" xml:space="preserve"><value>ImodVerificationMismatch</value></data>
   <data name="Message.ImodWriteFailed" xml:space="preserve"><value>ImodWriteFailed</value></data>
   <data name="Message.Include.USB.IMOD" xml:space="preserve"><value>Включить USB IMOD</value></data>
   <data name="Message.Include.USB.IMOD.in.auto.optimization" xml:space="preserve"><value>Включить USB IMOD в автооптимизацию?</value></data>
   <data name="Message.Initial.state.device" xml:space="preserve"><value>Устройство начального состояния:</value></data>
-  <data name="Message.Input.format.for.the.selected.IMOD.mode" xml:space="preserve"><value>Формат ввода для выбранного IMOD mode.</value></data>
+  <data name="Message.Input.format.for.the.selected.IMOD.mode" xml:space="preserve"><value>Формат ввода для выбранного режима IMOD.</value></data>
   <data name="Message.Install.the.GPU.driver.and.press.REFRESH" xml:space="preserve"><value>Установите драйвер видеокарты и нажмите ОБНОВИТЬ.</value></data>
-  <data name="Message.Integrated.GPU.iGPU" xml:space="preserve"><value>Integrated GPU (iGPU)</value></data>
+  <data name="Message.Integrated.GPU.iGPU" xml:space="preserve"><value>Встроенная графика (iGPU)</value></data>
   <data name="Message.Interrupters" xml:space="preserve"><value>Interrupters</value></data>
   <data name="Message.It.does.not.represent.measured.latency.or.the" xml:space="preserve"><value>Она не является измеренной задержкой и не показывает согласованную скорость подключения устройства.</value></data>
   <data name="Message.It.may.conflict.with.DTIMOD.sys" xml:space="preserve"><value>Возможен конфликт с DTIMOD.sys.</value></data>
@@ -375,8 +375,8 @@
   <data name="Message.Manual.custom.c20a02da" xml:space="preserve"><value>Вручную (своё)</value></data>
   <data name="Message.Mask" xml:space="preserve"><value>Affinity Mask:</value></data>
   <data name="Message.Memory.integrity.HVCI" xml:space="preserve"><value>Целостность памяти (HVCI)</value></data>
-  <data name="Message.MessageNumberLimit.sets.the.requested.message.limit.Unlimited.removes" xml:space="preserve"><value>MessageNumberLimit задает лимит сообщений. Unlimited снимает лимит (0 тоже принимается). Фактическое количество зависит от устройства / Windows / драйвера.</value></data>
-  <data name="Message.Mice.with.a.polling.rate.from.1.to" xml:space="preserve"><value>Мыши с частотой опроса от 1 до 8 кГц могут создавать высокую нагрузку сообщениями.</value></data>
+  <data name="Message.MessageNumberLimit.sets.the.requested.message.limit.Unlimited.removes" xml:space="preserve"><value>MessageNumberLimit задаёт лимит сообщений. Unlimited снимает лимит (0 тоже принимается). Фактическое количество зависит от устройства / Windows / драйвера.</value></data>
+  <data name="Message.Mice.with.a.polling.rate.from.1.to" xml:space="preserve"><value>Мыши с частотой опроса от 1 до 8 кГц могут создавать высокую нагрузку из-за большого числа сообщений.</value></data>
   <data name="Message.Microphone" xml:space="preserve"><value>Микрофон:</value></data>
   <data name="Message.Mode" xml:space="preserve"><value>Режим:</value></data>
   <data name="Message.Mouse.f75b476c" xml:space="preserve"><value>Мышь:</value></data>
@@ -418,7 +418,7 @@
   <data name="Message.Nominal.intervals.20.ms.50.Hz.8.ms" xml:space="preserve"><value>Расчётная частота: 20 мс ≈ 50 Гц, 8 мс ≈ 125 Гц, 1 мс ≈ 1 кГц. Это запрашиваемые интервалы; фактическая доставка зависит от Windows и получателя.</value></data>
   <data name="Message.None.dc937b59" xml:space="preserve"><value>Нет</value></data>
   <data name="Message.Normal" xml:space="preserve"><value>Обычный</value></data>
-  <data name="Message.Not.applied.3de0546b" xml:space="preserve"><value>не выполнено</value></data>
+  <data name="Message.Not.applied.3de0546b" xml:space="preserve"><value>не применено</value></data>
   <data name="Message.Not.configured" xml:space="preserve"><value>Не задано</value></data>
   <data name="Message.Not.configured.no.registry.value.This.does.not" xml:space="preserve"><value>Не задано = параметра нет в реестре. Это не означает, что функция отключена.</value></data>
   <data name="Message.Not.configured.no.registry.value.this.does.not.1bb0fa1a" xml:space="preserve"><value>Не задано: параметра нет в реестре. Это не означает "выключено".</value></data>
@@ -442,7 +442,7 @@
   <data name="Message.Optional.fake.IRQ.count.shown.in.device.blocks" xml:space="preserve"><value>Необязательное тестовое количество IRQ в карточках устройств. Если поле пустое или выбрано Авто, используется значение по роли.</value></data>
   <data name="Message.Optional.fake.hardware.ID.Example.PCI.VEN.10EC" xml:space="preserve"><value>Необязательный тестовый ID оборудования. Пример: PCI\VEN_10EC&amp;DEV_8125\TEST для предпросмотра профиля NIC ITR.</value></data>
   <data name="Message.Options" xml:space="preserve"><value>Параметры:</value></data>
-  <data name="Message.Original.baseline.snapshot.is.permanently.protected" xml:space="preserve"><value>Бэкап исходных настроек защищен от удаления.</value></data>
+  <data name="Message.Original.baseline.snapshot.is.permanently.protected" xml:space="preserve"><value>Бэкап исходных настроек защищён от удаления.</value></data>
   <data name="Message.Original.state.backup" xml:space="preserve"><value>Бэкап исходного состояния</value></data>
   <data name="Message.P.CORES" xml:space="preserve"><value>P-ЯДРА</value></data>
   <data name="Message.P.CORES.23e44c04" xml:space="preserve"><value>[ P-ЯДРА ]</value></data>
@@ -478,15 +478,15 @@
   <data name="Message.RESET" xml:space="preserve"><value>СБРОСИТЬ</value></data>
   <data name="Message.RESET.ADAPTER.SETTINGS" xml:space="preserve"><value>СБРОС НАСТРОЕК АДАПТЕРА</value></data>
   <data name="Message.RESET.TO.REAL" xml:space="preserve"><value>ВЕРНУТЬ РЕАЛЬНЫЕ ДАННЫЕ</value></data>
-  <data name="Message.RESET.WINDOWS.DEFAULT" xml:space="preserve"><value>СБРОС WINDOWS</value></data>
-  <data name="Message.RESET.WINDOWS.DEFAULT.PREVIEW" xml:space="preserve"><value>ПРЕДПРОСМОТР СБРОСА WINDOWS</value></data>
-  <data name="Message.RESET.WINDOWS.DEFAULT.finished.with.errors.Some.settings" xml:space="preserve"><value>Сброс Windows завершён с ошибками. Некоторые настройки могут оставаться активными.</value></data>
-  <data name="Message.RESET.WINDOWS.DEFAULT.preview.finished.with.errors" xml:space="preserve"><value>Предпросмотр сброса Windows завершён с ошибками.</value></data>
-  <data name="Message.RESET.WINDOWS.DEFAULT.restores.supported.settings.to.Windows" xml:space="preserve"><value>СБРОС WINDOWS возвращает поддерживаемые настройки к значениям Windows по умолчанию.</value></data>
-  <data name="Message.RESET.WINDOWS.DEFAULT.restores.supported.settings.to.their" xml:space="preserve"><value>СБРОС WINDOWS возвращает поддерживаемые настройки к стандартным значениям.</value></data>
-  <data name="Message.RESET.WINDOWS.DEFAULT.was.cancelled.because.the.rollback" xml:space="preserve"><value>Сброс Windows отменён: не удалось создать бэкап для отката.</value></data>
+  <data name="Message.RESET.WINDOWS.DEFAULT" xml:space="preserve"><value>СБРОС ПО УМОЛЧАНИЮ</value></data>
+  <data name="Message.RESET.WINDOWS.DEFAULT.PREVIEW" xml:space="preserve"><value>ПРЕДПРОСМОТР СБРОСА НАСТРОЕК</value></data>
+  <data name="Message.RESET.WINDOWS.DEFAULT.finished.with.errors.Some.settings" xml:space="preserve"><value>Сброс настроек по умолчанию завершён с ошибками. Некоторые параметры могут оставаться активными.</value></data>
+  <data name="Message.RESET.WINDOWS.DEFAULT.preview.finished.with.errors" xml:space="preserve"><value>Предпросмотр сброса настроек по умолчанию завершён с ошибками.</value></data>
+  <data name="Message.RESET.WINDOWS.DEFAULT.restores.supported.settings.to.Windows" xml:space="preserve"><value>СБРОС ПО УМОЛЧАНИЮ возвращает поддерживаемые настройки к значениям Windows по умолчанию.</value></data>
+  <data name="Message.RESET.WINDOWS.DEFAULT.restores.supported.settings.to.their" xml:space="preserve"><value>СБРОС ПО УМОЛЧАНИЮ возвращает поддерживаемые настройки к стандартным значениям.</value></data>
+  <data name="Message.RESET.WINDOWS.DEFAULT.was.cancelled.because.the.rollback" xml:space="preserve"><value>Сброс настроек по умолчанию отменён: не удалось создать бэкап для отката.</value></data>
   <data name="Message.RESTORE.LAST" xml:space="preserve"><value>ПОСЛЕДНИЙ БЭКАП</value></data>
-  <data name="Message.RESTORE.LAST.uses.the.newest.snapshot.RESTORE.SELECTED" xml:space="preserve"><value>ПОСЛЕДНИЙ восстанавливает свежий снимок. ВЫБРАННЫЙ восстанавливает выделенный снимок.</value></data>
+  <data name="Message.RESTORE.LAST.uses.the.newest.snapshot.RESTORE.SELECTED" xml:space="preserve"><value>«ПОСЛЕДНИЙ БЭКАП» восстанавливает последний снимок. «ВЫБРАННЫЙ БЭКАП» восстанавливает выделенный в списке.</value></data>
   <data name="Message.RESTORE.SELECTED" xml:space="preserve"><value>ВЫБРАННЫЙ БЭКАП</value></data>
   <data name="Message.RESTORE.SYSTEM.SETTINGS" xml:space="preserve"><value>ВОССТАНОВЛЕНИЕ НАСТРОЕК</value></data>
   <data name="Message.RESULT.DIALOGS" xml:space="preserve"><value>ОКНА РЕЗУЛЬТАТОВ</value></data>
@@ -509,7 +509,7 @@
   <data name="Message.RawMouseThrottleDuration.HKCU.Control.Panel.Mouse" xml:space="preserve"><value>RawMouseThrottleDuration: HKCU\Control Panel\Mouse.</value></data>
   <data name="Message.Read.failed" xml:space="preserve"><value>Ошибка чтения</value></data>
   <data name="Message.Read.interrupt.modes.for.all.PCI.devices" xml:space="preserve"><value>Считать режимы прерываний всех PCI-устройств</value></data>
-  <data name="Message.Read.interrupt.modes.for.all.PCI.devices.including" xml:space="preserve"><value>Считать режимы прерываний всех PCI-устройств, включая скрытые карточки. При необходимости загрузит DTIMOD.sys. Настройки устройств не меняются.</value></data>
+  <data name="Message.Read.interrupt.modes.for.all.PCI.devices.including" xml:space="preserve"><value>Считать режимы прерываний всех PCI-устройств, включая скрытые карточки. При необходимости будет загружен DTIMOD.sys. Настройки устройств не меняются.</value></data>
   <data name="Message.Read.only" xml:space="preserve"><value>Только чтение</value></data>
   <data name="Message.Read.the.current.interrupt.mode.Loads.DTIMOD.if" xml:space="preserve"><value>Считать текущий режим прерываний. При необходимости загрузит DTIMOD. Настройки устройства не меняются.</value></data>
   <data name="Message.Reading.Windows.allocated.interrupt.resources.No.driver.is" xml:space="preserve"><value>Чтение выделенных ресурсов Windows. Драйвер не загружается.</value></data>
@@ -517,7 +517,7 @@
   <data name="Message.Real.device.visibility" xml:space="preserve"><value>Видимость реальных устройств</value></data>
   <data name="Message.Refresh.devices.F5.Ctrl.R" xml:space="preserve"><value>Обновить устройства (F5 / Ctrl+R)</value></data>
   <data name="Message.Refresh.interrupt.mode" xml:space="preserve"><value>Обновить режим прерываний</value></data>
-  <data name="Message.Refresh.this.device.s.interrupt.mode.Loads.DTIMOD" xml:space="preserve"><value>Обновить режим прерываний этого устройства. При необходимости загрузит DTIMOD.sys. Настройки устройства не меняются.</value></data>
+  <data name="Message.Refresh.this.device.s.interrupt.mode.Loads.DTIMOD" xml:space="preserve"><value>Обновить режим прерываний этого устройства. При необходимости будет загружен DTIMOD.sys. Настройки устройства не меняются.</value></data>
   <data name="Message.RefreshFailed" xml:space="preserve"><value>RefreshFailed</value></data>
   <data name="Message.Refreshing.devices" xml:space="preserve"><value>Обновление устройств...</value></data>
   <data name="Message.Registry.HKLM.System.CurrentControlSet.Control.Session.Manager.kernel" xml:space="preserve"><value>Реестр: HKLM\System\CurrentControlSet\Control\Session Manager\kernel</value></data>
@@ -540,7 +540,7 @@
   <data name="Message.RestoreWriteFailed" xml:space="preserve"><value>RestoreWriteFailed</value></data>
   <data name="Message.Result.Dialog.Gallery" xml:space="preserve"><value>Галерея окон результатов</value></data>
   <data name="Message.Right.click.the.EXE.and.choose.Run.as" xml:space="preserve"><value>Нажмите правой кнопкой по EXE и выберите "Запуск от имени администратора".</value></data>
-  <data name="Message.Role.mode.applies.values.to.the.detected.interrupter" xml:space="preserve"><value>Role mode применяет значения к обнаруженному interrupter каждой USB-роли.</value></data>
+  <data name="Message.Role.mode.applies.values.to.the.detected.interrupter" xml:space="preserve"><value>Режим Role mode применяет значения к обнаруженному интерраптеру каждой USB-роли.</value></data>
   <data name="Message.RollbackFailed" xml:space="preserve"><value>RollbackFailed</value></data>
   <data name="Message.Run.DEVICE.TWEAKER.as.administrator.to.apply.settings" xml:space="preserve"><value>Для применения настроек запустите DEVICE TWEAKER от имени администратора.
 
@@ -592,7 +592,7 @@
   <data name="Message.Show.hide.IMOD.values.by.device.and.interrupter" xml:space="preserve"><value>Показать / скрыть значения IMOD по устройствам и интерраптерам.</value></data>
   <data name="Message.Show.test.devices.only" xml:space="preserve"><value>Показывать только тестовые устройства</value></data>
   <data name="Message.Simulated.Windows.allocation" xml:space="preserve"><value>Тестовое распределение ресурсов Windows. </value></data>
-  <data name="Message.Simulated.interrupt.mode.No.hardware.was.queried" xml:space="preserve"><value>Тестовый режим прерываний. Железо не опрашивалось.</value></data>
+  <data name="Message.Simulated.interrupt.mode.No.hardware.was.queried" xml:space="preserve"><value>Тестовый режим прерываний. Оборудование не опрашивалось.</value></data>
   <data name="Message.Skipped.12698ce1" xml:space="preserve"><value>пропущено</value></data>
   <data name="Message.Skipping.USB.IMOD" xml:space="preserve"><value>Пропуск USB IMOD...</value></data>
   <data name="Message.Skipping.USB.selective.suspend" xml:space="preserve"><value>Пропуск USB selective suspend...</value></data>
@@ -602,14 +602,14 @@
   <data name="Message.Some.power.settings.require.a.device.restart" xml:space="preserve"><value>Для части настроек питания требуется перезапуск устройства.</value></data>
   <data name="Message.Some.restore.steps.may.already.have.run" xml:space="preserve"><value>Часть настроек уже могла восстановиться.</value></data>
   <data name="Message.Some.system.checks.are.unavailable" xml:space="preserve"><value>Часть проверок системы недоступна.</value></data>
-  <data name="Message.Some.system.checks.are.unavailable.See.details" xml:space="preserve"><value>Часть проверок системы недоступна. Подробности доступны в проверке системы.</value></data>
+  <data name="Message.Some.system.checks.are.unavailable.See.details" xml:space="preserve"><value>Часть проверок системы недоступна. См. подробности.</value></data>
   <data name="Message.Source.Windows.allocated.resources.Line.based.interrupt.resources" xml:space="preserve"><value>Источник: выделенные ресурсы Windows. Выделены линейные прерывания. Биты PCI Enable не считывались.</value></data>
-  <data name="Message.Source.Windows.allocated.resources.Message.interrupt.allocated.hardware" xml:space="preserve"><value>Источник: выделенные ресурсы Windows. Выделено прерывание сообщениями. Устройство поддерживает MSI, поддержка MSI-X отсутствует. Биты PCI Enable не считывались.</value></data>
-  <data name="Message.Source.Windows.allocated.resources.Message.interrupt.allocated.hardware.68f3e6f1" xml:space="preserve"><value>Источник: выделенные ресурсы Windows. Выделено прерывание сообщениями. Устройство поддерживает MSI-X, поддержка MSI отсутствует. Биты PCI Enable не считывались.</value></data>
-  <data name="Message.Source.Windows.allocated.resources.Message.interrupts.allocated.hardware" xml:space="preserve"><value>Источник: выделенные ресурсы Windows. Выделены прерывания сообщениями. Возможности устройства прочитать не удалось. Биты PCI Enable не считывались.</value></data>
+  <data name="Message.Source.Windows.allocated.resources.Message.interrupt.allocated.hardware" xml:space="preserve"><value>Источник: выделенные ресурсы Windows. Выделено прерывание по сообщениям. Устройство поддерживает MSI, поддержка MSI-X отсутствует. Биты PCI Enable не считывались.</value></data>
+  <data name="Message.Source.Windows.allocated.resources.Message.interrupt.allocated.hardware.68f3e6f1" xml:space="preserve"><value>Источник: выделенные ресурсы Windows. Выделено прерывание по сообщениям. Устройство поддерживает MSI-X, поддержка MSI отсутствует. Биты PCI Enable не считывались.</value></data>
+  <data name="Message.Source.Windows.allocated.resources.Message.interrupts.allocated.hardware" xml:space="preserve"><value>Источник: выделенные ресурсы Windows. Выделены прерывания по сообщениям. Возможности устройства прочитать не удалось. Биты PCI Enable не считывались.</value></data>
   <data name="Message.Source.Windows.allocated.resources.No.interrupt.resources.allocated" xml:space="preserve"><value>Источник: выделенные ресурсы Windows. Ресурсы прерываний не выделены. Биты PCI Enable не считывались.</value></data>
   <data name="Message.Source.Windows.allocated.resources.One.descriptor.with.multiple" xml:space="preserve"><value>Источник: выделенные ресурсы Windows. Выделен один дескриптор с несколькими сообщениями. Биты PCI Enable не считывались.</value></data>
-  <data name="Message.Source.Windows.allocated.resources.One.message.allocated.hardware" xml:space="preserve"><value>Источник: выделенные ресурсы Windows. Выделено одно сообщение. Устройство поддерживает оба режима; этих данных недостаточно, чтобы различить MSI и MSI-X. Биты PCI Enable не считывались.</value></data>
+  <data name="Message.Source.Windows.allocated.resources.One.message.allocated.hardware" xml:space="preserve"><value>Источник: выделенные ресурсы Windows. Выделено одно прерывание по сообщению. Устройство поддерживает оба режима; этих данных недостаточно, чтобы различить MSI и MSI-X. Биты PCI Enable не считывались.</value></data>
   <data name="Message.Source.Windows.allocated.resources.Separate.message.descriptors.allocated" xml:space="preserve"><value>Источник: выделенные ресурсы Windows. Выделены отдельные дескрипторы сообщений. Биты PCI Enable не считывались.</value></data>
   <data name="Message.Speakers" xml:space="preserve"><value>Динамики</value></data>
   <data name="Message.SpecifiedProcessors" xml:space="preserve"><value>SpecifiedProcessors</value></data>
@@ -627,7 +627,7 @@
   <data name="Message.System.preset" xml:space="preserve"><value>Пресет системы:</value></data>
   <data name="Message.TEST.ADMIN" xml:space="preserve"><value>ТЕСТ-ПАНЕЛЬ</value></data>
   <data name="Message.TEST.DEVICE.no.registry.writes" xml:space="preserve"><value>ТЕСТОВОЕ УСТРОЙСТВО (без записи в реестр)</value></data>
-  <data name="Message.TEST.MODE.INFO" xml:space="preserve"><value>ИНФО ТЕСТОВОГО РЕЖИМА</value></data>
+  <data name="Message.TEST.MODE.INFO" xml:space="preserve"><value>ИНФОРМАЦИЯ О ТЕСТОВОМ РЕЖИМЕ</value></data>
   <data name="Message.Test.CPU.Topology" xml:space="preserve"><value>Тестовая топология CPU</value></data>
   <data name="Message.Test.CPU.mode.ACTIVE" xml:space="preserve"><value>Тестовый режим CPU: ВКЛЮЧЁН</value></data>
   <data name="Message.Test.CPU.mode.OFF" xml:space="preserve"><value>Тестовый режим CPU: ВЫКЛЮЧЕН</value></data>
@@ -643,11 +643,11 @@
   <data name="Message.The.operation.stopped.before.any.changes.were.made" xml:space="preserve"><value>Настройки не изменены: операция остановлена до применения.</value></data>
   <data name="Message.The.operation.was.cancelled" xml:space="preserve"><value>Операция отменена.</value></data>
   <data name="Message.The.original.settings.backup.BASELINE.is.protected.from" xml:space="preserve"><value>Бэкап исходных настроек нельзя удалить.</value></data>
-  <data name="Message.The.program.can.continue.but.the.log.may" xml:space="preserve"><value>Программа продолжит работу, но лог может быть неполным. Приложите это сообщение, если будете сообщать о баге.</value></data>
+  <data name="Message.The.program.can.continue.but.the.log.may" xml:space="preserve"><value>Программа продолжит работу, но лог может быть неполным. Приложите это сообщение, если будете сообщать об ошибке.</value></data>
   <data name="Message.The.protected.ORIGINAL.STATE.snapshot.is.always.retained" xml:space="preserve"><value>Защищённый снимок ИСХОДНОЕ СОСТОЯНИЕ сохраняется всегда.</value></data>
   <data name="Message.The.register.value.could.not.be.verified" xml:space="preserve"><value>Не удалось подтвердить значение регистра.</value></data>
   <data name="Message.The.remaining.results.are.available.in.DETAILS" xml:space="preserve"><value>Остальные результаты доступны в подробностях.</value></data>
-  <data name="Message.The.selected.backup.is.invalid" xml:space="preserve"><value>Бэкап поврежден или имеет неподходящий формат.</value></data>
+  <data name="Message.The.selected.backup.is.invalid" xml:space="preserve"><value>Бэкап повреждён или имеет неподходящий формат.</value></data>
   <data name="Message.The.setting.could.not.be.updated" xml:space="preserve"><value>Не удалось обновить настройку.</value></data>
   <data name="Message.The.setting.was.not.changed" xml:space="preserve"><value>Настройка не изменена.</value></data>
   <data name="Message.The.setting.writes.RawMouseThrottleDuration.to.HKCU.Control.Panel" xml:space="preserve"><value>Настройка записывает RawMouseThrottleDuration в HKCU\Control Panel\Mouse.</value></data>
@@ -659,7 +659,7 @@
   <data name="Message.This.device.has.no.PCI.interrupt.mode" xml:space="preserve"><value>У этого устройства нет режима прерываний PCI.</value></data>
   <data name="Message.This.does.not.identify.the.cause.of.the" xml:space="preserve"><value>Это не устанавливает причину отказа. Другие политики также могут запрещать загрузку; совместимость с античитами не подтверждена.</value></data>
   <data name="Message.This.estimate.is.based.on.the.controller.PCI" xml:space="preserve"><value>Оценка основана на PCI ID контроллера.</value></data>
-  <data name="Message.This.setting.does.not.target.foreground.apps" xml:space="preserve"><value>Эта настройка не нацелена на активные приложения.</value></data>
+  <data name="Message.This.setting.does.not.target.foreground.apps" xml:space="preserve"><value>Эта настройка не затрагивает активные приложения.</value></data>
   <data name="Message.This.will.re.enable.interrupt.moderation.and.standard" xml:space="preserve"><value>Будут включены Interrupt Moderation и стандартные RSS ring buffers.</value></data>
   <data name="Message.Throttling.and.coalescing.can.reduce.the.message.load" xml:space="preserve"><value>Ограничение частоты и объединение событий могут снизить нагрузку от сообщений фоновых обработчиков.</value></data>
   <data name="Message.Tip.full.PC.presets.are.above.This.section" xml:space="preserve"><value>Подсказка: готовые пресеты ПК находятся выше. В этом разделе можно добавлять и удалять тестовые устройства, а также временно скрывать реальные.</value></data>
@@ -676,7 +676,7 @@
   <data name="Message.USB.IMOD.DELETE" xml:space="preserve"><value>УДАЛЕНИЕ USB IMOD</value></data>
   <data name="Message.USB.IMOD.TUNING" xml:space="preserve"><value>НАСТРОЙКА USB IMOD</value></data>
   <data name="Message.USB.IMOD.completed.with.warnings.or.failed.steps" xml:space="preserve"><value>USB IMOD завершён с предупреждениями или ошибками.</value></data>
-  <data name="Message.USB.IMOD.is.active.for.this.session.but" xml:space="preserve"><value>USB IMOD применен в текущей сессии, но профиль автозапуска не сохранён.</value></data>
+  <data name="Message.USB.IMOD.is.active.for.this.session.but" xml:space="preserve"><value>USB IMOD применён в текущей сессии, но профиль автозапуска не сохранён.</value></data>
   <data name="Message.USB.IMOD.tuning.is.available.for.detected.XHCI" xml:space="preserve"><value>Для обнаруженных XHCI-контроллеров доступна настройка USB IMOD.</value></data>
   <data name="Message.USB.IMOD.tuning.is.available.for.detected.XHCI.bbc35c58" xml:space="preserve"><value>Для обнаруженных XHCI-контроллеров доступна настройка USB IMOD.
 
@@ -693,7 +693,7 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
 
 Отключить Vulnerable Driver Blocklist, чтобы DTIMOD загрузился после перезагрузки?
 
-Внимание: это может сломать Faceit, The Finals и похожие античиты.
+Внимание: это может нарушить работу FACEIT, The Finals и других игр с античитами.
 После перезагрузки снова нажмите ПРОВЕРИТЬ или АВТООПТИМИЗАЦИЮ, чтобы применить IMOD.</value></data>
   <data name="Message.USB.IMOD.was.not.applied" xml:space="preserve"><value>USB IMOD не применён.</value></data>
   <data name="Message.USB.POWER" xml:space="preserve"><value>ПИТАНИЕ USB</value></data>
@@ -724,19 +724,19 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
 Перезагрузите компьютер, затем снова нажмите ПРОВЕРИТЬ или АВТООПТИМИЗАЦИЮ, чтобы применить USB IMOD.</value></data>
   <data name="Message.Vulnerable.driver.blocklist.2f4a22f8" xml:space="preserve"><value>Блокировка уязвимых драйверов</value></data>
   <data name="Message.WARNING" xml:space="preserve"><value>ПРЕДУПРЕЖДЕНИЕ</value></data>
-  <data name="Message.Warning.e981ddae" xml:space="preserve"><value>замечание</value></data>
-  <data name="Message.Where.should.DEVICE.TWEAKER.save.the.pre.auto" xml:space="preserve"><value>Где сохранить бэкап перед автооптимизацией?</value></data>
+  <data name="Message.Warning.e981ddae" xml:space="preserve"><value>предупреждение</value></data>
+  <data name="Message.Where.should.DEVICE.TWEAKER.save.the.pre.auto" xml:space="preserve"><value>Куда сохранить бэкап перед автооптимизацией?</value></data>
   <data name="Message.Where.should.the.additional.backup.be.saved" xml:space="preserve"><value>Куда сохранить дополнительный бэкап?</value></data>
   <data name="Message.Wi.Fi.settings.are.preserved.by.DEVICE.TWEAKER" xml:space="preserve"><value>DEVICE TWEAKER не изменяет настройки Wi-Fi.</value></data>
   <data name="Message.Windows.CPU.topology.APIs.failed.no.affinity.changes" xml:space="preserve"><value>не удалось определить топологию CPU через Windows API; настройки Affinity не изменены</value></data>
   <data name="Message.Windows.Default" xml:space="preserve"><value>По умолчанию Windows</value></data>
   <data name="Message.Windows.Defender.blocked.DTIMOD" xml:space="preserve"><value>Windows Defender заблокировал DTIMOD.</value></data>
   <data name="Message.Windows.Defender.blocked.DTIMOD.USB.IMOD.was.not" xml:space="preserve"><value>Windows Defender заблокировал DTIMOD. USB IMOD не изменён.</value></data>
-  <data name="Message.Windows.blocked.DTIMOD.via.Vulnerable.Driver.Blocklist" xml:space="preserve"><value>Windows заблокировал DTIMOD через Vulnerable Driver Blocklist.</value></data>
-  <data name="Message.Windows.blocked.DTIMOD.via.Vulnerable.Driver.Blocklist.USB" xml:space="preserve"><value>Windows заблокировал DTIMOD через Vulnerable Driver Blocklist. USB IMOD не изменён.</value></data>
-  <data name="Message.Windows.has.allocated.no.interrupt.resources.to.this" xml:space="preserve"><value>Windows не выделил этому устройству ресурсы прерываний.</value></data>
+  <data name="Message.Windows.blocked.DTIMOD.via.Vulnerable.Driver.Blocklist" xml:space="preserve"><value>Windows заблокировала DTIMOD через Vulnerable Driver Blocklist.</value></data>
+  <data name="Message.Windows.blocked.DTIMOD.via.Vulnerable.Driver.Blocklist.USB" xml:space="preserve"><value>Windows заблокировала DTIMOD через Vulnerable Driver Blocklist. USB IMOD не изменён.</value></data>
+  <data name="Message.Windows.has.allocated.no.interrupt.resources.to.this" xml:space="preserve"><value>Windows не выделила этому устройству ресурсы прерываний.</value></data>
   <data name="Message.Windows.rejected.DTIMOD.Vulnerable.Driver.Blocklist.is.configured" xml:space="preserve"><value>Windows отклонила DTIMOD. В реестре Vulnerable Driver Blocklist задан как включённый.</value></data>
-  <data name="Message.Windows.rejected.DTIMOD.Vulnerable.Driver.Blocklist.is.enabled" xml:space="preserve"><value>Windows отклонила загрузку DTIMOD. Vulnerable Driver Blocklist включен в реестре.</value></data>
+  <data name="Message.Windows.rejected.DTIMOD.Vulnerable.Driver.Blocklist.is.enabled" xml:space="preserve"><value>Windows отклонила загрузку DTIMOD. Vulnerable Driver Blocklist включён в реестре.</value></data>
   <data name="Message.Windows.rejected.DTIMOD.due.to.code.integrity.signature" xml:space="preserve"><value>Windows отклонила DTIMOD при проверке целостности кода / подписи. USB IMOD не изменён.</value></data>
   <data name="Message.Windows.rejected.DTIMOD.due.to.code.integrity.signature.d38bd65b" xml:space="preserve"><value>Windows отклонила DTIMOD при проверке целостности кода / подписи.</value></data>
   <data name="Message.Windows.settings" xml:space="preserve"><value>Параметры Windows</value></data>
@@ -744,7 +744,7 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
   <data name="Message.Windows.settings.may.prevent.DTIMOD.sys.from.loading" xml:space="preserve"><value>Настройки Windows могут препятствовать загрузке DTIMOD.</value></data>
   <data name="Message.Windows.settings.service.status.This.check.does.not" xml:space="preserve"><value>Параметры Windows / состояние служб. Загрузка драйвера и совместимость с античитами здесь не проверяются.</value></data>
   <data name="Message.WmiTimeout" xml:space="preserve"><value>WmiTimeout</value></data>
-  <data name="Message.XHCI.one.value.for.all.controller.interrupters.Device" xml:space="preserve"><value>XHCI задает одно значение всем интерраптерам контроллера. Device mapping задает значения по ролям устройств. При неточном сопоставлении используется одно значение всему контроллеру. Interrupter задает значения по индексам.</value></data>
+  <data name="Message.XHCI.one.value.for.all.controller.interrupters.Device" xml:space="preserve"><value>XHCI задаёт одно значение для всех интерраптеров контроллера. Device mapping задаёт значения по ролям устройств. При неточном сопоставлении используется одно значение для всего контроллера. Interrupter задаёт значения по индексам.</value></data>
   <data name="Message.YES" xml:space="preserve"><value>ДА</value></data>
   <data name="Message.You.can.skip.this.copy.The.original.settings" xml:space="preserve"><value>Можно пропустить. Бэкап исходных настроек сохраняется в любом случае.</value></data>
   <data name="Message.absent" xml:space="preserve"><value>отсутствует</value></data>
@@ -771,7 +771,7 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
   <data name="Message.devices.unavailable" xml:space="preserve"><value>устройства: недоступно</value></data>
   <data name="Message.driver.blocked" xml:space="preserve"><value>драйвер заблокирован</value></data>
   <data name="Message.driver.check.skipped.test" xml:space="preserve"><value>проверка драйвера пропущена (тест)</value></data>
-  <data name="Message.driver.default" xml:space="preserve"><value>(настройка драйвера)</value></data>
+  <data name="Message.driver.default" xml:space="preserve"><value>(по умолчанию драйвера)</value></data>
   <data name="Message.driver.load.failed" xml:space="preserve"><value>драйвер не загрузился</value></data>
   <data name="Message.driver.not.loaded.press.CHECK" xml:space="preserve"><value>драйвер не загружен, нажмите ПРОВЕРИТЬ</value></data>
   <data name="Message.driver.unavailable" xml:space="preserve"><value>драйвер недоступен</value></data>
@@ -785,12 +785,12 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
   <data name="Message.loading.driver" xml:space="preserve"><value>загрузка драйвера...</value></data>
   <data name="Message.no.IRQ.a56d0ff8" xml:space="preserve"><value>нет IRQ</value></data>
   <data name="Message.no.devices.to.optimize" xml:space="preserve"><value>Нет устройств для автооптимизации.</value></data>
-  <data name="Message.no.performance.P.cores.available.for.affinity.plan" xml:space="preserve"><value>нет доступных производительных P-cores для плана Affinity</value></data>
+  <data name="Message.no.performance.P.cores.available.for.affinity.plan" xml:space="preserve"><value>нет доступных P-ядер для плана Affinity</value></data>
   <data name="Message.not.PCI" xml:space="preserve"><value>не PCI</value></data>
   <data name="Message.not.read.a1ff022a" xml:space="preserve"><value>не считан</value></data>
   <data name="Message.not.set" xml:space="preserve"><value>не задано</value></data>
   <data name="Message.off.b4dc66dd" xml:space="preserve"><value>выкл.</value></data>
-  <data name="Message.on.b8d31e85" xml:space="preserve"><value>включено</value></data>
+  <data name="Message.on.b8d31e85" xml:space="preserve"><value>вкл.</value></data>
   <data name="Message.pre.apply" xml:space="preserve"><value>до применения</value></data>
   <data name="Message.pre.auto" xml:space="preserve"><value>до автооптимизации</value></data>
   <data name="Message.pre.imod" xml:space="preserve"><value>до настройки IMOD</value></data>
@@ -798,7 +798,7 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
   <data name="Message.pre.nic.itr.save" xml:space="preserve"><value>до сохранения NIC ITR</value></data>
   <data name="Message.pre.release" xml:space="preserve"><value>перед обновлением</value></data>
   <data name="Message.pre.reset" xml:space="preserve"><value>до сброса</value></data>
-  <data name="Message.pre.reset.tweaks" xml:space="preserve"><value>до сброса твиков</value></data>
+  <data name="Message.pre.reset.tweaks" xml:space="preserve"><value>до сброса настроек</value></data>
   <data name="Message.pre.restore" xml:space="preserve"><value>до восстановления</value></data>
   <data name="Message.preserve" xml:space="preserve"><value>сохранить</value></data>
   <data name="Message.read.failed.8b7a2d80" xml:space="preserve"><value>ошибка чтения</value></data>
@@ -811,7 +811,7 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
   <data name="Message.saved.for.startup" xml:space="preserve"><value>сохранено для автозапуска</value></data>
   <data name="Message.saved.startup.task.disabled" xml:space="preserve"><value>сохранено (задача автозапуска отключена)</value></data>
   <data name="Message.ProfileSavedTaskDisabled" xml:space="preserve"><value>Профиль сохранён. Задача автозапуска остаётся отключённой.</value></data>
-  <data name="Message.ProfileKeptForModerationRetry" xml:space="preserve"><value>Профиль сохранён. Повторите удаление, чтобы восстановить настройки модерации сетевого драйвера.</value></data>
+  <data name="Message.ProfileKeptForModerationRetry" xml:space="preserve"><value>Не удалось восстановить модерацию сетевого адаптера. Профиль оставлен, чтобы можно было повторить удаление.</value></data>
   <data name="Message.signature.blocked" xml:space="preserve"><value>подпись драйвера заблокирована</value></data>
   <data name="Message.single.value.for.controller" xml:space="preserve"><value>одно значение для контроллера</value></data>
   <data name="Message.test.preview" xml:space="preserve"><value>тестовый предпросмотр</value></data>
@@ -840,13 +840,13 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
   <data name="Read.DeviceStateFailed" xml:space="preserve"><value>Не удалось обновить данные устройств. Текущий список сохранён.</value></data>
   <data name="Read.DeviceReadback" xml:space="preserve"><value>Чтение состояния устройств</value></data>
   <data name="Inline.Imod.LastRead" xml:space="preserve"><value>Считано:</value></data>
-  <data name="Action.ReadingIrq" xml:space="preserve"><value>СЧИТЫВАНИЕ...</value></data>
+  <data name="Action.ReadingIrq" xml:space="preserve"><value>ЧТЕНИЕ IRQ…</value></data>
   <data name="Status.IrqReading" xml:space="preserve"><value>Чтение режимов IRQ (устройств PCI: {0})…</value></data>
   <data name="Status.IrqPreparing" xml:space="preserve"><value>Подготовка DTIMOD для чтения режимов IRQ...</value></data>
   <data name="Status.IrqCompleted" xml:space="preserve"><value>Проверено устройств PCI: {0} · недоступно: {1} · см. поле Режим IRQ</value></data>
-  <data name="Status.IrqReadCount" xml:space="preserve"><value>СЧИТАТЬ IRQ: {0}/{1}</value></data>
+  <data name="Status.IrqReadCount" xml:space="preserve"><value>СЧИТАНО IRQ: {0}/{1}</value></data>
   <data name="Operation.CheckBusy" xml:space="preserve"><value>ЧТЕНИЕ…</value></data>
-  <data name="Operation.SaveBusy" xml:space="preserve"><value>СОХРАНЯЕМ…</value></data>
+  <data name="Operation.SaveBusy" xml:space="preserve"><value>СОХРАНЕНИЕ…</value></data>
   <data name="Operation.SetBusy" xml:space="preserve"><value>ЗАПИСЬ…</value></data>
   <data name="Operation.DeleteBusy" xml:space="preserve"><value>УДАЛЕНИЕ…</value></data>
   <data name="Operation.ApplyBusy" xml:space="preserve"><value>ПРИМЕНЕНИЕ…</value></data>
@@ -872,7 +872,7 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
   <data name="Driver.CheckAction" xml:space="preserve"><value>ПРОВЕРИТЬ СИСТЕМУ</value></data>
   <data name="Driver.Purpose" xml:space="preserve"><value>DTIMOD нужен для аппаратного доступа к USB IMOD, NIC ITR и регистрам PCI.</value></data>
   <data name="Driver.CompatibilityNotice" xml:space="preserve"><value>Easy Anti-Cheat, Riot Vanguard, FACEIT Anti-Cheat и другие античиты могут блокировать DTIMOD или отключать от матча.</value></data>
-  <data name="Driver.LifetimeNotice" xml:space="preserve"><value>Закрытие программы не выгружает DTIMOD. Для выгрузки перезагрузите Windows. Сохранённый профиль может загрузить драйвер при входе, после пробуждения или переподключения устройства.</value></data>
+  <data name="Driver.LifetimeNotice" xml:space="preserve"><value>Закрытие программы не выгружает DTIMOD. Для выгрузки перезагрузите Windows. Сохранённый профиль может загрузить драйвер при входе в систему, после пробуждения или переподключения устройства.</value></data>
   <data name="Driver.Cancelled" xml:space="preserve"><value>Действие с драйвером отменено.</value></data>
   <data name="Driver.CheckHeading" xml:space="preserve"><value>Проверка Windows</value></data>
   <data name="Driver.CompatibilityHeading" xml:space="preserve"><value>Совместимость</value></data>
@@ -885,7 +885,7 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
   <data name="Driver.VanguardInstalled" xml:space="preserve"><value>Обнаружена служба Riot Vanguard.</value></data>
   <data name="Driver.ServicesUnreadable" xml:space="preserve"><value>Часть сведений о службах недоступна.</value></data>
   <data name="Driver.CheckScope" xml:space="preserve"><value>Проверка читает параметры Windows и сведения об отдельных службах. Она не загружает DTIMOD и не определяет совместимость с античитами.</value></data>
-  <data name="Driver.InfoAction" xml:space="preserve"><value>О ДРАЙВЕРЕ</value></data>
+  <data name="Driver.InfoAction" xml:space="preserve"><value>ИНФОРМАЦИЯ О ДРАЙВЕРЕ</value></data>
   <data name="Driver.UseHeading" xml:space="preserve"><value>Для этого действия нужен DTIMOD.</value></data>
   <data name="Driver.BriefRisk" xml:space="preserve"><value>Античит может блокировать DTIMOD или отключить вас от игры.</value></data>
   <data name="Driver.BriefLifetime" xml:space="preserve"><value>Закрытие программы не выгружает DTIMOD. Сохранённые профили могут загружать его автоматически.</value></data>
@@ -941,14 +941,14 @@ DTIMOD может быть заблокирован Vulnerable Driver Blocklist,
   <data name="Message.UsbDeleteProfileTooltip" xml:space="preserve"><value>Удалить общий профиль автозапуска USB IMOD и NIC ITR.</value></data>
   <data name="Message.UsbDeleteProfileDone" xml:space="preserve"><value>Профиль автозапуска удалён. Перезагрузите Windows, чтобы сбросить действующие значения регистров.</value></data>
   <data name="Message.UsbDeleteProfileDriverRemoved" xml:space="preserve"><value>Профиль автозапуска и файл драйвера удалены. Перезагрузите Windows, чтобы сбросить действующие значения регистров.</value></data>
-  <data name="Message.UsbDeleteProfileDriverLoaded" xml:space="preserve"><value>Профиль автозапуска удалён. Перезагрузите Windows, чтобы выгрузить DTIMOD, затем снова нажмите УДАЛИТЬ ПРОФИЛЬ, чтобы убрать файл.</value></data>
-  <data name="Message.UsbDeleteProfileDriverKept" xml:space="preserve"><value>Профиль автозапуска удалён. Файл DTIMOD.sys оставлен на диске. Причина указана в логе.</value></data>
+  <data name="Message.UsbDeleteProfileDriverLoaded" xml:space="preserve"><value>Профиль автозапуска удалён. Перезагрузите Windows, чтобы выгрузить DTIMOD, затем снова нажмите УДАЛИТЬ ПРОФИЛЬ, чтобы удалить файл.</value></data>
+  <data name="Message.UsbDeleteProfileDriverKept" xml:space="preserve"><value>Профиль автозапуска удалён. Файл DTIMOD.sys оставлен, так как его не удалось безопасно удалить. Подробности указаны в логе.</value></data>
   <data name="Message.UsbDeleteProfileFailed" xml:space="preserve"><value>Не удалось полностью удалить профиль автозапуска. Откройте ПОДРОБНОСТИ.</value></data>
-  <data name="Message.UsbImodInvalidInput" xml:space="preserve"><value>Недопустимое значение USB IMOD не применено.</value></data>
+  <data name="Message.UsbImodInvalidInput" xml:space="preserve"><value>USB IMOD не применён: введено некорректное значение.</value></data>
   <data name="Validation.InvalidImodRole" xml:space="preserve"><value>Введите допустимый интервал USB IMOD в поле "{0}".</value></data>
   <data name="Message.UsbImodAmbiguousLegacy" xml:space="preserve"><value>Старый профиль USB IMOD подходит нескольким контроллерам. Задайте настройку заново для нужного контроллера.</value></data>
-  <data name="Message.UsbImodWriteFailedKeptProfile" xml:space="preserve"><value>Настройки USB IMOD не применены. Прежний профиль автозапуска сохранён.</value></data>
-  <data name="Message.UsbImodPartialKeptProfile" xml:space="preserve"><value>Значения USB IMOD записаны частично. Прежний профиль автозапуска сохранён.</value></data>
+  <data name="Message.UsbImodWriteFailedKeptProfile" xml:space="preserve"><value>Настройки USB IMOD не применены. Прежний профиль автозапуска оставлен без изменений.</value></data>
+  <data name="Message.UsbImodPartialKeptProfile" xml:space="preserve"><value>Значения USB IMOD записаны частично. Прежний профиль автозапуска оставлен без изменений.</value></data>
   <data name="Message.UsbImodWrittenSaveFailed" xml:space="preserve"><value>Значения USB IMOD записаны, но профиль автозапуска не сохранён.</value></data>
   <data name="Message.StartupProfileSaveFailed" xml:space="preserve"><value>Профиль автозапуска не сохранён.</value></data>
   <data name="Message.UsbImodWrittenRemoveFailed" xml:space="preserve"><value>Значения USB IMOD записаны, но прежний профиль автозапуска удалён не полностью.</value></data>

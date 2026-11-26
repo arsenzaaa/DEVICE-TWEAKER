@@ -34,7 +34,7 @@ NDIS and NetAdapterCx, RSS queues, moderation registers and the network driver's
 
 **07 · [CPU topology](./07-cpu-topology.md)**
 
-Physical cores, P/E, CPPC, CCD/CCX and ReservedCpuSets. How to read the processor map.
+Physical cores, P/E cores, CPPC, CCD/CCX and ReservedCpuSets. How to read the processor map.
 
 **08 · [Input and Polling Rate](./08-input.md)**
 

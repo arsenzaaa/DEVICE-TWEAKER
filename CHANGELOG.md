@@ -12,7 +12,7 @@ Source comparison: [v0.0.4 → v0.1.0](https://github.com/arsenzaaa/DEVICE-TWEAK
 
 - NIC ITR profiles identify the exact PCI adapter. Startup skips a legacy entry that matches multiple adapters.
 - Startup task updates preserve its enabled state. The task returns an error code when a register write fails, and the log records skips separately.
-- If deleting the shared profile fails to restore network moderation, the profile is kept for retry after the startup task is removed.
+- If deleting the shared profile fails to restore network-adapter interrupt moderation, the profile is kept for retry after the startup task is removed.
 - NIC ITR SAVE reports incomplete driver moderation setup if the profile is saved but reading or writing the driver setting fails.
 - If a backup lists a startup profile but its contents are missing, restore stops before writing settings. A device-list refresh error after restoration is reported separately.
 
@@ -33,10 +33,11 @@ Source comparison: [v0.0.4 → v0.1.0](https://github.com/arsenzaaa/DEVICE-TWEAK
 ### Interface and responsiveness
 
 - The main window fits the monitor work area at startup and after a DPI change.
-- Centered the buttons in result, information and backup-location dialogs. Added space between the power-saving label and its toggle in Russian.
+- Centered the buttons in result, information and backup-location dialogs, and ensured dialog footers and card action buttons accommodate localized busy captions without clipping. Added space between the power-saving label and its toggle in Russian, and improved Intel USB badge contrast.
 - REFRESH rescans devices and reuses compatible cards, keeping pending edits and the scroll position. A change in CPU topology forces a rebuild.
 - REFRESH keeps a pending CPU selection with its affinity policy or RSS mode when saved settings change. Driver details for the log are read independently of the device-list update.
-- Mouse event-rate calculations reuse their results while the sample buffers remain unchanged. Sample history is bounded; display confirmation timing is preserved.
+- Raw Input (`WM_INPUT`) measurement runs on a dedicated background message-only thread with cached rate calculations and bounded history, preventing high-rate (1K–8K) mouse/keyboard traffic from stalling window controls or delaying window close.
+- Disabling an action button during an operation releases focus cleanly instead of jumping focus to the first device card.
 - Animations share a frame clock with at most one pending UI callback. The clock stops when there are no active animations and does not change Windows timer resolution or display settings.
 - An incomplete IMOD readback no longer shifts later values into the wrong interrupter rows. The failed index and address are recorded in the log.
 
@@ -44,9 +45,10 @@ Source comparison: [v0.0.4 → v0.1.0](https://github.com/arsenzaaa/DEVICE-TWEAK
 
 - Manual APPLY writes pending settings only and asks for driver consent when applying IMOD edits.
 - USB IMOD SET applies to the selected controller. New profile entries use the PCI instance ID. A failed or partial write preserves the previous startup profile.
+- Applying USB IMOD via SET, APPLY or AUTO-OPTIMIZATION automatically expands the interrupter readback details table on updated controllers.
 - SET and APPLY reject invalid values in the per-role USB IMOD fields before using the combined value.
 - DELETE PROFILE backs up and removes the shared USB IMOD and NIC ITR startup profile. It also removes the staged driver file if it matches this build and is no longer in use. Restart Windows to clear active register overrides.
-- RESET WINDOWS restores the active power plan's defaults for USB selective suspend.
+- RESET WINDOWS DEFAULT restores the active power plan's defaults for USB selective suspend.
 
 ### Startup, restore and diagnostics
 
@@ -54,7 +56,7 @@ Source comparison: [v0.0.4 → v0.1.0](https://github.com/arsenzaaa/DEVICE-TWEAK
 - If startup-task registration fails, the application keeps the saved profile and rolls back the files and task it replaced. Any rollback failure is reported.
 - NIC ITR readback preserves edits made while its automatic backup is being created.
 - Task Scheduler XML is staged in the protected startup folder. Registration checks the stored task's action count, command and arguments, rather than looking for the script path as a substring.
-- A second launch no longer selects an Explorer window opened on a folder named DEVICE TWEAKER.
+- A second launch no longer activates an Explorer window open to a folder named DEVICE TWEAKER.
 - Translated restore results, device-scan failures and power-plan diagnostics that remained English in the Russian interface.
 - Device discovery continues if the Windows Storage WMI query (`MSFT_PhysicalDisk`) fails, retaining NVMe and SATA/AHCI controller entries with a warning in the log.
 - Reading `AssignmentSetOverride` supports 1–7 byte `REG_BINARY` values in little-endian order instead of requiring 4 or 8 bytes, so short registry affinity masks display correctly.
@@ -66,7 +68,7 @@ Source comparison: [v0.0.4 → v0.1.0](https://github.com/arsenzaaa/DEVICE-TWEAK
 ### Maintenance and QA
 
 - Separated startup bundle management, backup files/registry access, USB role mapping, IMOD map formatting, driver-file preparation and the KDU process from MainForm. Startup profile and backup formats are preserved.
-- Added models and regressions for the restricted driver API, USB topology replies, incomplete readback and extracted services. QA preparation runs inside the same serialized, memory-limited job as the scenario.
+- Streamlined the local QA suite (`Invoke-Qa.ps1 -Mode Fast` / `-Mode Full`, single-pass Workbench scenarios, 3-build cache retention) and added UX regression tests covering focus hygiene, background Raw Input shutdown, IMOD expansion and localized busy button widths.
 
 ## [0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4) · 2026-10-31
 

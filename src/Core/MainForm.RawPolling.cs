@@ -13,14 +13,21 @@ public sealed partial class MainForm
     private const int RawPollingLiveMinSamples = 12;
     private const int RawPollingLiveLogIntervalMs = 15000;
 
+    private readonly object _rawPollingLock = new();
     private readonly Dictionary<IntPtr, RawPollingState> _rawPollingStates = [];
+    private readonly HashSet<IntPtr> _ignoredRawDeviceHandles = [];
+    private readonly List<RawPollingState> _rawPollingSnapshot = [];
     private readonly Dictionary<string, Dictionary<string, string>> _rawPollingByController = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Dictionary<string, string>> _rawLivePollingByController = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _usbRoleOverrideByController = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _rawPollingUiSnapshotByController = new(StringComparer.OrdinalIgnoreCase);
+    private RawInputInterop.RawInputBackgroundMonitor? _rawInputMonitor;
     private System.Windows.Forms.Timer? _rawPollingTimer;
     private System.Windows.Forms.Timer? _deviceChangeTimer;
     private bool _rawPollingInitialized;
+    private bool _cachedRawMouseThrottleValid;
+    private int _cachedRawMouseThrottleDuration;
+    private long _cachedRawMouseThrottleReadTick;
 
     private System.Windows.Forms.Timer CreateDeviceChangeTimer()
     {
@@ -52,24 +59,12 @@ public sealed partial class MainForm
 
         // Top-level windows receive this without registration whenever a device
         // is added or removed; a burst of them collapses into one update.
-        if (m.Msg == WmDeviceChange && m.WParam == DbtDevNodesChanged)
+        if (!_uiDisposing && !IsDisposed && !Disposing && m.Msg == WmDeviceChange && m.WParam == DbtDevNodesChanged)
         {
             InvalidateDeviceTopology();
             _deviceChangeTimer ??= CreateDeviceChangeTimer();
             _deviceChangeTimer.Stop();
             _deviceChangeTimer.Start();
-        }
-
-        if (m.Msg == RawInputInterop.WmInput)
-        {
-            try
-            {
-                HandleRawInputMessage(m.LParam);
-            }
-            catch (Exception ex)
-            {
-                WriteLog($"USBPOLL.RAW.WARN: failed to process raw input: {ex.Message}");
-            }
         }
 
         base.WndProc(ref m);
@@ -83,13 +78,18 @@ public sealed partial class MainForm
         }
 
         _rawPollingInitialized = true;
-        if (!RawInputInterop.RegisterMouseAndKeyboard(Handle))
+        // Receive WM_INPUT on a dedicated background message-only HWND thread so
+        // 1K-8K mouse/keyboard packets never flood the WinForms UI message loop.
+        RawInputInterop.RawInputBackgroundMonitor monitor = new(OnBackgroundRawInputSample);
+        if (!monitor.Registered)
         {
+            monitor.Dispose();
             _rawPollingInitialized = false;
             WriteLog("USBPOLL.RAW.WARN: registration failed");
             return;
         }
 
+        _rawInputMonitor = monitor;
         _rawPollingTimer = new System.Windows.Forms.Timer
         {
             Interval = RawPollingUpdateIntervalMs,
@@ -102,6 +102,10 @@ public sealed partial class MainForm
 
     private void DisposeRawPolling()
     {
+        _rawPollingInitialized = false;
+        _rawInputMonitor?.Dispose();
+        _rawInputMonitor = null;
+
         _rawPollingTimer?.Stop();
         _rawPollingTimer?.Dispose();
         _rawPollingTimer = null;
@@ -110,59 +114,109 @@ public sealed partial class MainForm
         _deviceChangeTimer = null;
     }
 
-    private void HandleRawInputMessage(IntPtr lParam)
+    private void OnBackgroundRawInputSample(RawInputDeviceKind kind, IntPtr deviceHandle)
     {
-        if (!RawInputInterop.TryGetMessage(lParam, out RawInputMessage message))
+        if (_uiDisposing || IsDisposed || Disposing)
         {
             return;
         }
 
-        string role = message.Kind switch
+        RawPollingState? state;
+        bool resolveController = false;
+        lock (_rawPollingLock)
         {
-            RawInputDeviceKind.Mouse => "Mouse",
-            RawInputDeviceKind.Keyboard => "Keyboard",
-            _ => string.Empty,
-        };
+            if (_ignoredRawDeviceHandles.Contains(deviceHandle))
+            {
+                return;
+            }
 
-        if (string.IsNullOrWhiteSpace(role))
-        {
-            return;
+            _ = _rawPollingStates.TryGetValue(deviceHandle, out state);
         }
 
-        string instanceId = NormalizeInstanceId(message.InstanceId);
-        if (string.IsNullOrWhiteSpace(instanceId))
+        if (state is null)
         {
-            return;
-        }
+            if (!RawInputInterop.TryGetDeviceIdentity(deviceHandle, out string deviceName, out string rawInstanceId))
+            {
+                lock (_rawPollingLock)
+                {
+                    _ignoredRawDeviceHandles.Add(deviceHandle);
+                }
+                return;
+            }
 
-        if (!_rawPollingStates.TryGetValue(message.DeviceHandle, out RawPollingState? state))
-        {
-            state = new RawPollingState
+            string instanceId = NormalizeInstanceId(rawInstanceId);
+            if (string.IsNullOrWhiteSpace(instanceId))
+            {
+                lock (_rawPollingLock)
+                {
+                    _ignoredRawDeviceHandles.Add(deviceHandle);
+                }
+                return;
+            }
+
+            string role = kind switch
+            {
+                RawInputDeviceKind.Mouse => "Mouse",
+                RawInputDeviceKind.Keyboard => "Keyboard",
+                _ => string.Empty,
+            };
+            if (string.IsNullOrWhiteSpace(role))
+            {
+                return;
+            }
+
+            RawPollingState created = new()
             {
                 Role = role,
                 InstanceId = instanceId,
+                ControllerResolveStarted = true,
             };
-            _rawPollingStates[message.DeviceHandle] = state;
-            WriteLog($"USBPOLL.RAW: device role={role} inst={instanceId} name=\"{message.DeviceName}\"");
-        }
-
-        if (string.IsNullOrWhiteSpace(state.ControllerId))
-        {
-            state.ControllerId = ResolveRawPollingController(instanceId);
-            if (!string.IsNullOrWhiteSpace(state.ControllerId))
+            lock (_rawPollingLock)
             {
-                WriteLog($"USBPOLL.RAW: device controller role={role} inst={instanceId} controller={state.ControllerId}");
+                if (_rawPollingStates.TryGetValue(deviceHandle, out RawPollingState? existing))
+                {
+                    state = existing;
+                }
+                else
+                {
+                    _rawPollingStates[deviceHandle] = created;
+                    state = created;
+                    resolveController = true;
+                }
+            }
+
+            if (resolveController)
+            {
+                WriteLog($"USBPOLL.RAW: device role={role} inst={instanceId} name=\"{deviceName}\"");
+                QueueRawPollingControllerResolve(state);
             }
         }
 
-        long now = Stopwatch.GetTimestamp();
-        if (state.LastTick != 0)
-        {
-            double intervalMs = (now - state.LastTick) * 1000d / Stopwatch.Frequency;
-            state.RecordInterval(intervalMs);
-        }
+        state.RecordSampleTick(Stopwatch.GetTimestamp(), Stopwatch.Frequency);
+    }
 
-        state.LastTick = now;
+    private void QueueRawPollingControllerResolve(RawPollingState state)
+    {
+        string instanceId = state.InstanceId;
+        string role = state.Role;
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                string? controller = ResolveRawPollingController(instanceId);
+                if (string.IsNullOrWhiteSpace(controller) || _uiDisposing || IsDisposed || Disposing)
+                {
+                    return;
+                }
+
+                state.ControllerId = controller;
+                WriteLog($"USBPOLL.RAW: device controller role={role} inst={instanceId} controller={controller}");
+            }
+            catch
+            {
+                // Ignore background PnP lookup failures during shutdown or device removal.
+            }
+        });
     }
 
     private string? ResolveRawPollingController(string instanceId)
@@ -176,7 +230,16 @@ public sealed partial class MainForm
         bool changed = false;
         bool liveChanged = false;
 
-        foreach (RawPollingState state in _rawPollingStates.Values)
+        _rawPollingSnapshot.Clear();
+        lock (_rawPollingLock)
+        {
+            foreach (RawPollingState state in _rawPollingStates.Values)
+            {
+                _rawPollingSnapshot.Add(state);
+            }
+        }
+
+        foreach (RawPollingState state in _rawPollingSnapshot)
         {
             if (string.IsNullOrWhiteSpace(state.ControllerId))
             {
@@ -244,7 +307,7 @@ public sealed partial class MainForm
 
     private double NormalizeLivePollingHz(double hertz)
     {
-        if (TryReadRawMouseThrottleDuration(out int duration))
+        if (TryGetCachedRawMouseThrottleDuration(out int duration))
         {
             double throttleCap = 1000d / duration;
             if (IsClosePollingRate(hertz, throttleCap, 0.35d))
@@ -267,6 +330,20 @@ public sealed partial class MainForm
         }
 
         return bestError <= 0.15d ? best : hertz;
+    }
+
+    private bool TryGetCachedRawMouseThrottleDuration(out int duration)
+    {
+        long now = Stopwatch.GetTimestamp();
+        if (_cachedRawMouseThrottleReadTick == 0
+            || Stopwatch.GetElapsedTime(_cachedRawMouseThrottleReadTick, now).TotalSeconds >= 5)
+        {
+            _cachedRawMouseThrottleReadTick = now;
+            _cachedRawMouseThrottleValid = TryReadRawMouseThrottleDuration(out _cachedRawMouseThrottleDuration);
+        }
+
+        duration = _cachedRawMouseThrottleDuration;
+        return _cachedRawMouseThrottleValid;
     }
 
     private static bool IsClosePollingRate(double value, double target, double maxRelativeError)

@@ -34,7 +34,7 @@ NDIS и NetAdapterCx, очереди RSS, регистры модерации и
 
 **07 · [Топология CPU](./07-cpu-topology.ru.md)**
 
-Физические ядра, P/E, CPPC, CCD/CCX и ReservedCpuSets. Как читать карту процессора.
+Физические ядра, P/E-ядра, CPPC, CCD/CCX и ReservedCpuSets. Как читать карту процессора.
 
 **08 · [Ввод и Polling Rate](./08-input.ru.md)**
 

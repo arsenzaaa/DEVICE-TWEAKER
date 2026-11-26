@@ -72,6 +72,8 @@ internal sealed class InfoTextBox : RichTextBox
         ApplySyntaxColors();
     }
 
+    private const int WmSetRedraw = 0x000B;
+
     public void ApplySyntaxColors()
     {
         if (_formatting || IsDisposed || TextLength == 0)
@@ -82,6 +84,11 @@ internal sealed class InfoTextBox : RichTextBox
         _formatting = true;
         int selectionStart = SelectionStart;
         int selectionLength = SelectionLength;
+        bool suspendRedraw = IsHandleCreated;
+        if (suspendRedraw)
+        {
+            _ = NativeUser32.SendMessage(Handle, WmSetRedraw, IntPtr.Zero, IntPtr.Zero);
+        }
 
         try
         {
@@ -123,6 +130,11 @@ internal sealed class InfoTextBox : RichTextBox
             int safeStart = Math.Min(selectionStart, TextLength);
             int safeLength = Math.Min(selectionLength, Math.Max(0, TextLength - safeStart));
             Select(safeStart, safeLength);
+            if (suspendRedraw && IsHandleCreated && !IsDisposed)
+            {
+                _ = NativeUser32.SendMessage(Handle, WmSetRedraw, new IntPtr(1), IntPtr.Zero);
+                Invalidate();
+            }
             _formatting = false;
         }
     }

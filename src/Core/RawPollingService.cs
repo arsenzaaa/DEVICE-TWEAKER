@@ -4,14 +4,23 @@ namespace DeviceTweakerCS;
 
 internal sealed class RawPollingState
 {
+    private readonly object _sync = new();
     public required string Role { get; init; }
     public required string InstanceId { get; init; }
-    public string? ControllerId { get; set; }
+    private string? _controllerId;
+    public string? ControllerId
+    {
+        get => Volatile.Read(ref _controllerId);
+        set => Volatile.Write(ref _controllerId, value);
+    }
+    public bool ControllerResolveStarted { get; set; }
     public long LastTick { get; set; }
     private readonly Queue<double> _intervalsMs = [];
     private readonly Queue<double> _liveIntervalsMs = [];
-    public int StableSampleCount => _intervalsMs.Count;
-    public int LiveSampleCount => _liveIntervalsMs.Count;
+    private readonly double[] _stableScratch = new double[256];
+    private readonly double[] _liveScratch = new double[128];
+    public int StableSampleCount { get { lock (_sync) return _intervalsMs.Count; } }
+    public int LiveSampleCount { get { lock (_sync) return _liveIntervalsMs.Count; } }
     private bool _stableDirty = true, _liveDirty = true;
     private bool _hasStableEstimate, _hasLiveEstimate;
     private double _stableHertz, _liveHertz;
@@ -25,7 +34,29 @@ internal sealed class RawPollingState
     public int LiveCandidateCount { get; set; }
     public long LastLiveLogTimestamp { get; set; }
 
+    internal void RecordSampleTick(long now, long frequency)
+    {
+        lock (_sync)
+        {
+            if (LastTick != 0)
+            {
+                double intervalMs = (now - LastTick) * 1000d / frequency;
+                RecordIntervalUnsafe(intervalMs);
+            }
+
+            LastTick = now;
+        }
+    }
+
     internal void RecordInterval(double intervalMs)
+    {
+        lock (_sync)
+        {
+            RecordIntervalUnsafe(intervalMs);
+        }
+    }
+
+    private void RecordIntervalUnsafe(double intervalMs)
     {
         if (intervalMs > 500d)
         {
@@ -51,24 +82,30 @@ internal sealed class RawPollingState
     // every UI timer tick, including when no new input has arrived.
     internal bool TryEstimateLive(out double hertz)
     {
-        if (_liveDirty)
+        lock (_sync)
         {
-            _hasLiveEstimate = RawPollingService.TryEstimateLivePollingHz(_liveIntervalsMs, out _liveHertz);
-            _liveDirty = false;
+            if (_liveDirty)
+            {
+                _hasLiveEstimate = RawPollingService.TryEstimateLivePollingHz(_liveIntervalsMs, _liveScratch, out _liveHertz);
+                _liveDirty = false;
+            }
+            hertz = _liveHertz;
+            return _hasLiveEstimate;
         }
-        hertz = _liveHertz;
-        return _hasLiveEstimate;
     }
 
     internal bool TryEstimateStable(out double hertz)
     {
-        if (_stableDirty)
+        lock (_sync)
         {
-            _hasStableEstimate = RawPollingService.TryEstimateRawPollingHz(_intervalsMs, out _stableHertz);
-            _stableDirty = false;
+            if (_stableDirty)
+            {
+                _hasStableEstimate = RawPollingService.TryEstimateRawPollingHz(_intervalsMs, _stableScratch, out _stableHertz);
+                _stableDirty = false;
+            }
+            hertz = _stableHertz;
+            return _hasStableEstimate;
         }
-        hertz = _stableHertz;
-        return _hasStableEstimate;
     }
 }
 
@@ -93,49 +130,56 @@ internal static class RawPollingService
         if (string.Equals(state.LastDisplayedTag, tag, StringComparison.OrdinalIgnoreCase)) return false;
         state.LastDisplayedTag = tag; state.LastDisplayedHertz = hertz; return true;
     }
+    internal static bool TryEstimateRawPollingHz(Queue<double> intervalsMs, double[] scratch, out double hertz)
+        => TryEstimateMedianHz(intervalsMs, scratch, 12.5d, RawPollingMinSamples, 100d, out hertz);
+
+    internal static bool TryEstimateLivePollingHz(Queue<double> intervalsMs, double[] scratch, out double hertz)
+        => TryEstimateMedianHz(intervalsMs, scratch, 200d, RawPollingLiveMinSamples, double.Epsilon, out hertz);
+
     internal static bool TryEstimateRawPollingHz(IEnumerable<double> intervalsMs, out double hertz)
-    {
-        hertz = 0;
-        double[] samples = intervalsMs
-            .Where(v => v >= 0.05d && v <= 12.5d)
-            .OrderBy(v => v)
-            .ToArray();
+        => TryEstimateMedianHz(intervalsMs, null, 12.5d, RawPollingMinSamples, 100d, out hertz);
 
-        if (samples.Length < RawPollingMinSamples)
-        {
-            return false;
-        }
-
-        double activeIntervalMs = samples[samples.Length / 2];
-        if (activeIntervalMs <= 0)
-        {
-            return false;
-        }
-
-        hertz = 1000d / activeIntervalMs;
-        return hertz >= 100d;
-    }
     internal static bool TryEstimateLivePollingHz(IEnumerable<double> intervalsMs, out double hertz)
+        => TryEstimateMedianHz(intervalsMs, null, 200d, RawPollingLiveMinSamples, double.Epsilon, out hertz);
+
+    private static bool TryEstimateMedianHz(
+        IEnumerable<double> intervalsMs,
+        double[]? scratch,
+        double maxIntervalMs,
+        int minSamples,
+        double minHertz,
+        out double hertz)
     {
         hertz = 0;
-        double[] samples = intervalsMs
-            .Where(v => v >= 0.05d && v <= 200d)
-            .OrderBy(v => v)
-            .ToArray();
+        double[] buffer = scratch ?? new double[256];
+        int count = 0;
+        foreach (double v in intervalsMs)
+        {
+            if (v >= 0.05d && v <= maxIntervalMs)
+            {
+                if (count == buffer.Length)
+                {
+                    Array.Resize(ref buffer, buffer.Length * 2);
+                }
 
-        if (samples.Length < RawPollingLiveMinSamples)
+                buffer[count++] = v;
+            }
+        }
+
+        if (count < minSamples)
         {
             return false;
         }
 
-        double medianMs = samples[samples.Length / 2];
+        Array.Sort(buffer, 0, count);
+        double medianMs = buffer[count / 2];
         if (medianMs <= 0)
         {
             return false;
         }
 
         hertz = 1000d / medianMs;
-        return hertz > 0;
+        return hertz >= minHertz;
     }
     internal static bool IsClosePollingRate(double value, double target, double maxRelativeError)
     {

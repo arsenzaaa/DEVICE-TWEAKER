@@ -62,9 +62,9 @@ public sealed class DriverEnvironmentTests
         string text = (string)translate.Invoke(null, [DriverEnvironment.BuildConfirmation(snapshot)])!;
         Assert.Contains("Проверка системы (только чтение)", text);
         Assert.Contains("Vulnerable Driver Blocklist (реестр): нет явного параметра", text);
-        Assert.Contains("сейчас включена, в реестре 0 (задано выкл)", text);
+        Assert.Contains("сейчас включена, в реестре 0 (задано выкл.)", text);
         Assert.Contains("Служба FACEIT: найдена (работает)", text);
-        Assert.Contains("Vanguard: vgk не найдена, vgc не найдена", text);
+        Assert.Contains("Vanguard: vgk не найден, vgc не найдена", text);
         Assert.Contains("не определяет совместимость с античитами", text);
         Assert.DoesNotContain("found (", text);
     }

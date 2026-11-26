@@ -347,7 +347,7 @@ public sealed partial class MainForm
         Panel settingsPanel = new()
         {
             AutoSize = false,
-            BackColor = Color.Transparent,
+            BackColor = _bgGroup,
         };
 
         Label lblInterruptMode = new()
@@ -750,9 +750,9 @@ public sealed partial class MainForm
             nicReadbackX = nicValueX + readbackInset;
             txtNicItr.Location = new Point(nicValueX, txtNicItr.Top);
 
-            btnNicItr.Width = MeasureCardRowButtonWidth(btnNicItr, 54, 26);
-            btnNicItrSave.Width = MeasureCardRowButtonWidth(btnNicItrSave, 58, 26);
-            btnNicItrCheck.Width = MeasureCardRowButtonWidth(btnNicItrCheck, 76, 26);
+            btnNicItr.Width = MeasureCardRowButtonWidth(btnNicItr, 54, 26, busySourceText: "SET…");
+            btnNicItrSave.Width = MeasureCardRowButtonWidth(btnNicItrSave, 58, 26, busySourceText: "SAVE…");
+            btnNicItrCheck.Width = MeasureCardRowButtonWidth(btnNicItrCheck, 76, 26, busySourceText: "CHECK…");
 
             int buttonsWidth = btnNicItr.Width + nicButtonGap
                 + btnNicItrSave.Width + nicButtonGap
@@ -1143,9 +1143,9 @@ public sealed partial class MainForm
             btnImodDetails.Width = MeasureCardRowButtonWidth(btnImodDetails, 88, 30, imodDetailsExpanded ? "HIDE" : "DETAILS");
             btnImodDetails.Height = Math.Max(UiScale(26), btnImodDetails.Font.Height + UiScale(10));
 
-            btnImodApply.Width = MeasureCardRowButtonWidth(btnImodApply, 54, 30);
-            btnImodDelete.Width = MeasureCardRowButtonWidth(btnImodDelete, 76, 30);
-            btnImodCheck.Width = MeasureCardRowButtonWidth(btnImodCheck, 76, 30);
+            btnImodApply.Width = MeasureCardRowButtonWidth(btnImodApply, 54, 30, busySourceText: "SET…");
+            btnImodDelete.Width = MeasureCardRowButtonWidth(btnImodDelete, 76, 30, busySourceText: "DELETE…");
+            btnImodCheck.Width = MeasureCardRowButtonWidth(btnImodCheck, 76, 30, busySourceText: "CHECK…");
 
             lblImodMode.Location = new Point(0, imodRowTop + labelOffset);
             int widestModeText = cmbImodMode.Items.Cast<object>()
@@ -1739,7 +1739,11 @@ public sealed partial class MainForm
                 y += gapY;
             }
 
-            control.Location = new Point(paddingX, y);
+            Point targetLocation = new(paddingX, y);
+            if (control.Location != targetLocation)
+            {
+                control.Location = targetLocation;
+            }
             y += control.Height;
             firstPlaced = false;
         }

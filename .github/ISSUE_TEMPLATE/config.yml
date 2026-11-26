@@ -2,7 +2,7 @@ blank_issues_enabled: false
 contact_links:
   - name: Documentation / Документация
     url: https://github.com/arsenzaaa/DEVICE-TWEAKER/tree/main/docs
-    about: Guide, settings reference and building from source. / Руководство, справочник настроек и сборка
+    about: Guide, settings reference and building from source. / Руководство, справочник настроек и сборка из исходников
   - name: Security vulnerability / Уязвимость
     url: https://github.com/arsenzaaa/DEVICE-TWEAKER/security/advisories/new
     about: Report privately. / Сообщить приватно

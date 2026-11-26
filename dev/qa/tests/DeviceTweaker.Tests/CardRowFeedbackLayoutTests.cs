@@ -142,6 +142,16 @@ public sealed class CardRowFeedbackLayoutTests
                 Assert.Equal("CHECK", GetSourceText(form, usb.ImodCheckButton));
                 Assert.Equal(UiLanguage.Text("CHECK"), usb.ImodCheckButton.Text);
                 Assert.True(usb.ImodCheckButton.Right <= usb.SettingsPanel!.ClientSize.Width);
+
+                // Applying or checking IMOD must expand the details table cleanly
+                // even when invoked programmatically (e.g. after AUTO or SET).
+                Assert.False(usb.ImodDetailsExpanded);
+                MethodInfo revealImod = typeof(MainForm).GetMethod("RevealImodCheckResult", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                revealImod.Invoke(form, [usb]);
+                Assert.True(usb.ImodDetailsExpanded);
+                Assert.True(usb.ImodReadbackRequested);
+                Assert.Equal("HIDE", GetSourceText(form, usb.ImodDetailsButton!));
+                Assert.Equal(UiLanguage.Text("HIDE"), usb.ImodDetailsButton!.Text);
             }
             finally
             {

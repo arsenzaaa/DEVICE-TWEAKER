@@ -12,7 +12,7 @@ internal static class DeviceBadgePalette
     internal static readonly Color Storage = Color.FromArgb(204, 209, 216);
     internal static readonly Color Nvidia = Color.FromArgb(118, 185, 0);
     internal static readonly Color Amd = Color.FromArgb(235, 60, 60);
-    internal static readonly Color Intel = Color.FromArgb(45, 155, 255);
+    internal static readonly Color Intel = Color.FromArgb(88, 192, 255);
 
     internal static Color GetUsbColor(string instanceId)
     {

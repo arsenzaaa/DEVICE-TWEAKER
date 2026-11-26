@@ -183,6 +183,18 @@ public sealed partial class MainForm : Form
 
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
+        _uiDisposing = true;
+        UiFrameClock.StopAll(this);
+        DisposeRawPolling();
+        // Hide immediately and suspend layout before tearing down hundreds of
+        // child Win32 handles so closing feels instant instead of visibly freezing.
+        Visible = false;
+        SuspendLayout();
+        _devicesPanel?.SuspendLayout();
+        if (IsHandleCreated)
+        {
+            _ = NativeUser32.SendMessage(Handle, 0x000B /* WM_SETREDRAW */, IntPtr.Zero, IntPtr.Zero);
+        }
         if (_detailedLogEnabled)
         {
             AppDiagnostics.CompleteSession($"closeReason={e.CloseReason}");

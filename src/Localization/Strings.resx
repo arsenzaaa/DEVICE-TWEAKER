@@ -693,7 +693,7 @@ Apply it during AUTO-OPTIMIZATION?</value></data>
 
 Disable Vulnerable Driver Blocklist so DTIMOD can load after reboot?
 
-Warning: this can break Faceit, The Finals, and similar anti-cheats.
+Warning: this can break FACEIT, The Finals, and other anti-cheat-protected games.
 After reboot, run CHECK or AUTO-OPTIMIZATION again to apply IMOD.</value></data>
   <data name="Message.USB.IMOD.was.not.applied" xml:space="preserve"><value>USB IMOD was not applied.</value></data>
   <data name="Message.USB.POWER" xml:space="preserve"><value>USB POWER</value></data>
@@ -840,7 +840,7 @@ Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IM
   <data name="Read.DeviceStateFailed" xml:space="preserve"><value>Could not refresh device data. The current list is still available.</value></data>
   <data name="Read.DeviceReadback" xml:space="preserve"><value>Device readback</value></data>
   <data name="Inline.Imod.LastRead" xml:space="preserve"><value>Last read:</value></data>
-  <data name="Action.ReadingIrq" xml:space="preserve"><value>READING IRQ...</value></data>
+  <data name="Action.ReadingIrq" xml:space="preserve"><value>READING IRQ…</value></data>
   <data name="Status.IrqReading" xml:space="preserve"><value>Reading IRQ modes for {0} PCI devices…</value></data>
   <data name="Status.IrqPreparing" xml:space="preserve"><value>Preparing DTIMOD to read IRQ modes...</value></data>
   <data name="Status.IrqCompleted" xml:space="preserve"><value>PCI devices checked: {0} · unavailable: {1} · see IRQ Mode</value></data>

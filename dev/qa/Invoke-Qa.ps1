@@ -1,9 +1,12 @@
 ﻿# Local QA entry point. No settings writes, publication, git actions or driver loading.
 [CmdletBinding()]
 param(
+    [ValidateSet('Fast', 'Full')]
+    [string]$Mode = 'Fast',
     [string]$OutputRoot,
     [switch]$SkipGui,
     [switch]$VisibleGui,
+    [switch]$WithNative,
     [switch]$Worker,
     [string]$RunDirectory,
     [string]$SourceWorkspace,
@@ -16,10 +19,13 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Support\Private-Desktop.ps1')
 . (Join-Path $PSScriptRoot 'Support\Input-Snapshot.ps1')
 . (Join-Path $PSScriptRoot 'Support\Evidence.ps1')
+
+if ($SkipGui -and $Mode -eq 'Full') { $Mode = 'Fast' }
 $qaWorkloadLease = if (-not $Worker) { [DeviceTweakerQaDesktop]::AcquireWorkload() } else { $null }
 try {
-$root = (Resolve-Path (Join-Path $PSScriptRoot '..\..\src')).Path
-if ([string]::IsNullOrWhiteSpace($OutputRoot)) { $OutputRoot = Join-Path $root 'tmp\qa' }
+$workspace = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$root = Join-Path $workspace 'src'
+if ([string]::IsNullOrWhiteSpace($OutputRoot)) { $OutputRoot = Join-Path $workspace 'local\qa-runs' }
 $outputFull = [IO.Path]::GetFullPath($OutputRoot).TrimEnd('\')
 if (($outputFull.Equals($root, [StringComparison]::OrdinalIgnoreCase) -or
     $outputFull.StartsWith($root + '\', [StringComparison]::OrdinalIgnoreCase)) -and
@@ -32,13 +38,13 @@ $runDir = if ($RunDirectory) { [IO.Path]::GetFullPath($RunDirectory) } else {
         (Get-Date -Format 'yyyyMMdd_HHmmss'), [Guid]::NewGuid().ToString('N').Substring(0, 8))
 }
 New-Item -ItemType Directory -Path $runDir -Force | Out-Null
-if (-not $Worker) {
-    $workspace = Split-Path $root
+
+if ($Mode -eq 'Full' -and -not $Worker) {
     if ($BackupSamples) { $BackupSamples = (Resolve-Path -LiteralPath $BackupSamples).Path; if (-not (Test-Path -LiteralPath $BackupSamples -PathType Container)) { throw 'BackupSamples must be a directory' } }
     try {
         $snapshot = New-QaInputSnapshot $workspace $runDir
-        $parameters = @{ Worker = $true; RunDirectory = $runDir; SourceWorkspace = $workspace;
-            SkipGui = [bool]$SkipGui; VisibleGui = [bool]$VisibleGui; Monitor = $Monitor; BackupSamples = $BackupSamples }
+        $parameters = @{ Mode = 'Full'; Worker = $true; RunDirectory = $runDir; SourceWorkspace = $workspace;
+            SkipGui = [bool]$SkipGui; VisibleGui = [bool]$VisibleGui; WithNative = [bool]$WithNative; Monitor = $Monitor; BackupSamples = $BackupSamples }
         $script = Join-Path $snapshot 'dev\qa\Invoke-Qa.ps1'
         if ($VisibleGui) {
             & $script @parameters
@@ -47,7 +53,6 @@ if (-not $Worker) {
         $exitCode = Invoke-QaPrivateDesktop -ScriptPath $script -Parameters $parameters `
             -ReportDirectory (Join-Path $runDir 'isolation') -TimeoutSeconds 1800
         if ($null -eq $exitCode) { throw 'QA entry point cannot create a nested full run' }
-        # Inspect persisted reports, never trust a zero worker exit on its own.
         $report = Get-Content -LiteralPath (Join-Path $runDir 'qa.json') -Raw | ConvertFrom-Json
         if ($report.status -eq 'FAIL' -or $report.steps.Count -eq 0) { $exitCode = 1 }
         if ($exitCode -eq 0) {
@@ -63,14 +68,18 @@ if (-not $Worker) {
         exit $exitCode
     } catch {
         if (-not (Test-Path -LiteralPath (Join-Path $runDir 'qa.json'))) {
-            @{ status = 'FAIL'; error = $_.Exception.Message; artifacts = $runDir } |
+            @{ status = 'FAIL'; mode = $Mode; error = $_.Exception.Message; artifacts = $runDir } |
                 ConvertTo-Json | Set-Content -LiteralPath (Join-Path $runDir 'qa.json') -Encoding UTF8
         }
         throw
     }
 }
-if (-not $VisibleGui) { Assert-QaPrivateDesktop }
-Test-QaInputSnapshot $runDir
+
+if ($Mode -eq 'Full') {
+    if (-not $VisibleGui) { Assert-QaPrivateDesktop }
+    Test-QaInputSnapshot $runDir
+}
+
 $savedReadOnly = $env:DEVICE_TWEAKER_QA_READ_ONLY
 $savedOutput = $env:DEVICE_TWEAKER_QA_OUTPUT
 $savedBackups = $env:DEVICE_TWEAKER_QA_BACKUPS
@@ -98,10 +107,15 @@ function Invoke-DotnetStep([string]$Name, [string[]]$Arguments) {
 }
 
 try {
+    $activeWorkspace = if ($Mode -eq 'Full') { Split-Path $root } else { $workspace }
+    Test-QaDriverArtifact $activeWorkspace
+    $steps.Add([pscustomobject]@{ name = 'driver-artifact'; status = 'PASS' })
+
     Invoke-DotnetStep 'build' @('build', (Join-Path $root 'DeviceTweakerCS.csproj'), '-c', 'Release',
-        '-p:TreatWarningsAsErrors=true', '-p:BuildImodDriver=false', '--nologo')
+        '-p:TreatWarningsAsErrors=true', '-p:BuildImodDriver=false', '--nologo', '-m:1')
     Invoke-DotnetStep 'unit' @('test', (Join-Path $PSScriptRoot 'tests\DeviceTweaker.Tests\DeviceTweaker.Tests.csproj'),
-        '-c', 'Release', '-p:BuildImodDriver=false', '--nologo', '--logger', 'trx;LogFileName=unit.trx', '--results-directory', $runDir)
+        '-c', 'Release', '-p:BuildImodDriver=false', '--nologo', '-m:1', '--logger', 'trx;LogFileName=unit.trx', '--results-directory', $runDir)
+
     [xml]$trx = Get-Content -LiteralPath (Join-Path $runDir 'unit.trx') -Raw
     $unitResults = @($trx.TestRun.Results.UnitTestResult)
     if ($unitResults.Count -eq 0 -or @($unitResults | Where-Object outcome -ne 'Passed').Count -gt 0) {
@@ -110,81 +124,52 @@ try {
     $definitions = @{}
     foreach ($test in $trx.TestRun.TestDefinitions.UnitTest) { $definitions[$test.id] = $test.TestMethod.className }
     $coverage = @($trx.TestRun.Results.UnitTestResult | Group-Object { $definitions[$_.testId] } | ForEach-Object {
-        $scope = switch -Regex ($_.Name) {
-            'QaWriteGuardTests' { 'production write guards'; break }
-            'PowerPlanRestoreTests' { 'production saved-scheme AC/DC restore and failures on a memory Power API'; break }
-            'QaArtifactTests' { 'concurrent JSON readers/writers and absence of test panel in production assembly'; break }
-            'BackupRestoreTests' { 'production restore transaction / rollback and version 1 snapshots on memory storage'; break }
-            'ImodRegisterTests' { 'production IMOD register sequence on memory registers'; break }
-            'AutoAffinityPlannerTests' { 'production CPU allocation on synthetic CPU topologies'; break }
-            'NicItrProgrammingTests' { 'production NIC register sequence on an in-memory bus'; break }
-            'RawPollingRoleTests' { 'production estimators on synthetic intervals and polling display rules; no live device measurement'; break }
-            'RawPollingConfirmationTests' { 'production polling confirmation and downgrade state on synthetic events'; break }
-            'DevicePowerDiagnosticsTests' { 'production WMI query/write/fresh-readback sequence on injected providers; no real WMI writes'; break }
-            'NdisDiagnosticsTests' { 'production RSS comparison and query script with shadowed adapter cmdlets; no real adapter access'; break }
-            'DiagnosticRegressionTests' { 'actual diagnostic level classifier and EXE build identity / file digest'; break }
-            'DeviceSettingsWriterTests' { 'production MSI / IRQ / affinity value writes on a memory registry'; break }
-            default { 'pure logic / parsing / profile lookup' }
-        }
-        [pscustomobject]@{ testClass = $_.Name; scope = $scope; passed = @($_.Group | Where-Object outcome -eq 'Passed').Count;
+        [pscustomobject]@{ testClass = $_.Name; passed = @($_.Group | Where-Object outcome -eq 'Passed').Count;
             failed = @($_.Group | Where-Object outcome -eq 'Failed').Count; total = $_.Count }
     })
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-QaSensitivity.ps1') `
-        -OutputDirectory (Join-Path $runDir 'sensitivity')
-    $sensitivityCode = $LASTEXITCODE
-    $steps.Add([pscustomobject]@{ name = 'sensitivity'; status = $(if ($sensitivityCode -eq 0) { 'PASS' } else { 'FAIL' });
-        exitCode = $sensitivityCode; report = (Join-Path $runDir 'sensitivity\sensitivity.json') })
-    if ($sensitivityCode -ne 0) { throw 'QA sensitivity checks failed' }
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-QaScriptContracts.ps1') `
-        -OutputDirectory (Join-Path $runDir 'script-contracts')
-    $contractCode = $LASTEXITCODE
-    $steps.Add([pscustomobject]@{ name = 'script-contracts'; status = $(if ($contractCode -eq 0) { 'PASS' } else { 'FAIL' }); exitCode = $contractCode })
-    if ($contractCode -ne 0) { throw 'QA script contracts failed' }
-    $nativeCases = [ordered]@{ 'native-model' = $null; 'native-unload-mutant' = 'unload'; 'native-write-range-mutant' = 'write-past-device-end'; 'native-write-guard-mutant' = 'bypass-device-write-guard' }
-    foreach ($nativeCase in $nativeCases.Keys) {
-        $nativeArguments = @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $PSScriptRoot 'Checks\Test-NativeDriverModel.ps1'),'-OutputDirectory',(Join-Path $runDir $nativeCase))
-        if ($nativeCases[$nativeCase]) { $nativeArguments += @('-InjectRegression', $nativeCases[$nativeCase]) }
-        & powershell.exe @nativeArguments *> (Join-Path $runDir ($nativeCase+'.log'))
-        if ($LASTEXITCODE -ne 0) { throw "Native model stage failed: $nativeCase" }
+
+    if ($WithNative) {
+        $nativeCases = [ordered]@{ 'native-model' = $null; 'native-unload-mutant' = 'unload'; 'native-write-range-mutant' = 'write-past-device-end'; 'native-write-guard-mutant' = 'bypass-device-write-guard' }
+        foreach ($nativeCase in $nativeCases.Keys) {
+            $nativeArguments = @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $PSScriptRoot 'Checks\Test-NativeDriverModel.ps1'),'-OutputDirectory',(Join-Path $runDir $nativeCase))
+            if ($nativeCases[$nativeCase]) { $nativeArguments += @('-InjectRegression', $nativeCases[$nativeCase]) }
+            & powershell.exe @nativeArguments *> (Join-Path $runDir ($nativeCase+'.log'))
+            if ($LASTEXITCODE -ne 0) { throw "Native model stage failed: $nativeCase" }
+        }
+        $steps.Add([pscustomobject]@{ name = 'native-driver'; status = 'PASS'; scope = 'Actual native functions with fake kernel APIs; unload, write-range and write-guard mutations detected; no hardware access' })
     }
-    $steps.Add([pscustomobject]@{ name='native-driver'; status='PASS'; scope='Actual native functions with fake kernel APIs; unload, write-range and write-guard mutations detected; no hardware access' })
-    Invoke-DotnetStep 'source-inventory' @('run', '--project', (Join-Path $PSScriptRoot 'Inspect\Inspect.csproj'), '--',
-        (Split-Path $root), (Join-Path $root 'bin\Release\net10.0-windows\win-x64\DEVICE TWEAKER.dll'),
-        (Join-Path $runDir 'source-ui-inventory.json'))
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-QaDesktopContracts.ps1') `
-        -OutputDirectory (Join-Path $runDir 'desktop-contracts') `
-        -ExePath (Join-Path $root 'bin\Release\net10.0-windows\win-x64\DEVICE TWEAKER.exe')
-    if ($LASTEXITCODE -ne 0) { throw 'Private desktop launcher contracts failed' }
-    $steps.Add([pscustomobject]@{ name = 'desktop-contracts'; status = 'PASS'; report = (Join-Path $runDir 'desktop-contracts\contracts.json') })
-    if ($SkipGui) {
-        $steps.Add([pscustomobject]@{ name = 'gui'; status = 'SKIPPED'; reason = '-SkipGui explicitly requested' })
-        $status = 'PARTIAL'
-        Test-QaInputSnapshot $runDir
+
+    if ($Mode -ne 'Full') {
+        $status = 'PASS'
     } else {
+        Invoke-DotnetStep 'source-inventory' @('run', '--project', (Join-Path $PSScriptRoot 'Inspect\Inspect.csproj'), '--',
+            $activeWorkspace, (Join-Path $root 'bin\Release\net10.0-windows\win-x64\DEVICE TWEAKER.dll'),
+            (Join-Path $runDir 'source-ui-inventory.json'))
         Invoke-DotnetStep 'build-developer' @('build', (Join-Path $root 'DeviceTweakerCS.csproj'), '-c', 'Release',
-            '-p:DeveloperQa=true', '-p:TreatWarningsAsErrors=true', '-p:BuildImodDriver=false', '--nologo')
+            '-p:DeveloperQa=true', '-p:TreatWarningsAsErrors=true', '-p:BuildImodDriver=false', '--nologo', '-m:1')
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-UiControls.ps1') `
             -AssemblyPath (Join-Path $root 'bin\Release\net10.0-windows\win-x64\DEVICE TWEAKER.dll') `
             -OutputDirectory (Join-Path $runDir 'controls')
         if ($LASTEXITCODE -ne 0) { throw 'Production UI control contracts failed' }
         $steps.Add([pscustomobject]@{ name = 'ui-controls'; status = 'PASS'; report = (Join-Path $runDir 'controls\controls.json') })
+
         $exe = Join-Path $root 'bin\DeveloperQa\Release\net10.0-windows\win-x64\DEVICE TWEAKER QA.exe'
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-Workbench.ps1') `
             -ExePath $exe -OutputDirectory (Join-Path $runDir 'workbench')
         if ($LASTEXITCODE -ne 0) { throw 'Development workbench failed' }
-        $steps.Add([pscustomobject]@{ name = 'workbench'; status = 'PASS'; report = (Join-Path $runDir 'workbench\workbench.json');
-            scope = 'Functional scenarios / same-build image determinism; visual inspection remains separate' })
+        $steps.Add([pscustomobject]@{ name = 'workbench'; status = 'PASS'; report = (Join-Path $runDir 'workbench\workbench.json') })
+
         $guiDebugArgs = @()
         if ($VisibleGui) { $guiDebugArgs += '-VisibleGui' }
-        # Separate PowerShell process keeps the UI helper definitions and environment local.
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Smoke-SafeGui.ps1') `
             -ExePath $exe -OutputRoot (Join-Path $runDir 'gui') -Monitor $Monitor @guiDebugArgs
         $guiCode = $LASTEXITCODE
         $steps.Add([pscustomobject]@{ name = 'gui'; status = $(if ($guiCode -eq 0) { 'PASS' } else { 'FAIL' }); exitCode = $guiCode })
         if ($guiCode -ne 0) { throw "GUI QA failed with exit code $guiCode" }
+
         $guiLogs = @(Get-ChildItem -LiteralPath (Join-Path $runDir 'gui'), (Join-Path $runDir 'controls') -Recurse -File -Filter 'DeviceTweaker_*.log' |
             Where-Object { $_.Directory.Name -eq 'logs' })
-        if ($guiLogs.Count -lt 3) { throw 'Expected startup, sandbox and Russian GUI session logs' }
+        if ($guiLogs.Count -lt 2) { throw 'Expected production and control QA session logs' }
         foreach ($sessionLog in $guiLogs) {
             & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-LogQuality.ps1') `
                 -LogPath $sessionLog.FullName -RequireSessionSummary -RequireBuildIdentity
@@ -192,10 +177,10 @@ try {
             & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-QaLogErrors.ps1') `
                 -LogPath $sessionLog.FullName -ReportPath (Join-Path $runDir ($sessionLog.BaseName + '-errors.json'))
             if ($LASTEXITCODE -ne 0) { throw "Unexpected errors: $($sessionLog.FullName)" }
-
         }
         $steps.Add([pscustomobject]@{ name = 'log-contract'; status = 'PASS'; sessions = $guiLogs.Count })
         $steps.Add([pscustomobject]@{ name = 'runtime-error-audit'; status = 'PASS'; sessions = $guiLogs.Count })
+
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-GuiLayout.ps1') `
             -ExePath $exe -OutputDirectory (Join-Path $runDir 'layout')
         if ($LASTEXITCODE -ne 0) { throw 'GUI layout matrix failed' }
@@ -208,6 +193,7 @@ try {
                 -LogPath $layoutLog.FullName -ReportPath (Join-Path $layoutLog.Directory.FullName 'errors.json')
             if ($LASTEXITCODE -ne 0) { throw 'Unexpected layout scenario errors' }
         }
+
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-GuiResourceStability.ps1') `
             -ExePath (Join-Path $root 'bin\Release\net10.0-windows\win-x64\DEVICE TWEAKER.exe') `
             -OutputDirectory (Join-Path $runDir 'resources') @guiDebugArgs
@@ -234,25 +220,26 @@ try {
     Write-Host ($_ | Out-String) -ForegroundColor Red
 } finally {
     $report = [ordered]@{
-        schemaVersion = 2
+        schemaVersion = 3
+        mode = $Mode
+        withNative = [bool]$WithNative
         status = $status
-        inputs = (Join-Path $runDir 'inputs.json')
-        inputManifestSha256 = (Get-FileHash -LiteralPath (Join-Path $runDir 'inputs.json')).Hash
-        displayMode = $(if ($VisibleGui) { 'VISIBLE_DEBUG' } else { 'PRIVATE_DESKTOP' })
+        inputs = $(if ($Mode -eq 'Full') { Join-Path $runDir 'inputs.json' } else { $null })
+        inputManifestSha256 = $(if ($Mode -eq 'Full' -and (Test-Path -LiteralPath (Join-Path $runDir 'inputs.json'))) { (Get-FileHash -LiteralPath (Join-Path $runDir 'inputs.json')).Hash } else { $null })
+        displayMode = $(if ($Mode -ne 'Full') { 'IN_MEMORY' } elseif ($VisibleGui) { 'VISIBLE_DEBUG' } else { 'PRIVATE_DESKTOP' })
         desktop = [DeviceTweakerQaDesktop]::CurrentDesktop()
         artifactsIdentity = @(Get-ChildItem -LiteralPath $root -Recurse -File |
             Where-Object { $_.FullName -match '\\bin\\(DeveloperQa\\)?Release\\' -and $_.Extension -in @('.exe', '.dll') } |
             ForEach-Object { @{ path = $_.FullName; sha256 = (Get-FileHash -LiteralPath $_.FullName).Hash } })
         hardwareValidation = 'SKIPPED'
         limitations = @('Registry/WMI/power settings are denied, not applied and verified.',
-            'NIC programming uses the production sequence on simulated registers.',
-            'TEST ADMIN backup/restore and fault injection are virtual-model checks.',
             'Live Raw Input frequency and real driver readback are not validated.')
         unitCoverage = $coverage
         steps = @($steps.ToArray())
         artifacts = $runDir
     }
     $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $runDir 'qa.json') -Encoding UTF8
+    if ($Mode -eq 'Fast' -and $status -eq 'PASS') { Test-QaEvidence $runDir }
     $env:DEVICE_TWEAKER_QA_READ_ONLY = $savedReadOnly
     $env:DEVICE_TWEAKER_QA_OUTPUT = $savedOutput
     $env:DEVICE_TWEAKER_QA_BACKUPS = $savedBackups

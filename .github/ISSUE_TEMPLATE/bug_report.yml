@@ -14,7 +14,7 @@ body:
     id: steps
     attributes:
       label: Steps to reproduce / Как повторить
-      description: List the device, the setting you changed and whether you restarted Windows. / Укажите устройство, изменённую настройку и была ли перезагрузка Windows.
+      description: List the device, the setting you changed and whether you restarted Windows. / Укажите устройство, изменённую настройку и уточните, выполнялась ли перезагрузка Windows.
     validations:
       required: true
   - type: textarea
@@ -27,7 +27,7 @@ body:
     id: log
     attributes:
       label: Log excerpt / Фрагмент лога
-      description: Paste the lines for the affected operation. Remove personal paths, names and serial numbers. / Вставьте строки нужной операции. Уберите личные пути, имена и серийные номера.
+      description: Paste the lines for the affected operation. Remove personal paths, names and serial numbers. / Вставьте строки лога, относящиеся к проблемной операции. Уберите личные пути, имена и серийные номера.
       render: text
   - type: textarea
     id: attachments

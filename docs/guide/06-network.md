@@ -41,7 +41,7 @@ When you install or restore a profile, the application checks each NIC ITR entry
 
 ## Verification
 
-Wi-Fi is excluded from AUTO and supported wired-setting resets. Compare active RSS, ITR readback, packet loss, CPU load and latency under the same traffic. Less moderation can increase interrupt rate and CPU load.
+Wi-Fi is excluded from AUTO and from resets of wired network settings. Compare active RSS, ITR readback, packet loss, CPU load and latency under the same traffic. Less moderation can increase interrupt rate and CPU load.
 
 The [verification chapter](./10-verification.md) covers packet-processing traces and before/after comparisons.
 

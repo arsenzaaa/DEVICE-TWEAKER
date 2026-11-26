@@ -10,7 +10,7 @@ CPPC ratings rank cores by the firmware's estimate of their performance. CCD and
 
 ## How AUTO uses topology
 
-AUTO selects a target CCD and physical cores using project rules, SMT relationships and available ratings. AUTO selects two physical cores for a discrete GPU. Windows chooses the cores for integrated graphics. Other roles receive their own assignments. Unreliable detection of required topology blocks the relevant automatic write.
+AUTO selects a target CCD and physical cores using its topology rules, SMT relationships and available ratings. It assigns two physical cores to a discrete GPU. Windows chooses the cores for integrated graphics. Other roles receive their own assignments. Unreliable detection of required topology blocks the relevant automatic write.
 
 AUTO changes device settings while leaving SMT, E-cores and game-thread affinity unchanged. Core assignments depend on the detected topology; compare the resulting performance under your workload.
 

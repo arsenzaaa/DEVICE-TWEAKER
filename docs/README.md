@@ -4,7 +4,7 @@
 
 ## Getting started
 
-[Guide](./guide/README.md) · [Settings reference](./SETTINGS.md) · [Screenshots](./SCREENSHOTS.md) · [Verifying changes](./guide/10-verification.md)
+[Guide](./guide/README.md) · [Settings reference](./SETTINGS.md) · [Screenshots](./SCREENSHOTS.md) · [Verifying results](./guide/10-verification.md)
 
 ## By device
 

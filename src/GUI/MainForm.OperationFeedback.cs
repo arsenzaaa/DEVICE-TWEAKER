@@ -12,6 +12,10 @@ public sealed partial class MainForm
         if (button is null || button.IsDisposed) return new DeviceOperationScope(() => { });
         string original = GetIdleControlSourceText(button);
         bool wasEnabled = button.Enabled;
+        bool wasFocused = button.Focused;
+        bool restoreKeyboardFocus = wasFocused && ShowFocusCues;
+        if (wasFocused)
+            ReleaseControlFocus(button);
         _busyButtonCaptions.Add(button, new BusyButtonState(caption, original));
         button.Enabled = false;
         button.Text = caption;
@@ -23,7 +27,23 @@ public sealed partial class MainForm
             button.Text = original;
             button.Enabled = wasEnabled;
             refreshAfter?.Invoke();
+            if (restoreKeyboardFocus && ActiveControl is null && button.Visible && button.Enabled && button.CanFocus)
+                button.Focus();
         });
+    }
+
+    private void ReleaseControlFocus(Control control)
+    {
+        Control? current = control;
+        while (current is not null)
+        {
+            if (current is ContainerControl container && container != this)
+                container.ActiveControl = null;
+            current = current.Parent;
+        }
+
+        if (ActiveControl is not null)
+            ActiveControl = null;
     }
 
     private string GetIdleControlSourceText(Control control)

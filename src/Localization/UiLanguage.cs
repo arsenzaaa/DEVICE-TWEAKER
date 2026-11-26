@@ -311,22 +311,22 @@ internal static partial class UiLanguage
         return value;
     }
 
-    private static string TranslateDriverPreflightState(string source) => source
+    private static string TranslateDriverPreflightState(string source, bool masculine = false) => source
         .Replace("not explicitly configured", "нет явного параметра", StringComparison.Ordinal)
-        .Replace("not found", "не найдена", StringComparison.Ordinal)
-        .Replace("found (", "найдена (", StringComparison.Ordinal)
-        .Replace("configured off", "задано выкл", StringComparison.Ordinal)
-        .Replace("configured on", "задано вкл", StringComparison.Ordinal)
+        .Replace("not found", masculine ? "не найден" : "не найдена", StringComparison.Ordinal)
+        .Replace("found (", masculine ? "найден (" : "найдена (", StringComparison.Ordinal)
+        .Replace("configured off", "задано выкл.", StringComparison.Ordinal)
+        .Replace("configured on", "задано вкл.", StringComparison.Ordinal)
         .Replace("unavailable", "недоступно", StringComparison.Ordinal)
-        .Replace("disabled", "выключена", StringComparison.Ordinal)
-        .Replace("enabled", "включена", StringComparison.Ordinal)
+        .Replace("disabled", masculine ? "выключен" : "выключена", StringComparison.Ordinal)
+        .Replace("enabled", masculine ? "включён" : "включена", StringComparison.Ordinal)
         .Replace("running", "работает", StringComparison.Ordinal)
-        .Replace("stopped", "остановлена", StringComparison.Ordinal)
+        .Replace("stopped", masculine ? "остановлен" : "остановлена", StringComparison.Ordinal)
         .Replace("starting", "запускается", StringComparison.Ordinal)
         .Replace("stopping", "останавливается", StringComparison.Ordinal)
         .Replace("continuing", "возобновляется", StringComparison.Ordinal)
         .Replace("pausing", "приостанавливается", StringComparison.Ordinal)
-        .Replace("paused", "приостановлена", StringComparison.Ordinal);
+        .Replace("paused", masculine ? "приостановлен" : "приостановлена", StringComparison.Ordinal);
 
     private static string TranslateLine(string source)
     {
@@ -341,7 +341,7 @@ internal static partial class UiLanguage
         if (UiResources.TryTranslateMsiMaximum(source, out string maximumMessage)) return maximumMessage;
 
         if (source.StartsWith("Vulnerable Driver Blocklist (registry): ", StringComparison.Ordinal))
-            return "Vulnerable Driver Blocklist (реестр): " + TranslateDriverPreflightState(source["Vulnerable Driver Blocklist (registry): ".Length..]);
+            return "Vulnerable Driver Blocklist (реестр): " + TranslateDriverPreflightState(source["Vulnerable Driver Blocklist (registry): ".Length..], masculine: true);
         if (source.StartsWith("Memory Integrity / HVCI: runtime ", StringComparison.Ordinal))
             return "Целостность памяти / HVCI: сейчас " + TranslateDriverPreflightState(source["Memory Integrity / HVCI: runtime ".Length..].Replace(", registry ", ", в реестре ", StringComparison.Ordinal));
         if (source.StartsWith("Microsoft Defender service: ", StringComparison.Ordinal))
@@ -349,7 +349,18 @@ internal static partial class UiLanguage
         if (source.StartsWith("FACEIT service: ", StringComparison.Ordinal))
             return "Служба FACEIT: " + TranslateDriverPreflightState(source["FACEIT service: ".Length..]);
         if (source.StartsWith("Vanguard: vgk ", StringComparison.Ordinal))
-            return "Vanguard: vgk " + TranslateDriverPreflightState(source["Vanguard: vgk ".Length..]);
+        {
+            string rest = source["Vanguard: vgk ".Length..];
+            int vgcIndex = rest.IndexOf(", vgc ", StringComparison.Ordinal);
+            if (vgcIndex >= 0)
+            {
+                return "Vanguard: vgk "
+                    + TranslateDriverPreflightState(rest[..vgcIndex], masculine: true)
+                    + ", vgc "
+                    + TranslateDriverPreflightState(rest[(vgcIndex + ", vgc ".Length)..], masculine: false);
+            }
+            return "Vanguard: vgk " + TranslateDriverPreflightState(rest, masculine: true);
+        }
 
         Match match = AffinityMaskRegex().Match(source);
         if (match.Success)
@@ -402,7 +413,7 @@ internal static partial class UiLanguage
         match = RawRegex().Match(source);
         if (match.Success)
         {
-            return $"исходные значения: {TranslateImodStructuredText(match.Groups[1].Value)}";
+            return $"значения hex: {TranslateImodStructuredText(match.Groups[1].Value)}";
         }
 
         match = MapRegex().Match(source);
@@ -507,12 +518,12 @@ internal static partial class UiLanguage
 
         match = PendingApplyRegex().Match(source);
         if (match.Success)
-            return $"ожидает ПРИМЕНИТЬ: {TranslateInlineStatus(match.Groups[1].Value)}";
+            return $"ожидает применения: {TranslateInlineStatus(match.Groups[1].Value)}";
 
         match = ReservedValueRegex().Match(source);
         if (match.Success)
         {
-            string prefix = match.Groups[1].Value == "Pending APPLY" ? "Ожидает ПРИМЕНИТЬ" : "Значение";
+            string prefix = match.Groups[1].Value == "Pending APPLY" ? "Ожидает применения" : "Значение";
             string value = match.Groups[2].Value == "not set" ? "не задано" : match.Groups[2].Value.Replace(" | CPUs:", " | CPU:", StringComparison.Ordinal);
             return $"{prefix}: ReservedCpuSets = {value}";
         }
@@ -522,7 +533,7 @@ internal static partial class UiLanguage
             || source.StartsWith("Polling live: ", StringComparison.Ordinal))
         {
             int colon = source.IndexOf(':');
-            string prefix = source[..colon] switch { "HID" => "HID", "Polling" => "Опрос", _ => "Опрос live" };
+            string prefix = source[..colon] switch { "HID" => "HID", "Polling" => "Опрос", _ => "Текущий опрос" };
             return prefix + ": " + string.Join(", ", source[(colon + 2)..].Split(',', StringSplitOptions.TrimEntries).Select(TranslateRussianRole));
         }
 
@@ -596,6 +607,16 @@ internal static partial class UiLanguage
         return changed ? value[..(open + 1)] + translated + value[close..] : value;
     }
 
+    private static string FormatRussianValueNoun(int count)
+    {
+        int abs = Math.Abs(count) % 100;
+        int last = abs % 10;
+        if (abs is >= 11 and <= 19) return "значений";
+        if (last == 1) return "значение";
+        if (last is >= 2 and <= 4) return "значения";
+        return "значений";
+    }
+
     private static string TranslateInlineStatus(string value)
     {
         string trimmed = value.Trim();
@@ -607,7 +628,11 @@ internal static partial class UiLanguage
         Match enterValues = EnterValuesRegex().Match(trimmed);
         if (enterValues.Success)
         {
-            return $"введите одно значение или {enterValues.Groups[1].Value} значений";
+            string countText = enterValues.Groups[1].Value;
+            string noun = int.TryParse(countText, out int count)
+                ? FormatRussianValueNoun(count)
+                : "значений";
+            return $"введите одно значение или {countText} {noun}";
         }
 
         foreach ((string english, string russian) in InlineReplacements)
@@ -636,8 +661,8 @@ internal static partial class UiLanguage
             ("exact xHCI map", "точная карта xHCI"),
             ("addressMatches=", "совпадения адресов="),
             ("rootPortMatches=", "совпадения корневых портов="),
-            ("endpointTargets=", "цели конечных точек="),
-            ("slotTargets=", "цели слотов="),
+            ("endpointTargets=", "конечные точки="),
+            ("slotTargets=", "слоты="),
             ("classified=", "классифицировано="),
             ("filteredGenericHid=", "отфильтровано generic HID="),
             ("addrMap=", "карта адресов="),
@@ -646,13 +671,14 @@ internal static partial class UiLanguage
             ("slotTargetMap=", "карта слотов="),
             ("press CHECK", "нажмите ПРОВЕРИТЬ"),
             ("mixed", "разные значения"),
-            (" more", " ещё"),
         ];
 
         foreach ((string english, string russian) in replacements)
         {
             translated = translated.Replace(english, russian, StringComparison.OrdinalIgnoreCase);
         }
+
+        translated = Regex.Replace(translated, @"\b(\d+)\s+more\b", "ещё $1", RegexOptions.IgnoreCase);
 
         return translated;
     }

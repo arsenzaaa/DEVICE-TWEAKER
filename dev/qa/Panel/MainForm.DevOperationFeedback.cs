@@ -37,12 +37,15 @@ public sealed partial class MainForm
             Rectangle buttonBoundsBefore = button.Bounds;
             Rectangle? editorBoundsBefore = rowEditor?.Bounds;
             DevReveal(button);
+            button.Focus();
             using (IDisposable operation = TryBeginDeviceOperation("FEEDBACK AUDIT")
                 ?? throw new InvalidOperationException("Feedback audit could not acquire operation."))
             {
                 try
                 {
                     using IDisposable feedback = BeginButtonFeedback(button, caption);
+                    if (owningBlock is not null && DevDescendants(owningBlock.Group).OfType<TextBox>().Any(tb => tb.Focused || tb.SelectionLength > 0))
+                        throw new InvalidOperationException("Busy feedback shifted focus into a card TextBox: " + suffix);
                     if (button.Enabled || button.Text != UiLanguage.Text(caption))
                         throw new InvalidOperationException("Busy caption was not immediate.");
                     if (TryBeginDeviceOperation("REPEATED AUDIT") is not null)

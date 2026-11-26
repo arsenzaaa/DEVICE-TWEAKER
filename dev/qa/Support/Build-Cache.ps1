@@ -1,4 +1,4 @@
-# One source snapshot and build per input/SDK identity. Never deletes old evidence.
+# One source snapshot and build per input/SDK identity; retains the newest 3 completed builds.
 . (Join-Path $PSScriptRoot 'Input-Snapshot.ps1')
 
 function Get-QaBuildKey($Files, [string]$SdkVersion) {
@@ -99,6 +99,21 @@ function Get-QaDevBuild([string]$Workspace, [string]$BuildRoot, [switch]$FreshBu
             [IO.File]::Move($manifestTemp, (Join-Path $directory 'build.json'))
         }
         $null = Test-QaDevBuild $directory $key
+        if (-not $FreshBuild) {
+            # Retain only the newest 3 completed QA builds so local/qa-builds stays compact.
+            $completed = @(Get-ChildItem -LiteralPath $BuildRoot -Directory -ErrorAction SilentlyContinue |
+                Where-Object { $_.FullName -ne $directory -and (Test-Path -LiteralPath (Join-Path $_.FullName 'build.json') -PathType Leaf) } |
+                Sort-Object LastWriteTimeUtc -Descending)
+            if ($completed.Count -gt 2) {
+                foreach ($stale in ($completed | Select-Object -Skip 2)) {
+                    try {
+                        Remove-Item -LiteralPath $stale.FullName -Recurse -Force -ErrorAction SilentlyContinue
+                        $staleLock = Join-Path $BuildRoot ($stale.Name + '.lock')
+                        if (Test-Path -LiteralPath $staleLock) { Remove-Item -LiteralPath $staleLock -Force -ErrorAction SilentlyContinue }
+                    } catch { }
+                }
+            }
+        }
         return [pscustomobject]@{ directory = $directory; key = $key; reused = [bool]$reused;
             manifestSha256 = (Get-FileHash -LiteralPath (Join-Path $directory 'build.json')).Hash;
             snapshot = (Join-Path $directory 'input\repo'); sdkVersion = $sdkVersion }
@@ -109,7 +124,9 @@ function Get-QaSessionInspector([string]$RunDirectory) {
     $reference = Join-Path $RunDirectory 'build-reference.json'
     if (-not (Test-Path -LiteralPath $reference)) { return $null }
     $build = Get-Content -LiteralPath $reference -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ((Get-FileHash -LiteralPath (Join-Path $build.directory 'build.json')).Hash -ne $build.manifestSha256) { throw 'Session build reference changed' }
+    $manifestPath = Join-Path $build.directory 'build.json'
+    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { return $null }
+    if ((Get-FileHash -LiteralPath $manifestPath).Hash -ne $build.manifestSha256) { throw 'Session build reference changed' }
     $null = Test-QaDevBuild $build.directory $build.key
     return Join-Path $build.directory 'input\repo\dev\qa\Inspect\bin\Release\net10.0-windows\Inspect.dll'
 }

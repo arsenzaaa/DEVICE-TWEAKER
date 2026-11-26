@@ -26,16 +26,9 @@ The integration runner calls these checks in sequence. Use a focused check when 
 - **CPU:** shared scheduler against synthetic SMT, P/E and CCD/CCX topologies, including GPU/input isolation.
 - **Polling:** synthetic intervals, confirmation and rate changes; low keyboard activity must not replace the endpoint rate.
 - **Reports:** concurrent JSON reads/updates and exclusion of the test panel from normal builds.
-- **Sensitivity:** seventeen corrupted C# copies cover the I225 address, NIC readback, IMOD count, backup readback, GPU pair selection, premature polling downgrade, wrong AC/DC, activation of an inactive scheme, removing read-only through the environment, using MSI-X table size as Enable, ignoring a one-pixel difference, disposing fonts before controls, failing the second Windows resource list, loading before checking the existing device, SCM after KDU timeout, losing saved NIC ITR values and choosing an interrupter from Slot Context instead of TRB. The relevant assertions must fail; a build failure does not count.
-- **GUI:** EN/RU, geometry, dialogs, navigation, test panel and virtual scenarios.
-- **Workbench:** two scenarios run twice, with native captures, a transition, test JSON changes/restoration, a real fake-storage exception and exact checkpoint comparison. Design review is recorded separately.
-- **Normal-build controls:** dropdown key routing, selection and popup closing, Ctrl+Z/Home/End in editors and RU→EN→RU with source strings preserved. Eight normal/hover/focus/disabled captures use no physical input.
-- **Source inventory:** Roslyn lists active production C# files, methods and UI strings for manual inspection. This list alone does not verify all logic.
-- **Hidden launch:** independent script/EXE rejection of an incorrect desktop, exact error propagation and descendant cleanup after timeout.
-- **Layout:** six EN/RU × 100/125/150% scenarios with actual WinForms controls, rendered button captions and RESTORE dialog. These are developer-build layout models; Windows DPI settings and monitor transitions are not tested.
-- **Logs:** session format/completion and rejection of unexpected ERROR/FATAL entries. Injected errors are accepted only in a successfully verified scenario; dialog samples are labelled separately.
-- **Resources:** twenty refreshes in the normal read-only EXE, confirmation of every press and REFRESH.DONE, handle/GDI/USER settling and memory measurements.
-- **Evidence:** recheck TRX, mandatory stages/test classes, seventeen C# regressions, three native regressions, six scaling scenarios, completed cycles and file hashes.
+- **Modes:** `Invoke-Qa.ps1 -Mode Fast` (default) runs `Release` build (`TreatWarningsAsErrors`), xUnit (`DeviceTweaker.Tests`) and driver/KDU artifact checks. `-Mode Full` additionally builds `DeveloperQa`/`Inspect` and runs the streamlined `Test-Workbench.ps1` scenarios (single pass per scenario; use `Invoke-DevSession.ps1 -CompareWith` for before/after visual diffs), `Smoke-SafeGui.ps1` (read-only main window & single-instance smoke on `DEVICE TWEAKER QA.exe` without `TEST_ADMIN`), `Test-UiControls.ps1`, `Test-GuiLayout.ps1`, `Test-GuiResourceStability.ps1` (production `DEVICE TWEAKER.exe`), and log quality/error audits. Add `-WithNative` to run `Test-NativeDriverModel.ps1`.
+- **Cache retention:** `Build-Cache.ps1` retains only the newest 3 completed QA builds under `local/qa-builds`.
+- **Evidence:** rechecks `unit.trx`, mandatory stages, test classes, artifact hashes, log integrity, layout cases and resource stability cycles.
 
 Restore checks use synthetic JSON by default. To additionally inspect your own backup samples against in-memory storage, explicitly pass `-BackupSamples <directory>` to `Invoke-Qa.ps1`. Originals are unchanged. Real backups are not required, bundled or selected automatically; their paths may appear in local TRX reports.
 
@@ -53,13 +46,13 @@ Virtual APPLY/BACKUP/RESTORE actions are labelled as model checks. Actual hardwa
 
 ## Results
 
-`src/tmp/qa/run_*/` contains `qa.json`, `inputs.json`, copied inputs, TRX, logs, mutation reports, GUI screenshots, `layout/layout.json`, `resources/resources.json`, `desktop-contracts/contracts.json`, `isolation/desktop.json` and `evidence.json`. `desktop.json` records the desktop name, active-desktop checks and descendant cleanup confirmation.
+`local/qa-runs/run_*/` contains `qa.json`, `unit.trx`, logs and `evidence.json`. In `-Mode Full` it additionally stores `inputs.json`, copied inputs, GUI screenshots, `workbench/workbench.json`, `layout/layout.json`, `resources/resources.json` and `isolation/desktop.json`. `desktop.json` records the desktop name, active-desktop checks and descendant cleanup confirmation.
 
 A missing result, skipped required tests, changed source snapshot, nonzero worker exit or unconfirmed cycle is not a successful check. `evidence.json` checks artifact completeness and consistency; result validity still depends on the integrity of the checks and reports. Screenshots require visual inspection: image/geometry checks cannot judge the entire design.
 
 Layout `main.png` / `restore.png` captures use native PrintWindow within display geometry. Taller windows are explicitly marked `fullWindow=false` and show only the viewport. The invisible desktop is not displayed. Separate `*.layout.png` images contain full DrawToBitmap diagnostic rendering; native text and DWM frames can differ, so these are not presented as full visual captures. Large white regions fail native-capture validation.
 
-`PASS` applies to the listed checks, not every hardware configuration. `-SkipGui` produces `PARTIAL`; a failed mandatory stage produces `FAIL` and a nonzero exit code. The script closes only its own processes and does not commit, push or publish.
+`PASS` applies to the listed checks, not every hardware configuration. `-SkipGui` switches `-Mode Full` to `-Mode Fast`; a failed mandatory stage produces `FAIL` and a nonzero exit code. The script closes only its own processes and does not commit, push or publish.
 
 Check an existing local EXE package separately:
 
@@ -73,12 +66,8 @@ The native model compiles the production device-write worker and writer as well 
 
 `Test-BuildUserData.ps1` checks clean-build preservation using temporary EXE-folder fixtures and a fake publisher. It covers a failure while moving the second folder, a failure at the next EXE flavor, publisher failure and successful publishing. It never starts the app, signs a driver or uses real backups/logs; CI runs it separately.
 
-The full workbench suite includes `refresh-reuse`, `refresh-reuse-lifecycle` and `refresh-reuse-lifecycle-amd`. They exercise retained control identity, fresh settings and editor baselines, drafts/focus/viewport, virtual APPLY targeting, device removal/reconnection, role changes, discovery faults, topology changes during discovery/readback, and clearing stale RSS selection. These are synthetic read-only scenarios, not physical hotplug validation.
+The workbench suite includes `refresh-reuse-lifecycle` (and `refresh-reuse` / `refresh-reuse-lifecycle-amd` remain available as standalone `Invoke-DevSession.ps1` scenarios). They exercise retained control identity, fresh settings and editor baselines, drafts/focus/viewport, virtual APPLY targeting, device removal/reconnection, role changes, discovery faults, topology changes during discovery/readback, and clearing stale RSS selection. These are synthetic read-only scenarios, not physical hotplug validation.
 
 QA launchers allow one independent workload per Windows session. Preparation is serialized before snapshots/builds. Invoke-DevSession creates the bounded private job before cache inspection or compilation; the scenario and compiler descendants share that job. Nested probes remain inside their existing private job. Private workers and their descendants run below normal priority with a job commit limit of at most 3 GiB (also bounded by host RAM). Sustained low physical memory or commit headroom stops only the owned job. `isolation/resources.json` records the limit, peak job commit and minimum observed headroom during the run. This is a host safeguard, not a performance benchmark or a guarantee against every source of host load. Direct manual build commands are outside this launcher.
-
-`Test-QaWorkload.ps1 -OutputDirectory local/qa-workload` checks serialization, memory boundaries, simulated pressure shutdown and owned-child cleanup with small processes. It never fills host memory. Run this short contract from the normal desktop; it creates no visible windows.
-
-`Test-QaDevPreparation.ps1 -OutputDirectory local/qa-preparation` checks the real development entry point with a small substituted build boundary. It verifies that preparation and its child inherit the bounded private job, and that a preparation failure reaches the caller. No compiler or product GUI is started. Use a new output directory for each run.
 
 For smaller hardware-matrix runs, set the `audit-hardware-matrix` step's `device` field to comma-separated profile IDs, for example `system-13,system-14,cpu-00`. IDs come from the catalog indices recorded in matrix reports. Unknown, duplicate or empty IDs fail the run; omitting the filter retains the full matrix. Run groups sequentially in separate processes.

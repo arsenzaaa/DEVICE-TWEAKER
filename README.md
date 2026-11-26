@@ -18,7 +18,7 @@ A utility for configuring MSI, interrupt affinity, ReservedCpuSets and USB IMOD 
 Requires **Windows 10/11 x64** and administrator access. The main download includes .NET. The smaller build requires .NET 10 Desktop Runtime x64 and is available on the [release page](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest).
 
 1. Run the EXE as administrator and select a device from the list.
-2. Adjust its settings and click **APPLY**, or choose **AUTO-OPTIMIZATION** to apply automatic settings.
+2. Adjust its settings and click **APPLY**, or click **AUTO-OPTIMIZATION** to configure devices automatically.
 3. Restart Windows after changing MSI, interrupt affinity or ReservedCpuSets. Check the result with the [verification guide](./docs/guide/10-verification.md).
 
 The application uses DTIMOD for USB IMOD, NIC ITR and reading PCI configuration. The [driver guide](./docs/guide/11-driver.md) covers loading requirements and possible anti-cheat conflicts.

@@ -24,13 +24,20 @@ The gallery command produces an `index.html`, native PNGs and `gallery.json` und
 
 For application logic, select the relevant tests under [tests/DeviceTweaker.Tests](tests/DeviceTweaker.Tests). For a cross-cutting integration change, use the full suite below. Do not run it after each text edit or small visual adjustment.
 
-## Full hidden QA
+## Hidden QA
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-Qa.ps1
+# Fast gate (Release build, xUnit tests, driver/KDU provenance; ~15-20s):
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-Qa.ps1 -Mode Fast
+
+# Full gate (hidden-desktop GUI smoke, workbench scenarios, 96/120/144 DPI layout, GDI/handle stability):
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-Qa.ps1 -Mode Full
+
+# Add -WithNative when driver C sources changed:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-Qa.ps1 -Mode Full -WithNative
 ```
 
-This builds a source snapshot, runs unit tests, deliberate fault checks, the native driver model and hidden GUI checks. It can take several minutes. See [coverage and reports](Checks/README.md) for the exact scope and requirements.
+See [coverage and reports](Checks/README.md) for the exact scope and requirements.
 
 ## Other entry points
 

@@ -137,7 +137,7 @@ public static class DeviceTweakerQaDesktop
             catch (System.Threading.AbandonedMutexException) { acquired = true; }
             if (!acquired) throw new InvalidOperationException("Another QA workload is already running. Run QA and builds sequentially.");
             MemoryStatus memory = ReadMemoryStatus();
-            ulong reserve = Math.Min(2UL << 30, memory.totalPhysical / 5);
+            ulong reserve = Math.Min(1UL << 30, memory.totalPhysical / 8);
             if (!HasMemoryHeadroom(memory.availablePhysical, memory.availableCommit, reserve + (256UL << 20)))
                 throw new InvalidOperationException("Not enough free memory for QA. No build or worker was started.");
             return new WorkloadLease(mutex);
@@ -198,7 +198,7 @@ public static class DeviceTweakerQaDesktop
     }
     static Result RunBounded(string desktopName, string host, string command, string cwd, int timeoutSeconds, string resourceReport, bool pressureProbe) {
         MemoryStatus memory = ReadMemoryStatus();
-        ulong reserve = Math.Min(2UL << 30, memory.totalPhysical / 5);
+        ulong reserve = Math.Min(1UL << 30, memory.totalPhysical / 8);
         if (!HasMemoryHeadroom(memory.availablePhysical, memory.availableCommit, reserve + (256UL << 20)))
             throw new InvalidOperationException("Not enough free memory for QA. No worker was started.");
         var result = new Result { desktop = desktopName, inputBefore = InputDesktop(), reserveBytes = reserve,

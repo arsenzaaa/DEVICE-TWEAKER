@@ -2,7 +2,7 @@
 
 Describe the problem and resulting behavior.
 
-Опишите проблему и что изменилось для пользователя.
+Опишите проблему и итоговое поведение.
 
 ## Verification / Проверка
 

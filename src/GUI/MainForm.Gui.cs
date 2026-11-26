@@ -325,7 +325,11 @@ public sealed partial class MainForm
         };
 
         int scrollWidth = UiScale(14);
-        _devicesPanel = new BufferedPanel
+        // Plain Panel instead of BufferedPanel: _devicesPanel spans the entire
+        // scrollable card stack (often 4,800-10,000+ px tall). Double-buffering
+        // it allocates a 20-45 MB GDI backbuffer on scroll/paint even though
+        // every DeviceCard on top is already double-buffered.
+        _devicesPanel = new Panel
         {
             Dock = DockStyle.None,
             BackColor = _bgForm,
@@ -358,7 +362,6 @@ public sealed partial class MainForm
             }
 
             SetDevicesScrollOffset(_devicesScroll.Value);
-            SyncDevicesScrollBar();
         };
 
         _devicesHost.Controls.Add(_devicesPanel);
@@ -366,6 +369,7 @@ public sealed partial class MainForm
         EnsureDevicesBusyOverlay();
         _devicesHost.SizeChanged += (_, _) =>
         {
+            if (_uiDisposing || IsDisposed || Disposing) return;
             UpdateDevicesHostLayout();
             // Form.Resize can run before DockStyle.Fill has its final width.
             // Reflow cards against the actual viewport, after docking completes.
@@ -373,7 +377,6 @@ public sealed partial class MainForm
             UpdateDevicesScrollLayout();
             SyncDevicesScrollBar();
         };
-        _devicesHost.MouseEnter += (_, _) => _devicesHost.Focus();
         _devicesHost.MouseWheel += (_, e) => HandleDevicesMouseWheel(e);
         _devicesHost.TabStop = true;
 
@@ -398,6 +401,12 @@ public sealed partial class MainForm
         Controls.Add(buttonPanel);
         Controls.Add(statusPanel);
         Controls.Add(brandPanel);
+
+        WireDevicesMouseWheelForwarding(brandPanel);
+        WireDevicesMouseWheelForwarding(statusPanel);
+        WireDevicesMouseWheelForwarding(buttonPanel);
+        WireDevicesMouseWheelForwarding(_filterPanel);
+        WireDevicesMouseWheelForwarding(_noMatchesLabel);
 
         ApplyDarkScrollBarTheme(_devicesPanel);
         SyncDevicesScrollBar();
@@ -562,7 +571,10 @@ public sealed partial class MainForm
 
                 TickDevicesBusy("Updating IMOD / IRQ display...", 1);
                 await AwaitBackgroundUiTasksAsync(report,
-                    RefreshImodCurrentValuesAsync(showReadingStatus: true, reason: sandboxDryRun ? "apply-dry-run" : "apply"),
+                    RefreshImodCurrentValuesAsync(
+                        showReadingStatus: true,
+                        reason: sandboxDryRun ? "apply-dry-run" : "apply",
+                        revealInstanceIds: !sandboxDryRun && applyImod ? imodTargets : null),
                     CalculateIrqCountsAsync(sandboxDryRun ? "apply-dry-run" : "apply"));
                 if (IsDisposed || Disposing) return;
                 if (sandboxDryRun) ValidateApplyPreviewReport(report);
@@ -775,6 +787,16 @@ public sealed partial class MainForm
                 SetDevicesBusyStage("Refreshing devices...");
                 report.MergeIssues(await RefreshBlocksAsync());
                 if (IsDisposed || Disposing) return;
+                if (applyImod)
+                {
+                    foreach (DeviceBlock block in _blocks)
+                    {
+                        if (IsUsbImodTarget(block.Device) && block.ImodAutoCheck.Checked && block.ImodMapReadAt.HasValue)
+                        {
+                            RevealImodCheckResult(block);
+                        }
+                    }
+                }
                 _devicesBusyDone = _devicesBusyTotal;
                 UpdateDevicesBusy("Ready", 100);
             }
@@ -822,9 +844,14 @@ public sealed partial class MainForm
         _lastLayoutDpi = GetCurrentWindowDpi();
         Resize += (_, _) =>
         {
+            if (_uiDisposing || IsDisposed || Disposing) return;
             LayoutBlocks();
         };
-        ResizeEnd += (_, _) => LayoutBlocks();
+        ResizeEnd += (_, _) =>
+        {
+            if (_uiDisposing || IsDisposed || Disposing) return;
+            LayoutBlocks();
+        };
         DpiChanged += (_, _) =>
         {
             UpdateUiScale();
@@ -1094,7 +1121,11 @@ public sealed partial class MainForm
 
         int maxOffset = Math.Max(0, _devicesPanel.Height - _devicesHost.ClientSize.Height);
         int next = Math.Max(0, Math.Min(maxOffset, offset));
-        _devicesPanel.Location = new Point(0, -next);
+        int targetTop = -next;
+        if (_devicesPanel.Top != targetTop || _devicesPanel.Left != 0)
+        {
+            _devicesPanel.Location = new Point(0, targetTop);
+        }
     }
 
     private void ResetDevicesScroll()

@@ -20,7 +20,7 @@ The [gallery](../SCREENSHOTS.md#usb-controller) shows a complete USB controller 
 
 ## Apply and save
 
-Enter the values for the selected mode and click **SET** in the controller card. The program backs up the settings and writes that controller's registers. It saves custom values for startup after a successful write. If the register write is partial, it keeps the previous startup profile. Open **DETAILS** if the result reports an incomplete write or a failure to save the profile.
+Enter the values for the selected mode and click **SET** in the controller card. The program backs up the settings and writes that controller's registers. It saves custom values for startup after a successful write. If the register write fails or is partial, it keeps the previous startup profile. Open **DETAILS** if the result reports an incomplete write or a failure to save the profile.
 
 If a role field contains an invalid value, **SET** and **APPLY** stop and identify the field to correct.
 

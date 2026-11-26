@@ -155,6 +155,13 @@ public sealed partial class MainForm
     {
         if ((_startupConfigWorkPending || _interruptModeCheckRunning || (_operations.IsBusy && _activeOperationName != "REFRESH")) && e.CloseReason == CloseReason.UserClosing) e.Cancel = true;
         base.OnFormClosing(e);
+        if (!e.Cancel)
+        {
+            // Stop high-rate WM_INPUT, timers and frame animations as soon as close is confirmed.
+            _uiDisposing = true;
+            UiFrameClock.StopAll(this);
+            DisposeRawPolling();
+        }
     }
 
     private static InterruptModeResult CreateTestInterruptMode(DeviceInfo device)

@@ -20,7 +20,7 @@ Cache preparation and the scenario run in one bounded private job, including com
 
 `-BuildRoot` selects a shared cache directory, including across worktrees. Use a short path when a nested checkout makes Windows DLL paths too long; it does not change Windows settings.
 
-If build preparation is interrupted before the manifest is saved, the next run builds in a new directory and keeps the old logs. A finished build with changed files fails validation. Use `-FreshBuild` to make an independent build for comparison. Keep archived builds with the sessions that reference them. A session's `build-reference.json` records the exact directory and manifest hash.
+If build preparation is interrupted before the manifest is saved, the next run builds in a new directory and keeps the old logs. A finished build with changed files fails validation. Use `-FreshBuild` to make an independent build for comparison. The cache retains the newest three completed builds; if an older build referenced by `build-reference.json` has been pruned, verification falls back to `Inspect.csproj`.
 
 Create a task-specific JSON using [device-flow.json](Scenarios/device-flow.json) or [control-states.json](Scenarios/control-states.json). After editing, rerun the same scenario against the previous successful run:
 
@@ -31,8 +31,6 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\dev\qa\Invoke-DevSessi
 If reproduction initially fails, keep its screenshots and exceptions. Automated comparison requires two successful runs with the same scenario and environment.
 
 `refresh-preserves-edits.json` checks MSI/Limit drafts, modeled IMOD, scroll position and RU/EN rebuilds. `refresh-preserves-network-edits.json` checks NIC ITR input, queue counts, base CPU and the related mask after REFRESH; it does not perform hardware RSS configuration. Roles `nic-itr`, `rss-queues` and `affinity` select actual card controls; property `rss-base` reads the card state's base CPU. `select` sets NumericUpDown through its public property and normal ValueChanged event; it does not test physical arrow-key presses.
-
-`refresh-readback-lifecycle.json` delays only the virtual IRQ source within the shared read path. It checks awaiting, progress until completion, UI release after timeout and generation-based rejection of late responses. Data comes from a preset; Windows WMI/PCI and the driver are not called. `refresh-readback-model` modes exist only in the developer workbench. The normal application's IRQ-read timeout remains 20 seconds.
 
 ## Focused resource measurements
 
@@ -106,7 +104,7 @@ At least three real frames are saved. If the final two frames differ, a settling
 
 [usb-role-order.json](Scenarios/usb-role-order.json) shows all USB roles on one controller: EN/RU headers, language transition and a narrowed window. Run `Invoke-DevSession.ps1 -Scenario .\dev\qa\Scenarios\usb-role-order.json`. This caption-order review scenario runs separately from the general suite.
 
-`Invoke-Qa.ps1` runs the integration scenarios twice and compares checkpoints: `device-flow`, `control-states`, `dtimod-status`, `imod-check`, `imod-editor`, four `text-fields-*`, the EN/RU dialog audits at three layout scales, `backup-menu-flow`, `navigation-audit`, `irq-check-loading` and the three `refresh-reuse*` scenarios. This checks reproducibility of the current build. Gallery, EN/RU, scaling models, log/resource audits, tests and intentional mutations follow. `dtimod-status` uses shared lifecycle code with fake backends and actual error dialogs, without loading the driver.
+`Invoke-Qa.ps1 -Mode Full` runs the 14 streamlined integration scenarios once each: `device-flow`, `control-states`, `dtimod-status`, `imod-check`, `imod-editor`, `imod-invalid-role`, `text-fields-imod`, `text-fields-nic`, `dialog-audit-en`, `dialog-audit-ru`, `backup-menu-flow`, `navigation-audit`, `irq-check-loading` and `refresh-reuse-lifecycle`. Use `Invoke-DevSession.ps1 -CompareWith` when comparing screenshots before and after an edit. `dtimod-status` uses shared lifecycle code with fake backends and actual error dialogs, without loading the driver.
 
 Registry, power plans, startup and drivers are neither changed nor completely emulated. A new feature needs its own scenario and shared technical-code checks against fake data; coverage does not appear automatically.
 
@@ -114,41 +112,27 @@ Registry, power plans, startup and drivers are neither changed nor completely em
 
 The native reference editor is created and given a message-loop turn before glyph capture. An empty reference remains a failure. `restore-nic-msi-messages.json` checks the MSI refusal and skipped NIC restore warning in EN/RU at modeled layout scales of 96, 120 and 144 DPI; this does not change Windows DPI.
 
-`text-fields-*` checks actual search, MSI Limit, IMOD, role-based IMOD, NIC ITR and RSS fields across Intel, AMD, IMOD and NIC device sets. Each scenario uses EN at 1200×900 and RU after narrowing to 1000×720. The inner editor is compared with a taller field of identical width, text, font and colours: vertical glyph completeness, not capacity for arbitrary long input. Bounds are checked separately against the viewport; context captures support visual layout review.
+`text-fields-imod` and `text-fields-nic` check actual search, MSI Limit, IMOD, role-based IMOD, NIC ITR and RSS fields in EN at 1200×900 and RU after narrowing to 1000×720. The inner editor is compared with a taller field of identical width, text, font and colours: vertical glyph completeness, not capacity for arbitrary long input. Bounds are checked separately against the viewport; context captures support visual layout review.
 
 ## Dialogs and menus
 
-`dialog-audit-en/ru` covers save/restore windows, file paths, system checks with known/unavailable data, confirmations, backup location, empty/normal/long lists and success/warnings/partial/failed/stress results. The integration runner generates the 125% and 150% variants from the same scenario steps. `audit-dialog` records label height, button capacity and window bounds.
+`dialog-audit-en` and `dialog-audit-ru` cover save/restore windows, file paths, system checks with known/unavailable data, confirmations, backup location, empty/normal/long lists, pre-restore/pre-release/IMOD/NIC ITR save reasons and success/warnings/partial/failed/stress results. `audit-dialog` records label height, button capacity and window bounds. JSON reasons and filenames are not translated.
 
 `backup-menu-flow` uses a fake callback through the shared menu to verify deletion: window retention, original-backup protection, an empty list, failure/exception, selection of a remaining file and full paths. No real backup files are deleted. `navigation-audit` opens actual dropdowns with F4, navigates items, closes with Escape and changes categories in EN/RU.
 
 `dialog` invokes only allowed previews of shared windows. `active:id:...` selects a control in the active nested window; ordinary `id:...` still rejects ambiguity. Form Enter/Escape goes through its dialog-key handler; other controls receive their own messages. System focus and physical input are not modeled. A report and `MATCH` do not replace PNG review.
 
-In `transition`, a nonempty `value` checks the target's selected `property` before the action and on every observed frame. `imod-check` uses this for a stable CHECK/ПРОВЕРИТЬ caption throughout rereading. `check-presentation` separately captures hover, focus, IRQ/HW lines and the backup picker in EN/RU. Category buttons scroll to devices; search hides nonmatching cards.
+In `transition`, a nonempty `value` checks the target's selected `property` before the action and on every observed frame. `imod-check` uses this for a stable CHECK/ПРОВЕРИТЬ caption throughout rereading. Category buttons scroll to devices; search hides nonmatching cards.
 
 `irq-check-loading` presses the global IRQ button in the top row in EN/RU: GPU/USB, success, failure and retry. Only hardware reads are replaced with delayed responses. Every PCI device, including filtered cards, must be queried once. Each frame checks dark technical backgrounds, form availability, disabled buttons and exactly one working indicator. No driver is loaded.
-
-`interface-wording` shows the main window, IMOD, system details, restore and result dialogs in EN/RU. `dialog-audit-*` also checks pre-restore, pre-release and IMOD/NIC ITR save reasons. JSON reasons and filenames are not translated.
-
-`irq-field-layout` compares IRQ Mode fields and navigation before/after the change in EN/RU, GPU/USB and 1200/1000 widths. `irq-placement` adds refresh hover/focus; `irq-toolbar-dense` checks search/category capacity on a dense device set. The top row has four main actions and the global IRQ Mode read button.
-
-`irq-control-states` captures the IRQ Mode field and global button in normal, hover, focus and reading states in EN/RU, with layoutDpi 96/120/144 supported. `irq-glyph-errors` checks leaving the reading state after failure/retry, Russian status capacity and complete PCI coverage.
-
-`irq-global-label` checks the single global IRQ button: hidden PCI devices, failure and retry. Keyboard activation must query the same complete set once each, without driver loading.
-
-`irq-summary` checks the five-button top row: one global IRQ button outside the cards, no overlaps, caption capacity, EN/RU, success/failure/retry, complete PCI coverage, Space activation and 1200/1000 widths. layoutDpi 120/144 variants check scaling models.
 
 ## Interaction latency and motion
 
 `ui-latency` measures synchronous search, navigation, draft toggles, IMOD details, language and presentation handlers on the DevicePalette model. `state/handlers.json` contains individual timings and allocations. The waits between samples allow painting and are excluded from handler timings. Results describe this device/CPU model and host; they are not hardware latency or display FPS.
 
-`irq-stable-value` retains the last IRQ Mode during a slow read. `irq-repeat-clicks` exercises repeated button clicks and re-entrant commands through the shared operation guard, including failure and retry; only the read backend is synthetic.
-
 `toggle-motion` captures the native toggle component in EN/RU: immediate state/events, 120 ms movement, reversal, disabled/reduced-motion state and hidden/disposed frame subscription cleanup. The initial movement uses the default production policy, including when Windows client-area animation is off. A QA-only override checks disabled local motion. High Contrast disables motion; no Windows preference is changed.
 
 `ui-motion` exercises the actual Power Saving draft control, wheel accumulation/reversal, category retargeting, thumb capture, scroll-range changes, button hover and frame subscription cleanup in EN/RU. Ordinary navigation steps await the visual destination; transition steps retain intermediate frames. Main-list wheel/category/page movement takes 80 ms; button colour feedback takes 100 ms. Direct thumb dragging remains immediate.
-
-`filter-layout-transitions` hides cards while changing language, width and layout DPI, then reveals them. Use it with the existing USB/network presentation and REFRESH preservation scenarios when changing layout reuse.
 
 ### Frame pacing and motion lifecycle
 
@@ -156,11 +140,7 @@ In `transition`, a nonempty `value` checks the target's selected `property` befo
 
 `motion-lifecycle` checks the always-on default with real native controls: completion when hidden, no idle frame posts, movement after showing, coalescing during a busy UI and worker cleanup on disposal. It also verifies removal of the old system-menu command. JSON tests cover dropping the obsolete flag on language save while retaining unknown settings.
 
-`dialog-consistency.json` covers driver consent, the USB IMOD choice before and after consent, and driver information on EN/RU at 100/125/150% layout scaling. Dialog audits check text fit and a shared action baseline. Centered messages use centered action groups; technical and selection dialogs keep the scaled 20-pixel right inset. Both retain the 20-pixel bottom inset. `dialog-audit-en.json` and `dialog-audit-ru.json` cover the remaining dialog surfaces.
-
 Ordinary checkpoints wait for active animations in the main window and owned dialogs to finish after painting their current targets. Transition steps keep recording the motion itself. Pixel tolerance and masks are unchanged.
-
-`dialog-result-alignment` covers reset completion, backup results and backup-location choices in EN/RU at 100/125/150% layout scaling.
 
 ## Documentation images
 
