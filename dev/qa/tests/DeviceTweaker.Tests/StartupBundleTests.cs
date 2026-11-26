@@ -65,10 +65,11 @@ public sealed class StartupBundleTests : IDisposable
         Assert.NotEqual(0xEF, runtime[0]);
         Assert.Equal(_payload.Runtime, Encoding.UTF8.GetString(runtime));
         Assert.Equal("{\"schemaVersion\":1}", File.ReadAllText(layout.ProfilePath));
-        Assert.Equal(new[] { layout.LoaderDirectory }, _payload.LoaderWrites);
+        Assert.StartsWith(Path.Combine(layout.Root, ".prepare-"), Assert.Single(_payload.LoaderWrites));
+        Assert.Empty(Directory.GetDirectories(layout.Root, ".prepare-*"));
         Assert.Equal(new[] { layout.ScriptPath }, _tasks.Registered);
         Assert.Equal(1, _legacyRunEntryRemovals);
-        Assert.True(Bundle().IsCurrent());
+        Assert.False(Bundle().NeedsAutomaticRepair(staleNic: false));
     }
 
     [Fact]
@@ -144,12 +145,31 @@ public sealed class StartupBundleTests : IDisposable
     {
         const string previous = "{\"usb\":\"previous\"}";
         if (existingProfile) Bundle().Install(previous);
+        string? previousTask = existingProfile ? StartupTask.BuildXml(Layout.ScriptPath + ".old") : null;
+        _tasks.CurrentXml = previousTask;
+        string? previousRuntime = existingProfile ? File.ReadAllText(Layout.RuntimePath) : null;
+        _payload.Runtime = "// changed payload";
+        _payload.Loader = "changed loader";
+        string driver = Path.Combine(_root, "DTIMOD.sys");
+        Directory.CreateDirectory(_root);
+        File.WriteAllText(driver, "previous driver");
         _tasks.RegisterError = "query failed after registration";
 
-        Assert.Throws<InvalidOperationException>(() => Bundle().Install("{\"usb\":\"new\"}"));
+        Assert.Throws<InvalidOperationException>(() => Bundle().Install("{\"usb\":\"new\"}", driver,
+            () => File.WriteAllText(driver, "replacement driver")));
 
+        Assert.Equal(previousTask, _tasks.CurrentXml);
+        Assert.Equal("previous driver", File.ReadAllText(driver));
         Assert.Equal(existingProfile, File.Exists(Layout.ProfilePath));
-        if (existingProfile) Assert.Equal(previous, File.ReadAllText(Layout.ProfilePath));
+        Assert.Equal(existingProfile, File.Exists(Layout.RuntimePath));
+        Assert.Equal(existingProfile, File.Exists(Path.Combine(Layout.LoaderDirectory, "drv64.dll")));
+        if (existingProfile)
+        {
+            Assert.Equal(previous, File.ReadAllText(Layout.ProfilePath));
+            Assert.Equal(previousRuntime, File.ReadAllText(Layout.RuntimePath));
+            Assert.Equal("loader", File.ReadAllText(Path.Combine(Layout.LoaderDirectory, "kdu.exe")));
+        }
+        Assert.Empty(Directory.GetDirectories(Layout.Root, ".prepare-*"));
     }
 
     [Fact]
@@ -171,55 +191,103 @@ public sealed class StartupBundleTests : IDisposable
     }
 
     [Fact]
-    public void BundleIsOutdatedWhenAnyPartDiffers()
+    public void ProfileOnlySaveDoesNotRewriteCurrentPayloadOrTask()
     {
-        Bundle().Install("{}");
-        Assert.True(Bundle().IsCurrent());
+        Bundle().Install("previous settings");
+        Bundle().Install("new settings");
 
-        _payload.Runtime = "// newer runtime";
-        Assert.False(Bundle().IsCurrent());
-        _payload.Runtime = FakePayload.InitialRuntime;
-
-        _payload.LoaderCurrent = false;
-        Assert.False(Bundle().IsCurrent());
-        _payload.LoaderCurrent = true;
-
-        _tasks.TaskExists = false;
-        Assert.False(Bundle().IsCurrent());
-        _tasks.TaskExists = true;
-
-        File.Delete(Layout.ScriptPath);
-        Assert.False(Bundle().IsCurrent());
+        Assert.Equal("new settings", File.ReadAllText(Layout.ProfilePath));
+        Assert.Single(_tasks.Registered);
+        Assert.Single(_payload.LoaderWrites);
     }
 
     [Fact]
-    public void UnreadablePayloadMakesTheBundleOutdated()
+    public void RepairKeepsADisabledTaskDisabled()
+    {
+        Bundle().Install("previous settings");
+        _tasks.CurrentXml = StartupTask.BuildXml(Layout.ScriptPath, enabled: false);
+        Assert.False(Bundle().NeedsAutomaticRepair(staleNic: false));
+        Assert.False(Bundle().Install("new settings"));
+        Assert.Single(_tasks.Registered);
+
+        _tasks.CurrentXml = _tasks.CurrentXml!.Replace("<LogonTrigger>", "<BootTrigger>", StringComparison.Ordinal)
+            .Replace("</LogonTrigger>", "</BootTrigger>", StringComparison.Ordinal);
+        Assert.True(Bundle().NeedsAutomaticRepair(staleNic: false));
+        Assert.False(Bundle().Install("new settings"));
+        Assert.Equal(2, _tasks.Registered.Count);
+        Assert.True(StartupTask.IsExplicitlyDisabled(_tasks.CurrentXml));
+        Assert.False(Bundle().NeedsAutomaticRepair(staleNic: false));
+    }
+
+    [Fact]
+    public void FailedModerationRestoreLeavesTheProfileForRetryAndDoesNotRecreateTheTask()
+    {
+        Bundle().Install("saved settings");
+        OperationReport failed = new();
+        Bundle().Remove(failed, () => false);
+
+        Assert.False(failed.Succeeded);
+        Assert.Null(_tasks.ReadXml());
+        Assert.Equal("saved settings", File.ReadAllText(Layout.ProfilePath));
+        Assert.False(Bundle().NeedsAutomaticRepair(staleNic: true));
+
+        OperationReport retried = new();
+        Bundle().Remove(retried, () => true);
+        Assert.True(retried.Succeeded);
+        Assert.False(File.Exists(Layout.ProfilePath));
+        Assert.Null(_tasks.ReadXml());
+    }
+
+    [Fact]
+    public void AutomaticRepairChecksPayloadOnlyWhileATaskExists()
+    {
+        Bundle().Install("{}");
+        Assert.False(Bundle().NeedsAutomaticRepair(staleNic: false));
+
+        _payload.Runtime = "// newer runtime";
+        Assert.True(Bundle().NeedsAutomaticRepair(staleNic: false));
+        _payload.Runtime = FakePayload.InitialRuntime;
+
+        _payload.LoaderCurrent = false;
+        Assert.True(Bundle().NeedsAutomaticRepair(staleNic: false));
+        _payload.LoaderCurrent = true;
+
+        _tasks.TaskExists = false;
+        Assert.False(Bundle().NeedsAutomaticRepair(staleNic: true));
+        _tasks.TaskExists = true;
+
+        File.Delete(Layout.ScriptPath);
+        Assert.True(Bundle().NeedsAutomaticRepair(staleNic: false));
+    }
+
+    [Fact]
+    public void UnreadablePayloadIsReportedToTheCaller()
     {
         Bundle().Install("{}");
         _payload.ScriptError = new InvalidDataException("Missing embedded startup resource");
 
-        Assert.False(Bundle().IsCurrent());
+        Assert.Throws<InvalidDataException>(() => Bundle().NeedsAutomaticRepair(staleNic: false));
     }
 
     [Fact]
-    public void RemoveDeletesTheBundleAndReportsATaskFailure()
+    public void TaskDeletionFailureLeavesTheProfileAndPayloadInPlace()
     {
         Bundle().Install("{}");
         _tasks.DeleteError = "task is in use";
         OperationReport report = new();
 
-        Bundle().Remove(report);
+        Bundle().Remove(report, () => throw new InvalidOperationException("must not modify saved settings"));
 
         StartupBundleLayout layout = Layout;
-        Assert.False(File.Exists(layout.ProfilePath));
-        Assert.False(File.Exists(layout.ScriptPath));
-        Assert.False(File.Exists(layout.RuntimePath));
-        Assert.False(Directory.Exists(layout.LoaderDirectory));
+        Assert.True(File.Exists(layout.ProfilePath));
+        Assert.True(File.Exists(layout.ScriptPath));
+        Assert.True(File.Exists(layout.RuntimePath));
+        Assert.True(Directory.Exists(layout.LoaderDirectory));
         Assert.Contains("IMOD.STARTUP.TASK: task is in use", _log);
         OperationIssue issue = Assert.Single(report.Issues);
         Assert.Equal(("IMOD.STARTUP", "task is in use"), (issue.Component, issue.TechnicalDetails));
         Assert.False(report.Succeeded);
-        Assert.Equal(2, _legacyRunEntryRemovals);
+        Assert.Equal(1, _legacyRunEntryRemovals);
     }
 
     [Fact]
@@ -264,6 +332,7 @@ public sealed class StartupBundleTests : IDisposable
         public string Runtime { get; set; } = InitialRuntime;
         public Exception? ScriptError { get; set; }
         public string? LoaderError { get; set; }
+        public string Loader { get; set; } = "loader";
         public bool LoaderCurrent { get; set; } = true;
         public List<string> LoaderWrites { get; } = [];
 
@@ -273,11 +342,16 @@ public sealed class StartupBundleTests : IDisposable
             if (error is not null) return false;
             LoaderWrites.Add(directory);
             Directory.CreateDirectory(directory);
-            File.WriteAllText(Path.Combine(directory, "kdu.exe"), "loader");
+            File.WriteAllText(Path.Combine(directory, "kdu.exe"), Loader);
+            File.WriteAllText(Path.Combine(directory, "drv64.dll"), Loader);
             return true;
         }
 
-        public bool IsLoaderCurrent(string directory) => LoaderCurrent && File.Exists(Path.Combine(directory, "kdu.exe"));
+        public bool IsLoaderCurrent(string directory)
+        {
+            string file = Path.Combine(directory, "kdu.exe");
+            return LoaderCurrent && File.Exists(file) && File.ReadAllText(file) == Loader;
+        }
     }
 
     private sealed class FakeTasks : IStartupTaskRegistry
@@ -287,20 +361,30 @@ public sealed class StartupBundleTests : IDisposable
         public string? DeleteError { get; set; }
         public List<string> Registered { get; } = [];
 
-        public bool Exists() => TaskExists && Registered.Count > 0;
+        public string? CurrentXml { get; set; }
+        public string? ReadXml() => TaskExists ? CurrentXml : null;
 
-        public bool Register(string scriptPath, Action<string> log, out string? error)
+        public bool Register(string scriptPath, bool enabled, Action<string> log, out string? error)
         {
             error = RegisterError;
-            if (error is not null) return false;
+            CurrentXml = StartupTask.BuildXml(scriptPath, enabled);
             Registered.Add(scriptPath);
+            return error is null;
+        }
+
+        public bool Restore(string scriptPath, string? previousXml, Action<string> log, out string? error)
+        {
+            CurrentXml = previousXml;
+            error = null;
             return true;
         }
 
         public bool Delete(Action<string> log, out string? error)
         {
             error = DeleteError;
-            return error is null;
+            if (error is not null) return false;
+            CurrentXml = null;
+            return true;
         }
     }
 }

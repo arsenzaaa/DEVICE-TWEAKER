@@ -322,18 +322,6 @@ public sealed partial class MainForm
         return true;
     }
 
-    private static int GetAutoAssignmentPriority(DeviceKind kind)
-    {
-        return kind switch
-        {
-            DeviceKind.USB => 1,
-            DeviceKind.GPU => 2,
-            DeviceKind.NET_NDIS or DeviceKind.NET_CX => 3,
-            DeviceKind.AUDIO => 4,
-            _ => 5,
-        };
-    }
-
     private static AutoAffinityRole GetAutoAffinityRole(DeviceBlock block)
     {
         return block.Kind switch
@@ -386,11 +374,6 @@ public sealed partial class MainForm
             AutoAffinityRole.OtherUsb => 6,
             _ => 7,
         };
-    }
-
-    private static bool IsInputAffinityRole(AutoAffinityRole role)
-    {
-        return role is AutoAffinityRole.InputMouse or AutoAffinityRole.InputController or AutoAffinityRole.Keyboard;
     }
 
     private static string BuildAutoUsbImodRoleProfile(string roles)
@@ -1098,7 +1081,7 @@ public sealed partial class MainForm
                     block.SuppressCpuEvents++;
                     try
                     {
-                        block.RssQueueBox.Value = 1;
+                        block.RssQueueBox.Value = FloorRssQueueCount(block, 1);
                     }
                     finally
                     {
@@ -1250,7 +1233,7 @@ public sealed partial class MainForm
                                 b.SuppressCpuEvents++;
                                 try
                                 {
-                                    b.RssQueueBox.Value = 1;
+                                    b.RssQueueBox.Value = FloorRssQueueCount(b, 1);
                                 }
                                 finally
                                 {
@@ -1427,8 +1410,8 @@ public sealed partial class MainForm
                 && b.PowerSavingCheck is not null);
             if (anyRealUsb)
             {
-                UsbSelectiveSuspendPolicy.SetPowerPlanEnabled(true);
-                WriteLog("SAFE_RESET.SUSPEND.PLAN: USB selective suspend power plan restored to Enabled");
+                UsbSelectiveSuspendPolicy.ResetActivePowerPlanDefaults();
+                WriteLog("SAFE_RESET.SUSPEND.PLAN: USB selective suspend restored to power scheme defaults");
             }
             else
             {
@@ -1486,66 +1469,5 @@ public sealed partial class MainForm
         await RemoveImodPersistenceFiles(report);
         WriteLog("SAFE_RESET.IMOD: persistence removed; runtime MMIO intentionally untouched until reboot");
         await AwaitBackgroundUiTasksAsync(report, RefreshImodCurrentValuesAsync(reason: "safe-reset"));
-    }
-
-    private async Task ResetImodIntervalsToDefault(string reason = "reset-imod", OperationReport? report = null)
-    {
-        string defaultText = FormatImodValue(ImodDefaultInterval);
-        bool hasUsb = false;
-
-        foreach (DeviceBlock block in _blocks)
-        {
-            if (IsUsbImodTarget(block.Device))
-            {
-                string before = block.ImodBox.Text?.Trim() ?? string.Empty;
-                block.ImodBox.Text = defaultText;
-                block.ImodAutoCheck.Checked = false;
-                WriteLog($"RESET.IMOD.USB: {block.Device.InstanceId} {before} -> {defaultText}");
-                hasUsb = true;
-            }
-        }
-
-        if (hasUsb)
-        {
-            if (_testAutoDryRun)
-            {
-                WriteLog($"RESET.IMOD.USB: dry-run -> skipped ApplyImodSettings/RemoveImodPersistenceFiles reason={reason}");
-            }
-            else
-            {
-                // RESET/DELETE must not pull DTIMOD via KDU. Hardware write only if
-                // the driver was already loaded explicitly (CHECK / prior IMOD apply).
-                if (IsImodDriverAlreadyAvailable())
-                {
-                    (ImodApplyOutcome outcome, string? note, string? technicalDetails) = await ApplyImodSettingsAsync();
-                    if (!string.IsNullOrWhiteSpace(note))
-                    {
-                        WriteLog($"RESET.IMOD.USB: {note}");
-                    }
-
-                    if (report is not null)
-                    {
-                        AddImodResultToReport(report, outcome, note, technicalDetails, "IMOD reset");
-                    }
-                }
-                else
-                {
-                    WriteLog(
-                        $"RESET.IMOD.USB: skipped hardware apply reason=driver-not-loaded " +
-                        $"(press CHECK first); cleared UI defaults and persistence only reason={reason}");
-                }
-
-                await RemoveImodPersistenceFiles(report);
-                await AwaitBackgroundUiTasksAsync(report, RefreshImodCurrentValuesAsync(reason: reason));
-            }
-        }
-        else if (!_testAutoDryRun)
-        {
-            await RemoveImodPersistenceFiles(report);
-        }
-        else
-        {
-            WriteLog($"RESET.IMOD: dry-run -> skipped RemoveImodPersistenceFiles reason={reason}");
-        }
     }
 }

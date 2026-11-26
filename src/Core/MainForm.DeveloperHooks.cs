@@ -4,7 +4,7 @@ public sealed partial class MainForm
 {
     private static TestDeviceState EnsureTestDeviceState(DeviceInfo device)
         => throw new InvalidOperationException("Device simulation requires the developer QA build.");
-    private static bool ApplyTestBlockSettings(DeviceBlock block, bool autoMsiOnly, OperationReport? report)
+    private static bool ApplyTestBlockSettings(DeviceBlock block, bool autoMsiOnly, OperationReport? report, DeviceSettingChanges changes)
         => throw new InvalidOperationException("Device simulation requires the developer QA build.");
     private static void ResetTestBlockState(DeviceBlock block)
         => throw new InvalidOperationException("Device simulation requires the developer QA build.");

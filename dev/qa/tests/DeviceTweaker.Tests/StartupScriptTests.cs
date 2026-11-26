@@ -79,16 +79,25 @@ public sealed partial class StartupScriptTests
             $tokens = $null; $errors = $null
             $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'ApplyIMOD.ps1'), [ref]$tokens, [ref]$errors)
             if ($errors.Count) { throw ($errors | Out-String) }
-            foreach ($name in @('ConvertFrom-ImodNumber', 'Import-ImodProfile')) {
+            foreach ($name in @('ConvertFrom-ImodNumber', 'Import-ImodProfile', 'Test-ImportedImodProfile')) {
                 $definition = $ast.Find({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $a.Name -eq $name }, $true)
                 Invoke-Expression $definition.Extent.Text
             }
             $scriptRoot = $PSScriptRoot
-            Import-ImodProfile -path (Join-Path $PSScriptRoot 'profile.json')
+            $profilePath = Join-Path $PSScriptRoot 'profile.json'
+            Import-ImodProfile -path $profilePath
+            $profileUnchanged = Test-ImportedImodProfile -path $profilePath
+            [System.IO.File]::AppendAllText($profilePath, ' ')
+            $profileReplaced = Test-ImportedImodProfile -path $profilePath
+            [System.IO.File]::Delete($profilePath)
+            $profileDeleted = Test-ImportedImodProfile -path $profilePath
             $intel = $userDefinedData['VEN_8086&DEV_7AE0']
             $amd = $userDefinedData['VEN_1022&DEV_15B6']
             $nic = $nicItrData[0]
             [pscustomobject]@{
+                profileUnchanged = $profileUnchanged
+                profileReplaced = $profileReplaced
+                profileDeleted = $profileDeleted
                 apply = $applyUsbImod
                 interval = [uint64]$globalInterval
                 rtsoff = [uint64]$globalRTSOFF
@@ -112,6 +121,9 @@ public sealed partial class StartupScriptTests
         Assert.True(code == 0, output);
         using JsonDocument result = JsonDocument.Parse(output.Trim().Split('\n')[^1]);
         JsonElement r = result.RootElement;
+        Assert.True(r.GetProperty("profileUnchanged").GetBoolean());
+        Assert.False(r.GetProperty("profileReplaced").GetBoolean());
+        Assert.False(r.GetProperty("profileDeleted").GetBoolean());
         Assert.True(r.GetProperty("apply").GetBoolean());
         Assert.Equal(0xC8UL, r.GetProperty("interval").GetUInt64());
         Assert.Equal(0x18UL, r.GetProperty("rtsoff").GetUInt64());

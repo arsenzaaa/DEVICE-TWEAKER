@@ -395,7 +395,7 @@ public sealed partial class MainForm
                 ? (UiLanguage.IsRussian ? "Применено с замечаниями" : "Applied with warnings")
                 : isPartial
                     ? (UiLanguage.IsRussian ? "Применено частично" : "Partially applied")
-                    : (UiLanguage.IsRussian ? "Операция не выполнена" : "Operation not applied");
+                    : (UiLanguage.IsRussian ? "Операция не выполнена" : "Operation failed");
             AddCenteredDialogText(dialog, statusHeader, innerWidth, padding, ref currentY, _fgMain);
             string lead = NormalizeDialogMessage(UiLanguage.Text(report.Succeeded ? successMessage : partialMessage));
             if (report.NoChangesMade && string.IsNullOrWhiteSpace(lead))
@@ -622,9 +622,6 @@ public sealed partial class MainForm
         StyleDialogButton(button, isPrimary);
         return button;
     }
-
-    private Button NewOperationResultButton(string text, int height, int? width = null)
-        => NewDialogButton(text, height, width, isPrimary: false);
 
     private void StyleDialogButton(Button button, bool isPrimary = false)
     {
@@ -912,12 +909,8 @@ public sealed partial class MainForm
 
         // Prompt Header
         string titleText = hasBackup
-            ? (UiLanguage.IsRussian
-                ? "Выберите бекап для восстановления настроек:"
-                : "Select a backup to restore settings:")
-            : (UiLanguage.IsRussian
-                ? "Бекапы не найдены."
-                : "No backup snapshots were found.");
+            ? UiLanguage.Text("Choose a backup to restore settings.")
+            : UiLanguage.Text("No backups found.");
 
         Label promptTitle = new()
         {
@@ -935,9 +928,7 @@ public sealed partial class MainForm
         currentY = promptTitle.Bottom + UiScale(4);
 
         string subText = hasBackup
-            ? (UiLanguage.IsRussian
-                ? "Настройки устройств / сохранённый профиль IMOD и NIC ITR."
-                : "Device settings / saved IMOD and NIC ITR profile.")
+            ? UiLanguage.Text("Device settings and the saved IMOD/NIC ITR profile.")
             : (UiLanguage.IsRussian
                 ? "Сброс возвращает поддерживаемые настройки к значениям Windows."
                 : "Reset restores supported settings to Windows defaults.");
@@ -1099,7 +1090,7 @@ public sealed partial class MainForm
                     TextRenderer.DrawText(e.Graphics, origText, _blockTitleFont, origRect, _fgMain, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                     x += origW + UiScale(12);
 
-                    string desc = UiLanguage.IsRussian ? "Исходные настройки устройств (защищены)" : "Original device settings (protected)";
+                    string desc = BackupReasonLabel.Get("original-state");
                     TextRenderer.DrawText(e.Graphics, desc, _technicalFont, new Point(x, textY + UiScale(1)), _fgMain, TextFormatFlags.NoPadding);
                 }
                 else
@@ -1170,9 +1161,7 @@ public sealed partial class MainForm
             Label noteLabel = new()
             {
                 AutoSize = false,
-                Text = UiLanguage.IsRussian
-                    ? "Бекап исходных настроек защищён от удаления."
-                    : "The original-settings backup is protected from deletion.",
+                Text = UiLanguage.Text("The original backup cannot be deleted."),
                 Font = _technicalFont,
                 ForeColor = _mutedText,
                 BackColor = _bgForm,
@@ -1261,7 +1250,7 @@ public sealed partial class MainForm
                     int deleted = deleteBackup(selected);
                     if (deleted == 0)
                     {
-                        menuStatus!.Text = UiLanguage.Text("The backup could not be deleted. See LOGS for details.");
+                        menuStatus!.Text = UiLanguage.Text("Could not delete the backup. See LOGS for details.");
                         return;
                     }
                     backupList.BeginUpdate();
@@ -1275,7 +1264,7 @@ public sealed partial class MainForm
                     finally { backupList.EndUpdate(); }
                     menuStatus!.Text = UiLanguage.Text(backups.Count == 0
                         ? "Backup deleted. No backups remain."
-                        : "Backup deleted. Select another backup or close this window.");
+                        : "Backup deleted. You can select another backup.");
                     if (listScroll is not null)
                     {
                         listScroll.Maximum = Math.Max(1, backups.Count);
@@ -1287,7 +1276,7 @@ public sealed partial class MainForm
                 catch (Exception ex)
                 {
                     WriteLog($"BACKUP.DELETE: failed path={selected.Path} error={FlattenLogText(ex.ToString())}");
-                    menuStatus!.Text = UiLanguage.Text("The backup could not be deleted. See LOGS for details.");
+                    menuStatus!.Text = UiLanguage.Text("Could not delete the backup. See LOGS for details.");
                 }
             };
             UpdateDeleteButtonState();
@@ -1342,9 +1331,9 @@ public sealed partial class MainForm
         AutoBackupChoice choice = AutoBackupChoice.Cancel;
         int currentY = padding;
 
-        AddCenteredDialogText(dialog, UiLanguage.Text("Where should the additional backup be saved?"), innerWidth, padding, ref currentY, _fgMain);
-        AddCenteredDialogText(dialog, UiLanguage.Text("The EXE folder keeps the backup next to the program.\nAppData keeps it in your user profile."), innerWidth, padding, ref currentY, _mutedText);
-        AddCenteredDialogText(dialog, UiLanguage.Text("Skipping this copy keeps the original-settings backup."), innerWidth, padding, ref currentY, _mutedText);
+        AddCenteredDialogText(dialog, UiLanguage.Text("Choose where to save the extra backup."), innerWidth, padding, ref currentY, _fgMain);
+        AddCenteredDialogText(dialog, UiLanguage.Text("EXE FOLDER saves the backup next to the program.\nAPPDATA saves it in your Windows user profile."), innerWidth, padding, ref currentY, _mutedText);
+        AddCenteredDialogText(dialog, UiLanguage.Text("SKIP keeps the original backup without creating another."), innerWidth, padding, ref currentY, _mutedText);
 
         Button exeButton = NewDialogButton(UiLanguage.Text("EXE FOLDER"), buttonHeight, buttonWidth, isPrimary: true);
         exeButton.Name = "EXE FOLDER";

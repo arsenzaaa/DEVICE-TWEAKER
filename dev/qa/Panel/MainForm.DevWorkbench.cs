@@ -460,7 +460,9 @@ public sealed partial class MainForm
             case "leave": DevEvent(DevTarget(step), "OnMouseLeave", EventArgs.Empty); break;
             case "focus": if (!DevTarget(step).Focus()) throw new InvalidOperationException("Focus rejected"); break;
             case "text":
-                if (DevTarget(step) is not TextBoxBase editor || editor.ReadOnly) throw new InvalidOperationException("Text target is not an editable text box");
+                Control textTarget = DevTarget(step);
+                if (textTarget is ThemedTextBox field) textTarget = field.Inner;
+                if (textTarget is not TextBoxBase editor || editor.ReadOnly) throw new InvalidOperationException("Text target is not an editable text box");
                 editor.Text = step.Value; break;
             case "select":
                 if (DevTarget(step) is NumericUpDown numeric)
@@ -472,7 +474,7 @@ public sealed partial class MainForm
                 if (DevTarget(step) is ListBox list && int.TryParse(step.Value, out int row) && row >= 0 && row < list.Items.Count)
                 { list.SelectedIndex = row; break; }
                 if (DevTarget(step) is not ThemedDropDownPicker picker || !picker.Items.Contains(step.Value)) throw new InvalidOperationException("Picker item missing");
-                picker.SelectedItem = step.Value; break;
+                picker.CommitSelection(picker.Items.IndexOf(step.Value)); break;
             case "toggle":
                 if (DevTarget(step) is not CheckBox check) throw new InvalidOperationException("Toggle target is not a checkbox");
                 check.Checked = bool.Parse(step.Value); break;
@@ -514,20 +516,31 @@ public sealed partial class MainForm
                 DevCaptureWindow(step.Id + "-frame-000", step.Target, true, step.Device);
                 await DevExecute(step.Trigger!, observeTransition: true);
                 Stopwatch interval = Stopwatch.StartNew(); int count = 1;
-                // Native snapshots can take longer than the requested observation window on a busy desktop.
-                // Always retain enough real samples to check change and settling; timestamps expose that overhead.
-                while (count < 3 || interval.ElapsedMilliseconds < step.DurationMs)
+                async Task CaptureTransitionFrame()
                 {
                     await Task.Delay(step.IntervalMs);
                     CheckObservedState();
                     DevCaptureWindow(step.Id + "-frame-" + count++.ToString("D3"), step.Target, true, step.Device);
                 }
+
+                // Native snapshots can take longer than the requested observation window on a busy desktop.
+                // Always retain enough real samples to check change and settling; timestamps expose that overhead.
+                while (count < 3 || interval.ElapsedMilliseconds < step.DurationMs)
+                    await CaptureTransitionFrame();
+
+                // A single transient native paint at the end can obscure settling.
+                // Check at most two more full frames and still require exact equality.
+                for (int confirmation = 0; step.RequireSettled && confirmation < 2; confirmation++)
+                {
+                    if (_devRun!.Captures[^1].Sha256 == _devRun.Captures[^2].Sha256) break;
+                    await CaptureTransitionFrame();
+                }
                 DevCapture[] frames = _devRun!.Captures.Where(c => c.Timeline && c.Id.StartsWith(step.Id + "-frame-", StringComparison.Ordinal)).ToArray();
+                TransitionEvidence.Write(QaRun.OutputDirectory, step.Id, frames, step.IntervalMs);
                 if (frames.Length < 3) throw new InvalidOperationException("Transition has fewer than three observed frames");
                 bool changed = frames.Select(f => f.Sha256).Distinct().Count() > 1;
                 if (step.RequireChange && !changed) throw new InvalidOperationException("Expected transition did not change pixels");
                 if (step.RequireSettled && frames[^1].Sha256 != frames[^2].Sha256) throw new InvalidOperationException("Transition did not settle in the observation window");
-                TransitionEvidence.Write(QaRun.OutputDirectory, step.Id, frames, step.IntervalMs);
                 DevCaptureWindow(step.Id + "-settled", step.Target, false, step.Device); break;
             default: throw new InvalidDataException("Unsupported action: " + step.Action);
         }
@@ -576,7 +589,7 @@ public sealed partial class MainForm
         DeviceSettingsWriter.SetAffinity(values, state.Policy, state.AffinityMask, 8);
         var actual = DevFiles.Read<Dictionary<string, DevRegistryValue>>(values.Path);
         if (!actual.TryGetValue("MSISupported", out var msi) || msi.Kind != "DWord" || msi.Json != (state.MsiEnabled ? "1" : "0")
-            || !actual.TryGetValue("DevicePolicy", out var policy) || policy.Json != (state.AffinityMask == 0 || state.Policy == 0 ? "0" : state.Policy.ToString())
+            || !actual.TryGetValue("DevicePolicy", out var policy) || policy.Json != (state.Policy == 4 && state.AffinityMask == 0 ? "0" : state.Policy.ToString())
             || (state.MsiLimit.HasValue ? !actual.TryGetValue("MessageNumberLimit", out var limit) || limit.Json != state.MsiLimit.Value.ToString() : actual.ContainsKey("MessageNumberLimit")))
             throw new InvalidOperationException("File-backed settings readback does not match the virtual UI state");
         DevRecordState("state/" + name + ".registry.json");
@@ -593,6 +606,7 @@ public sealed partial class MainForm
             {
                 DriverReadyPolicy.Ensure(
                     () => { if (name == "dtimod-incompatible") throw new InvalidOperationException(expected); return false; },
+                    () => true,
                     () => { pending = true; return false; },
                     () => { if (pending) throw new InvalidOperationException(expected); },
                     () => throw new InvalidOperationException("Unexpected SCM call in pending-load model"));

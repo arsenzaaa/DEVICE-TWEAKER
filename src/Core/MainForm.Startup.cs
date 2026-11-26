@@ -94,8 +94,8 @@ public sealed partial class MainForm
         return result.RequireValueOrCreate(() => new ImodConfig { HasScript = false });
     }
 
-    // Loads the profile; a profile saved by an older layout is moved to the
-    // current one, and an outdated script / runtime / loader is replaced.
+    // Existing current-layout profiles receive the updated bundle. Older scripts
+    // retain their layout until the user explicitly saves or restores settings.
     private ImodConfig LoadStartupConfig(bool virtualOnly)
     {
         // Virtual fixtures own their saved values; never inherit the host's profile.
@@ -116,13 +116,25 @@ public sealed partial class MainForm
 
         try
         {
-            bool legacy = !string.Equals(source, GetStartupProfilePath(), StringComparison.OrdinalIgnoreCase);
+            if (!string.Equals(source, GetStartupProfilePath(), StringComparison.OrdinalIgnoreCase))
+                return config;
+
+            // A missing task may be intentional or left by an incomplete DELETE PROFILE.
+            // Only an explicit save or restore should register it again.
+            StartupBundle bundle = CreateStartupBundle();
             bool staleNic = config.NicItrEntries.Any(entry => DescribeStaleNicItrEntry(entry) is not null);
-            if (legacy || staleNic || !IsStartupBundleCurrent())
+            if (!bundle.NeedsAutomaticRepair(staleNic))
+                return config;
+
+            using DriverLoadGate gate = DriverLoadGate.Enter();
+            ImodConfig current = ReadSavedStartupConfig(out string? currentSource);
+            if (string.Equals(currentSource, source, StringComparison.OrdinalIgnoreCase)
+                && bundle.NeedsAutomaticRepair(current.NicItrEntries.Any(entry => DescribeStaleNicItrEntry(entry) is not null)))
             {
-                InstallStartupBundle(config);
-                WriteLog($"IMOD.STARTUP.{(legacy ? "MIGRATE" : "UPDATE")}: source=\"{source}\" target=\"{GetStartupRoot()}\" status=success");
+                WriteStartupBundle(bundle, current);
+                WriteLog($"IMOD.STARTUP.UPDATE: source=\"{source}\" target=\"{GetStartupRoot()}\" status=success");
             }
+            return current;
         }
         catch (Exception ex)
         {
@@ -132,18 +144,18 @@ public sealed partial class MainForm
         return config;
     }
 
-    private bool IsStartupBundleCurrent() => CreateStartupBundle().IsCurrent();
-
-    private void InstallStartupBundle(ImodConfig config)
+    private bool InstallStartupBundle(ImodConfig config)
     {
         DemandRealWrite("InstallStartupBundle");
         using DriverLoadGate gate = DriverLoadGate.Enter();
-        DriverLoadGate.AssertLoaderIdle();
-        if (!EnsureImodDriverOnDisk(persistDriver: true, out string driverPath, out string? driverError))
-        {
-            throw new IOException("DTIMOD.sys could not be staged: " + driverError);
-        }
+        return WriteStartupBundle(CreateStartupBundle(), config);
+    }
 
+    private bool WriteStartupBundle(StartupBundle bundle, ImodConfig config)
+    {
+        DemandRealWrite("WriteStartupBundle");
+        DriverLoadGate.AssertLoaderIdle();
+        string driverPath = GetImodDriverSystemPath();
         foreach (string removed in RemoveStaleNicItrEntries(config))
         {
             WriteLog($"IMOD.STARTUP.NIC.REMOVED: {removed} action=not-saved; set NIC ITR again for this adapter");
@@ -153,9 +165,13 @@ public sealed partial class MainForm
         string profileJson = profile.ToJson();
         _ = ConvertStartupProfile(StartupProfile.FromJson(profileJson));
 
-        StartupBundle bundle = CreateStartupBundle();
-        bundle.Install(profileJson);
+        bool enabled = bundle.Install(profileJson, driverPath, () =>
+        {
+            if (!EnsureImodDriverOnDisk(persistDriver: true, out _, out string? driverError))
+                throw new IOException("DTIMOD.sys could not be staged: " + driverError);
+        });
         WriteLog($"IMOD.STARTUP: saved profile usb={profile.Usb.Controllers.Count} nic={profile.NicItr.Count} root=\"{bundle.Layout.Root}\"");
+        return enabled;
     }
 
     private void RemoveStartupBundle(OperationReport? report)

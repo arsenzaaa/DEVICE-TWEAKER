@@ -40,7 +40,7 @@ public sealed partial class MainForm
         return true;
     }
 
-    private bool ApplyTestBlockSettings(DeviceBlock block, bool autoMsiOnly, OperationReport? report)
+    private bool ApplyTestBlockSettings(DeviceBlock block, bool autoMsiOnly, OperationReport? report, DeviceSettingChanges changes = DeviceSettingChanges.All)
     {
         TestDeviceState state = EnsureTestDeviceState(block.Device);
         if (TryConsumeTestFault(TestSandboxFault.RegistryWriteDenied))
@@ -51,17 +51,21 @@ public sealed partial class MainForm
             return false;
         }
 
-        bool msiRequested = string.Equals(block.MsiCombo.SelectedItem?.ToString(), "Enabled", StringComparison.OrdinalIgnoreCase);
-        if (!msiRequested && !TryValidateMsiDisable(block.InterruptCapabilities, out string msiDisableError))
+        if (changes.HasFlag(DeviceSettingChanges.Msi))
         {
-            report?.AddError($"{block.Device.Name}: MSI", msiDisableError,
-                $"Requested value=Disabled; hardware={FormatInterruptCapabilities(block.InterruptCapabilities)}");
-            WriteLog($"TEST.SANDBOX.WRITE.ERROR: id={block.Device.InstanceId} setting=MSI value=Disabled action=skipped-write");
+            bool msiRequested = string.Equals(block.MsiCombo.SelectedItem?.ToString(), "Enabled", StringComparison.OrdinalIgnoreCase);
+            if (!msiRequested && !TryValidateMsiDisable(block.InterruptCapabilities, out string msiDisableError))
+            {
+                report?.AddError($"{block.Device.Name}: MSI", msiDisableError,
+                    $"Requested value=Disabled; hardware={FormatInterruptCapabilities(block.InterruptCapabilities)}");
+                WriteLog($"TEST.SANDBOX.WRITE.ERROR: id={block.Device.InstanceId} setting=MSI value=Disabled action=skipped-write");
+            }
+            else
+            {
+                state.MsiEnabled = msiRequested;
+            }
         }
-        else
-        {
-            state.MsiEnabled = msiRequested;
-        }
+
         _testSandbox.VirtualWrites++;
         if (autoMsiOnly)
         {
@@ -69,54 +73,65 @@ public sealed partial class MainForm
             return true;
         }
 
-        if (!TryValidateMsiLimitInput(block.LimitBox.Text, block.InterruptCapabilities, out bool unlocked, out int limit, out string limitError))
+        if (changes.HasFlag(DeviceSettingChanges.MsiLimit))
         {
-            report?.AddError($"{block.Device.Name}: MSI Limit", limitError,
-                $"Requested value={block.LimitBox.Text}; hardware={FormatInterruptCapabilities(block.InterruptCapabilities)}");
-            return false;
-        }
-
-        state.MsiLimit = unlocked ? null : limit;
-        state.Priority = block.PrioCombo.SelectedItem?.ToString() switch
-        {
-            "Low" => 1,
-            "Normal" => 2,
-            "High" => 3,
-            _ => null,
-        };
-
-        if (block.Kind == DeviceKind.NET_NDIS)
-        {
-            if (TryConsumeTestFault(TestSandboxFault.NicItrReadFailed)
-                || TryConsumeTestFault(TestSandboxFault.NicItrWriteFailed))
+            if (!TryValidateMsiLimitInput(block.LimitBox.Text, block.InterruptCapabilities, out bool unlocked, out int limit, out string limitError))
             {
-                report?.AddError(
-                    $"{block.Device.Name}: NIC ITR",
-                    "The NIC interrupt moderation value could not be verified.",
-                    _testSandbox.Fault == TestSandboxFault.NicItrReadFailed
-                        ? "DeviceIoControl(NIC_ITR_READ) failed with simulated Win32 error 31."
-                        : "DeviceIoControl(NIC_ITR_WRITE) failed with simulated Win32 error 5.");
+                report?.AddError($"{block.Device.Name}: MSI Limit", limitError,
+                    $"Requested value={block.LimitBox.Text}; hardware={FormatInterruptCapabilities(block.InterruptCapabilities)}");
                 return false;
             }
 
-            state.RssBaseCore = block.RssBaseCore;
-            state.RssQueues = Math.Max(1, (int)(block.RssQueueBox?.Value ?? 1));
-            state.NdisMode = block.NdisModeCombo?.SelectedItem?.ToString() ?? "RSS";
-            state.AffinityMask = block.AffinityMask;
-            state.Policy = state.NdisMode is "IRQ" or "BOTH" ? 4 : 0;
-        }
-        else if (block.Kind == DeviceKind.STOR)
-        {
-            state.Policy = 0;
-            state.AffinityMask = 0;
-        }
-        else
-        {
-            state.Policy = MapPolicyText(block.PolicyCombo.SelectedItem?.ToString() ?? "MachineDefault") ?? 0;
-            state.AffinityMask = state.Policy == 0 ? 0 : block.AffinityMask;
+            state.MsiLimit = unlocked ? null : limit;
         }
 
-        if (block.PowerSavingCheck is not null && !block.Device.Wifi)
+        if (changes.HasFlag(DeviceSettingChanges.Priority))
+        {
+            state.Priority = block.PrioCombo.SelectedItem?.ToString() switch
+            {
+                "Low" => 1,
+                "Normal" => 2,
+                "High" => 3,
+                _ => null,
+            };
+        }
+
+        if (changes.HasFlag(DeviceSettingChanges.Affinity))
+        {
+            if (block.Kind == DeviceKind.NET_NDIS)
+            {
+                if (TryConsumeTestFault(TestSandboxFault.NicItrReadFailed)
+                    || TryConsumeTestFault(TestSandboxFault.NicItrWriteFailed))
+                {
+                    report?.AddError(
+                        $"{block.Device.Name}: NIC ITR",
+                        "The NIC interrupt moderation value could not be verified.",
+                        _testSandbox.Fault == TestSandboxFault.NicItrReadFailed
+                            ? "DeviceIoControl(NIC_ITR_READ) failed with simulated Win32 error 31."
+                            : "DeviceIoControl(NIC_ITR_WRITE) failed with simulated Win32 error 5.");
+                    return false;
+                }
+
+                state.RssBaseCore = block.RssBaseCore;
+                state.RssQueues = Math.Max(1, (int)(block.RssQueueBox?.Value ?? 1));
+                state.NdisMode = block.NdisModeCombo?.SelectedItem?.ToString() ?? "RSS";
+                state.AffinityMask = block.AffinityMask;
+                state.Policy = state.NdisMode is "IRQ" or "BOTH" ? 4 : 0;
+            }
+            else if (block.Kind == DeviceKind.STOR)
+            {
+                state.Policy = 0;
+                state.AffinityMask = 0;
+            }
+            else
+            {
+                RecalcAffinityMask(block);
+                state.Policy = MapPolicyText(block.PolicyCombo.SelectedItem?.ToString() ?? "MachineDefault") ?? 0;
+                state.AffinityMask = state.Policy == 4 ? block.AffinityMask : 0;
+            }
+        }
+
+        if (changes.HasFlag(DeviceSettingChanges.Power) && block.PowerSavingCheck is not null && !block.Device.Wifi)
         {
             if (TryConsumeTestFault(TestSandboxFault.UsbPowerWriteFailed)
                 || TryConsumeTestFault(TestSandboxFault.WmiTimeout))

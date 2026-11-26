@@ -15,7 +15,7 @@ param(
     [string]$TriggerDevice
 )
 
-$imodScriptVersion = 33
+$imodScriptVersion = 37
 
 function Test-IsAdmin {
     try {
@@ -72,7 +72,8 @@ function Test-ImodFileHash {
 function Import-ImodProfile {
     param([string]$path)
 
-    $profileData = [System.IO.File]::ReadAllText($path) | ConvertFrom-Json
+    $script:importedProfileText = [System.IO.File]::ReadAllText($path)
+    $profileData = $script:importedProfileText | ConvertFrom-Json
     if ([int]$profileData.schemaVersion -ne 1) {
         throw ("unsupported profile schemaVersion " + $profileData.schemaVersion)
     }
@@ -127,6 +128,13 @@ function Import-ImodProfile {
             'VALUES' = @($nic.values | ForEach-Object { ConvertFrom-ImodNumber $_ })
         }
     }
+}
+
+function Test-ImportedImodProfile {
+    param([string]$path)
+
+    return (Test-Path -LiteralPath $path -PathType Leaf) -and
+        [string]::Equals([System.IO.File]::ReadAllText($path), $importedProfileText, [System.StringComparison]::Ordinal)
 }
 
 function Write-ImodLog {
@@ -255,43 +263,6 @@ function Get-ImodUsbRootPort {
     return $null
 }
 
-function Get-ImodUsbRootPortFromMap {
-    param(
-        [string]$deviceId,
-        [hashtable]$propertyMap
-    )
-
-    $key = ConvertTo-ImodNormalizedDeviceId $deviceId
-    if ([string]::IsNullOrWhiteSpace($key) -or $null -eq $propertyMap -or -not $propertyMap.ContainsKey($key)) {
-        return (Get-ImodUsbRootPort $deviceId)
-    }
-
-    $props = $propertyMap[$key]
-    if ($props.ContainsKey('DEVPKEY_Device_LocationPaths')) {
-        foreach ($path in @($props['DEVPKEY_Device_LocationPaths'])) {
-            if ([string]$path -match 'USBROOT\(\d+\)#USB\((\d+)\)') {
-                return [int]$Matches[1]
-            }
-        }
-    }
-
-    if ($props.ContainsKey('DEVPKEY_Device_LocationInfo')) {
-        $location = [string]$props['DEVPKEY_Device_LocationInfo']
-        if ($location -match 'Port_#0*(\d+)\.Hub_#') {
-            return [int]$Matches[1]
-        }
-    }
-
-    if ($props.ContainsKey('DEVPKEY_Device_Address')) {
-        $address = $props['DEVPKEY_Device_Address']
-        if ($null -ne $address -and [int]$address -gt 0) {
-            return [int]$address
-        }
-    }
-
-    return $null
-}
-
 function Get-ImodParentDeviceId {
     param([string]$deviceId)
     try {
@@ -303,26 +274,6 @@ function Get-ImodParentDeviceId {
     }
 
     return $null
-}
-
-function Add-ImodRoleByParentWalk {
-    param(
-        [hashtable]$rootPortByDeviceId,
-        [hashtable]$rolesByPort,
-        [string]$deviceId,
-        [string]$role
-    )
-
-    $current = $deviceId
-    for ($depth = 0; $depth -lt 12 -and -not [string]::IsNullOrWhiteSpace($current); $depth++) {
-        $key = ConvertTo-ImodNormalizedDeviceId $current
-        if ($rootPortByDeviceId.ContainsKey($key)) {
-            Add-ImodRootPortRole -rolesByPort $rolesByPort -rootPort ([int]$rootPortByDeviceId[$key]) -role $role
-            return
-        }
-
-        $current = Get-ImodParentDeviceId $current
-    }
 }
 
 function Add-ImodRoleByControllerParentWalk {
@@ -612,8 +563,9 @@ if ($TriggerDevice -and $TriggerDevice -notmatch '^(USB|HID)\\') {
     exit 0
 }
 
+$profilePath = Join-Path $scriptRoot 'profile.json'
 try {
-    Import-ImodProfile -path (Join-Path $scriptRoot 'profile.json')
+    Import-ImodProfile -path $profilePath
 } catch {
     Write-ImodLog ("error: cannot read profile.json: " + $_.Exception.Message)
     exit 1
@@ -689,7 +641,6 @@ function Invoke-ImodKduLoader {
     }
 
     foreach ($payload in @(
-        @('DTIMOD.sys', $ImodDriverPath, $ImodDriverSha256),
         @('kdu.exe', $ImodKduPath, $ImodKduSha256),
         @('drv64.dll', $ImodKduDbPath, $ImodKduDbSha256)
     )) {
@@ -778,18 +729,36 @@ if (-not $imodLoadGateHeld) {
 }
 
 try {
+    # A queued invocation may have imported the old profile before DELETE PROFILE took the lock.
+    if (-not (Test-ImportedImodProfile -path $profilePath)) {
+        Write-ImodLog "startup skipped: profile removed or replaced while waiting for DTIMOD"
+        exit 0
+    }
+
     [DeviceTweakerLoaderJournal]::AssertLoaderIdle()
+    if (-not (Test-ImodFileHash -name 'DTIMOD.sys' -path $ImodDriverPath -expected $ImodDriverSha256)) {
+        exit 1
+    }
     Write-ImodLog "startup apply begin; driver=$ImodDriverPath loader=kdu-first"
     if (-not (Invoke-ImodKduLoader)) {
         [DeviceTweakerLoaderJournal]::AssertLoaderIdle()
+        if (-not (Test-ImodFileHash -name 'DTIMOD.sys' -path $ImodDriverPath -expected $ImodDriverSha256)) {
+            exit 1
+        }
         Write-ImodLog "startup loader: fallback service"
         [DeviceTweakerImodRuntime]::EnsureDriver($ImodDriverPath)
     }
 
     $appliedUsb = 0
+    $failedUsb = 0
+    $failedNic = 0
     if ($applyUsbImod) {
         $controllers = [DeviceTweakerImodRuntime]::EnumerateXhciControllers()
         Write-ImodLog ("usb controllers=" + $controllers.Count)
+        $controllerIds = [string[]]@($controllers | ForEach-Object { $_.DeviceId })
+        $profileKeys = [string[]]@($userDefinedData.Keys)
+        $exactOnly = $globalInterval -eq 0xC8 -and $profileKeys.Count -gt 0 -and
+            @($profileKeys | Where-Object { -not [DeviceTweakerImodRuntime]::IsPciInstanceMatch($_) }).Count -eq 0
         foreach ($controller in $controllers) {
             $controllerBaseText = if ($controller.HasBase) { Format-ImodHex ([uint64]$controller.BaseAddress) } else { '-' }
             Write-ImodLog ("usb controller: id=$($controller.DeviceId) caption=$(Format-ImodText $controller.Caption) problem=$($controller.ProblemCode) hasBase=$($controller.HasBase) base=$controllerBaseText length=$(Format-ImodHex ([uint64]$controller.MemoryLength))") -verboseOnly
@@ -797,19 +766,14 @@ try {
                 Write-ImodLog ("skip disabled " + $controller.DeviceId)
                 continue
             }
-            if (-not $controller.HasBase) {
-                Write-ImodLog ("skip missing base " + $controller.DeviceId + " " + $controller.BaseError)
+            $ambiguous = $false
+            $matchedKey = [DeviceTweakerImodRuntime]::SelectUsbProfileMatch($controller.DeviceId, $controllerIds, $profileKeys, [ref]$ambiguous)
+            if ($ambiguous) {
+                Write-ImodLog ("usb skip ambiguous legacy profile: " + $controller.DeviceId + "; save a profile for the intended controller")
                 continue
             }
-
-            $entry = $null
-            $matchedKey = ''
-            foreach ($key in $userDefinedData.Keys) {
-                if ($controller.DeviceId.IndexOf([string]$key, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
-                    $entry = $userDefinedData[$key]
-                    $matchedKey = [string]$key
-                }
-            }
+            if ($exactOnly -and [string]::IsNullOrEmpty($matchedKey)) { continue }
+            $entry = if ([string]::IsNullOrEmpty($matchedKey)) { $null } else { $userDefinedData[$matchedKey] }
 
             $enabled = $true
             $interval = [uint32]$globalInterval
@@ -844,6 +808,11 @@ try {
 
             if (-not $enabled) {
                 Write-ImodLog ("skip config-disabled " + $controller.DeviceId)
+                continue
+            }
+            if (-not $controller.HasBase) {
+                Write-ImodLog ("error: USB IMOD resources unavailable " + $controller.DeviceId + " " + $controller.BaseError)
+                $failedUsb++
                 continue
             }
 
@@ -884,9 +853,8 @@ try {
 
             $result = [DeviceTweakerImodRuntime]::ApplyController([string]$controller.DeviceId, [uint64]$controller.BaseAddress, [uint64]$controller.MemoryLength, $hcsparamsOffset, $rtsoff, $interval, $intervalArray)
             Write-ImodLog ($controller.DeviceId + " " + $result)
-            if (-not $result.StartsWith('error:', [System.StringComparison]::OrdinalIgnoreCase)) {
-                $appliedUsb++
-            }
+            if ($result.StartsWith('error:', [System.StringComparison]::OrdinalIgnoreCase)) { $failedUsb++ }
+            else { $appliedUsb++ }
         }
     } else {
         Write-ImodLog "usb imod skipped; no custom USB IMOD config"
@@ -895,6 +863,14 @@ try {
     $appliedNic = 0
     if ($nicItrData -and $nicItrData.Count -gt 0) {
         $pciDevices = [DeviceTweakerImodRuntime]::EnumeratePciDevices()
+        $pciIds = [string[]]@($pciDevices | ForEach-Object { $_.DeviceId })
+        $devicesById = @{}
+        foreach ($device in $pciDevices) { $devicesById[$device.DeviceId] = $device }
+        $exactProfiles = @{}
+        foreach ($nic in $nicItrData) {
+            $key = [string]$nic['HWID']
+            if ([DeviceTweakerImodRuntime]::IsPciInstanceMatch($key)) { $exactProfiles[$key] = $true }
+        }
         Write-ImodLog ("nic itr entries=" + $nicItrData.Count + " pci=" + $pciDevices.Count)
         foreach ($device in $pciDevices) {
             $pciBaseText = if ($device.HasBase) { Format-ImodHex ([uint64]$device.BaseAddress) } else { '-' }
@@ -908,17 +884,21 @@ try {
 
             Write-ImodLog ("nic itr apply plan: hwid=$hwid family=$(Format-ImodText $nic['FAMILY']) baseOffset=$(Format-ImodHex ([uint64]$nic['BASE_OFFSET'])) stride=$(Format-ImodHex ([uint64]$nic['STRIDE'])) queues=$($nic['QUEUES']) width=$($nic['WIDTH']) mask=$(Format-ImodHex ([uint64]$nic['MASK'])) orBits=$(Format-ImodHex ([uint64]$nic['OR_BITS'])) values=[$(Format-ImodVector $nic['VALUES'])]")
 
-            $target = $null
-            foreach ($device in $pciDevices) {
-                if ($device.DeviceId.IndexOf($hwid, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
-                    $target = $device
-                }
+            $ambiguous = $false
+            $targetId = [DeviceTweakerImodRuntime]::SelectNicProfileTarget($hwid, $pciIds, [ref]$ambiguous)
+            if ($ambiguous) {
+                Write-ImodLog ("nic itr skip ambiguous legacy profile " + $hwid + "; save a profile for the intended adapter")
+                continue
             }
-
-            if ($null -eq $target) {
+            if ([string]::IsNullOrEmpty($targetId)) {
                 Write-ImodLog ("nic itr skip missing " + $hwid)
                 continue
             }
+            if (-not [DeviceTweakerImodRuntime]::IsPciInstanceMatch($hwid) -and $exactProfiles.ContainsKey($targetId)) {
+                Write-ImodLog ("nic itr skip legacy profile " + $hwid + "; exact profile exists for " + $targetId)
+                continue
+            }
+            $target = $devicesById[$targetId]
             $targetBaseText = if ($target.HasBase) { Format-ImodHex ([uint64]$target.BaseAddress) } else { '-' }
             # largestRange is informational only; ApplyNicItr selects the register BAR from PCI config space.
             Write-ImodLog ("nic itr matched: hwid=$hwid id=$($target.DeviceId) caption=$(Format-ImodText $target.Caption) problem=$($target.ProblemCode) hasBase=$($target.HasBase) largestRange=$targetBaseText+$(Format-ImodHex ([uint64]$target.MemoryLength))")
@@ -927,7 +907,8 @@ try {
                 continue
             }
             if (-not $target.HasBase) {
-                Write-ImodLog ("nic itr skip missing base " + $target.DeviceId + " " + $target.BaseError)
+                Write-ImodLog ("error: NIC ITR resources unavailable " + $target.DeviceId + " " + $target.BaseError)
+                $failedNic++
                 continue
             }
 
@@ -942,16 +923,15 @@ try {
                 [uint64]$nic['OR_BITS'],
                 $values)
             Write-ImodLog ("nic itr " + $target.DeviceId + " " + $result)
-            if (-not $result.StartsWith('error:', [System.StringComparison]::OrdinalIgnoreCase)) {
-                $appliedNic++
-            }
+            if ($result.StartsWith('error:', [System.StringComparison]::OrdinalIgnoreCase)) { $failedNic++ }
+            else { $appliedNic++ }
         }
     } else {
         Write-ImodLog "nic itr skipped; entries=0"
     }
 
-    Write-ImodLog "startup apply done; usb=$appliedUsb nic=$appliedNic"
-    $imodExitCode = 0
+    Write-ImodLog "startup apply done; usb=$appliedUsb nic=$appliedNic usbFailed=$failedUsb nicFailed=$failedNic"
+    $imodExitCode = if ($failedUsb -gt 0 -or $failedNic -gt 0) { 1 } else { 0 }
 } catch {
     Write-ImodLog ("error: " + $_.Exception.Message)
     $imodExitCode = 1

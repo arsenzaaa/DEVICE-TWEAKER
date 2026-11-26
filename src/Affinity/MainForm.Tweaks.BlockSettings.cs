@@ -56,7 +56,12 @@ public sealed partial class MainForm
     }
 
     internal static int NormalizePolicyForSelection(int policy, ulong mask)
-        => mask == 0 ? 0 : policy == 0 ? 4 : policy;
+        => policy switch
+        {
+            0 when mask != 0 => 4,
+            4 when mask == 0 => 0,
+            _ => policy,
+        };
 
     // Per-adapter options bound queue counts; CPU count bounds the processor layout.
     private static int ClampRssQueueCount(int value) => Math.Max(1, value);
@@ -135,11 +140,17 @@ public sealed partial class MainForm
             + $"profile=\"{SanitizeLogValue(state.Profile)}\" error=\"{SanitizeLogValue(state.Error)}\"";
     }
 
-    private void LogNdisRssComparison(string prefix, string instanceId, NdisRssRuntimeState? state, int? registryBase, int? registryQueues, int? registryMaxProcessors, bool wifiPreserved = false)
+    private NdisRssDiagnostics.Comparison LogNdisRssComparison(string prefix, string instanceId,
+        NdisRssRuntimeState? state, NdisRssDiagnostics.RequestedSettings requested, bool wifiPreserved = false)
     {
-        NdisRssDiagnostics.Comparison result = NdisRssDiagnostics.Compare(state, registryBase, registryQueues, registryMaxProcessors, wifiPreserved);
+        NdisRssDiagnostics.Comparison result = NdisRssDiagnostics.Compare(state, requested, wifiPreserved);
         string eventName = result.Status == "different" ? "CONFLICT" : result.Status == "failed" ? "ERROR" : "CHECK";
-        WriteLog($"{prefix}.RSS.{eventName}: {instanceId} registryBase={(registryBase?.ToString(CultureInfo.InvariantCulture) ?? "-")} registryQueues={(registryQueues?.ToString(CultureInfo.InvariantCulture) ?? "-")} registryMaxProcessors={(registryMaxProcessors?.ToString(CultureInfo.InvariantCulture) ?? "-")} activeStatus={result.Status} detail=\"{SanitizeLogValue(result.Detail)}\"");
+        WriteLog($"{prefix}.RSS.{eventName}: {instanceId} registryBase={FormatNdisRuntimeValue(requested.BaseProcessor)} "
+            + $"registryBaseGroup={FormatNdisRuntimeValue(requested.BaseProcessor.HasValue ? requested.BaseGroup : null)} "
+            + $"registryQueues={FormatNdisRuntimeValue(requested.QueueCount)} registryMaxProcessors={FormatNdisRuntimeValue(requested.MaxProcessors)} "
+            + $"registryMaxProc={FormatNdisRuntimeValue(requested.MaxProcessor)} registryMaxGroup={FormatNdisRuntimeValue(requested.MaxGroup)} "
+            + $"activeStatus={result.Status} detail=\"{SanitizeLogValue(result.Detail)}\"");
+        return result;
     }
 
     private NdisAffinityMode ChooseSmartNdisAffinityMode(DeviceBlock block, int plannedQueues, out string reason)
@@ -330,17 +341,20 @@ public sealed partial class MainForm
             return;
         }
 
+        int current = (int)block.RssQueueBox.Value;
         block.SuppressCpuEvents++;
         try
         {
+            block.RssQueueBox.Minimum = 1;
             block.RssQueueBox.Maximum = options[^1];
+            block.RssQueueBox.Minimum = options[0];
+            block.RssQueueBox.Value = NdisRssLayout.Floor(options, (int)block.RssQueueBox.Value);
         }
         finally
         {
             block.SuppressCpuEvents--;
         }
 
-        int current = (int)block.RssQueueBox.Value;
         if (!options.Contains(current) && block.RssBaseCore is int baseCore)
         {
             ApplyNdisSelection(block, baseCore, current);
@@ -632,7 +646,8 @@ public sealed partial class MainForm
 
             string loadPrefix = isTestDevice ? "LOAD.TEST" : "LOAD";
             WriteLog($"{loadPrefix}.RSS.ACTIVE: {block.Device.InstanceId} {FormatNdisRssRuntimeState(block.NdisRssRuntime)}");
-            LogNdisRssComparison(loadPrefix, block.Device.InstanceId, block.NdisRssRuntime, baseCore, registryQueues, null, block.Device.Wifi);
+            LogNdisRssComparison(loadPrefix, block.Device.InstanceId, block.NdisRssRuntime,
+                new(baseCore, registryQueues, null), block.Device.Wifi);
             WriteLog($"{loadPrefix}: NET_NDIS {block.Device.InstanceId} MSI={(msiSupported == 1 ? "Enabled" : "Disabled")} Limit={(limitPresent ? limit.ToString(CultureInfo.InvariantCulture) : "Unlimited")} PrioVal={prioValue} Mode={FormatNdisAffinityMode(ndisMode)} BaseCore={(baseCore ?? -1)} Queues={queues} IrqPolicy={irqPolicy} IrqMask=0x{irqMask:X} Mask=0x{block.AffinityMask:X}");
         }
         else
@@ -670,6 +685,7 @@ public sealed partial class MainForm
                 mask = testState.AffinityMask;
             }
 
+            if (policyVal is 1 or 2 or 3 or 5) mask = 0;
             block.PolicyCombo.SelectedItem = FormatPolicyValue(policyVal);
 
             block.AffinityMask = mask;
@@ -946,18 +962,19 @@ public sealed partial class MainForm
     }
 
     // Keep the real-write guard synchronous and before any UI/state access.
-    private Task SaveBlockSettings(DeviceBlock block, bool autoMsiOnly = false, OperationReport? report = null)
+    private Task SaveBlockSettings(DeviceBlock block, bool autoMsiOnly = false, OperationReport? report = null,
+        DeviceSettingChanges changes = DeviceSettingChanges.All)
     {
         if (block.Device.IsTestDevice)
         {
-            ApplyTestBlockSettings(block, autoMsiOnly, report);
+            ApplyTestBlockSettings(block, autoMsiOnly, report, changes);
             UpdateBlockInfoText(block);
-            WriteLog($"APPLY.VIRTUAL: {block.Device.InstanceId} Kind={block.Kind} reason=TEST_DEVICE");
+            WriteLog($"APPLY.VIRTUAL: {block.Device.InstanceId} Kind={block.Kind} changes={changes} reason=TEST_DEVICE");
             return Task.CompletedTask;
         }
         DemandRealWrite("DEVICE SETTINGS");
         RecalcAffinityMask(block);
-        NdisRssLayout.Layout? layout = block.Kind == DeviceKind.NET_NDIS && !autoMsiOnly
+        NdisRssLayout.Layout? layout = block.Kind == DeviceKind.NET_NDIS && !autoMsiOnly && changes.HasFlag(DeviceSettingChanges.Affinity)
             ? ApplyNdisSelection(block, block.RssBaseCore ?? GetFirstCheckedCore(block) ?? 0,
                 ClampRssQueueCount((int)(block.RssQueueBox?.Value ?? 1))) : null;
         if (layout is not null) layout = layout with { Processors = Array.AsReadOnly(layout.Processors.ToArray()) };
@@ -969,7 +986,7 @@ public sealed partial class MainForm
             Priority = block.PrioCombo.SelectedItem?.ToString() ?? "Undefined",
             Policy = block.PolicyCombo.SelectedItem?.ToString() ?? "MachineDefault", AffinityMask = block.AffinityMask,
             PowerSaving = block.PowerSavingCheck?.Checked, Wifi = block.Device.Wifi,
-            NdisMode = GetSelectedNdisAffinityMode(block), RssLayout = layout, AutoMsiOnly = autoMsiOnly,
+            NdisMode = GetSelectedNdisAffinityMode(block), RssLayout = layout, Changes = changes, AutoMsiOnly = autoMsiOnly,
             AutoReason = block.Kind == DeviceKind.GPU && block.Device.IsIntegratedGpu ? "integrated-gpu"
                 : IsAutoDisplayAudioMsiOnly(block) ? "display-audio" : "auto-policy",
         };
@@ -1009,7 +1026,7 @@ public sealed partial class MainForm
     {
         string defaultText = FormatImodValue(config.GlobalInterval);
         block.ImodDefaultLabel.Text = config.StartupReadError is null
-            ? $"default: {defaultText}" : UiResources.English(UiText.ProfileUnreadable);
+            ? $"base interval: {defaultText}" : UiResources.English(UiText.ProfileUnreadable);
         block.ImodDefaultLabel.Tag = config.StartupReadError ?? defaultText;
         block.ImodDefaultLabel.ForeColor = config.StartupReadError is null ? _mutedText : _statusDanger;
         if (config.StartupReadError is not null) SetImodStatusTooltip(block.ImodDefaultLabel);

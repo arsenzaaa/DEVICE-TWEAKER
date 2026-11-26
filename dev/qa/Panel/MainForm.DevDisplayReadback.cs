@@ -27,10 +27,11 @@ public sealed partial class MainForm
             Interlocked.Increment(ref _devDisplayReadPending);
             try
             {
-                return ReadDisplaySnapshot([new("QA_DISPLAY", DeviceKind.NET_NDIS, false)], true,
+                DisplaySnapshot snapshot = ReadDisplaySnapshot([new("QA_DISPLAY", DeviceKind.NET_NDIS, false)],
                     _ => { Stage("power"); return false; },
-                    _ => { Stage("rss"); return EmptyNdisRssRuntimeState("model-only"); },
-                    () => { Stage("drivers"); return (new() { ["QA_DISPLAY"] = new() { DeviceId = "QA_DISPLAY" } }, null); });
+                    _ => { Stage("rss"); return EmptyNdisRssRuntimeState("model-only"); });
+                Stage("drivers");
+                return snapshot;
             }
             finally { Interlocked.Decrement(ref _devDisplayReadPending); }
         }, TimeSpan.FromMilliseconds(model.Outcome == "timeout" ? 200 : 5000),
@@ -59,31 +60,37 @@ public sealed partial class MainForm
         if (!QaRun.IsReadOnly || !_testDevicesOnly)
             throw new InvalidOperationException("Snapshot overlap requires a synthetic read-only session.");
         int uiThread = Environment.CurrentManagedThreadId, workerThread = 0;
-        TaskCompletionSource stateStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource<SnapshotReadResult<DriverMetadata>> metadata = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        Task<SnapshotReadResult<DisplaySnapshot>> combined = _displayReader.ReadTaskAsync(
-            () => CompleteDisplaySnapshotAsync(() =>
-            {
-                workerThread = Environment.CurrentManagedThreadId;
-                stateStarted.SetResult();
-                return new DisplaySnapshot([], null, null);
-            }, metadata.Task), TimeSpan.FromSeconds(5), error => throw new InvalidOperationException("Unexpected late fault", error));
+        Task publication = PublishDriverMetadataAsync(metadata.Task);
         try
         {
-            await stateStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
-            if (combined.IsCompleted || workerThread == uiThread)
+            var state = await _displayReader.ReadAsync(() =>
+            {
+                workerThread = Environment.CurrentManagedThreadId;
+                return ReadDisplaySnapshot([new("QA_OVERLAP", DeviceKind.USB, false)],
+                    _ => true, _ => throw new InvalidOperationException("USB must not query RSS."));
+            }, TimeSpan.FromSeconds(2), error => throw new InvalidOperationException("Unexpected late fault", error));
+            if (workerThread == uiThread || state.Snapshot is null || publication.IsCompleted)
                 throw new InvalidOperationException("State read was blocked by metadata or ran on the UI thread.");
+            PublishDisplaySnapshot(state.Snapshot, replaceDevices: false);
         }
         finally
         {
-            metadata.TrySetResult(new(new(new() { ["QA_OVERLAP"] = new() { DeviceId = "QA_OVERLAP" } }, null), null));
+            metadata.TrySetResult(new(null, "Synthetic metadata timeout."));
+            await publication;
         }
-        var result = await combined;
-        if (result.Snapshot?.Drivers?.ContainsKey("QA_OVERLAP") != true || result.Error is not null)
-            throw new InvalidOperationException("The combined snapshot lost its diagnostic metadata.");
+        if (!_displayPowerCache.TryGetValue("QA_OVERLAP", out bool enabled) || !enabled
+            || _signedDriverInfoError != "Synthetic metadata timeout.")
+            throw new InvalidOperationException("A metadata timeout must leave the published device state intact.");
+
+        await PublishDriverMetadataAsync(Task.FromResult(new SnapshotReadResult<DriverMetadata>(
+            new(new() { ["QA_OVERLAP"] = new() { DeviceId = "QA_OVERLAP" } }, null), null)));
+        if (_signedDriverInfoCache?.ContainsKey("QA_OVERLAP") != true || _signedDriverInfoError is not null)
+            throw new InvalidOperationException("The metadata retry must update the diagnostic cache.");
         string relative = "state/" + id + ".json";
         DeviceTweakerQa.DevFiles.Write(DevArtifact(relative), new { workerOffUi = true,
-            stateStartedBeforeMetadataCompleted = true, fullSnapshotJoined = true, hostReads = false });
+            statePublishedBeforeMetadataCompleted = true, metadataTimeoutDidNotClearState = true,
+            metadataRetrySucceeded = true, hostReads = false });
         DevRecordState(relative);
         DevCaptureWindow(id, "@main", false);
     }

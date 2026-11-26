@@ -13,7 +13,7 @@ public sealed partial class MainForm
         (Button Button, string Caption, string Suffix)[] cases =
         [
             (DevDescendants(usb.Group).OfType<Button>().First(b => GetSourceControlText(b) == "SET"), "SET…", "usb-set"),
-            (DevDescendants(usb.Group).OfType<Button>().First(b => GetSourceControlText(b) == "DELETE"), "DELETE…", "usb-delete"),
+            (DevDescendants(usb.Group).OfType<Button>().First(b => GetSourceControlText(b) == UiResources.English(UiText.DeleteProfile)), "DELETE…", "usb-delete"),
             (usb.ImodCheckButton!, "CHECK…", "usb-check"),
             (nic.NicItrApplyButton!, "SET…", "nic-set"),
             (nic.NicItrCheckButton!, "CHECK…", "nic-check"),

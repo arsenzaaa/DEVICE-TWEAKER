@@ -425,8 +425,8 @@ $normalProc = Start-OwnedProcess
 Write-Report "START NORMAL pid=$($normalProc.Id)"
 $normalMain = Get-MainWindow -processId $normalProc.Id -timeoutSec 30
 if ($null -eq $normalMain) { throw 'Normal main window not found' }
-$englishSubtitlePattern = '^version .+ - developed by @arsenza$'
-$russianSubtitlePattern = '^версия .+ - разработчик @arsenza$'
+$englishSubtitlePattern = '^Version .+ · @arsenza$'
+$russianSubtitlePattern = '^Версия .+ · @arsenza$'
 $startupSubtitle = Find-DescNamePattern $normalMain $englishSubtitlePattern 5
 if ($null -eq $startupSubtitle) { throw 'Startup version subtitle not found' }
 Start-Sleep -Milliseconds 60
@@ -927,7 +927,7 @@ foreach ($preview in $resultPreviews) {
             throw 'IMOD compact prompt exposes the technical report before expansion'
         }
         if ($promptNames -notmatch 'Include USB IMOD in auto-optimization') { throw 'IMOD compact prompt omits the action question' }
-        foreach ($required in @('APPLY configures USB IMOD.', 'SKIP continues AUTO without USB IMOD.',
+        foreach ($required in @('APPLY includes USB IMOD tuning.', 'SKIP keeps the current profile.',
             'Anti-cheat software may block DTIMOD or disconnect you from a game.', 'Closing the app does not unload DTIMOD.', 'DRIVER INFO')) {
             if ($promptNames -notmatch [regex]::Escape($required)) { throw "IMOD prompt omits a choice or driver consequence: $required" }
         }
@@ -939,7 +939,7 @@ foreach ($preview in $resultPreviews) {
             [System.Windows.Automation.Condition]::TrueCondition) | Where-Object { -not $_.Current.IsOffscreen } | ForEach-Object { [string]$_.Current.Name }) -join ' '
         $promptNames = ($promptNames -replace '\s+', ' ').Replace([char]0x2011, '-')
         foreach ($required in @('DTIMOD provides hardware access', 'Driver lifetime', 'Windows check', 'Compatibility',
-            'Easy Anti-Cheat', 'Riot Vanguard', 'FACEIT Anti-Cheat', 'Compatibility is not guaranteed.',
+            'Easy Anti-Cheat', 'Riot Vanguard', 'FACEIT Anti-Cheat', 'can block DTIMOD or disconnect you from a match.',
             'This check reads Windows settings and selected service information.', 'It does not load DTIMOD or test anti-cheat compatibility.')) {
             if ($promptNames -notmatch [regex]::Escape($required)) { throw "Driver information omits its purpose or limits: $required" }
         }
@@ -1485,7 +1485,7 @@ try {
         }
 
         foreach ($prompt in @(
-            @{ Button = 'ДИАЛОГ: БЕКАП'; Id = 'AUTO_BACKUP_DIALOG'; File = '25_prompt_backup_ru.png'; Required = 'Куда сохранить дополнительный бекап|Исходный бекап сохраняется и при пропуске'; Dismiss = 'SKIP' },
+            @{ Button = 'ДИАЛОГ: БЭКАП'; Id = 'AUTO_BACKUP_DIALOG'; File = '25_prompt_backup_ru.png'; Required = 'Куда сохранить дополнительный бэкап|Исходный бэкап сохраняется и при пропуске'; Dismiss = 'SKIP' },
             @{ Button = 'ДИАЛОГ: ПОДТВЕРЖДЕНИЕ'; Id = 'CONFIRM_DIALOG'; File = '25_prompt_confirm_ru.png'; Required = 'Сбросить сетевые настройки|Interrupt Moderation|СБРОСИТЬ'; Dismiss = 'CANCEL' }
         )) {
             $ruAdmin = Find-AutomationId $ruAdminMain 'TEST_ADMIN_DIALOG' 5
@@ -1512,8 +1512,8 @@ try {
             [System.Windows.Automation.Condition]::TrueCondition) | Where-Object { -not $_.Current.IsOffscreen } | ForEach-Object { [string]$_.Current.Name }) -join ' '
         $ruPreflightNames = $ruPreflightNames -replace '\s+', ' '
         if ($ruPreflightNames -match 'Driver preflight|Проверка системы \(только чтение\)|PREFLIGHT') { throw 'Russian IMOD prompt exposes technical details before expansion' }
-        if ($ruPreflightNames -notmatch 'Включить USB IMOD в авто.оптимизацию') { throw 'Russian compact IMOD question is missing or untranslated' }
-        foreach ($required in @('ПРИМЕНИТЬ настраивает USB IMOD.', 'ПРОПУСТИТЬ продолжает АВТО без USB IMOD.',
+        if ($ruPreflightNames -notmatch 'Включить USB IMOD в автооптимизацию\?') { throw 'Russian compact IMOD question is missing or untranslated' }
+        foreach ($required in @('ПРИМЕНИТЬ включает настройку USB IMOD.', 'ПРОПУСТИТЬ сохраняет текущий профиль.',
             'Античит может блокировать DTIMOD или отключить вас от игры.', 'Закрытие программы не выгружает DTIMOD.', 'О ДРАЙВЕРЕ')) {
             if ($ruPreflightNames -notmatch [regex]::Escape($required)) { throw "Russian IMOD prompt omits a choice or driver consequence: $required" }
         }
@@ -1525,7 +1525,7 @@ try {
             [System.Windows.Automation.Condition]::TrueCondition) | Where-Object { -not $_.Current.IsOffscreen } | ForEach-Object { [string]$_.Current.Name }) -join ' '
         $ruPreflightNames = $ruPreflightNames -replace '\s+', ' '
         foreach ($required in @('DTIMOD нужен для аппаратного доступа', 'Драйвер и автозапуск', 'Проверка Windows', 'Совместимость',
-            'Easy Anti-Cheat', 'Riot Vanguard', 'FACEIT Anti-Cheat', 'Совместимость не гарантируется.',
+            'Easy Anti-Cheat', 'Riot Vanguard', 'FACEIT Anti-Cheat', 'могут блокировать DTIMOD или отключать от матча.',
             'Проверка читает параметры Windows', 'Она не загружает DTIMOD и не определяет совместимость с античитами.')) {
             if ($ruPreflightNames -notmatch [regex]::Escape($required)) { throw "Russian driver information omits its purpose or limits: $required" }
         }

@@ -8,7 +8,7 @@ internal delegate bool ImodDriverLoader(string path, Action<string>? log, out st
 
 internal sealed class ImodDriverContext : IDisposable
 {
-    internal const int StartupScriptVersion = 33;
+    internal const int StartupScriptVersion = 37;
     public IntPtr DriverHandle { get; private set; } = InvalidHandleValue;
     public bool ServiceCreated { get; private set; }
     public bool ServiceStartedByContext { get; private set; }
@@ -122,7 +122,7 @@ internal sealed class ImodDriverContext : IDisposable
         error = null;
         _log?.Invoke("IMOD.DRIVER: primary loader=kdu");
 
-        string? kduError = null, serviceError = null;
+        string? driverFileError = null, kduError = null, serviceError = null;
         DriverReadyResult result = DriverReadyPolicy.Ensure(
             () =>
             {
@@ -135,6 +135,8 @@ internal sealed class ImodDriverContext : IDisposable
                 _log?.Invoke($"IMOD.DRIVER.PRELOAD: deviceAvailable=false loaderNext=kdu detail=\"{SanitizeLogValue(openError)}\"");
                 return false;
             },
+            () => ImodDriverFiles.TryVerifyEmbeddedImodResourceFile(
+                "DeviceTweakerCS.IMOD.DTIMOD.sys", ".DTIMOD.sys", DriverPath, out driverFileError),
             () => _loadDriver!(DriverPath, _log, out kduError),
             DriverLoadGate.AssertLoaderIdle,
             () =>
@@ -153,6 +155,13 @@ internal sealed class ImodDriverContext : IDisposable
             case DriverReadyResult.Service:
                 _log?.Invoke($"IMOD.DRIVER.SUMMARY: final=service loader=service kdu_error={kduError ?? "none"}");
                 return true;
+        }
+
+        if (driverFileError is not null)
+        {
+            error = $"DTIMOD.sys verification failed: {driverFileError}";
+            _log?.Invoke($"IMOD.DRIVER.VERIFY: path={DriverPath} error={error}");
+            return false;
         }
 
         error = $"kdu={kduError ?? "unknown"}; service={serviceError ?? "unknown"}";
@@ -175,20 +184,20 @@ internal sealed class ImodDriverContext : IDisposable
         IntPtr service = IntPtr.Zero;
         try
         {
-            service = OpenService(scm, ImodDriverServiceName, ServiceAllAccess);
+            service = OpenService(scm, DriverIdentity.ServiceName, ServiceAllAccess);
             if (service == IntPtr.Zero)
             {
-                int lastError = Marshal.GetLastWin32Error();
-                if (lastError != ErrorServiceDoesNotExist)
+                int openError = Marshal.GetLastWin32Error();
+                if (openError != ErrorServiceDoesNotExist)
                 {
-                    error = $"failed to open IMOD driver service: {GetWin32ErrorMessage(lastError)}";
+                    error = $"failed to open IMOD driver service: {GetWin32ErrorMessage(openError)}";
                     return false;
                 }
 
                 service = CreateService(
                     scm,
-                    ImodDriverServiceName,
-                    ImodDriverServiceName,
+                    DriverIdentity.ServiceName,
+                    DeviceTweakerImodRuntime.ImodDriverServiceDisplayName,
                     ServiceAllAccess,
                     ServiceKernelDriver,
                     ServiceDemandStart,
@@ -217,7 +226,7 @@ internal sealed class ImodDriverContext : IDisposable
                          null,
                          null,
                          null,
-                         ImodDriverServiceName))
+                         DeviceTweakerImodRuntime.ImodDriverServiceDisplayName))
             {
                 error = $"failed to configure IMOD driver service path: {GetWin32ErrorMessage(Marshal.GetLastWin32Error())}";
                 return false;
@@ -229,7 +238,7 @@ internal sealed class ImodDriverContext : IDisposable
                 if (TryOpenImodDriverDeviceOnce(out IntPtr runningHandle, out string? runningOpenError))
                 {
                     _ = CloseHandle(runningHandle);
-                    _log?.Invoke($"IMOD.DRIVER: service already running {ImodDriverServiceName}");
+                    _log?.Invoke($"IMOD.DRIVER: service already running {DriverIdentity.ServiceName}");
                     return true;
                 }
 
@@ -246,7 +255,7 @@ internal sealed class ImodDriverContext : IDisposable
                 int lastError = Marshal.GetLastWin32Error();
                 if (lastError == ErrorServiceAlreadyRunning)
                 {
-                    _log?.Invoke($"IMOD.DRIVER: service already running {ImodDriverServiceName}");
+                    _log?.Invoke($"IMOD.DRIVER: service already running {DriverIdentity.ServiceName}");
                     return true;
                 }
 
@@ -258,7 +267,7 @@ internal sealed class ImodDriverContext : IDisposable
             }
 
             ServiceStartedByContext = true;
-            _log?.Invoke($"IMOD.DRIVER: service started {ImodDriverServiceName}");
+            _log?.Invoke($"IMOD.DRIVER: service started {DriverIdentity.ServiceName}");
 
         }
         finally
@@ -319,7 +328,7 @@ internal sealed class ImodDriverContext : IDisposable
 
         try
         {
-            IntPtr service = OpenService(scm, ImodDriverServiceName, ServiceAllAccess);
+            IntPtr service = OpenService(scm, DriverIdentity.ServiceName, ServiceAllAccess);
             if (service == IntPtr.Zero)
             {
                 return;

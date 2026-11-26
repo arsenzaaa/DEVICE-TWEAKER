@@ -105,6 +105,21 @@ public sealed class StartupProfileRestoreCompatibilityTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void MissingContentsCannotBeInterpretedAsAnAbsentProfile(bool legacy)
+    {
+        string path = legacy ? Path.ChangeExtension(ProfilePath, ".ps1") : ProfilePath;
+        FileBackup file = new() { Path = path, Exists = true };
+        DeviceTweakerBackup backup = legacy ? new() { ImodScript = file } : new() { StartupProfile = file };
+
+        TargetInvocationException error = Assert.Throws<TargetInvocationException>(() => Normalize(backup));
+
+        Assert.Contains("missing the saved startup profile contents", Assert.IsType<InvalidDataException>(error.InnerException).Message);
+        Assert.True(file.Exists);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void FailedInstallRollsBackToPreparedProfileAndReportsRealRollbackFailure(bool denyRollback)
     {
         DeviceTweakerBackup backup = new() { StartupProfile = File(new()) };

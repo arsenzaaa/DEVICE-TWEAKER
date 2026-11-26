@@ -31,13 +31,14 @@ public sealed class DriverIdentityTests
         => Assert.Throws<IOException>(() => DriverIdentity.CheckLegacyDevice(_ => throw new IOException("access failed")));
 
     [Fact]
-    public void ApplicationStartupAndBundledDriverUseTheSameIdentity()
+    public void StartupAndApplicationKeepTheBundledDeviceInterfaceAndSeparateServiceNames()
     {
         const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Static;
-        Assert.Equal(DriverIdentity.ServiceName, typeof(ImodDriverNative).GetField("ImodDriverServiceName", flags)!.GetRawConstantValue());
+        Assert.Equal("DeviceTweakerImod", DriverIdentity.ServiceName);
+        Assert.Equal("DEVICE TWEAKER IMOD", DeviceTweakerImodRuntime.ImodDriverServiceDisplayName);
         Assert.Equal(DriverIdentity.DevicePath, typeof(ImodDriverNative).GetField("ImodDriverDevicePath", flags)!.GetRawConstantValue());
         string script = StartupScriptTests.ReadResource("DeviceTweakerCS.Startup.ApplyIMOD.ps1");
-        Assert.Contains("-drvn " + DriverIdentity.ServiceName + " -drvr " + DriverIdentity.ServiceName, script);
+        Assert.Contains("-drvn DeviceTweakerImod2 -drvr DeviceTweakerImod2", script);
         Assert.Contains("$imodScriptVersion = " + ImodDriverContext.StartupScriptVersion, script);
         Assert.DoesNotContain("-drvn DTIMODMapped", script);
         using Stream stream = typeof(MainForm).Assembly.GetManifestResourceStream("DeviceTweakerCS.IMOD.DTIMOD.sys")!;

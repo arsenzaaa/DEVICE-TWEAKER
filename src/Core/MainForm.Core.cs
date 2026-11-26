@@ -127,6 +127,8 @@ public sealed partial class MainForm : Form
             $"UI.SHOWN: bounds={Bounds.X},{Bounds.Y},{Bounds.Width}x{Bounds.Height} " +
             $"client={ClientSize.Width}x{ClientSize.Height} dpi={GetCurrentWindowDpi()} " +
             $"screen=\"{Screen.FromControl(this).DeviceName}\" monitors={Screen.AllScreens.Length}");
+        if (_detailedLogEnabled && !QaRun.IsReadOnly)
+            _ = Task.Run(LogWindowsInfo);
         InitializeRawPolling();
 #if DEVELOPER_QA
         bool showTestAdmin = string.Equals(
@@ -342,28 +344,35 @@ public sealed partial class MainForm : Form
         {
             WriteLog($"OS.ERROR: {FlattenLogText(ex.ToString())}");
         }
+    }
 
+    private static void LogWindowsInfo()
+    {
         try
         {
             using ManagementObjectSearcher osSearcher = new(
                 "root\\CIMV2",
                 "SELECT Caption, Version, LastBootUpTime FROM Win32_OperatingSystem");
 
-            foreach (ManagementObject mo in osSearcher.Get())
+            using ManagementObjectCollection rows = osSearcher.Get();
+            foreach (ManagementObject mo in rows)
             {
-                string caption = mo["Caption"] as string ?? "Windows";
-                string version = mo["Version"] as string ?? string.Empty;
-                string? lastBoot = mo["LastBootUpTime"] as string;
+                using (mo)
+                {
+                    string caption = mo["Caption"] as string ?? "Windows";
+                    string version = mo["Version"] as string ?? string.Empty;
+                    string? lastBoot = mo["LastBootUpTime"] as string;
 
-                if (!string.IsNullOrWhiteSpace(lastBoot))
-                {
-                    DateTime bootTime = ManagementDateTimeConverter.ToDateTime(lastBoot);
-                    TimeSpan uptime = DateTime.Now - bootTime;
-                    WriteLog($"OS: {caption} {version} Uptime={uptime.TotalDays:N1}d");
-                }
-                else
-                {
-                    WriteLog($"OS: {caption} {version}");
+                    if (!string.IsNullOrWhiteSpace(lastBoot))
+                    {
+                        DateTime bootTime = ManagementDateTimeConverter.ToDateTime(lastBoot);
+                        TimeSpan uptime = DateTime.Now - bootTime;
+                        _ = AppDiagnostics.Write($"OS: {caption} {version} Uptime={uptime.TotalDays:N1}d");
+                    }
+                    else
+                    {
+                        _ = AppDiagnostics.Write($"OS: {caption} {version}");
+                    }
                 }
 
                 break;
@@ -372,93 +381,6 @@ public sealed partial class MainForm : Form
         catch (Exception ex)
         {
             AppDiagnostics.Warn("OS.INFO", ex);
-        }
-
-        if (_cpuInfo is not null)
-        {
-            WriteLog($"CPU.SUMMARY: logical={_cpuInfo.Topology.Logical} maxVisual={_maxLogical} groups={_cpuGroupCount} ccd={_cpuInfo.CcdMap.Values.Distinct().Count()} ccx={_cpuInfo.CcxMap.Values.Distinct().Count()}");
-            WriteLog("CPU.TOPO: snapshot from CpuInfo");
-
-            foreach (CpuLpInfo e in _cpuInfo.Topology.LPs.OrderBy(x => x.LP))
-            {
-                bool isSecondaryThread = false;
-                int coreKey = CpuTopology.MakeCoreKey(e.Group, e.Core);
-                if (_cpuInfo.Topology.ByCore.TryGetValue(coreKey, out List<CpuLpInfo>? coreGroup) && coreGroup.Count > 1)
-                {
-                    if (coreGroup[0].LP != e.LP)
-                    {
-                        isSecondaryThread = true;
-                    }
-                }
-
-                int ccdId = _cpuInfo.CcdMap.TryGetValue(e.LP, out int cid) ? cid : 0;
-                int ccxId = _cpuInfo.CcxMap.TryGetValue(e.LP, out int xid) ? xid : 0;
-                string localText = e.LocalIndex >= 0 ? $" Local={e.LocalIndex}" : string.Empty;
-                string idText = e.CpuSetId >= 0 ? $" Id={e.CpuSetId}" : string.Empty;
-                string typeText = IsEfficiencyCore(e) ? "E"
-                    : HasHybridCpu() ? (isSecondaryThread ? "P/HT" : "P")
-                    : isSecondaryThread ? "Core/SMT" : "Core";
-                string cppcText = _cppcRanks.TryGetValue(e.LP, out int rank)
-                    ? _cppcRatings.TryGetValue(e.LP, out int rating)
-                        ? $" CPPC=R{rating}/#{rank} Preferred={(rank == 1 ? 1 : 0)}"
-                        : $" CPPC=#{rank} Preferred={(rank == 1 ? 1 : 0)}"
-                    : " CPPC=unavailable Preferred=0";
-                WriteLog($"CPU.ENTRY: G{e.Group} L{e.LP}{localText}{idText} Core={e.Core} Type={typeText} CCD={ccdId} CCX={ccxId} SMT={isSecondaryThread} EffClass={e.EffClass}{cppcText}");
-            }
-
-            Dictionary<int, List<int>> ccdGroups = new();
-            foreach (KeyValuePair<int, int> kvp in _cpuInfo.CcdMap)
-            {
-                if (!ccdGroups.TryGetValue(kvp.Value, out List<int>? list))
-                {
-                    list = [];
-                    ccdGroups[kvp.Value] = list;
-                }
-
-                list.Add(kvp.Key);
-            }
-
-            foreach (int ccdId in ccdGroups.Keys.OrderBy(x => x))
-            {
-                List<int> lps = ccdGroups[ccdId].OrderBy(x => x).ToList();
-                WriteLog($"CCD.MAP: CCD{ccdId} -> LPs=[{string.Join(',', lps)}]");
-            }
-
-            Dictionary<int, List<int>> ccxGroups = new();
-            foreach (KeyValuePair<int, int> kvp in _cpuInfo.CcxMap)
-            {
-                if (!ccxGroups.TryGetValue(kvp.Value, out List<int>? list))
-                {
-                    list = [];
-                    ccxGroups[kvp.Value] = list;
-                }
-
-                list.Add(kvp.Key);
-            }
-
-            foreach (int ccxId in ccxGroups.Keys.OrderBy(x => x))
-            {
-                List<int> lps = ccxGroups[ccxId].OrderBy(x => x).ToList();
-                WriteLog($"CCX.MAP: CCX{ccxId} -> LPs=[{string.Join(',', lps)}]");
-            }
-        }
-
-        if (_blocks.Count > 0)
-        {
-            foreach (DeviceBlock b in _blocks)
-            {
-                string msi = b.MsiCombo.SelectedItem?.ToString() ?? "(none)";
-                string prio = b.PrioCombo.SelectedItem?.ToString() ?? "(none)";
-                string policy = b.PolicyCombo.SelectedItem?.ToString() ?? "(none)";
-                string name = !string.IsNullOrWhiteSpace(b.Device.Name) ? b.Device.Name : b.Device.InstanceId;
-                string cls = b.Device.Class ?? string.Empty;
-                string usb = b.Device.UsbRoles ?? string.Empty;
-                string usbPolling = b.Device.UsbPollingRates ?? string.Empty;
-                string audio = b.Device.AudioEndpoints ?? string.Empty;
-
-                WriteLog(
-                    $"BOOT.DEV: {b.Device.InstanceId} Kind={b.Kind} Class={cls} Name=\"{name}\" MSI={msi} Prio={prio} Policy={policy} Mask=0x{b.AffinityMask:X} UsbRoles=\"{usb}\" UsbPolling=\"{usbPolling}\" Audio=\"{audio}\"");
-            }
         }
     }
 
@@ -1049,19 +971,20 @@ public sealed partial class MainForm : Form
         {
             signedDriverMap = _signedDriverInfoCache ?? [];
             string? wmiError = _signedDriverInfoError;
-            wmiMapEmpty = signedDriverMap.Count == 0 && !(_testDevicesEnabled && _testDevicesOnly);
+            bool readingDrivers = _driverMetadataRead is { IsCompleted: false };
+            wmiMapEmpty = signedDriverMap.Count == 0;
             if (!string.IsNullOrWhiteSpace(wmiError))
             {
                 WriteLog($"GUI.ISSUE: reason=wmiQueryFailed error=\"{SanitizeLogValue(wmiError)}\"");
                 issueCount++;
             }
-            else if (wmiMapEmpty)
+            else if (wmiMapEmpty && !readingDrivers && !(_testDevicesEnabled && _testDevicesOnly))
             {
                 WriteLog("GUI.ISSUE: reason=wmiQueryEmpty");
                 issueCount++;
             }
 
-            WriteLog($"GUI.WMI: signedDrivers={signedDriverMap.Count}");
+            WriteLog($"GUI.WMI: signedDrivers={signedDriverMap.Count} pending={readingDrivers}");
         }
 
         string snapshotScope = includeDeviceDiagnostics ? "full" : "layout-state";
@@ -1710,7 +1633,9 @@ public sealed partial class MainForm : Form
                 NdisRssRuntimeState runtime = block.Device.Wifi ? EmptyNdisRssRuntimeState("wifi-preserved") : GetNdisRssRuntimeState(instanceId);
                 block.NdisRssRuntime = runtime;
                 WriteLog($"GUI.BLOCK.RSS.ACTIVE: idx={index} {FormatNdisRssRuntimeState(runtime)}");
-                LogNdisRssComparison("GUI.BLOCK", instanceId, runtime, rssBase, rssQueues, TryParseLeadingInt(rssMaxProcessorsRaw), block.Device.Wifi);
+                LogNdisRssComparison("GUI.BLOCK", instanceId, runtime, new(rssBase, rssQueues,
+                    TryParseLeadingInt(rssMaxProcessorsRaw), TryParseLeadingInt(rssMaxProcRaw),
+                    TryParseLeadingInt(rssBaseGroupRaw) ?? 0, TryParseLeadingInt(rssMaxGroupRaw)), block.Device.Wifi);
                 issues += LogGuiBlockIssues(block, index, normalizedId, signedDriverMap, wmiMapEmpty, enumProblemRaw, svcImageRaw, svcImageResolved, drvInfo, msiKey, affKey, rssBase);
             }
             else
@@ -1971,7 +1896,7 @@ public sealed partial class MainForm : Form
                 }
 
                 ulong? regMaskRaw = TryGetAssignmentMask(affKey);
-                ulong regMask = regMaskRaw ?? 0;
+                ulong regMask = TryGetRegInt(affKey, "DevicePolicy") is 1 or 2 or 3 or 5 ? 0 : regMaskRaw ?? 0;
                 if (uiMask != regMask)
                 {
                     string suffix = regMaskRaw.HasValue ? string.Empty : " regMissing=1";
@@ -1983,19 +1908,5 @@ public sealed partial class MainForm : Form
         return issues;
     }
 
-    private void DisableDetailedLog(bool writeClosingEntry = true)
-    {
-        if (!_detailedLogEnabled)
-        {
-            return;
-        }
 
-        if (writeClosingEntry)
-        {
-            WriteLog("LOG: detailed logging DISABLED");
-        }
-
-        AppDiagnostics.Disable();
-        _detailedLogEnabled = false;
-    }
 }

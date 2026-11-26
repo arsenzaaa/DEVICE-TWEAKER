@@ -36,6 +36,7 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
     public Color ArrowColor { get; set; } = Color.FromArgb(240, 240, 240);
 
     public event EventHandler? SelectedIndexChanged;
+    public event EventHandler? SelectionCommitted;
 
     [DefaultValue(-1)]
     public int SelectedIndex
@@ -230,7 +231,7 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
                 Keys.Home => 0,
                 _ => Items.Count - 1,
             };
-            SelectedIndex = next;
+            CommitSelection(next);
             e.Handled = true;
             e.SuppressKeyPress = true;
             return;
@@ -361,10 +362,11 @@ internal sealed class ThemedDropDownPicker : Control, IMessageFilter
         }
     }
 
-    private void CommitSelection(int index)
+    internal void CommitSelection(int index)
     {
         SelectedIndex = index;
         ClosePopup();
+        SelectionCommitted?.Invoke(this, EventArgs.Empty);
     }
 
     private sealed class DropDownForm : Form

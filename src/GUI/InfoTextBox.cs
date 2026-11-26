@@ -20,6 +20,7 @@ internal sealed class InfoTextBox : RichTextBox
         "Topology:",
         "Controller capability:",
         "Power Saving:",
+        "Энергосбережение:",
         "USB selective suspend:",
         "Raw input throttle:",
         "ТЕСТОВОЕ УСТРОЙСТВО",

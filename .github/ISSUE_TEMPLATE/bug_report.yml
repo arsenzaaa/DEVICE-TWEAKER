@@ -1,60 +1,36 @@
 name: Bug report / Ошибка
-description: The program shows or applies something incorrectly / Программа показывает или применяет что-то неправильно
+description: Report a crash or unexpected behavior / Сообщить о сбое или ошибке в работе
 labels: [bug]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        The log is in the `logs` folder next to the EXE. For startup IMOD or NIC ITR, also attach `%ProgramData%\DEVICE TWEAKER\Startup\logs`; for restore problems, `Backups` next to the EXE and `%APPDATA%\DEVICE TWEAKER\Backups`. Remove personal paths and names before posting.
-        Лог лежит в папке `logs` рядом с EXE. Если IMOD или NIC ITR применяется при запуске, приложите также `%ProgramData%\DEVICE TWEAKER\Startup\logs`, при проблеме с восстановлением - `Backups` рядом с EXE и `%APPDATA%\DEVICE TWEAKER\Backups`. Перед отправкой уберите личные пути и имена.
-
-        For questions about settings, check the [guide](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/README.md) first.
-        Описание настроек: [руководство на русском](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/README.ru.md).
   - type: input
     id: version
     attributes:
-      label: Version and build / Версия и сборка
-      placeholder: 0.1.0, SelfContained
-    validations:
-      required: true
-  - type: textarea
-    id: system
-    attributes:
-      label: System and device / Система и устройство
-      description: Windows build, CPU, motherboard, BIOS, device Hardware ID, driver version / Сборка Windows, CPU, материнская плата, BIOS, Hardware ID устройства, версия драйвера
+      label: Build / Сборка
+      description: Copy the LOG.VERSION line from the logs folder next to the EXE, or enter the version shown in the window. / Скопируйте строку LOG.VERSION из лога в папке logs рядом с EXE или укажите версию из окна программы.
+      placeholder: product=0.1.0 build=…
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
       label: Steps to reproduce / Как повторить
-      description: What you clicked and in which order / Что нажимали и в каком порядке
+      description: List the device, the setting you changed and whether you restarted Windows. / Укажите устройство, изменённую настройку и была ли перезагрузка Windows.
     validations:
       required: true
   - type: textarea
     id: result
     attributes:
-      label: Expected and actual result / Ожидали и получили
-    validations:
-      required: true
-  - type: dropdown
-    id: restart
-    attributes:
-      label: Did you restart Windows afterwards? / Перезагружали Windows после этого?
-      options:
-        - Yes / Да
-        - No / Нет
-        - Not relevant / Не относится к ошибке
+      label: Expected and actual result / Что ожидали и что произошло
     validations:
       required: true
   - type: textarea
     id: log
     attributes:
-      label: Log / Лог
-      description: Relevant lines from the log / Строки лога, относящиеся к ошибке
+      label: Log excerpt / Фрагмент лога
+      description: Paste the lines for the affected operation. Remove personal paths, names and serial numbers. / Вставьте строки нужной операции. Уберите личные пути, имена и серийные номера.
       render: text
   - type: textarea
     id: attachments
     attributes:
-      label: Files / Файлы
-      description: Whole log files or a zip of the folders / Файлы логов целиком или архив папок
+      label: Additional evidence / Дополнительные данные
+      description: For a restore issue, attach the relevant anonymized backup. For a startup issue, attach the relevant startup log. / При ошибке восстановления приложите обезличенный бэкап. При ошибке автозапуска приложите лог этой попытки.

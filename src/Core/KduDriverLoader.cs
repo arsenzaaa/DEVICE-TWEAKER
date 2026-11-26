@@ -49,15 +49,6 @@ internal static class KduDriverLoader
             return false;
         }
 
-        string? expectedDriverHash = ReadEmbeddedImodDriverHash();
-        if (string.IsNullOrWhiteSpace(expectedDriverHash)
-            || !HashEquals(ComputeFileSha256(driverPath), expectedDriverHash))
-        {
-            error = "DTIMOD.sys changed after staging or its embedded hash is unavailable";
-            log?.Invoke($"IMOD.DRIVER.KDU: driver verification failed path={driverPath}");
-            return false;
-        }
-
         log?.Invoke($"IMOD.DRIVER.KDU: map start kdu={kduPath} driver={driverPath}");
         if (!RunImodKduMap(kduPath, driverPath, log, out error))
         {

@@ -26,6 +26,37 @@ public sealed class ImodDriverContextTests
         Assert.Contains("QA read-only", error);
     }
 
+    [Theory]
+    [InlineData(true, true, false, true, nameof(StagedDriverCleanup.Loaded))]
+    [InlineData(true, false, true, true, nameof(StagedDriverCleanup.Referenced))]
+    [InlineData(true, false, false, false, nameof(StagedDriverCleanup.HashMismatch))]
+    [InlineData(true, false, false, true, nameof(StagedDriverCleanup.Deleted))]
+    [InlineData(false, false, false, true, nameof(StagedDriverCleanup.Absent))]
+    public void StagedDriverCleanupRequiresAnUnusedMatchingFile(
+        bool exists, bool loaded, bool registered, bool matches, string expected)
+    {
+        string folder = Path.Combine(QaRun.OutputDirectory, "driver-cleanup-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        string driver = Path.Combine(folder, "DTIMOD.sys");
+        if (exists) File.WriteAllBytes(driver, matches ? [1, 2] : [3, 4]);
+
+        StagedDriverCleanup result = ImodDriverFiles.CleanUpStagedFile(
+            driver, ImodDriverFiles.ComputeSha256([1, 2]), () => loaded, () => registered);
+
+        Assert.Equal(expected, result.ToString());
+        Assert.Equal(exists && result != StagedDriverCleanup.Deleted, File.Exists(driver));
+    }
+
+    [Fact]
+    public void UncertainDriverStatusLeavesTheFileUntouched()
+    {
+        string driver = Path.Combine(QaRun.OutputDirectory, Guid.NewGuid().ToString("N") + ".sys");
+        File.WriteAllBytes(driver, [1, 2]);
+        Assert.Throws<IOException>(() => ImodDriverFiles.CleanUpStagedFile(
+            driver, ImodDriverFiles.ComputeSha256([1, 2]), () => throw new IOException("Probe failed"), () => false));
+        Assert.Equal(new byte[] { 1, 2 }, File.ReadAllBytes(driver));
+    }
+
     private static ImodDriverContext Create(Action<string> log) => (ImodDriverContext)Activator.CreateInstance(
         typeof(ImodDriverContext), BindingFlags.Instance | BindingFlags.NonPublic, null,
         new object?[] { "unused-driver-path", log }, null)!;

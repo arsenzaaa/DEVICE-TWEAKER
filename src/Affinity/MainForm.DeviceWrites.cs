@@ -13,55 +13,41 @@ public sealed partial class MainForm
         string intBase = regBase + @"\Device Parameters\Interrupt Management";
         void RecordError(string operation, Exception ex)
         {
-            report?.AddError($"{plan.DeviceName}: {operation}", ex.Message);
+            report.AddError($"{plan.DeviceName}: {operation}", ex.Message);
         }
 
-        try
-        {
-            Registry.LocalMachine.CreateSubKey(intBase)?.Dispose();
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"APPLY.REG.ERROR: {plan.InstanceId} operation=create-interrupt-key path=HKLM\\{intBase} error=\"{FlattenLogText(ex.ToString())}\"");
-            RecordError("create interrupt settings key", ex);
-        }
-
+        DeviceSettingChanges changes = plan.AutoMsiOnly ? DeviceSettingChanges.Msi : plan.Changes;
+        WriteLog($"APPLY.PLAN: {plan.InstanceId} changes={changes}");
         string msiPath = intBase + @"\MessageSignaledInterruptProperties";
-        try
-        {
-            Registry.LocalMachine.CreateSubKey(msiPath)?.Dispose();
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"APPLY.REG.ERROR: {plan.InstanceId} operation=create-msi-key path=HKLM\\{msiPath} error=\"{FlattenLogText(ex.ToString())}\"");
-            RecordError("create MSI settings key", ex);
-        }
 
         string mode = plan.MsiMode;
-        int msiVal = mode == "Enabled" ? 1 : 0;
-        if (msiVal == 0 && !TryValidateMsiDisable(plan.InterruptCapabilities, out string msiDisableError))
+        if (changes.HasFlag(DeviceSettingChanges.Msi))
         {
-            WriteLog($"APPLY.VALIDATION.ERROR: {plan.InstanceId} setting=MSI value={mode} hardware=\"{FormatInterruptCapabilities(plan.InterruptCapabilities)}\" action=skipped-write error=\"{FlattenLogText(msiDisableError)}\"");
-            report.AddError($"{plan.DeviceName}: MSI", msiDisableError,
-                $"Requested value={mode}; hardware={FormatInterruptCapabilities(plan.InterruptCapabilities)}");
-            mode = "unchanged";
-        }
-        else
-        {
-            try
+            int msiVal = mode == "Enabled" ? 1 : 0;
+            if (msiVal == 0 && !TryValidateMsiDisable(plan.InterruptCapabilities, out string msiDisableError))
             {
-                using RegistryKey? msiKey = Registry.LocalMachine.OpenSubKey(msiPath, writable: true);
-                if (msiKey is null)
-                {
-                    throw new InvalidOperationException("MSI registry key could not be opened for writing");
-                }
-
-                DeviceSettingsWriter.SetMsi(new WindowsRegistryValues(msiKey), msiVal == 1);
+                WriteLog($"APPLY.VALIDATION.ERROR: {plan.InstanceId} setting=MSI value={mode} hardware=\"{FormatInterruptCapabilities(plan.InterruptCapabilities)}\" action=skipped-write error=\"{FlattenLogText(msiDisableError)}\"");
+                report.AddError($"{plan.DeviceName}: MSI", msiDisableError,
+                    $"Requested value={mode}; hardware={FormatInterruptCapabilities(plan.InterruptCapabilities)}");
+                mode = "unchanged";
             }
-            catch (Exception ex)
+            else
             {
-                WriteLog($"APPLY.REG.ERROR: {plan.InstanceId} operation=set-msi value={msiVal} path=HKLM\\{msiPath} error=\"{FlattenLogText(ex.ToString())}\"");
-                RecordError("set MSI mode", ex);
+                try
+                {
+                    using RegistryKey? msiKey = Registry.LocalMachine.CreateSubKey(msiPath);
+                    if (msiKey is null)
+                    {
+                        throw new InvalidOperationException("MSI registry key could not be opened for writing");
+                    }
+
+                    DeviceSettingsWriter.SetMsi(new WindowsRegistryValues(msiKey), msiVal == 1);
+                }
+                catch (Exception ex)
+                {
+                    WriteLog($"APPLY.REG.ERROR: {plan.InstanceId} operation=set-msi value={msiVal} path=HKLM\\{msiPath} error=\"{FlattenLogText(ex.ToString())}\"");
+                    RecordError("set MSI mode", ex);
+                }
             }
         }
 
@@ -73,106 +59,112 @@ public sealed partial class MainForm
         }
 
         string limitText = plan.LimitText;
-        if (!TryValidateMsiLimitInput(limitText, plan.InterruptCapabilities, out bool isUnlocked, out int limitValue, out string validationError))
+        string prioStr = plan.Priority;
+        if (changes.HasFlag(DeviceSettingChanges.MsiLimit))
         {
-            string msiLimitMessage = validationError + " " + UiResources.English(UiText.InvalidMsiNotApplied);
-            WriteLog($"APPLY.VALIDATION.ERROR: {plan.InstanceId} setting=MSI-Limit value=\"{FlattenLogText(limitText)}\" hardware=\"{FormatInterruptCapabilities(plan.InterruptCapabilities)}\" error=\"{FlattenLogText(validationError)}\"");
-            report.AddError($"{plan.DeviceName}: MSI Limit", msiLimitMessage,
-                $"Requested value={limitText}; hardware={FormatInterruptCapabilities(plan.InterruptCapabilities)}");
-        }
-        else
-        {
-            if (!isUnlocked && plan.InterruptCapabilities is null)
+            if (!TryValidateMsiLimitInput(limitText, plan.InterruptCapabilities, out bool isUnlocked, out int limitValue, out string validationError))
             {
-                const string warning = "Windows did not publish this device's PCI interrupt capability; the numeric MSI limit could only be range-checked.";
-                WriteLog($"APPLY.VALIDATION.WARN: {plan.InstanceId} setting=MSI-Limit value={limitValue} reason=capability-unknown");
-                report?.AddWarning($"{plan.DeviceName}: MSI Limit", warning);
+                string msiLimitMessage = validationError + " " + UiResources.English(UiText.InvalidMsiNotApplied);
+                WriteLog($"APPLY.VALIDATION.ERROR: {plan.InstanceId} setting=MSI-Limit value=\"{FlattenLogText(limitText)}\" hardware=\"{FormatInterruptCapabilities(plan.InterruptCapabilities)}\" error=\"{FlattenLogText(validationError)}\"");
+                report.AddError($"{plan.DeviceName}: MSI Limit", msiLimitMessage,
+                    $"Requested value={limitText}; hardware={FormatInterruptCapabilities(plan.InterruptCapabilities)}");
             }
+            else
+            {
+                if (!isUnlocked && plan.InterruptCapabilities is null)
+                {
+                    const string warning = "Windows did not publish this device's PCI interrupt capability; the numeric MSI limit could only be range-checked.";
+                    WriteLog($"APPLY.VALIDATION.WARN: {plan.InstanceId} setting=MSI-Limit value={limitValue} reason=capability-unknown");
+                    report.AddWarning($"{plan.DeviceName}: MSI Limit", warning);
+                }
+                try
+                {
+                    using RegistryKey? msiKey = isUnlocked
+                        ? Registry.LocalMachine.OpenSubKey(msiPath, writable: true)
+                        : Registry.LocalMachine.CreateSubKey(msiPath);
+                    if (msiKey is null && !isUnlocked)
+                        throw new InvalidOperationException("MSI registry key could not be opened for writing");
+
+                    if (isUnlocked)
+                    {
+                        if (msiKey is not null) DeviceSettingsWriter.SetMsiLimit(new WindowsRegistryValues(msiKey), null);
+                        result.NormalizedLimit = "Unlimited";
+                        limitText = "Unlimited";
+                    }
+                    else
+                    {
+                        DeviceSettingsWriter.SetMsiLimit(new WindowsRegistryValues(msiKey!), limitValue);
+                        result.NormalizedLimit = limitValue.ToString(CultureInfo.InvariantCulture);
+                        limitText = limitValue.ToString(CultureInfo.InvariantCulture);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteLog($"APPLY.REG.ERROR: {plan.InstanceId} operation=set-msi-limit value=\"{limitText}\" path=HKLM\\{msiPath} error=\"{FlattenLogText(ex.ToString())}\"");
+                    RecordError("set MSI limit", ex);
+                }
+            }
+        }
+
+        if (changes.HasFlag(DeviceSettingChanges.Priority))
+        {
+            string prioPath = intBase + @"\Priority";
+            string prioAffPath = intBase + @"\Affinity Policy";
             try
             {
-                using RegistryKey? msiKey = Registry.LocalMachine.OpenSubKey(msiPath, writable: true);
-                if (msiKey is null)
+                Registry.LocalMachine.CreateSubKey(prioAffPath)?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                WriteLog($"APPLY.REG.ERROR: {plan.InstanceId} operation=create-affinity-key path=HKLM\\{prioAffPath} error=\"{FlattenLogText(ex.ToString())}\"");
+                RecordError("create affinity settings key", ex);
+            }
+
+            int? prioVal = prioStr switch
+            {
+                "Low" => 1,
+                "Normal" => 2,
+                "High" => 3,
+                _ => null,
+            };
+
+            try
+            {
+                using RegistryKey? prioKey = Registry.LocalMachine.OpenSubKey(prioAffPath, writable: true);
+                if (prioKey is null)
                 {
-                    throw new InvalidOperationException("MSI registry key could not be opened for writing");
+                    throw new InvalidOperationException("Affinity registry key could not be opened for writing");
                 }
 
-                if (isUnlocked)
+                if (prioVal.HasValue)
                 {
-                    DeviceSettingsWriter.SetMsiLimit(new WindowsRegistryValues(msiKey), null);
-                    result.NormalizedLimit = "Unlimited";
-                    limitText = "Unlimited";
+                    DeviceSettingsWriter.SetPriority(new WindowsRegistryValues(prioKey), prioVal.Value);
                 }
                 else
                 {
-                    DeviceSettingsWriter.SetMsiLimit(new WindowsRegistryValues(msiKey), limitValue);
-                    result.NormalizedLimit = limitValue.ToString(CultureInfo.InvariantCulture);
-                    limitText = limitValue.ToString(CultureInfo.InvariantCulture);
+                    DeviceSettingsWriter.SetPriority(new WindowsRegistryValues(prioKey), null);
                 }
             }
             catch (Exception ex)
             {
-                WriteLog($"APPLY.REG.ERROR: {plan.InstanceId} operation=set-msi-limit value=\"{limitText}\" path=HKLM\\{msiPath} error=\"{FlattenLogText(ex.ToString())}\"");
-                RecordError("set MSI limit", ex);
+                WriteLog($"APPLY.REG.ERROR: {plan.InstanceId} operation=set-priority value={prioStr} path=HKLM\\{prioAffPath} error=\"{FlattenLogText(ex.ToString())}\"");
+                RecordError("set IRQ priority", ex);
             }
-        }
 
-        string prioPath = intBase + @"\Priority";
-        string prioAffPath = intBase + @"\Affinity Policy";
-        try
-        {
-            Registry.LocalMachine.CreateSubKey(prioAffPath)?.Dispose();
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"APPLY.REG.ERROR: {plan.InstanceId} operation=create-affinity-key path=HKLM\\{prioAffPath} error=\"{FlattenLogText(ex.ToString())}\"");
-            RecordError("create affinity settings key", ex);
-        }
-
-        string prioStr = plan.Priority;
-        int? prioVal = prioStr switch
-        {
-            "Low" => 1,
-            "Normal" => 2,
-            "High" => 3,
-            _ => null,
-        };
-
-        try
-        {
-            using RegistryKey? prioKey = Registry.LocalMachine.OpenSubKey(prioAffPath, writable: true);
-            if (prioKey is null)
+            try
             {
-                throw new InvalidOperationException("Affinity registry key could not be opened for writing");
+                Registry.LocalMachine.DeleteSubKeyTree(prioPath, throwOnMissingSubKey: false);
             }
-
-            if (prioVal.HasValue)
+            catch (Exception ex)
             {
-                DeviceSettingsWriter.SetPriority(new WindowsRegistryValues(prioKey), prioVal.Value);
+                WriteLog($"APPLY.REG.ERROR: {plan.InstanceId} operation=delete-legacy-priority path=HKLM\\{prioPath} error=\"{FlattenLogText(ex.ToString())}\"");
+                RecordError("remove legacy priority settings", ex);
             }
-            else
-            {
-                DeviceSettingsWriter.SetPriority(new WindowsRegistryValues(prioKey), null);
-            }
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"APPLY.REG.ERROR: {plan.InstanceId} operation=set-priority value={prioStr} path=HKLM\\{prioAffPath} error=\"{FlattenLogText(ex.ToString())}\"");
-            RecordError("set IRQ priority", ex);
-        }
-
-        try
-        {
-            Registry.LocalMachine.DeleteSubKeyTree(prioPath, throwOnMissingSubKey: false);
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"APPLY.REG.ERROR: {plan.InstanceId} operation=delete-legacy-priority path=HKLM\\{prioPath} error=\"{FlattenLogText(ex.ToString())}\"");
-            RecordError("remove legacy priority settings", ex);
         }
 
         WriteLog($"APPLY: {plan.InstanceId} MSI={mode} Limit={limitText} Prio={prioStr} Mask=0x{plan.AffinityMask:X} Kind={plan.Kind}");
 
-        if (plan.PowerSaving.HasValue && plan.Kind == DeviceKind.USB)
+        if (changes.HasFlag(DeviceSettingChanges.Power) && plan.PowerSaving.HasValue && plan.Kind == DeviceKind.USB)
         {
             bool suspendEnabled = plan.PowerSaving.Value;
             string suspendMode = suspendEnabled ? "Enabled" : "Disabled";
@@ -209,7 +201,7 @@ public sealed partial class MainForm
             }
         }
 
-        if (plan.PowerSaving.HasValue
+        if (changes.HasFlag(DeviceSettingChanges.Power) && plan.PowerSaving.HasValue
             && (plan.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX)
             && !plan.Wifi)
         {
@@ -250,6 +242,8 @@ public sealed partial class MainForm
             }
         }
 
+        if (!changes.HasFlag(DeviceSettingChanges.Affinity)) return;
+
         if (plan.Kind == DeviceKind.NET_NDIS)
         {
             NdisRssLayout.Layout layout = plan.RssLayout
@@ -257,6 +251,7 @@ public sealed partial class MainForm
             int baseCore = layout.BaseProcessor;
             int queues = layout.QueueCount;
             NdisAffinityMode ndisMode = plan.NdisMode;
+            int errorsBeforeRss = report.Errors.Count;
             if (ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both)
             {
                 SetNdisRssQueues(plan.InstanceId, queues, report, plan.DeviceName);
@@ -282,10 +277,17 @@ public sealed partial class MainForm
             WriteLog($"APPLY: NET_NDIS {plan.InstanceId} mode={FormatNdisAffinityMode(ndisMode)} baseCore={baseCore} queues={queues} processors={layout.Processors.Count} mask=0x{plan.AffinityMask:X}");
             result.RssRuntime = ReadNdisRssRuntimeState(plan.InstanceId);
             WriteLog($"APPLY.RSS.ACTIVE: {plan.InstanceId} {FormatNdisRssRuntimeState(result.RssRuntime)}");
-            int? appliedRssBase = ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both ? baseCore : null;
-            int? appliedRssQueues = ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both ? queues : null;
-            int? appliedRssProcessors = ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both ? layout.Processors.Count : null;
-            LogNdisRssComparison("APPLY", plan.InstanceId, result.RssRuntime, appliedRssBase, appliedRssQueues, appliedRssProcessors);
+            bool appliesRss = ndisMode is NdisAffinityMode.Rss or NdisAffinityMode.Both;
+            NdisRssDiagnostics.RequestedSettings requested = appliesRss
+                ? new(baseCore, queues, layout.Processors.Count, layout.MaxProcessor, BaseGroup: 0, MaxGroup: 0)
+                : new(null, null, null);
+            NdisRssDiagnostics.Comparison check = LogNdisRssComparison("APPLY", plan.InstanceId, result.RssRuntime, requested);
+            if (appliesRss && report.Errors.Count == errorsBeforeRss)
+            {
+                report.AddSuccess("RSS", check.Status == "ok"
+                    ? "RSS settings saved and confirmed on the adapter."
+                    : "RSS settings saved. Check the active adapter settings after restarting Windows.");
+            }
             return;
         }
 
@@ -322,11 +324,8 @@ public sealed partial class MainForm
         string policyStr = plan.Policy;
         int policyVal = MapPolicyText(policyStr) ?? 0;
 
-        ulong mask = plan.AffinityMask;
-        if (policyVal == 0)
-        {
-            mask = 0;
-        }
+        if (policyVal == 4 && plan.AffinityMask == 0) policyVal = 0;
+        ulong mask = policyVal == 4 ? plan.AffinityMask : 0;
 
         try
         {
@@ -334,20 +333,12 @@ public sealed partial class MainForm
             if (affKey is null)
             {
                 WriteLog($"APPLY.REG.ERROR: {plan.InstanceId} operation=open-affinity-key path=HKLM\\{affPath} error=key-unavailable");
-                report?.AddError($"{plan.DeviceName}: set affinity", "registry key is unavailable");
-                return;
-            }
-
-            if (mask == 0 || policyVal == 0)
-            {
-                // Empty CPU selection / MachineDefault = clear DT affinity override (like RESET).
-                DeviceSettingsWriter.SetAffinity(new WindowsRegistryValues(affKey), policyVal, mask, IntPtr.Size);
-                WriteLog($"APPLY: AFFINITY {plan.InstanceId} policy=MachineDefault value=0 mask cleared");
+                report.AddError($"{plan.DeviceName}: set affinity", "registry key is unavailable");
                 return;
             }
 
             DeviceSettingsWriter.SetAffinity(new WindowsRegistryValues(affKey), policyVal, mask, IntPtr.Size);
-            WriteLog($"APPLY: AFFINITY {plan.InstanceId} policy={policyStr} value={policyVal} mask=0x{mask:X}");
+            WriteLog($"APPLY: AFFINITY {plan.InstanceId} policy={FormatPolicyValue(policyVal)} value={policyVal} mask=0x{mask:X}");
         }
         catch (Exception ex)
         {

@@ -26,16 +26,16 @@ Warnings are errors, in CI as well. `src/.editorconfig` enables CA1304 / CA1305 
 powershell -NoProfile -ExecutionPolicy Bypass -File .\src\build.ps1 -Flavor both -Configuration Release -SkipImodDriverBuild
 ```
 
-- `-Flavor both` / `with-net` / `without-net` - both builds, only the self-contained one, or only the standard one
-- `-SkipImodDriverBuild` - use the existing `IMOD/DTIMOD.sys`
-- `-TrustImodDriverCert` - install the driver certificate on a test machine
-- `-NoClean` - keep intermediate files
+- `-Flavor both` / `with-net` / `without-net` · both builds, only the self-contained one, or only the standard one
+- `-SkipImodDriverBuild` · use the existing `IMOD/DTIMOD.sys`
+- `-TrustImodDriverCert` · install the driver certificate on a test machine
+- `-NoClean` · keep intermediate files
 
 Output:
 
-- `src/bin/Publish/DEVICE TWEAKER/DEVICE TWEAKER.exe` - standard build, requires the .NET 10 Desktop Runtime x64;
-- `src/bin/Publish/DEVICE TWEAKER (SELF-CONTAINED)/…` - self-contained, compressed single file;
-- `src/bin/ReleasePackages/v<version>/` - both EXEs and `SHA256SUMS.txt` for the release.
+- `src/bin/Publish/DEVICE TWEAKER/DEVICE TWEAKER.exe` · requires .NET 10 Desktop Runtime x64
+- `src/bin/Publish/DEVICE TWEAKER (SELF-CONTAINED)/DEVICE TWEAKER (SELF-CONTAINED).exe` · compressed EXE with .NET included
+- `src/bin/ReleasePackages/v<version>/` · both release EXEs and `SHA256SUMS.txt`
 
 A clean build keeps the `Backups` and `logs` folders next to the EXEs, including when preparation or publishing fails. Close running published copies before rebuilding them.
 
@@ -59,13 +59,13 @@ The KDU loader is pinned to version 1.4.5.2512; its sources and manifests are in
 
 ## QA
 
-The full local QA - builds, tests, deliberate faults, the native driver model and UI checks on a hidden desktop - is described in [`dev/qa`](../dev/qa/README.md). It is read-only and never loads the driver.
+See [Developer checks](../dev/qa/README.md) for unit tests, the native driver model and GUI scenarios. GUI automation uses a hidden desktop in read-only mode.
 
-GitHub CI builds the application and developer workbench, checks Windows PowerShell 5.1 scripts and runs unit tests. CodeQL default setup is configured separately in the repository settings for **C#** and **GitHub Actions**; the published tree contains no Python files. When restoring these settings, select the languages present in the checkout. The native C/C++ driver is not covered by that CodeQL configuration; its model checks are described in the [QA guide](../dev/qa/README.md).
+GitHub CI builds the app and developer workbench, checks PowerShell 5.1 scripts and runs unit tests. CodeQL default setup covers **C#** and **GitHub Actions**. The [native driver model](../dev/qa/Checks/README.md) covers selected C driver paths.
 
 ## Choosing checks
 
-Build and run checks that protect the changed behavior. Full QA belongs at integration points for cross-cutting changes; an expensive successful run need not be repeated after every text edit.
+Build and test the behavior you changed. Run the full suite for changes that affect several components.
 
 For GUI work, reproduce a scenario first, then run it after the change:
 
@@ -106,14 +106,14 @@ Driver session ownership is in `src/Core/ImodDriverContext.cs`, with device/SCM 
 
 `src/Devices/NdisRssSettingsWriter.cs` owns RSS registry write and clear sequences. MainForm keeps the write authorization and operation coordination; the Windows key factory independently enforces the immutable QA write block. Tests use disposable fake registry keys. Per-value logs record completed writes and the exact failed step; active adapter readback remains separate from registry-write success.
 
-- `src/Affinity` - CPU topology, affinity masks, ReservedCpuSets
-- `src/Devices` - device discovery and classification, RSS, power saving
-- `src/Core` - applying and restoring settings, IMOD, NIC ITR, startup, logs
-- `src/GUI`, `src/Localization` - user interface and RU / EN strings
-- `src/Interop` - Windows API calls
-- `src/Startup` - startup script and the shared register runtime
-- `src/IMOD` - the DTIMOD driver and the KDU loader
-- `dev/qa` - tests, test panel and QA
+- `src/Affinity` · CPU topology, affinity masks, ReservedCpuSets
+- `src/Devices` · device discovery and classification, RSS, power saving
+- `src/Core` · applying and restoring settings, IMOD, NIC ITR, startup, logs
+- `src/GUI`, `src/Localization` · user interface and RU / EN strings
+- `src/Interop` · Windows API calls
+- `src/Startup` · startup script and the shared register runtime
+- `src/IMOD` · the DTIMOD driver and the KDU loader
+- `dev/qa` · tests, test panel and QA
 
 Application logs go to the `logs` folder next to the EXE, one file per run. An unhandled error also writes a crash file and `last-crash.txt` there.
 

@@ -42,7 +42,6 @@ internal static class ImodDriverNative
     internal const uint FileAttributeNormal = 0x00000080;
 
     internal const string ImodDriverDevicePath = DriverIdentity.DevicePath;
-    internal const string ImodDriverServiceName = DriverIdentity.ServiceName;
     internal const int ImodDriverOpenRetryCount = 10;
     internal const int ImodDriverOpenRetryDelayMs = 100;
     internal const int ImodKduTimeoutMs = 60000;
@@ -165,17 +164,6 @@ internal static class ImodDriverNative
 
         error = $"failed to open {ImodDriverDevicePath}: {GetWin32ErrorMessage(lastError)}";
         return false;
-    }
-
-    internal static bool IsImodDriverAlreadyAvailable()
-    {
-        if (!TryOpenImodDriverDeviceOnce(out IntPtr handle, out _))
-        {
-            return false;
-        }
-
-        _ = CloseHandle(handle);
-        return true;
     }
 
     internal static bool TryOpenImodDriverDeviceOnce(out IntPtr handle, out string? error)

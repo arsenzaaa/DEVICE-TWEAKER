@@ -221,12 +221,12 @@ internal static class NicItrService
     {
         if (values.Count == 0)
         {
-            return preview ? "preview: -" : "queues: -";
+            return preview ? "preview: -" : "ITR values: -";
         }
 
         if (values.Count > 4)
         {
-            string prefix = preview ? "preview: " : "queues: ";
+            string prefix = preview ? "preview: " : "ITR values: ";
             return prefix + FormatNicItrTimingList(values, profile);
         }
 

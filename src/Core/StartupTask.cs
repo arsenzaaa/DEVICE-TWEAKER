@@ -16,7 +16,7 @@ internal static class StartupTask
         => "-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass"
             + $" -File \"{scriptPath}\" -TriggerDevice \"$(Device)\"";
 
-    internal static string BuildXml(string scriptPath)
+    internal static string BuildXml(string scriptPath, bool enabled = true)
     {
         string powerShell = PowerShellCommand;
         string arguments = BuildArguments(scriptPath);
@@ -74,7 +74,7 @@ internal static class StartupTask
                         new XElement(Ns + "StopOnIdleEnd", "false"),
                         new XElement(Ns + "RestartOnIdle", "false")),
                     new XElement(Ns + "AllowStartOnDemand", "true"),
-                    new XElement(Ns + "Enabled", "true"),
+                    new XElement(Ns + "Enabled", enabled ? "true" : "false"),
                     new XElement(Ns + "Hidden", "false"),
                     new XElement(Ns + "RunOnlyIfIdle", "false"),
                     new XElement(Ns + "ExecutionTimeLimit", "PT2M"),
@@ -90,9 +90,20 @@ internal static class StartupTask
         return writer.ToString();
     }
 
-    // Checks the task Windows actually stored: exactly one action, the expected
-    // PowerShell command and arguments, nothing else that SYSTEM would run.
-    internal static string? VerifyRegisteredXml(string registeredXml, string scriptPath)
+    internal static bool IsExplicitlyDisabled(string? registeredXml)
+    {
+        if (registeredXml is null) return false;
+        try
+        {
+            return IsDisabled(XDocument.Parse(registeredXml).Root?.Element(Ns + "Settings"));
+        }
+        catch (System.Xml.XmlException) { return false; }
+    }
+
+    private static bool IsDisabled(XElement? element)
+        => element?.Element(Ns + "Enabled")?.Value.Trim() is "false" or "0";
+
+    internal static string? VerifyRegisteredXml(string registeredXml, string scriptPath, bool enabled = true)
     {
         XDocument document;
         try
@@ -128,92 +139,139 @@ internal static class StartupTask
             return $"the registered task has unexpected arguments: {arguments}";
         }
 
+        XElement? settings = document.Root?.Element(Ns + "Settings");
+        if (IsDisabled(settings) == enabled)
+            return enabled ? "the registered task is disabled" : "the registered task should remain disabled";
+
+        XElement[] principals = document.Root?.Element(Ns + "Principals")?.Elements(Ns + "Principal").ToArray() ?? [];
+        string? user = principals.Length == 1 ? principals[0].Element(Ns + "UserId")?.Value.Trim() : null;
+        if (!string.Equals(user, "S-1-5-18", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(user, @"NT AUTHORITY\SYSTEM", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(user, "SYSTEM", StringComparison.OrdinalIgnoreCase))
+            return "the registered task does not run as SYSTEM";
+        string? context = (string?)actionLists[0].Attribute("Context");
+        if (context is not null && context != (string?)principals[0].Attribute("id"))
+            return "the registered task action has a different principal";
+
+        XElement[] triggers = document.Root?.Element(Ns + "Triggers")?.Elements().ToArray() ?? [];
+        if (triggers.Length != 3 || triggers.Any(IsDisabled)
+            || triggers.Count(t => t.Name == Ns + "LogonTrigger"
+                && string.IsNullOrWhiteSpace(t.Element(Ns + "UserId")?.Value)) != 1)
+            return "the registered task must have enabled triggers for sign-in, resume and USB/HID arrival";
+
+        XElement expected = XDocument.Parse(BuildXml(scriptPath)).Root!.Element(Ns + "Triggers")!;
+        foreach (XElement trigger in expected.Elements(Ns + "EventTrigger"))
+        {
+            string subscription = trigger.Element(Ns + "Subscription")!.Value;
+            XElement? values = trigger.Element(Ns + "ValueQueries");
+            if (triggers.Count(t => t.Name == Ns + "EventTrigger"
+                && SameSubscription(t.Element(Ns + "Subscription")?.Value, subscription)
+                && XNode.DeepEquals(t.Element(Ns + "ValueQueries"), values)) != 1)
+                return "a required event trigger or its device query is missing";
+        }
+
         return null;
     }
 
-    internal static bool Register(string scriptPath, Action<string> log, out string? error)
+    private static bool SameSubscription(string? actual, string expected)
     {
-        QaRun.DemandWrite("StartupTask.Register");
-        // The XML is staged next to the script, in the folder only administrators and SYSTEM
-        // can change, so another process cannot edit it before schtasks reads it.
-        string? stagingDirectory = Path.GetDirectoryName(Path.GetFullPath(scriptPath));
-        if (string.IsNullOrWhiteSpace(stagingDirectory))
-        {
-            error = $"cannot resolve the startup folder for {scriptPath}";
-            return false;
-        }
+        if (actual is null) return false;
+        try { return XNode.DeepEquals(XElement.Parse(actual), XElement.Parse(expected)); }
+        catch (System.Xml.XmlException) { return false; }
+    }
 
-        string xmlPath = Path.Combine(stagingDirectory, $".task-{Guid.NewGuid():N}.xml");
+    internal static string? ReadXml()
+    {
+        object service = Activator.CreateInstance(Type.GetTypeFromProgID("Schedule.Service", throwOnError: true)!)!;
+        object? folder = null, task = null;
         try
         {
-            using (FileStream stream = new(xmlPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read))
-            using (StreamWriter writer = new(stream, Encoding.Unicode))
+            ((dynamic)service).Connect();
+            folder = ((dynamic)service).GetFolder(@"\");
+            try { task = ((dynamic)folder).GetTask(TaskName); }
+            catch (Exception ex) when (ex.HResult is unchecked((int)0x80070002) or unchecked((int)0x80070003))
             {
-                writer.Write(BuildXml(scriptPath));
+                return null;
             }
 
+            return (string)((dynamic)task).Xml;
+        }
+        finally
+        {
+            if (task is not null) System.Runtime.InteropServices.Marshal.ReleaseComObject(task);
+            if (folder is not null) System.Runtime.InteropServices.Marshal.ReleaseComObject(folder);
+            System.Runtime.InteropServices.Marshal.ReleaseComObject(service);
+        }
+    }
+
+    internal static bool Register(string scriptPath, bool enabled, Action<string> log, out string? error)
+    {
+        if (!WriteRegistration(scriptPath, BuildXml(scriptPath, enabled), out error)) return false;
+        string? registered = ReadXml();
+        error = registered is null ? "the registered task was not found" : VerifyRegisteredXml(registered, scriptPath, enabled);
+        if (error is not null) return false;
+        log($"IMOD.STARTUP.TASK: registered {TaskName} script=\"{scriptPath}\"");
+        return true;
+    }
+
+    internal static bool Restore(string scriptPath, string? previousXml, Action<string> log, out string? error)
+    {
+        return previousXml is null
+            ? Delete(log, out error) : WriteRegistration(scriptPath, previousXml, out error);
+    }
+
+    private static bool WriteRegistration(string scriptPath, string xml, out string? error)
+    {
+        QaRun.DemandWrite("StartupTask.Register");
+        // Stage the XML in the protected folder before schtasks reads it.
+        string xmlPath = Path.Combine(Path.GetDirectoryName(scriptPath)!, $".task-{Guid.NewGuid():N}.xml");
+        try
+        {
+            AtomicFile.WriteAllText(xmlPath, xml, Encoding.Unicode);
             if (!RunSchtasks(["/Create", "/TN", TaskName, "/XML", xmlPath, "/F"], out string output))
             {
                 error = $"schtasks /Create failed: {output}";
                 return false;
             }
 
-            if (!RunSchtasks(["/Query", "/TN", TaskName, "/XML"], out string registered))
-            {
-                error = $"schtasks /Query failed after registration: {registered}";
-                return false;
-            }
-
-            string? verifyError = VerifyRegisteredXml(registered, scriptPath);
-            if (verifyError is not null)
-            {
-                error = verifyError;
-                return false;
-            }
-
-            log($"IMOD.STARTUP.TASK: registered {TaskName} script=\"{scriptPath}\"");
             error = null;
             return true;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException
-            or System.ComponentModel.Win32Exception)
-        {
-            error = ex.Message;
-            return false;
-        }
         finally
         {
-            try
-            {
-                File.Delete(xmlPath);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                // A leftover task XML in the protected startup folder is harmless.
-            }
+            try { File.Delete(xmlPath); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         }
     }
-
-    internal static bool Exists() => RunSchtasks(["/Query", "/TN", TaskName], out _);
 
     internal static bool Delete(Action<string> log, out string? error)
     {
         QaRun.DemandWrite("StartupTask.Delete");
-        if (!Exists())
+        try
         {
             error = null;
+            if (ReadXml() is null) return true;
+
+            if (!RunSchtasks(["/Delete", "/TN", TaskName, "/F"], out string output))
+            {
+                error = $"schtasks /Delete failed: {output}";
+                return false;
+            }
+            if (ReadXml() is not null)
+            {
+                error = "the startup task is still registered after deletion";
+                return false;
+            }
+
+            log($"IMOD.STARTUP.TASK: deleted {TaskName}");
             return true;
         }
-
-        if (!RunSchtasks(["/Delete", "/TN", TaskName, "/F"], out string output))
+        catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or IOException
+            or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
         {
-            error = $"schtasks /Delete failed: {output}";
+            error = $"could not confirm startup task deletion: {ex.Message}";
             return false;
         }
-
-        log($"IMOD.STARTUP.TASK: deleted {TaskName}");
-        error = null;
-        return true;
     }
 
     private static bool RunSchtasks(IReadOnlyList<string> arguments, out string output)

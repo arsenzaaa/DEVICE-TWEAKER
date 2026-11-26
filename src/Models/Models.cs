@@ -227,6 +227,7 @@ internal sealed class DeviceBlock
     public Label? ImodModeHintLabel { get; init; }
     public Button? ImodCheckButton { get; init; }
     public required TextBox ImodBox { get; init; }
+    internal Func<string?>? FindInvalidImodRole { get; init; }
     public required Label ImodDefaultLabel { get; init; }
     public required Label ImodCurrentLabel { get; init; }
     public Control? ImodMapLabel { get; init; }

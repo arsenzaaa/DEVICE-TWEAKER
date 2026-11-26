@@ -130,7 +130,8 @@ public sealed partial class MainForm
             else if (!string.IsNullOrWhiteSpace(device.StorageTag) &&
                      !string.Equals(device.StorageTag, "NVMe", StringComparison.OrdinalIgnoreCase) &&
                      !string.Equals(device.StorageTag, "SSD", StringComparison.OrdinalIgnoreCase) &&
-                     !string.Equals(device.StorageTag, "HDD", StringComparison.OrdinalIgnoreCase))
+                     !string.Equals(device.StorageTag, "HDD", StringComparison.OrdinalIgnoreCase) &&
+                     !string.Equals(device.StorageTag, "SATA", StringComparison.OrdinalIgnoreCase))
             {
                 title = $"{device.Name} [{device.StorageTag}]";
             }
@@ -333,7 +334,7 @@ public sealed partial class MainForm
             ForeColor = _mutedText,
             Location = new Point(UiScale(18), maskY + UiScale(20)),
         };
-        _copyToolTip.SetToolTip(lblIrq, "IRQ count comes from WMI. IRQ Mode uses Windows allocated resources. HW lists supported modes. Refresh updates the readings without loading a driver.");
+        _copyToolTip.SetToolTip(lblIrq, "IRQ counts interrupt resources reported by WMI. IRQ Mode uses Windows resources and PCI data when available. HW lists supported modes. REFRESH reads the current state without loading DTIMOD.");
 
         // Longest common left labels: "Mouse Throttle:", "IRQ Priority:", "Power Saving:".
         int valueX = UiScale(140);
@@ -613,6 +614,8 @@ public sealed partial class MainForm
                 CheckColor = _fgMain,
             };
 
+            lblPowerSaving.SizeChanged += (_, _) =>
+                chkPowerSaving.Left = Math.Max(valueX, lblPowerSaving.Right + UiScale(8));
             settingsPanel.Controls.AddRange([lblPowerSaving, chkPowerSaving]);
             rowTop = Math.Max(lblPowerSaving.Bottom, chkPowerSaving.Bottom) + rowGap;
 
@@ -965,7 +968,7 @@ public sealed partial class MainForm
 
         Label lblImodDefault = new()
         {
-            Text = "default: 0x0",
+            Text = "base interval: 0x0",
             AutoSize = false,
             AutoEllipsis = true,
             ForeColor = _mutedText,
@@ -1048,7 +1051,8 @@ public sealed partial class MainForm
             await ApplyImodFromBlock(createdBlock);
         };
 
-        Button btnImodDelete = NewCardButton(UiText.Delete, UiScale(76, 24));
+        Button btnImodDelete = NewCardButton(UiText.DeleteProfile, UiScale(150, 24));
+        _copyToolTip.SetToolTip(btnImodDelete, "Remove the shared USB IMOD and NIC ITR startup profile.");
         btnImodDelete.Click += async (_, _) =>
         {
             using IDisposable feedback = BeginButtonFeedback(btnImodDelete, "DELETE…");
@@ -1604,6 +1608,7 @@ public sealed partial class MainForm
             ImodModeHintLabel = showImod ? lblImodModeHint : null,
             ImodCheckButton = showImod ? btnImodCheck : null,
             ImodBox = txtImod.Inner,
+            FindInvalidImodRole = showImod ? imodRoleEditor.FindInvalidRole : null,
             ImodDefaultLabel = lblImodDefault,
             ImodCurrentLabel = lblImodCurrent,
             ImodMapLabel = lblImodMap,
@@ -2137,7 +2142,7 @@ public sealed partial class MainForm
             DevMarkUiStage("refresh-start");
 #endif
             DiscoveryInput input = CaptureDiscoveryInput();
-            Task<SnapshotReadResult<DriverMetadata>>? metadataRead = BeginDriverMetadataRead();
+            BeginDriverMetadataRead();
             DeviceDiscoveryResult discovery = await _deviceDiscovery.ReadAsync(
                 () => DiscoverDevicesAsync(input),
                 TimeSpan.FromSeconds(30), error => AppDiagnostics.Warn("SCAN.LATE", error));
@@ -2151,7 +2156,7 @@ public sealed partial class MainForm
             }
             IReadOnlyList<DeviceInfo> devs = discovery.Devices;
             SetDevicesBusyStage(UiResources.English(UiText.DeviceStateReading));
-            SnapshotReadResult<DisplaySnapshot> display = await ReadDisplaySnapshotAsync(devs, metadataRead);
+            SnapshotReadResult<DisplaySnapshot> display = await ReadDisplaySnapshotAsync(devs);
             if (_uiDisposing || IsDisposed || Disposing) return refreshReport;
             if (display.Snapshot is null)
             {

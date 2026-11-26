@@ -4,8 +4,8 @@ function Test-QaEvidence([string]$RunDirectory) {
     $report = Read-QaJson (Join-Path $RunDirectory 'qa.json')
     $full = $report.status -eq 'PASS'
     if ($report.status -notin @('PASS', 'PARTIAL')) { throw 'Worker did not finish the required stages' }
-    $required = @('build', 'unit', 'sensitivity', 'script-contracts', 'native-driver', 'build-developer', 'desktop-contracts', 'source-inventory')
-    if ($full) { $required += @('gui', 'log-contract', 'runtime-error-audit', 'gui-layout', 'gui-resources', 'input-integrity', 'ui-controls', 'workbench') }
+    $required = @('build', 'unit', 'sensitivity', 'script-contracts', 'native-driver', 'desktop-contracts', 'source-inventory')
+    if ($full) { $required += @('build-developer', 'gui', 'log-contract', 'runtime-error-audit', 'gui-layout', 'gui-resources', 'input-integrity', 'ui-controls', 'workbench') }
     foreach ($name in $required) {
         $step = @($report.steps | Where-Object { $_.name -eq $name -and $_.status -eq 'PASS' })
         if ($step.Count -ne 1) { throw "Mandatory QA stage is missing or ambiguous: $name" }
@@ -64,7 +64,7 @@ function Test-QaEvidence([string]$RunDirectory) {
     }
     if ($full) {
         $bench = Read-QaJson (Join-Path $RunDirectory 'workbench\workbench.json')
-        $expectedScenarios = @('device-flow','control-states','dtimod-status','imod-check','imod-editor',
+        $expectedScenarios = @('device-flow','control-states','dtimod-status','imod-check','imod-editor','imod-invalid-role',
             'text-fields-intel','text-fields-amd','text-fields-imod','text-fields-nic',
             'dialog-audit-en','dialog-audit-ru','dialog-audit-en-120','dialog-audit-en-144',
             'dialog-audit-ru-120','dialog-audit-ru-144','backup-menu-flow','navigation-audit','irq-check-loading','refresh-reuse','refresh-reuse-lifecycle','refresh-reuse-lifecycle-amd')

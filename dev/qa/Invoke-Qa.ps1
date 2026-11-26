@@ -148,8 +148,6 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Native model stage failed: $nativeCase" }
     }
     $steps.Add([pscustomobject]@{ name='native-driver'; status='PASS'; scope='Actual native functions with fake kernel APIs; unload, write-range and write-guard mutations detected; no hardware access' })
-    Invoke-DotnetStep 'build-developer' @('build', (Join-Path $root 'DeviceTweakerCS.csproj'), '-c', 'Release',
-        '-p:DeveloperQa=true', '-p:TreatWarningsAsErrors=true', '-p:BuildImodDriver=false', '--nologo')
     Invoke-DotnetStep 'source-inventory' @('run', '--project', (Join-Path $PSScriptRoot 'Inspect\Inspect.csproj'), '--',
         (Split-Path $root), (Join-Path $root 'bin\Release\net10.0-windows\win-x64\DEVICE TWEAKER.dll'),
         (Join-Path $runDir 'source-ui-inventory.json'))
@@ -163,6 +161,8 @@ try {
         $status = 'PARTIAL'
         Test-QaInputSnapshot $runDir
     } else {
+        Invoke-DotnetStep 'build-developer' @('build', (Join-Path $root 'DeviceTweakerCS.csproj'), '-c', 'Release',
+            '-p:DeveloperQa=true', '-p:TreatWarningsAsErrors=true', '-p:BuildImodDriver=false', '--nologo')
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Checks\Test-UiControls.ps1') `
             -AssemblyPath (Join-Path $root 'bin\Release\net10.0-windows\win-x64\DEVICE TWEAKER.dll') `
             -OutputDirectory (Join-Path $runDir 'controls')

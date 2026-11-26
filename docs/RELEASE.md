@@ -2,7 +2,7 @@
 
 [Documentation](./README.md) / Release · [Русский](./RELEASE.ru.md)
 
-Build one reviewed source commit, accept its exact files and publish a new release. The package workflow only builds and validates; it has no publication permissions.
+Build from one reviewed commit. After acceptance, publish those exact files. GitHub Actions builds and checks the package. Publication is a separate step.
 
 ## Sources and release notes
 

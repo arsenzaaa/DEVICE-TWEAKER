@@ -4,19 +4,17 @@
 
 ## AUTO policy for GPUs
 
-For a discrete GPU, AUTO selects a pair of physical cores on the target CCD, uses SpecCPU and High, enables MSI and removes the custom MSI Limit. An SMT sibling is not counted as a second physical core; CPU 0 is avoided where possible. AUTO returns integrated-GPU affinity to Windows.
+For a discrete GPU, AUTO looks for a pair of neighboring physical cores in the preferred topology, excluding E-cores. It avoids the core that contains CPU 0 when possible. AUTO configures **High** IRQ Priority, enables MSI and clears the custom MSI Limit. It sets **SpecCPU** when it finds a pair and otherwise skips the affinity assignment. Integrated graphics use Windows interrupt placement.
 
-Work distribution across the selected cores depends on the GPU driver. Compare AUTO with the original settings under the same workload.
+The selected cores are eligible to receive the GPU's interrupts. Which cores handle the interrupts and DPCs depends on the driver and the allocated vectors.
 
 ## Manual configuration
 
-The GPU card exposes CPU Affinity, MSI Mode/Limit, IRQ Priority and Policy. Reboot after applying interrupt policy and read IRQ Mode again.
-
-Compare the original behavior with AUTO first. For subsequent experiments, change one parameter and keep the game scene, FPS limiter, power mode and graphics settings consistent. Compare repeated runs rather than the best individual result.
+The GPU card exposes CPU Affinity, MSI Mode/Limit, IRQ Priority and Policy. Restart Windows after applying changes. If you changed MSI, click **READ IRQ MODE** and check the **IRQ Mode** field.
 
 ## Checking the result
 
-Compare frame times and graphics-driver ISR/DPC activity using the method in [chapter 10](./10-verification.md). Record the GPU model, driver version, HAGS state and workload with each result. Saved settings are available through **RESTORE**.
+Compare frame times and graphics-driver ISR/DPC activity with the original settings. Keep the game scene, graphics settings and FPS limit fixed. Use the procedure in [verifying changes](./10-verification.md).
 
 ---
 

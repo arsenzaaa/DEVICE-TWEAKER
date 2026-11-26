@@ -14,6 +14,8 @@ Anti-cheat software can block DTIMOD or disconnect a game while it is loaded. EA
 
 The application asks for confirmation once per session before driver use or saving/restoring a driver profile. AUTO includes this in its USB IMOD prompt. **DRIVER INFO** reads HVCI, the driver-blocklist registry setting and FACEIT/Vanguard service states. This is a system-status report, not a driver-loading or compatibility test.
 
+The Windows service used by the fallback is `DeviceTweakerImod` (**DEVICE TWEAKER IMOD**). Both loaders verify the driver file before loading it.
+
 ## Saved profile
 
 The `\DEVICE TWEAKER\IMOD` task runs as SYSTEM at sign-in, after resume and on relevant USB/HID device events. It reapplies the saved USB IMOD and NIC ITR settings independently of the application.
@@ -29,7 +31,9 @@ The `\DEVICE TWEAKER\IMOD` task runs as SYSTEM at sign-in, after resume and on r
 
 `profile.json` stores register settings and component hashes. The script checks the shared runtime's SHA-256 before compilation, then checks DTIMOD and the loader files when loading the driver. The application and script share a load mutex. Only administrators and SYSTEM can modify the directory; startup logs retain the latest 14 files.
 
-Profile read or parse errors leave the saved configuration unchanged. **DELETE** in the IMOD block removes the shared USB IMOD/NIC ITR startup configuration and scheduled task. Compatibility of older NIC entries is covered in the [network chapter](./06-network.md#nic-itr).
+When loading a profile in the current format, the application can update outdated startup files and drop [NIC ITR entries with an incompatible register layout](./06-network.md#nic-itr). If reading or parsing the profile fails, the existing configuration stays in place. See [Delete or restore](./05-usb-imod.md#delete-or-restore) for profile and driver-file removal.
+
+A task disabled in Windows Task Scheduler stays disabled when the profile is saved or the task is updated. The startup log records skipped adapters separately from application errors. An error during application sets the task result to a nonzero exit code.
 
 ## Controller lifecycle during register access
 

@@ -1,5 +1,17 @@
 namespace DeviceTweakerCS;
 
+[Flags]
+internal enum DeviceSettingChanges
+{
+    None = 0,
+    Msi = 1,
+    MsiLimit = 2,
+    Priority = 4,
+    Affinity = 8,
+    Power = 16,
+    All = Msi | MsiLimit | Priority | Affinity | Power,
+}
+
 // Captured on the UI thread before entering the backend. No control or mutable
 // DeviceBlock reference crosses the worker boundary.
 internal sealed record DeviceSettingsWritePlan
@@ -18,6 +30,7 @@ internal sealed record DeviceSettingsWritePlan
     internal bool Wifi { get; init; }
     internal NdisAffinityMode NdisMode { get; init; }
     internal NdisRssLayout.Layout? RssLayout { get; init; }
+    internal DeviceSettingChanges Changes { get; init; } = DeviceSettingChanges.All;
     internal bool AutoMsiOnly { get; init; }
     internal string AutoReason { get; init; } = "auto-policy";
 }

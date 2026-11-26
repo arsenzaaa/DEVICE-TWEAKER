@@ -31,14 +31,12 @@ internal static class DeviceSettingsWriter
     }
     internal static void SetAffinity(IRegistryValues values, int policy, ulong mask, int pointerSize)
     {
-        if (mask == 0 || policy == 0)
-        {
-            values.Set("DevicePolicy", 0, RegistryValueKind.DWord);
-            values.Delete("AssignmentSetOverride");
-            return;
-        }
+        if (policy == 4 && mask == 0) policy = 0;
         values.Set("DevicePolicy", policy, RegistryValueKind.DWord);
-        values.Set("AssignmentSetOverride", pointerSize >= 8 ? BitConverter.GetBytes(mask) : BitConverter.GetBytes((uint)mask), RegistryValueKind.Binary);
+        if (policy == 4)
+            values.Set("AssignmentSetOverride", pointerSize >= 8 ? BitConverter.GetBytes(mask) : BitConverter.GetBytes((uint)mask), RegistryValueKind.Binary);
+        else
+            values.Delete("AssignmentSetOverride");
     }
     internal static void ClearStorageAffinity(IRegistryValues values)
     {

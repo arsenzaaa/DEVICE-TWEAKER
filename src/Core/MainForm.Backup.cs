@@ -199,7 +199,7 @@ public sealed partial class MainForm
                 "DCSettingIndex");
         }
 
-        backup.StartupProfile = CaptureStartupProfileFile();
+        backup.StartupProfile = CaptureStartupProfileForBackup();
         return backup;
     }
 
@@ -210,7 +210,7 @@ public sealed partial class MainForm
             DeviceTweakerBackup backup = CaptureDeviceTweakerBackup("qa-imod-persistence", CaptureBackupTargets());
             ValidateDeviceTweakerBackup(backup);
             if (backup.StartupProfile is null
-                || !string.Equals(backup.StartupProfile.Path, GetStartupProfilePath(), StringComparison.OrdinalIgnoreCase))
+                || !IsManagedImodScriptPath(backup.StartupProfile.Path))
             {
                 error = "startup profile state is not captured";
                 return false;
@@ -265,7 +265,7 @@ public sealed partial class MainForm
             if (string.IsNullOrWhiteSpace(path))
             {
                 WriteLog("BACKUP.RESTORE: restore-backup requested but no backup found");
-                ShowThemedInfo("No backup files were found in the EXE folder or APPDATA.");
+                ShowThemedInfo("No backups found next to the EXE or in AppData.");
                 return;
             }
 
@@ -280,7 +280,7 @@ public sealed partial class MainForm
                 report = await Task.Run(() =>
                 {
                     BackupRestoreWorkflow workflow = new(
-                        ReadDeviceTweakerBackup,
+                        _ => selectedBackup,
                         selected =>
                         {
                             rollback = CreateDeviceTweakerBackupCore("pre-restore", BackupLocation.Local, selected, targets);
@@ -306,9 +306,10 @@ public sealed partial class MainForm
             _reservedCpuSetsDirty = false;
             _rawMouseThrottlePending = false;
             BeginDevicesBusyWork("Refreshing devices...", 4);
+            OperationReport refreshReport;
             try
             {
-                report.MergeIssues(await RefreshBlocksAsync(preserveEdits: false));
+                refreshReport = await RefreshBlocksAsync(preserveEdits: false);
                 if (IsDisposed || Disposing) return;
             }
             finally
@@ -316,13 +317,7 @@ public sealed partial class MainForm
                 EndDevicesBusy();
             }
 
-            if (report.Succeeded && report.Warnings.Count == 0)
-                ShowBackupFileResult(path, restored: true);
-            else
-                ShowOperationResult(report,
-                    "Backup restored with warnings. Open DETAILS.",
-                    "Saved settings were restored, but some live power settings could not be applied. Open DETAILS.",
-                    operationName: "BACKUP RESTORE");
+            ShowCompletedBackupRestore(report, path, refreshReport);
         }
         catch (Exception ex)
         {
@@ -342,6 +337,23 @@ public sealed partial class MainForm
                 "Restore did not finish. Open DETAILS before rebooting.",
                 operationName: "BACKUP RESTORE");
         }
+    }
+
+    private void ShowCompletedBackupRestore(OperationReport report, string path, OperationReport? refreshReport = null)
+    {
+        // Discovery and display run after the saved settings have been restored.
+        // Failure here can leave the displayed values stale, not the restore partial.
+        if (refreshReport is not null)
+            foreach (OperationIssue issue in refreshReport.Issues)
+                report.AddWarning(issue.Component, issue.UserMessage, issue.TechnicalDetails);
+
+        if (report.Succeeded && report.Warnings.Count == 0)
+            ShowBackupFileResult(path, restored: true);
+        else
+            ShowOperationResult(report,
+                string.Empty,
+                "Saved settings were restored.",
+                operationName: "BACKUP RESTORE");
     }
 
     private async Task RunSafeResetFromRestore()
@@ -437,7 +449,7 @@ public sealed partial class MainForm
                 "An outdated NIC ITR startup setting was skipped. Save NIC ITR again for this adapter.", skipped);
         foreach (RegistryValueBackup skipped in backup.RegistryValues.Where(value =>
             string.Equals(value.Kind, "ReadError", StringComparison.OrdinalIgnoreCase)))
-            report.AddSkipped("Saved setting", "The original backup could not read this value; it was left unchanged.",
+            report.AddSkipped("Saved setting", "This setting was unreadable when the backup was created. Its current value was kept.",
                 $"{skipped.Hive}\\{skipped.Path}\\{skipped.Name}: {skipped.Data}");
         return report;
     }
@@ -456,6 +468,14 @@ public sealed partial class MainForm
         string path = GetStartupProfilePath();
         bool exists = File.Exists(path);
         return new FileBackup { Path = path, Exists = exists, Text = exists ? File.ReadAllText(path, Encoding.UTF8) : null };
+    }
+
+    private static FileBackup CaptureStartupProfileForBackup()
+    {
+        string path = GetStartupProfilePath();
+        static FileBackup Read(string file) => new() { Path = file, Exists = true, Text = File.ReadAllText(file, Encoding.UTF8) };
+        return StartupConfigReader.Read(path, new[] { GetLegacyAppDataImodScriptPath(), GetLegacyImodStartupPath() }, Read, Read)
+            .RequireValueOrCreate(() => new FileBackup { Path = path, Exists = false });
     }
 
     // Brings a backup to the current startup layout before restore: a script saved
@@ -477,16 +497,17 @@ public sealed partial class MainForm
             return;
         }
 
-        if (!source.Exists || source.Text is null)
+        if (!source.Exists)
         {
             backup.StartupProfile = new FileBackup { Path = GetStartupProfilePath(), Exists = false };
             return;
         }
 
+        string text = source.Text ?? throw new InvalidDataException("The backup is missing the saved startup profile contents.");
         bool legacyScript = !string.Equals(Path.GetFullPath(source.Path), Path.GetFullPath(GetStartupProfilePath()), StringComparison.OrdinalIgnoreCase);
         ImodConfig config = legacyScript
-            ? ParseImodScriptText(source.Text)
-            : ConvertStartupProfile(StartupProfile.FromJson(source.Text));
+            ? ParseImodScriptText(text)
+            : ConvertStartupProfile(StartupProfile.FromJson(text));
         foreach (string removed in RemoveStaleNicItrEntries(config))
         {
             backup.SkippedNicItrEntries.Add(removed);

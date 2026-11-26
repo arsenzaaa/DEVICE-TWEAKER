@@ -124,6 +124,62 @@ public static class DeviceTweakerLoaderJournal
 
 public static class DeviceTweakerImodRuntime
 {
+    public static string SelectNicProfileTarget(string key, string[] adapterIds, out bool ambiguous)
+    {
+        ambiguous = false;
+        if (string.IsNullOrWhiteSpace(key)) return null;
+        bool exact = IsPciInstanceMatch(key);
+        string target = null;
+        foreach (string id in adapterIds)
+        {
+            if (string.IsNullOrEmpty(id)) continue;
+            bool matches = exact ? string.Equals(id, key, StringComparison.OrdinalIgnoreCase)
+                : id.IndexOf(key, StringComparison.OrdinalIgnoreCase) >= 0;
+            if (!matches) continue;
+            if (target != null && !string.Equals(target, id, StringComparison.OrdinalIgnoreCase))
+            {
+                ambiguous = true;
+                return null;
+            }
+            target = id;
+        }
+        return target;
+    }
+
+    public static bool IsPciInstanceMatch(string match)
+    {
+        return !string.IsNullOrEmpty(match) && match.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase)
+            && match.IndexOf('\\', 4) >= 0;
+    }
+
+    // Exact instance records take precedence. Legacy selectors are accepted only
+    // when they identify one connected controller and one applicable profile entry.
+    public static string SelectUsbProfileMatch(string deviceId, string[] controllerIds, string[] keys, out bool ambiguous)
+    {
+        ambiguous = false;
+        string legacy = null;
+        foreach (string key in keys)
+        {
+            if (string.IsNullOrWhiteSpace(key)) continue;
+            if (IsPciInstanceMatch(key))
+            {
+                if (string.Equals(deviceId, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    ambiguous = false;
+                    return key;
+                }
+                continue;
+            }
+            if (deviceId.IndexOf(key, StringComparison.OrdinalIgnoreCase) < 0) continue;
+            int matches = 0;
+            foreach (string candidate in controllerIds)
+                if (candidate.IndexOf(key, StringComparison.OrdinalIgnoreCase) >= 0) matches++;
+            if (matches != 1 || legacy != null) ambiguous = true;
+            legacy = key;
+        }
+        return ambiguous ? null : legacy;
+    }
+
     private const uint CmProbDisabled = 0x00000016;
     private const uint DigcfPresent = 0x00000002;
     private const uint DigcfAllClasses = 0x00000004;
@@ -168,7 +224,8 @@ public static class DeviceTweakerImodRuntime
     private const int OpenRetryCount = 10;
     private const int OpenRetryDelayMs = 100;
     private const string ImodDriverDevicePath = "\\\\.\\DeviceTweakerImod2";
-    private const string ImodDriverServiceName = "DeviceTweakerImod2";
+    internal const string ImodDriverServiceName = "DeviceTweakerImod";
+    internal const string ImodDriverServiceDisplayName = "DEVICE TWEAKER IMOD";
     private static readonly IntPtr InvalidHandleValue = new IntPtr(-1);
     // Read-only config space + allocated resources of one exact PCI devnode (struct ImodPciQuery / ImodPciReply).
     internal static readonly uint IoctlImodQueryPci = CtlCode(FileDeviceImod, ImodIoctlIndex + 4, MethodBuffered, FileReadAccess);
@@ -338,7 +395,7 @@ public static class DeviceTweakerImodRuntime
                 service = CreateService(
                     scm,
                     ImodDriverServiceName,
-                    ImodDriverServiceName,
+                    ImodDriverServiceDisplayName,
                     ServiceAllAccess,
                     ServiceKernelDriver,
                     ServiceDemandStart,
@@ -365,9 +422,11 @@ public static class DeviceTweakerImodRuntime
                          null,
                          null,
                          null,
-                         ImodDriverServiceName))
+                         ImodDriverServiceDisplayName))
             {
-                throw new InvalidOperationException("failed to configure IMOD driver service path: " + GetWin32ErrorMessage(Marshal.GetLastWin32Error()));
+                int configError = Marshal.GetLastWin32Error();
+                CloseServiceHandle(service);
+                throw new InvalidOperationException("failed to configure IMOD driver service path: " + GetWin32ErrorMessage(configError));
             }
 
             try
@@ -1055,7 +1114,8 @@ public static class DeviceTweakerImodRuntime
             }
 
             string mode = intervals != null && intervals.Length > 0 ? "vector=" + intervals.Length : "interval=0x" + interval.ToString("X", CultureInfo.InvariantCulture);
-            return "writes=" + writeCount + "/" + maxIntrs
+            return (failures > 0 ? "error: " : "") + "writes=" + (writeCount - failures) + "/" + writeCount
+                + " interrupters=" + maxIntrs
                 + " hcsparams=0x" + hcsparamsValue.ToString("X", CultureInfo.InvariantCulture)
                 + " rtsoff=0x" + rtsoffValue.ToString("X", CultureInfo.InvariantCulture)
                 + " runtime=0x" + runtimeAddress.ToString("X", CultureInfo.InvariantCulture)

@@ -2,7 +2,7 @@
 
 [Documentation](../README.md) / Guide · [Русский](./README.ru.md)
 
-From interrupt handling to device settings. Read in order or jump to the hardware you are configuring.
+Windows interrupts and device configuration for graphics, USB, networking and CPUs.
 
 ## Foundations
 
@@ -48,11 +48,11 @@ USB selective suspend, permission to turn off a device and verification of writt
 
 **10 · [Verifying results](./10-verification.md)**
 
-Logs, readback, external traces and evidence for understanding behaviour on particular hardware.
+Logs, register readback and trace analysis with Xperf, WPA and MXA.
 
 **11 · [Driver and startup](./11-driver.md)**
 
-DTIMOD.sys, KDU, write boundaries and the independent PowerShell profile.
+Loading DTIMOD, accessing registers and applying a saved profile.
 
 ---
 

@@ -126,32 +126,47 @@ internal static class WmiInterop
         return results;
     }
 
-    public static List<WmiPhysicalDisk> GetPhysicalDisks()
+    public static bool TryGetPhysicalDisks(out List<WmiPhysicalDisk> disks, out string? error)
+        => TryGetPhysicalDisksCore(QueryPhysicalDisks, out disks, out error);
+
+    internal static bool TryGetPhysicalDisksCore(
+        Func<List<WmiPhysicalDisk>> query,
+        out List<WmiPhysicalDisk> disks,
+        out string? error)
     {
-        List<WmiPhysicalDisk> results = [];
         try
         {
-            using ManagementObjectSearcher searcher = new(
-                "root\\Microsoft\\Windows\\Storage",
-                "SELECT FriendlyName, BusType, MediaType FROM MSFT_PhysicalDisk");
-
-            foreach (ManagementObject mo in searcher.Get())
-            {
-                string name = mo["FriendlyName"] as string ?? mo["FriendlyName"]?.ToString() ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(name))
-                {
-                    name = "Unknown";
-                }
-
-                ushort busType = ToUShort(mo["BusType"]);
-                ushort mediaType = ToUShort(mo["MediaType"]);
-                results.Add(new WmiPhysicalDisk(name, busType, mediaType));
-            }
+            disks = query();
+            error = null;
+            return true;
         }
-        catch (Exception error)
+        catch (Exception ex) when (ex is ManagementException or System.Runtime.InteropServices.COMException)
         {
-            AppDiagnostics.Warn("WMI.DISCOVERY", error);
-            throw;
+            AppDiagnostics.Warn("WMI.STORAGE", ex);
+            disks = [];
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private static List<WmiPhysicalDisk> QueryPhysicalDisks()
+    {
+        List<WmiPhysicalDisk> results = [];
+        using ManagementObjectSearcher searcher = new(
+            "root\\Microsoft\\Windows\\Storage",
+            "SELECT FriendlyName, BusType, MediaType FROM MSFT_PhysicalDisk");
+
+        foreach (ManagementObject mo in searcher.Get())
+        {
+            string name = mo["FriendlyName"] as string ?? mo["FriendlyName"]?.ToString() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                name = "Unknown";
+            }
+
+            ushort busType = ToUShort(mo["BusType"]);
+            ushort mediaType = ToUShort(mo["MediaType"]);
+            results.Add(new WmiPhysicalDisk(name, busType, mediaType));
         }
 
         return results;

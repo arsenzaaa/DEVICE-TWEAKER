@@ -37,4 +37,29 @@ public sealed class DeviceEditorStateTests
         Assert.Equal("0x0", merged.NicItrText);
         Assert.Equal(2, merged.PriorityIndex);
     }
+
+    [Fact]
+    public void EditedCpuMaskKeepsItsPolicyWhenTheSavedPolicyChanges()
+    {
+        var baseline = new DeviceEditorState { PolicyIndex = 4, AffinityMask = 4 };
+        var draft = baseline with { AffinityMask = 16 };
+        var latest = baseline with { PolicyIndex = 3, AffinityMask = 0, PriorityIndex = 2 };
+        var merged = DeviceEditorState.MergeDraft(latest, baseline, draft);
+        Assert.Equal(4, merged.PolicyIndex);
+        Assert.Equal(16UL, merged.AffinityMask);
+        Assert.Equal(2, merged.PriorityIndex);
+    }
+
+    [Fact]
+    public void EditingRssQueuesDoesNotAdoptAnExternallyChangedIrqMode()
+    {
+        var baseline = new DeviceEditorState { NdisModeIndex = 0, RssQueues = 2, AffinityMask = 0x14 };
+        var draft = baseline with { RssQueues = 4, AffinityMask = 0x154 };
+        var latest = baseline with { NdisModeIndex = 1, RssQueues = 4, AffinityMask = 0x100, LimitText = "8" };
+        var merged = DeviceEditorState.MergeDraft(latest, baseline, draft);
+        Assert.Equal(0, merged.NdisModeIndex);
+        Assert.Equal(4m, merged.RssQueues);
+        Assert.Equal(0x154UL, merged.AffinityMask);
+        Assert.Equal("8", merged.LimitText);
+    }
 }

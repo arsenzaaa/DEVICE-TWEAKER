@@ -39,7 +39,7 @@ internal static class NdisRssLayout
     {
         maxQueues = Math.Max(1, maxQueues);
         List<int> driver = driverValues?.Where(value => value > 0).Distinct().ToList() ?? [];
-        if (driver.Count > 0) return driver.Append(1).Distinct().Order().ToList();
+        if (driver.Count > 0) return driver.Order().ToList();
         if (capabilities is not null && (capabilities.Support & PciInterruptSupport.MsiX) == 0) return [1];
 
         if (capabilities?.MessageMaximum is uint messages && messages > 0)
@@ -47,9 +47,7 @@ internal static class NdisRssLayout
             maxQueues = Math.Min(maxQueues, (int)Math.Min(messages, int.MaxValue));
         }
 
-        IEnumerable<int> candidates = Enumerable.Range(1, maxQueues);
-        List<int> allowed = candidates.Where(value => value <= maxQueues).Append(1).Distinct().Order().ToList();
-        return allowed;
+        return Enumerable.Range(1, maxQueues).ToList();
     }
 
     // Moves a spinner value to an allowed count in the direction the user stepped.

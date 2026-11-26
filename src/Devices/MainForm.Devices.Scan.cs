@@ -10,7 +10,11 @@ namespace DeviceTweakerCS;
 public sealed partial class MainForm
 {
     private string? GetClassKeyForDevice(string instanceId)
+        => GetClassKeyForDevice(instanceId, out _);
+
+    private string? GetClassKeyForDevice(string instanceId, out string? lookupError)
     {
+        lookupError = null;
         string enumPath = $@"SYSTEM\CurrentControlSet\Enum\{instanceId}";
         try
         {
@@ -32,6 +36,7 @@ public sealed partial class MainForm
         }
         catch (Exception error)
         {
+            lookupError = error.Message;
             WriteLog($"REG.CLASS.WARN: instance={instanceId} path=HKLM\\{enumPath} hresult=0x{error.HResult:X8} error=\"{SanitizeLogValue(error.ToString())}\"");
             return null;
         }
@@ -825,7 +830,13 @@ public sealed partial class MainForm
         Dictionary<string, UsbPollingRateInfo> usbPolling = BuildUsbPollingRateLookup();
         Dictionary<string, List<string>> usbRoles = UsbControllerRoles(raw, deviceLookup, usbPairs, usbPolling);
         Dictionary<string, List<string>> audioEndpoints = AudioControllerEndpoints(raw, deviceLookup);
-        List<WmiPhysicalDisk> physicalDisks = WmiInterop.GetPhysicalDisks();
+        bool storageInventoryAvailable = WmiInterop.TryGetPhysicalDisks(
+            out List<WmiPhysicalDisk> physicalDisks,
+            out string? storageInventoryError);
+        if (!storageInventoryAvailable)
+        {
+            WriteLog($"SCAN.STORAGE.WARN: MSFT_PhysicalDisk unavailable ({FlattenLogText(storageInventoryError ?? "unknown")}); continuing without disk media tags");
+        }
 
         string[] skipPatterns =
         [
@@ -1089,7 +1100,7 @@ public sealed partial class MainForm
             string storageTag = string.Empty;
             if (kind == DeviceKind.STOR)
             {
-                storageTag = GetStorageTagForDevice(displayName, physicalDisks);
+                storageTag = GetStorageTagForDevice(displayName, physicalDisks, storageInventoryAvailable);
                 if (string.IsNullOrWhiteSpace(storageTag))
                 {
                     if (!HasNonDefaultInterruptAffinity(regBase))
@@ -1220,7 +1231,10 @@ public sealed partial class MainForm
         }
     }
 
-    private static string GetStorageTagForDevice(string deviceName, IReadOnlyList<WmiPhysicalDisk> physicalDisks)
+    internal static string GetStorageTagForDevice(
+        string deviceName,
+        IReadOnlyList<WmiPhysicalDisk> physicalDisks,
+        bool storageInventoryAvailable = true)
     {
         if (string.IsNullOrWhiteSpace(deviceName))
         {
@@ -1229,6 +1243,11 @@ public sealed partial class MainForm
 
         bool isNvme = Regex.IsMatch(deviceName, "(?i)NVM\\s*Express|NVMe");
         bool isSata = Regex.IsMatch(deviceName, "(?i)\\bSATA\\b|\\bAHCI\\b");
+
+        if (!storageInventoryAvailable)
+        {
+            return isNvme ? "NVMe" : isSata ? "SATA" : string.Empty;
+        }
 
         if (physicalDisks.Count == 0)
         {

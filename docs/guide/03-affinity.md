@@ -6,22 +6,22 @@
 
 Interrupt Affinity selects the logical CPUs allowed to service a device's interrupts. Moving that work away from a busy game core can reduce competition for CPU time. Start with the device and workload you want to tune, then compare the result with the original configuration.
 
-Use the topology labels in the CPU list: two SMT siblings share a physical core. On a hybrid processor, distinguish P-cores and E-cores; on a multi-CCD processor, check which CCD contains the selected cores. [Chapter 7](./07-cpu-topology.md) explains the labels.
+Use the topology labels in the CPU list: two SMT siblings share a physical core. On a hybrid processor, check whether you selected P-cores or E-cores. On a multi-CCD processor, check that the selected cores share the intended CCD. [Chapter 7](./07-cpu-topology.md) explains the labels.
 
 For manual selection, tick the required CPUs and use **SpecCPU**. Click **APPLY** to save the policy and mask, then restart Windows. AUTO can choose cores using the detected topology; [GPU](./04-gpu.md) and [network](./06-network.md) settings have their own allocation rules.
 
 ## Policies
 
-**SpecCPU** uses the CPUs selected in the card. **MachineDefault** returns processor selection to Windows. Clearing the CPU selection on an ordinary device removes its affinity override when applied; network cards have separate RSS/IRQ controls.
+**SpecCPU** uses the CPUs selected in the card. **MachineDefault** returns processor selection to Windows. On devices with a manual IRQ affinity picker, choose **MachineDefault** and click **APPLY** to remove the override. For NDIS cards, use the network controls to choose **RSS**, **IRQ** or **BOTH**.
 
-The other policies ask Windows to choose processors according to a rule:
+Choose any of the following policies to let Windows select the processors. The card clears the manual CPU selection when you choose one of them:
 
 - **AllClose** uses processors close to the device in the NUMA topology. On a non-NUMA system it behaves like **All**.
 - **Single** requests one close processor; on a non-NUMA system Windows can choose any processor.
 - **All** allows assignment across the machine's processors.
 - **SpreadMessages** requests distribution of different interrupt messages across processors where possible. It uses the messages the device and driver allocate.
 
-See [IRQ_DEVICE_POLICY](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_device_policy) for Windows policy definitions.
+See *Windows Internals*, 7th ed., Part 2, pp. 52–54, and [IRQ_DEVICE_POLICY](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_device_policy) for the policy definitions.
 
 ## Affinity mask
 
@@ -40,15 +40,13 @@ Device Parameters\Interrupt Management\Affinity Policy
 
 ## IRQ Priority
 
-**Undefined**, **Low**, **Normal** and **High** express a preference for interrupt servicing. Windows considers it when assigning IRQLs for the platform and device resources. AUTO uses **High** for devices it configures. This setting does not change the game's thread priority or a DPC's queue priority. See [IRQ_PRIORITY](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_priority).
+**Undefined**, **Low**, **Normal** and **High** express a preference for interrupt servicing. Windows considers it when assigning IRQLs for the platform and device resources. AUTO uses **High** for devices eligible for automatic CPU placement. Integrated graphics and other excluded devices can use **Undefined**; for display audio, AUTO preserves the existing priority. See [IRQ_PRIORITY](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_priority).
 
 ## Check the result
 
-After rebooting, compare the card's saved policy and mask with the log. Use an ETW trace to see where the driver's ISR, DPCs and worker threads actually run: a driver can target them separately. [Chapter 10](./10-verification.md) describes this check.
+After rebooting, compare the card's saved policy and mask with the log. In the trace, compare the driver's ISR and DPC placement with the application's busy threads. For example, if the original trace shows ISR/DPC activity concentrated on CPU 0 alongside a busy game thread, check whether a different placement reduces overlap or improves frame times. See [verifying changes](./10-verification.md).
 
-The mask defines the CPUs available for interrupts; the device driver determines how work is distributed within that set.
-
-AUTO leaves storage-device affinity to Windows. For manual storage changes, keep a recovery backup and check boot, I/O and stability.
+Windows and the storage driver select CPUs for storage controllers. The storage card provides MSI and IRQ Priority settings.
 
 ---
 

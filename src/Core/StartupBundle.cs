@@ -44,15 +44,18 @@ internal sealed record StartupBundleLayout(string ParentDirectory, string Legacy
 // The task that runs the startup script as SYSTEM.
 internal interface IStartupTaskRegistry
 {
-    bool Exists();
-    bool Register(string scriptPath, Action<string> log, out string? error);
+    string? ReadXml();
+    bool Register(string scriptPath, bool enabled, Action<string> log, out string? error);
+    bool Restore(string scriptPath, string? previousXml, Action<string> log, out string? error);
     bool Delete(Action<string> log, out string? error);
 }
 
 internal sealed class ScheduledStartupTask : IStartupTaskRegistry
 {
-    public bool Exists() => StartupTask.Exists();
-    public bool Register(string scriptPath, Action<string> log, out string? error) => StartupTask.Register(scriptPath, log, out error);
+    public string? ReadXml() => StartupTask.ReadXml();
+    public bool Register(string scriptPath, bool enabled, Action<string> log, out string? error) => StartupTask.Register(scriptPath, enabled, log, out error);
+    public bool Restore(string scriptPath, string? previousXml, Action<string> log, out string? error)
+        => StartupTask.Restore(scriptPath, previousXml, log, out error);
     public bool Delete(Action<string> log, out string? error) => StartupTask.Delete(log, out error);
 }
 
@@ -78,67 +81,150 @@ internal sealed class StartupBundle(
 {
     public StartupBundleLayout Layout => layout;
 
-    public bool IsCurrent()
+    public bool NeedsAutomaticRepair(bool staleNic)
     {
-        try
-        {
-            return FileTextEquals(layout.ScriptPath, payload.Script)
-                && FileTextEquals(layout.RuntimePath, payload.Runtime)
-                && payload.IsLoaderCurrent(layout.LoaderDirectory)
-                && tasks.Exists();
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
-        {
-            return false;
-        }
+        string? xml = tasks.ReadXml();
+        return xml is not null && (staleNic || !PayloadIsCurrent() || !TaskIsCurrent(xml));
     }
 
-    public void Install(string profileJson)
+    public bool Install(string profileJson, string? driverPath = null, Action? stageDriver = null)
     {
+        QaRun.DemandArtifactPath(layout.Root);
         secureFolder(layout.ParentDirectory);
         secureFolder(layout.Root);
-        // PowerShell 5.1 reads a script without BOM in the ANSI code page.
-        AtomicFile.WriteAllText(layout.ScriptPath, payload.Script, new UTF8Encoding(true));
-        AtomicFile.WriteAllText(layout.RuntimePath, payload.Runtime, new UTF8Encoding(false));
-
-        string? loaderError;
+        string? previousTask = tasks.ReadXml();
+        bool enabled = !StartupTask.IsExplicitlyDisabled(previousTask);
+        bool updateTask = !TaskIsCurrent(previousTask);
+        bool updatePayload = !PayloadIsCurrent();
+        List<(string Path, byte[]? Content)> previous = [];
+        bool taskWriteStarted = false;
+        string? prepared = null;
         try
         {
-            secureFolder(layout.LoaderDirectory);
+            if (updatePayload)
+            {
+                try { secureFolder(layout.LoaderDirectory); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    throw new IOException("The startup loader could not be prepared: " + ex.Message, ex);
+                }
+                prepared = Path.Combine(layout.Root, $".prepare-{Guid.NewGuid():N}");
+                Directory.CreateDirectory(prepared);
+                if (!payload.TryWriteLoader(prepared, out string? stagingError))
+                    throw new IOException("The startup loader could not be prepared: " + stagingError);
+
+                string script = payload.Script;
+                string runtime = payload.Runtime;
+                // Write the script with a BOM for Windows PowerShell 5.1.
+                ReplaceFile(layout.ScriptPath, () => AtomicFile.WriteAllText(layout.ScriptPath, script, new UTF8Encoding(true)));
+                ReplaceFile(layout.RuntimePath, () => AtomicFile.WriteAllText(layout.RuntimePath, runtime, new UTF8Encoding(false)));
+                foreach (string file in new[] { ImodDriverNative.ImodKduFileName, ImodDriverNative.ImodKduDatabaseFileName })
+                {
+                    string target = Path.Combine(layout.LoaderDirectory, file);
+                    byte[] bytes = File.ReadAllBytes(Path.Combine(prepared, file));
+                    ReplaceFile(target, () => AtomicFile.WriteAllBytes(target, bytes));
+                }
+            }
+
+            if (driverPath is not null && stageDriver is not null)
+                ReplaceFile(driverPath, stageDriver);
+
+            if (updateTask)
+            {
+                taskWriteStarted = true;
+                if (!tasks.Register(layout.ScriptPath, enabled, log, out string? taskError))
+                    throw new InvalidOperationException("The startup task could not be registered: " + taskError);
+            }
+
+            AtomicFile.WriteAllText(layout.ProfilePath, profileJson, new UTF8Encoding(false));
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception failure)
         {
-            throw new IOException("The startup loader could not be prepared: " + ex.Message, ex);
+            List<string> errors = [];
+            for (int i = previous.Count - 1; i >= 0; i--)
+            {
+                (string path, byte[]? bytes) = previous[i];
+                try
+                {
+                    byte[]? current = ReadOptionalFile(path);
+                    if (bytes is null)
+                    {
+                        if (current is not null) File.Delete(path);
+                    }
+                    else if (!bytes.AsSpan().SequenceEqual(current))
+                        AtomicFile.WriteAllBytes(path, bytes);
+                }
+                catch (Exception ex) { errors.Add($"{path}: {ex.Message}"); }
+            }
+            if (taskWriteStarted)
+            {
+                try
+                {
+                    if (!tasks.Restore(layout.ScriptPath, previousTask, log, out string? error))
+                        errors.Add(error ?? "the previous task could not be restored");
+                }
+                catch (Exception ex) { errors.Add(ex.Message); }
+            }
+            if (errors.Count > 0)
+                throw new InvalidOperationException("Startup update failed and rollback was incomplete: "
+                    + string.Join(" | ", errors), failure);
+            throw;
+        }
+        finally
+        {
+            if (prepared is not null) DeleteDirectory(prepared, "IMOD.STARTUP.STAGING", report: null);
         }
 
-        if (!payload.TryWriteLoader(layout.LoaderDirectory, out loaderError))
-        {
-            throw new IOException("The startup loader could not be prepared: " + loaderError);
-        }
-
-        if (!tasks.Register(layout.ScriptPath, log, out string? taskError))
-        {
-            throw new InvalidOperationException("The startup task could not be registered: " + taskError);
-        }
-
-        // Publish new settings only after registration and verification succeed.
-        // An existing task must retain its previous profile on registration failure.
-        AtomicFile.WriteAllText(layout.ProfilePath, profileJson, new UTF8Encoding(false));
         RemoveLegacy(report: null);
+        if (!enabled) log("IMOD.STARTUP.TASK: saved profile; task remains disabled");
+        return enabled;
+
+        void ReplaceFile(string path, Action write)
+        {
+            QaRun.DemandArtifactPath(path);
+            previous.Add((path, ReadOptionalFile(path)));
+            write();
+        }
     }
 
-    public void Remove(OperationReport? report)
+    private bool PayloadIsCurrent() => FileTextEquals(layout.ScriptPath, payload.Script)
+        && FileTextEquals(layout.RuntimePath, payload.Runtime)
+        && payload.IsLoaderCurrent(layout.LoaderDirectory);
+
+    private bool TaskIsCurrent(string? xml)
+        => xml is not null && StartupTask.VerifyRegisteredXml(xml, layout.ScriptPath, !StartupTask.IsExplicitlyDisabled(xml)) is null;
+
+    private static byte[]? ReadOptionalFile(string path)
     {
+        try { return File.ReadAllBytes(path); }
+        catch (FileNotFoundException) { return null; }
+        catch (DirectoryNotFoundException) { return null; }
+    }
+
+    public void Remove(OperationReport? report, Func<bool>? beforeFilesRemoved = null)
+    {
+        QaRun.DemandArtifactPath(layout.Root);
         if (!tasks.Delete(log, out string? taskError))
         {
-            log($"IMOD.STARTUP.TASK: {taskError}");
-            report?.AddError("IMOD.STARTUP", taskError ?? "startup task was not deleted");
+            string error = taskError ?? "startup task was not deleted";
+            log($"IMOD.STARTUP.TASK: {error}");
+            if (report is null) throw new InvalidOperationException(error);
+            report.AddError("IMOD.STARTUP", error);
+            return;
         }
 
+        if (beforeFilesRemoved is not null && !beforeFilesRemoved())
+        {
+            const string error = "Could not restore network moderation. The profile was kept so you can retry.";
+            log($"IMOD.STARTUP.REMOVE: {error}");
+            if (report is null) throw new InvalidOperationException(error);
+            report.AddError("IMOD.STARTUP", error);
+            return;
+        }
         DeleteFile(layout.ProfilePath, "IMOD.STARTUP", report);
         DeleteFile(layout.ScriptPath, "IMOD.STARTUP", report);
         DeleteFile(layout.RuntimePath, "IMOD.STARTUP", report);
-        DeleteDirectory(layout.LoaderDirectory, "IMOD.STARTUP");
+        DeleteDirectory(layout.LoaderDirectory, "IMOD.STARTUP", report);
         RemoveLegacy(report);
     }
 
@@ -147,7 +233,7 @@ internal sealed class StartupBundle(
         removeLegacyRunEntry(report);
         DeleteFile(layout.LegacyAppDataScriptPath, "IMOD.STARTUP.LEGACY", report);
         DeleteFile(layout.LegacyStartupScriptPath, "IMOD.STARTUP.LEGACY", report);
-        DeleteDirectory(Path.Combine(layout.LegacyAppDataDirectory, "Loader"), "IMOD.STARTUP.LEGACY");
+        DeleteDirectory(Path.Combine(layout.LegacyAppDataDirectory, "Loader"), "IMOD.STARTUP.LEGACY", report);
         if (Directory.Exists(layout.LegacyAppDataDirectory))
         {
             foreach (string previous in Directory.GetFiles(layout.LegacyAppDataDirectory, StartupBundleLayout.ScriptFileName + ".pre-DTIMOD-*.bak"))
@@ -226,7 +312,7 @@ internal sealed class StartupBundle(
         }
     }
 
-    private void DeleteDirectory(string path, string label)
+    private void DeleteDirectory(string path, string label, OperationReport? report)
     {
         QaRun.DemandArtifactPath(path);
         try
@@ -240,6 +326,7 @@ internal sealed class StartupBundle(
         catch (Exception ex)
         {
             log($"{label}: failed to delete {path}: {ex.Message}");
+            report?.AddError(label, $"failed to delete {path}: {ex.Message}");
         }
     }
 }

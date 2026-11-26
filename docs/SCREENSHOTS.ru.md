@@ -2,22 +2,22 @@
 
 [Документация](./README.ru.md) / Скриншоты · [English](./SCREENSHOTS.md)
 
-Примеры интерфейса с демонстрационными данными. Нажмите на изображение, чтобы открыть его в исходном размере.
+Снимки сделаны с демонстрационными данными. Нажмите на изображение, чтобы открыть его в исходном размере.
 
-## Настройки устройств
+## Видеокарта
 
-CPU affinity, режим MSI и приоритет прерываний на системе с гибридным процессором Intel.
+Привязка прерываний RTX 4090 на гибридном процессоре Intel. Выбраны два P-ядра.
 
-[![Настройки устройств DEVICE TWEAKER](../assets/screenshots/intel-affinity.ru.png)](../assets/screenshots/intel-affinity.ru.png)
+[![Карточка RTX 4090 с двумя выбранными P-ядрами](../assets/screenshots/intel-affinity.ru.png)](../assets/screenshots/intel-affinity.ru.png)
 
 ## Контроллер USB
 
-Affinity контроллера, параметры питания и USB IMOD.
+В режиме XHCI для контроллера AMD задан один интервал IMOD.
 
 [![Настройки контроллера USB](../assets/screenshots/usb-xhci.ru.png)](../assets/screenshots/usb-xhci.ru.png)
 
 ## Сетевой адаптер
 
-Выбор CPU для RSS, число очередей и NIC ITR на Intel I226-V.
+Для Intel I226-V выбраны четыре очереди RSS и базовый CPU 8. Ниже показан тестовый профиль NIC ITR.
 
 [![Настройки сетевого адаптера](../assets/screenshots/network-rss.ru.png)](../assets/screenshots/network-rss.ru.png)

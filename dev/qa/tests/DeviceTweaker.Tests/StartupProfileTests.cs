@@ -43,6 +43,26 @@ public sealed class StartupProfileTests
     }
 
     [Fact]
+    public void UsbProfileMatchUsesExactInstancesAndRejectsAmbiguousLegacyKeys()
+    {
+        const string first = @"PCI\VEN_1022&DEV_15B6\A";
+        const string second = @"PCI\VEN_1022&DEV_15B6\B";
+        const string legacy = "DEV_15B6";
+        string[] connected = [first, second];
+
+        Assert.Equal(first, DeviceTweakerImodRuntime.SelectUsbProfileMatch(first, connected, [legacy, first, second], out bool ambiguous));
+        Assert.False(ambiguous);
+        Assert.Equal(second, DeviceTweakerImodRuntime.SelectUsbProfileMatch(second, connected, [first, second], out ambiguous));
+        Assert.False(ambiguous);
+        Assert.Null(DeviceTweakerImodRuntime.SelectUsbProfileMatch(second, connected, [legacy, first], out ambiguous));
+        Assert.True(ambiguous);
+        Assert.Equal(legacy, DeviceTweakerImodRuntime.SelectUsbProfileMatch(second, [second], [legacy], out ambiguous));
+        Assert.False(ambiguous);
+        Assert.Null(DeviceTweakerImodRuntime.SelectUsbProfileMatch(first + "0", [first + "0"], [first], out ambiguous));
+        Assert.False(ambiguous);
+    }
+
+    [Fact]
     public void ProfileRoundTripKeepsEveryValue()
     {
         string json = MainForm.BuildStartupProfile(Sample(), DriverPath).ToJson();
@@ -209,6 +229,35 @@ public sealed class StartupTaskTests
     public void RegisteredTaskMatchingTheBuiltXmlIsAccepted()
     {
         Assert.Null(StartupTask.VerifyRegisteredXml(StartupTask.BuildXml(Script), Script));
+    }
+
+    [Fact]
+    public void RegisteredTaskRequiresTheIntendedAccountAndDeviceTrigger()
+    {
+        XDocument task = XDocument.Parse(StartupTask.BuildXml(Script));
+        XElement account = task.Descendants(Ns + "UserId").Single();
+        account.Value = "S-1-5-19";
+        Assert.Contains("does not run as SYSTEM", StartupTask.VerifyRegisteredXml(task.ToString(), Script));
+
+        account.Value = "S-1-5-18";
+        task.Descendants(Ns + "ValueQueries").Single().Remove();
+        Assert.Contains("device query is missing", StartupTask.VerifyRegisteredXml(task.ToString(), Script));
+    }
+
+    [Fact]
+    public void NicProfileBindsToAnExactInstanceOrAUniqueLegacyMatch()
+    {
+        const string key = "VEN_8086&DEV_15F3";
+        const string first = @"PCI\VEN_8086&DEV_15F3\1";
+        const string second = @"PCI\VEN_8086&DEV_15F3\2";
+        Assert.Equal(second, DeviceTweakerImodRuntime.SelectNicProfileTarget(second.ToLowerInvariant(), [first, second], out bool ambiguous));
+        Assert.False(ambiguous);
+        Assert.Null(DeviceTweakerImodRuntime.SelectNicProfileTarget(first, [second], out ambiguous));
+        Assert.False(ambiguous);
+        Assert.Equal(second, DeviceTweakerImodRuntime.SelectNicProfileTarget(key, [second], out ambiguous));
+        Assert.False(ambiguous);
+        Assert.Null(DeviceTweakerImodRuntime.SelectNicProfileTarget(key, [first, second], out ambiguous));
+        Assert.True(ambiguous);
     }
 
     [Fact]

@@ -21,9 +21,11 @@ internal static class UiText
     internal const string Save = "Action.Save";
     internal const string Check = "Action.Check";
     internal const string Delete = "Action.Delete";
+    internal const string DeleteProfile = "Action.DeleteProfile";
     internal const string Details = "Action.Details";
     internal const string Changed = "State.Changed";
     internal const string ProfileUnreadable = "State.ProfileUnreadable";
     internal const string MsiLimitMaximum = "Validation.MsiLimitMaximum";
     internal const string InvalidMsiNotApplied = "Validation.InvalidMsiNotApplied";
+    internal const string InvalidImodRole = "Validation.InvalidImodRole";
 }

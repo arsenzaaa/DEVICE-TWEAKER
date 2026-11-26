@@ -8,13 +8,13 @@ A PCI device can signal an event through an interrupt line or a message. MSI use
 
 ## Saved setting and current mode
 
-**MSI Mode** is the configuration selected for the device. Changing the dropdown prepares an edit; **APPLY** writes `MSISupported` to the registry. Restart Windows before checking how the driver uses the new setting.
+**MSI Mode** selects the device setting. **APPLY** writes `MSISupported` to its registry key.
 
 **IRQ Mode** shows the mode currently reported for the device. Click **READ IRQ MODE** at the top to read all listed PCI devices, including cards hidden by a filter. This command can load DTIMOD. Automatic background reads use Windows resources or an already loaded driver.
 
-For example, **MSI Mode: Enabled** with **IRQ Mode: Line** means the saved configuration and the current mode differ. If you have just applied MSI, restart and read the mode again. If they still differ, check the device and driver rather than treating the registry value as confirmation that MSI is active.
+For example, **MSI Mode: Enabled** with **IRQ Mode: Line** means that MSI is configured and the device is currently using a line interrupt. If both readings persist after a reboot, check the device and driver.
 
-The **HW** part of the card lists hardware capabilities and the available maximum number of messages. The nearby **IRQ** number comes from allocated interrupt resources. A device can use one allocated resource while supporting many messages. If the available data only establishes message-based operation, the card shows **MSI/MSI-X** until PCI configuration can distinguish the two.
+The **HW** part of the card lists supported modes and the maximum number of messages. The nearby **IRQ** number counts interrupt resources reported by WMI. A device can have one allocated interrupt resource while supporting multiple messages. When the data confirms message-based interrupts, the card shows **MSI/MSI-X** until PCI configuration can distinguish the two.
 
 ## MSI Limit
 
@@ -28,7 +28,7 @@ Select the desired mode and limit, click **APPLY**, then restart Windows. Read *
 
 If PCI capabilities explicitly report message interrupts without line-based INTx support, the program refuses to disable MSI and leaves that setting unchanged.
 
-AUTO enables MSI and removes the custom limit for the device categories it configures. **RESET WINDOWS DEFAULT** preserves MSI Mode and Limit; restore a suitable backup to return those two settings to their previous values.
+AUTO enables MSI and removes the custom limit on devices it configures. It leaves the limit intact for display audio and skips Wi-Fi. **RESET WINDOWS DEFAULT** preserves MSI Mode and Limit. Restore a backup to return those two settings to their previous values.
 
 ---
 

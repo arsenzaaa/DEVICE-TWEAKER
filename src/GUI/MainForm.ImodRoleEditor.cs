@@ -101,6 +101,17 @@ public sealed partial class MainForm
             SyncFromText();
         }
 
+        internal string? FindInvalidRole()
+        {
+            foreach ((string role, ThemedTextBox box) in Boxes)
+            {
+                string value = box.Text.Trim();
+                if (value.Length > 0 && !TryParseImodInterval(value, ImodDefaultInterval, out _))
+                    return role;
+            }
+            return null;
+        }
+
         private void SyncFromText()
         {
             if (Boxes.Count == 0 || _suppress)

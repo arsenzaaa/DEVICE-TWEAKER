@@ -160,6 +160,24 @@ public sealed partial class MainForm
             await Refresh(edits: false);
             usb = _blocks.Single(block => block.Device.InstanceId == targetId);
             Check("restore-style-refresh-discards-draft", Same(before, usb) && usb.LimitBox.Text == "2" && !usb.IsDirty);
+
+            TestDeviceState usbState = EnsureTestDeviceState(usb.Device);
+            usbState.Policy = 4;
+            usbState.AffinityMask = 4;
+            await Refresh(edits: false);
+            usb = _blocks.Single(block => block.Device.InstanceId == targetId);
+            ApplyMaskToCpuBoxes(usb, 16);
+            usbState.Policy = 2;
+            usbState.AffinityMask = 0;
+            await Refresh();
+            usb = _blocks.Single(block => block.Device.InstanceId == targetId);
+            Check("edited-mask-retains-spec-cpu-policy", usb.AffinityMask == 16
+                && usb.PolicyCombo.SelectedItem as string == "SpecCPU" && usb.IsDirty);
+            await Refresh(edits: false);
+            usb = _blocks.Single(block => block.Device.InstanceId == targetId);
+            Check("fresh-policy-visible-without-draft", usb.AffinityMask == 0
+                && usb.PolicyCombo.SelectedItem as string == "Single" && !usb.IsDirty);
+
             DeviceBlock? nic = _blocks.FirstOrDefault(block => block.Kind == DeviceKind.NET_NDIS && !block.Device.Wifi);
             if (nic is not null)
             {

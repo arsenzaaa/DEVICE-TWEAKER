@@ -43,6 +43,19 @@ function Test-QaDevBuild([string]$BuildDirectory, [string]$ExpectedKey) {
     return $manifest
 }
 
+function Get-QaBuildDirectory([string]$BuildRoot, [string]$Name) {
+    $attempt = 0
+    $directory = Join-Path $BuildRoot $Name
+    # The caller holds the lock for this build key. A missing manifest means
+    # preparation never finished. Keep that directory and try another slot.
+    while ((Test-Path -LiteralPath $directory -PathType Container) -and
+        -not (Test-Path -LiteralPath (Join-Path $directory 'build.json'))) {
+        $attempt++
+        $directory = Join-Path $BuildRoot ($Name + '-retry-' + $attempt)
+    }
+    return $directory
+}
+
 function Get-QaDevBuild([string]$Workspace, [string]$BuildRoot, [switch]$FreshBuild) {
     $Workspace = [IO.Path]::GetFullPath($Workspace).TrimEnd('\')
     if (-not $BuildRoot) { $BuildRoot = Join-Path $Workspace 'local\qa-builds' }
@@ -60,10 +73,10 @@ function Get-QaDevBuild([string]$Workspace, [string]$BuildRoot, [switch]$FreshBu
     $key = Get-QaBuildKey $files $sdkVersion
     $name = if ($FreshBuild) { $key + '_' + [Guid]::NewGuid().ToString('N').Substring(0,8) } else { $key }
     New-Item -ItemType Directory -Force -Path $BuildRoot | Out-Null
-    $directory = Join-Path $BuildRoot $name
     # A second writer must fail rather than modify a build in use.
     $lock = [IO.File]::Open((Join-Path $BuildRoot ($name+'.lock')), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
     try {
+        $directory = Get-QaBuildDirectory $BuildRoot $name
         $reused = Test-Path -LiteralPath $directory
         if (-not $reused) {
             New-Item -ItemType Directory -Path $directory | Out-Null
@@ -78,10 +91,12 @@ function Get-QaDevBuild([string]$Workspace, [string]$BuildRoot, [switch]$FreshBu
                 if ($LASTEXITCODE -ne 0) { throw "Inspector build failed; see $directory\inspect-build.log" }
             } finally { Pop-Location }
             Test-QaInputSnapshot $directory
+            $manifestTemp = Join-Path $directory 'build.json.tmp'
             [ordered]@{ schemaVersion = 1; key = $key; sdkVersion = $sdkVersion;
                 inputsSha256 = (Get-FileHash -LiteralPath (Join-Path $directory 'inputs.json')).Hash;
                 outputs = @(Get-QaBuildOutputInventory $directory) } |
-                ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $directory 'build.json') -Encoding UTF8
+                ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifestTemp -Encoding UTF8
+            [IO.File]::Move($manifestTemp, (Join-Path $directory 'build.json'))
         }
         $null = Test-QaDevBuild $directory $key
         return [pscustomobject]@{ directory = $directory; key = $key; reused = [bool]$reused;

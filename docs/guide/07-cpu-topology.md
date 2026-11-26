@@ -4,19 +4,19 @@
 
 ## Reading the CPU list
 
-Cards show logical CPUs, physical cores, SMT siblings and available CCD/CCX and CPPC information. Homogeneous CPUs use Core and Core/SMT labels; hybrid topologies use P-Core and E-Core labels. For example, `CPU 6 (Core, R131, #4)` and `CPU 7 (Core/SMT, R131, #4)` belong to one physical core.
+Use the CPU list to see which logical processors share a physical core. Where available, the labels include CCD, CCX and CPPC information. On homogeneous CPUs, look for Core and Core/SMT. On hybrid CPUs, P-Core and E-Core distinguish core types. For example, `CPU 6 (Core, R131, #4)` and `CPU 7 (Core/SMT, R131, #4)` belong to one physical core.
 
-CPPC ratings describe the firmware's relative core-performance ranking. CCD/CCX labels identify chiplets and core groups; cache information helps distinguish their roles on multi-CCD processors.
+CPPC ratings rank cores by the firmware's estimate of their performance. CCD and CCX labels identify chiplets and core groups. Cache information helps distinguish CCDs on multi-chiplet processors.
 
 ## How AUTO uses topology
 
-AUTO selects a target CCD and physical cores using project rules, SMT relationships and available ratings. A discrete GPU receives a physical-core pair; integrated-GPU affinity returns to Windows. Other roles receive their own assignments. Unreliable detection of required topology blocks the relevant automatic write.
+AUTO selects a target CCD and physical cores using project rules, SMT relationships and available ratings. AUTO selects two physical cores for a discrete GPU. Windows chooses the cores for integrated graphics. Other roles receive their own assignments. Unreliable detection of required topology blocks the relevant automatic write.
 
 AUTO changes device settings while leaving SMT, E-cores and game-thread affinity unchanged. Core assignments depend on the detected topology; compare the resulting performance under your workload.
 
 ## ReservedCpuSets
 
-The **Reserved CPU Sets** panel selects CPUs that Windows should try to leave aside during ordinary thread scheduling. Checking a CPU in this panel reserves it; checking a CPU in a device card assigns that device's interrupt affinity. These are separate settings.
+Use **Reserved CPU Sets** to reserve logical CPUs at the system level. Windows can still use them when required, for example when a thread's affinity restricts it to those CPUs. The CPU checkboxes in a device card configure its interrupt affinity.
 
 The reservation mask is stored here:
 
@@ -25,13 +25,15 @@ HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Kernel
   ReservedCpuSets  REG_BINARY
 ```
 
-Choose the CPUs in the panel and click **APPLY**. The program creates a backup before writing the mask; restart Windows to check its effect. If writing fails, the edits remain available for another attempt. The panel is disabled when CPU Set IDs cannot be determined reliably.
+Choose the CPUs and click **APPLY**. Clearing all selections and applying removes the registry value. The program creates a backup before writing. If writing fails, the edits remain pending. The panel is available when CPU Set IDs can be determined reliably.
 
-This system-wide mask does not assign the selected CPUs to a particular game. Check actual thread scheduling and ISR/DPC activity after rebooting, and keep the original mask for restoration. The [CPU Sets API documentation](https://learn.microsoft.com/en-us/windows/win32/procthread/cpu-sets) describes per-process assignments and CPU Set IDs; those APIs are distinct from this registry setting.
+**AUTO-OPTIMIZATION** clears the reservation when this panel is available. To keep a custom reservation, use **APPLY** to configure device settings manually.
+
+For the CPU Sets and thread-affinity model, see *Windows Internals*, 7th ed., Part 1, pp. 278–283, and the [CPU Sets API documentation](https://learn.microsoft.com/en-us/windows/win32/procthread/cpu-sets).
 
 ## Checking the selection
 
-Use core and CCD/CCX labels to check which physical cores are selected. The [verification chapter](./10-verification.md) describes how to inspect thread scheduling and interrupt processing after rebooting.
+Use the core and CCD/CCX labels to confirm the selection. After rebooting, check where threads and interrupt handlers ran using the [trace procedure](./10-verification.md#inspecting-a-trace).
 
 ---
 

@@ -17,27 +17,41 @@ public sealed class NdisDiagnosticsTests
     public void MissingReadbackNeverBecomesOk(string reason, string expected)
     {
         var state = Read with { RssFound = false, Enabled = null, Error = reason };
-        Assert.Equal(expected, NdisRssDiagnostics.Compare(state, null, null, null).Status);
-        Assert.Equal(expected, NdisRssDiagnostics.Compare(state, 2, 4, 4).Status);
+        Assert.Equal(expected, NdisRssDiagnostics.Compare(state, new(null, null, null)).Status);
+        Assert.Equal(expected, NdisRssDiagnostics.Compare(state, new(2, 4, 4)).Status);
     }
 
     [Fact]
     public void WifiComparisonIsSkippedEvenWithPreexistingOverridesAndConflictingReadback()
     {
-        Assert.Equal("skipped", NdisRssDiagnostics.Compare(Read, 8, 1, 1, wifiPreserved: true).Status);
-        Assert.Equal("different", NdisRssDiagnostics.Compare(Read, 8, 1, 1).Status);
+        Assert.Equal("skipped", NdisRssDiagnostics.Compare(Read, new(8, 1, 1), wifiPreserved: true).Status);
+        Assert.Equal("different", NdisRssDiagnostics.Compare(Read, new(8, 1, 1)).Status);
     }
 
     [Fact]
     public void OkRequiresAllRequestedFieldsAndTheProcessorGroupToBeRead()
     {
-        Assert.Equal("ok", NdisRssDiagnostics.Compare(Read, 2, 4, 4).Status);
-        Assert.Equal("unverified", NdisRssDiagnostics.Compare(Read with { NumberOfReceiveQueues = null }, 2, 4, 4).Status);
-        Assert.Equal("unverified", NdisRssDiagnostics.Compare(Read with { BaseProcessorGroup = null }, 2, 4, 4).Status);
-        Assert.Equal("different", NdisRssDiagnostics.Compare(Read with { BaseProcessorGroup = 1 }, 2, 4, 4).Status);
-        Assert.Equal("read", NdisRssDiagnostics.Compare(Read, null, null, null).Status);
-        Assert.Equal("disabled", NdisRssDiagnostics.Compare(Read with { Enabled = false }, 2, 4, 4).Status);
-        Assert.Equal("unavailable", NdisRssDiagnostics.Compare(null, null, null, null).Status);
+        NdisRssDiagnostics.RequestedSettings request = new(2, 4, 4, MaxProcessor: 15, MaxGroup: 0);
+        Assert.Equal("ok", NdisRssDiagnostics.Compare(Read, request).Status);
+        Assert.Equal("unverified", NdisRssDiagnostics.Compare(Read with { NumberOfReceiveQueues = null }, request).Status);
+        Assert.Equal("unverified", NdisRssDiagnostics.Compare(Read with { BaseProcessorGroup = null }, request).Status);
+        Assert.Equal("different", NdisRssDiagnostics.Compare(Read with { BaseProcessorGroup = 1 }, request).Status);
+        Assert.Equal("read", NdisRssDiagnostics.Compare(Read, new(null, null, null)).Status);
+        Assert.Equal("disabled", NdisRssDiagnostics.Compare(Read with { Enabled = false }, request).Status);
+        Assert.Equal("unavailable", NdisRssDiagnostics.Compare(null, new(null, null, null)).Status);
+    }
+
+    [Theory]
+    [InlineData(15, 0, "ok")]
+    [InlineData(63, 0, "different")]
+    [InlineData(15, 1, "different")]
+    [InlineData(null, 0, "unverified")]
+    [InlineData(15, null, "unverified")]
+    public void UpperBoundMustMatchWhenApplyRequestsIt(int? maxProcessor, int? maxGroup, string status)
+    {
+        NdisRssRuntimeState state = Read with { MaxProcessorNumber = maxProcessor, MaxProcessorGroup = maxGroup };
+        Assert.Equal(status, NdisRssDiagnostics.Compare(state, new(2, 4, 4, MaxProcessor: 15, MaxGroup: 0)).Status);
+        Assert.Equal("ok", NdisRssDiagnostics.Compare(state, new(2, 4, 4)).Status);
     }
 
     [Theory]
@@ -45,7 +59,8 @@ public sealed class NdisDiagnosticsTests
     [InlineData(0, 8UL, 4)]
     [InlineData(4, 8UL, 4)]
     [InlineData(1, 8UL, 1)]
-    [InlineData(5, 0UL, 0)]
+    [InlineData(5, 0UL, 5)]
+    [InlineData(2, 0UL, 2)]
     public void DiagnosticPolicyUsesTheSameNormalizationAsTheCpuSelection(int registryPolicy, ulong mask, int expected)
         => Assert.Equal(expected, MainForm.NormalizePolicyForSelection(registryPolicy, mask));
 

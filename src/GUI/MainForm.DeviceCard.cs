@@ -220,6 +220,8 @@ public sealed partial class MainForm
                 }
                 else
                 {
+                    if (cb.Checked && block.PolicyCombo.Enabled)
+                        block.PolicyCombo.SelectedItem = "SpecCPU";
                     RecalcAffinityMask(block);
                 }
                 OnBlockSettingChanged(block);
@@ -307,6 +309,14 @@ public sealed partial class MainForm
     }
     block.PrioCombo.SelectedIndexChanged += (_, _) => OnBlockSettingChanged(block);
     block.PolicyCombo.SelectedIndexChanged += (_, _) => OnBlockSettingChanged(block);
+    block.PolicyCombo.SelectionCommitted += (_, _) =>
+    {
+        if (block.PolicyCombo.SelectedItem is string policy && policy != "SpecCPU")
+        {
+            ApplyMaskToCpuBoxes(block, 0);
+            OnBlockSettingChanged(block);
+        }
+    };
     if (block.PowerSavingCheck is not null)
     {
         block.PowerSavingCheck.CheckedChanged += (_, _) => OnBlockSettingChanged(block);

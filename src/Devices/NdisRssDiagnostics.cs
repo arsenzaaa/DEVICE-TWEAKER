@@ -3,6 +3,8 @@ namespace DeviceTweakerCS;
 internal static class NdisRssDiagnostics
 {
     internal sealed record Comparison(string Status, string Detail);
+    internal sealed record RequestedSettings(int? BaseProcessor, int? QueueCount, int? MaxProcessors,
+        int? MaxProcessor = null, int? BaseGroup = 0, int? MaxGroup = null);
 
     internal static string ReadStatus(NdisRssRuntimeState? state)
     {
@@ -14,8 +16,8 @@ internal static class NdisRssDiagnostics
         return state.Enabled.Value ? "available" : "disabled";
     }
 
-    internal static Comparison Compare(NdisRssRuntimeState? state, int? registryBase, int? registryQueues,
-        int? registryMaxProcessors, bool wifiPreserved = false)
+    internal static Comparison Compare(NdisRssRuntimeState? state, RequestedSettings requested,
+        bool wifiPreserved = false)
     {
         if (wifiPreserved) return new("skipped", "Wi-Fi settings preserved");
         string status = ReadStatus(state);
@@ -28,13 +30,16 @@ internal static class NdisRssDiagnostics
             if (!actual.HasValue) incomplete = true;
             else if (requested != actual) differences.Add($"{name} registry={requested} active={actual}");
         }
-        Check("base", registryBase, state!.BaseProcessorNumber);
-        if (registryBase.HasValue) Check("baseGroup", 0, state.BaseProcessorGroup);
-        Check("queues", registryQueues, state.NumberOfReceiveQueues);
-        Check("maxProcessors", registryMaxProcessors, state.MaxProcessors);
+        Check("base", requested.BaseProcessor, state!.BaseProcessorNumber);
+        if (requested.BaseProcessor.HasValue) Check("baseGroup", requested.BaseGroup, state.BaseProcessorGroup);
+        Check("queues", requested.QueueCount, state.NumberOfReceiveQueues);
+        Check("maxProcessors", requested.MaxProcessors, state.MaxProcessors);
+        Check("maxProc", requested.MaxProcessor, state.MaxProcessorNumber);
+        Check("maxGroup", requested.MaxGroup, state.MaxProcessorGroup);
         if (differences.Count > 0) return new("different", string.Join("; ", differences));
         if (incomplete) return new("unverified", "requested fields missing from readback");
-        bool configured = registryBase.HasValue || registryQueues.HasValue || registryMaxProcessors.HasValue;
+        bool configured = requested.BaseProcessor.HasValue || requested.QueueCount.HasValue
+            || requested.MaxProcessors.HasValue || requested.MaxProcessor.HasValue || requested.MaxGroup.HasValue;
         return new(configured ? "ok" : "read", configured ? "requested fields match readback" : "no explicit RSS overrides");
     }
 }

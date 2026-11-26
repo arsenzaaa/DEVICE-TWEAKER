@@ -2,27 +2,22 @@
 
 [DEVICE TWEAKER](../README.ru.md) / Документация · [English](./README.md)
 
-Настройка устройств, принципы работы прерываний Windows и разработка DEVICE TWEAKER.
-
 ## Начало работы
 
-- [Скриншоты](./SCREENSHOTS.ru.md) - Настройки устройств, контроллеров USB и сетевых адаптеров.
-- [Справочник настроек](./SETTINGS.ru.md) - поля, кнопки, применение и восстановление.
-- [Руководство](./guide/README.ru.md) - 11 глав от ISR/DPC и MSI до IMOD и RSS.
-- [Логи и проверка](./guide/10-verification.ru.md) - где найти лог операции, как считать настройки и сравнить результат до/после.
+[Руководство](./guide/README.ru.md) · [Справочник настроек](./SETTINGS.ru.md) · [Скриншоты](./SCREENSHOTS.ru.md) · [Проверка результата](./guide/10-verification.ru.md)
 
 ## По устройствам
 
-- **[Видеокарта](./guide/04-gpu.ru.md)** - физические ядра, SMT и политика привязки.
-- **[USB](./guide/05-usb-imod.ru.md)** - xHCI-контроллеры, interrupter и IMOD для мыши, клавиатуры и аудио.
-- **[Сеть](./guide/06-network.ru.md)** - RSS, NDIS/NetAdapterCx и NIC ITR.
-- **[Процессор](./guide/07-cpu-topology.ru.md)** - P/E-ядра, CPPC, CCD/CCX и ReservedCpuSets.
-- **[Ввод](./guide/08-input.ru.md)** - Polling Rate, Raw Input и Mouse Throttle.
-- **[Энергосбережение](./guide/09-power.ru.md)** - USB selective suspend и разрешение Windows отключать устройство для экономии энергии.
+- **[Видеокарта](./guide/04-gpu.ru.md)** · физические ядра, SMT и политика привязки
+- **[USB](./guide/05-usb-imod.ru.md)** · контроллеры xHCI, interrupter и IMOD
+- **[Сеть](./guide/06-network.ru.md)** · RSS, NDIS/NetAdapterCx и NIC ITR
+- **[Процессор](./guide/07-cpu-topology.ru.md)** · P- и E-ядра, CPPC, CCD/CCX и ReservedCpuSets
+- **[Ввод](./guide/08-input.ru.md)** · частота опроса, Raw Input и Mouse Throttle
+- **[Энергосбережение](./guide/09-power.ru.md)** · выборочная приостановка USB и разрешение отключать устройства для экономии энергии
 
 ## Драйвер и автозапуск
 
-[DTIMOD.sys, KDU и PowerShell-профиль](./guide/11-driver.ru.md): какие функции требуют драйвера, как ограничена запись в память и как профиль работает без основного EXE.
+[DTIMOD](./guide/11-driver.ru.md) · чтение и запись регистров, загрузка драйвера и сохранённые профили
 
 ## Для разработчиков
 

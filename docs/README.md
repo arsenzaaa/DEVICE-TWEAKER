@@ -2,27 +2,22 @@
 
 [DEVICE TWEAKER](../README.md) / Documentation · [Русский](./README.ru.md)
 
-Device configuration, Windows interrupt handling and DEVICE TWEAKER development.
-
 ## Getting started
 
-- [Screenshots](./SCREENSHOTS.md) - Device settings, USB controllers and network adapters.
-- [Settings reference](./SETTINGS.md) - fields, controls, applying changes and restoring settings.
-- [Guide](./guide/README.md) - 11 chapters from ISR/DPC and MSI to IMOD and RSS.
-- [Logs and verification](./guide/10-verification.md) - finding operation logs, rereading settings and comparing before/after results.
+[Guide](./guide/README.md) · [Settings reference](./SETTINGS.md) · [Screenshots](./SCREENSHOTS.md) · [Verifying changes](./guide/10-verification.md)
 
 ## By device
 
-- **[Graphics card](./guide/04-gpu.md)** - physical cores, SMT and affinity policy.
-- **[USB](./guide/05-usb-imod.md)** - xHCI controllers, interrupters and IMOD for mouse, keyboard and audio.
-- **[Network](./guide/06-network.md)** - RSS, NDIS/NetAdapterCx and NIC ITR.
-- **[Processor](./guide/07-cpu-topology.md)** - P/E cores, CPPC, CCD/CCX and ReservedCpuSets.
-- **[Input](./guide/08-input.md)** - Polling Rate, Raw Input and Mouse Throttle.
-- **[Power saving](./guide/09-power.md)** - USB selective suspend and device power controls.
+- **[Graphics card](./guide/04-gpu.md)** · physical cores, SMT and affinity policy
+- **[USB](./guide/05-usb-imod.md)** · xHCI controllers, interrupters and IMOD
+- **[Network](./guide/06-network.md)** · RSS, NDIS/NetAdapterCx and NIC ITR
+- **[Processor](./guide/07-cpu-topology.md)** · P-cores, E-cores, CPPC, CCD/CCX and ReservedCpuSets
+- **[Input](./guide/08-input.md)** · polling rate, Raw Input and Mouse Throttle
+- **[Power saving](./guide/09-power.md)** · USB selective suspend and permission to turn off devices to save power
 
 ## Driver and startup
 
-[DTIMOD.sys, KDU and the PowerShell profile](./guide/11-driver.md): which features require the driver, how memory writes are restricted and how the profile works without the main EXE.
+[DTIMOD](./guide/11-driver.md) · reading and writing registers, driver loading and saved profiles
 
 ## For developers
 

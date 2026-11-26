@@ -29,9 +29,9 @@ internal static class DriverEnvironment
     internal const string PurposeNotice =
         "DTIMOD provides hardware access for USB IMOD, NIC ITR and PCI register reads.";
     internal const string AntiCheatNotice =
-        "Easy Anti-Cheat, Riot Vanguard, FACEIT Anti-Cheat and other protection software may block the driver or disconnect you from a game. Compatibility is not guaranteed.";
+        "Easy Anti-Cheat, Riot Vanguard, FACEIT Anti-Cheat and other anti-cheat software can block DTIMOD or disconnect you from a match.";
     internal const string LifetimeNotice =
-        "Closing DEVICE TWEAKER does not unload the driver. Restart Windows to unload it. Saved profiles can load it again at sign-in, wake or device reconnection.";
+        "Closing the app does not unload DTIMOD. Restart Windows to unload it. A saved profile can reload it at sign-in, after resume or when a device reconnects.";
 
     internal const string BriefCompatibilityNotice =
         "Anti-cheat software may block DTIMOD or disconnect you from a game.";
@@ -48,7 +48,7 @@ internal static class DriverEnvironment
         }];
         lines.Add(snapshot.Blocklist.Enabled switch
         {
-            true => "Driver blocklist is configured on.",
+            true => "The driver blocklist is enabled in the registry.",
             false => "Driver blocklist registry value is set to off.",
             _ => snapshot.Blocklist.Evidence == "missing"
                 ? "Driver blocklist has no explicit registry setting."
@@ -136,7 +136,7 @@ internal static class DriverEnvironment
     {
         List<string> notes = [];
         if (snapshot.Blocklist.Enabled == true)
-            notes.Add("Driver blocklist is configured on.");
+            notes.Add("The driver blocklist is enabled in the registry.");
         if (snapshot.HvciRunning == true)
             notes.Add("Memory integrity (HVCI) is enabled.");
         if (snapshot.HvciRunning is null || snapshot.Blocklist.Evidence.StartsWith("unavailable", StringComparison.Ordinal)
@@ -145,7 +145,7 @@ internal static class DriverEnvironment
             notes.Add("Some system checks are unavailable.");
         const string question = "Include USB IMOD in auto-optimization?";
         string concern = notes.Count == 0 ? string.Empty : "\n\n" + string.Join("\n", notes);
-        return question + "\n\nAPPLY configures USB IMOD. SKIP continues AUTO without USB IMOD." + (includeCompatibilityNotice
+        return question + "\n\nAPPLY includes USB IMOD tuning. SKIP keeps the current profile." + (includeCompatibilityNotice
             ? "\n\n" + BriefCompatibilityNotice + "\n\n" + BriefLifetimeNotice : string.Empty) + concern;
     }
 

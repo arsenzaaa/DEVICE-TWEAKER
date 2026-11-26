@@ -93,6 +93,15 @@ public class NdisRssLayoutTests
         Assert.Equal([1, 2, 4], NdisRssLayout.GetAllowedQueueCounts([1, 2, 4], msix, maxQueues: 2));
     }
 
+    [Fact]
+    public void AdvertisedQueueOptionsWithoutOne_SelectSmallestSupportedCount()
+    {
+        var allowed = NdisRssLayout.GetAllowedQueueCounts([4, 2], null, 8);
+        Assert.Equal([2, 4], allowed);
+        Assert.Equal(2, NdisRssLayout.Floor(allowed, 1));
+        Assert.Equal(2, NdisRssLayout.Snap(allowed, 2, 1));
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(8)]

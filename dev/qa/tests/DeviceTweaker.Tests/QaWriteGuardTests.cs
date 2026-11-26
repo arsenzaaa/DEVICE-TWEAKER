@@ -61,6 +61,7 @@ public sealed class QaWriteGuardTests
         Assert.Throws<QaWriteBlockedException>(() => UsbSelectiveSuspendPolicy.SetDeviceParameterDword("", "", 0));
         Assert.Throws<QaWriteBlockedException>(() => UsbSelectiveSuspendPolicy.ApplyControllerAndHubs("", false));
         Assert.Throws<QaWriteBlockedException>(() => UsbSelectiveSuspendPolicy.SetPowerPlanEnabled(false));
+        Assert.Throws<QaWriteBlockedException>(() => UsbSelectiveSuspendPolicy.ResetActivePowerPlanDefaults());
         Assert.Throws<QaWriteBlockedException>(() => UsbSelectiveSuspendPolicy.ActivateCurrentPowerScheme());
         Assert.Throws<QaWriteBlockedException>(() => UsbSelectiveSuspendPolicy.RestorePowerPlanIndex(Guid.Empty, true, 0));
         Assert.Throws<QaWriteBlockedException>(() => new WindowsRegistryValues(null!).Set("", 0, Microsoft.Win32.RegistryValueKind.DWord));
@@ -76,9 +77,9 @@ public sealed class QaWriteGuardTests
             Name = "QA sentinel", InstanceId = "", Class = "Display", RegBase = "",
             Kind = DeviceKind.GPU, IsTestDevice = false
         });
-        AssertBlocked("SaveBlockSettings", block, false, null);
+        AssertBlocked("SaveBlockSettings", block, false, null, DeviceSettingChanges.MsiLimit);
         AssertBlocked("ApplyDeviceSettingsPlan", null, null);
-        AssertBlocked("TryApplyImod", null, null, false, null, null);
+        AssertBlocked("TryApplyImod", null, null, false, null, null, null);
         AssertBlocked("ResetBlockSettings", block, null);
         AssertBlocked("ApplyDeviceResetPlan", null, null);
         AssertBlocked("ResetDevicePowerSaving", null, null);
@@ -104,7 +105,10 @@ public sealed class QaWriteGuardTests
         AssertBlocked("SaveStartupProfile", (object?)null);
         AssertBlocked("RemoveStartupBundle", (object?)null);
         AssertBlocked("DeleteImodStartupRegistration", (object?)null);
-        AssertBlocked("RemoveImodPersistenceFiles", (object?)null);
+        AssertBlocked("RemoveImodPersistenceFiles", null, true);
+        Assert.Throws<QaWriteBlockedException>(() => ImodDriverFiles.CleanUpStagedDriver(_ => { }));
+        Assert.Throws<QaWriteBlockedException>(() => ImodDriverFiles.CleanUpStagedFile(
+            ImodDriverPaths.SystemPath(), "", () => throw new InvalidOperationException("Probe must not run"), () => false));
         AssertBlocked("SetRawMouseThrottle", false, 0);
         AssertBlocked("SetReservedCpuSets", (object?)null);
         AssertBlocked("SetNdisBaseCore", "", 0, null, null);

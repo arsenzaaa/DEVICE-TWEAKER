@@ -4,9 +4,9 @@
 
 ## Applying a power setting
 
-Change **Power Saving** in the device card and click **APPLY**. The program saves a backup before applying the available device power settings. USB selective suspend can suspend individual idle ports. Disabling idle power saving can increase power use, particularly on battery. Availability also depends on the device class and driver. See [USB selective suspend](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/usb-selective-suspend) and [HID-specific behavior](https://learn.microsoft.com/en-us/windows-hardware/drivers/hid/selective-suspend-for-hid-over-usb-devices).
+Change **Power Saving** in the device card and click **APPLY**. The application backs up settings before writing. Disabling [USB selective suspend](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/usb-selective-suspend) keeps idle devices from entering this low-power state and can increase battery use.
 
-AUTO disables power saving for the devices it configures. Compare responsiveness, power use, sleep and resume on your system before keeping the change.
+AUTO disables power saving for the devices it configures.
 
 ## USB and wired networking
 
@@ -16,13 +16,13 @@ For supported wired adapters, the application changes permission for Windows to 
 
 ## Confirming the outcome
 
-Read the operation summary after applying the change. If a WMI property is unavailable or a value cannot be written or verified, open DETAILS to identify the affected step. A partially applied result can mean that saved settings changed while a live device operation failed.
+The program uses WMI where the device exposes the relevant property. If a write or verification fails, open **DETAILS** in the result dialog to see which step failed. A live device operation can fail after the registry settings have already been saved.
 
-After a change, check sustained use, idle, sleep and resume. Restore the original settings if the device disappears or resumes poorly.
+After a change, check sustained use, idle, sleep and resume. Restore the original settings if the device disappears or stops responding after resume.
 
 ## Restoration
 
-Restore applies values from the selected backup. USB selective suspend is restored through the Windows Power API for AC (plugged in) and DC (battery) in the current power scheme, then verified by reading it back. If the running device does not accept a restored setting, the result reports that step separately even when registry restoration succeeded.
+Restore applies values from the selected backup. USB selective suspend is restored through the Windows Power API for AC (plugged in) and DC (battery) in the power scheme recorded in the backup, then verified by reading it back. The current Windows scheme stays selected. If the running device does not accept a restored setting, the result reports that step separately even when registry restoration succeeded.
 
 ---
 

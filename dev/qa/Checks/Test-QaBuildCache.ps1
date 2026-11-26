@@ -26,6 +26,16 @@ try {
     Confirm 'removed-file-invalidates' ($key -ne (Get-QaBuildKey @($a) '10.0.100'))
     Confirm 'added-file-invalidates' ($key -ne (Get-QaBuildKey @($a,$b,[pscustomobject]@{path='src\new.cs';sha256=('C'*64)}) '10.0.100'))
     Confirm 'content-change-invalidates' ($key -ne (Get-QaBuildKey @($a,[pscustomobject]@{path=$b.path;sha256=('C'*64)}) '10.0.100'))
+    $entry = Join-Path $OutputDirectory $key
+    New-Item -ItemType Directory -Path $entry | Out-Null
+    $interruptedLog = Join-Path $entry 'build.log'
+    [IO.File]::WriteAllText($interruptedLog, 'interrupted compilation')
+    $retry = Get-QaBuildDirectory $OutputDirectory $key
+    Confirm 'interrupted-cache-does-not-block-next-build' ($retry -ne $entry -and -not (Test-Path -LiteralPath $retry))
+    Confirm 'interrupted-output-preserved' ([IO.File]::ReadAllText($interruptedLog) -eq 'interrupted compilation')
+    New-Item -ItemType Directory -Path $retry | Out-Null
+    [IO.File]::WriteAllText((Join-Path $retry 'build.json'), '{}')
+    Confirm 'finished-retry-is-selected-for-validation' ((Get-QaBuildDirectory $OutputDirectory $key) -eq $retry)
     $fixture = Join-Path $OutputDirectory 'integrity-fixture'
     $snapshot = New-QaInputSnapshot $workspace $fixture
     $inputs = Get-Content -LiteralPath (Join-Path $fixture 'inputs.json') -Raw -Encoding UTF8 | ConvertFrom-Json

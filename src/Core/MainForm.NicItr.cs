@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Security;
-using System.Text.RegularExpressions;
 using Microsoft.Win32;
 
 using static DeviceTweakerCS.ImodDriverNative;
@@ -15,14 +14,19 @@ public sealed partial class MainForm
         => NicItrService.TryGetNicItrProfile(instanceId);
 
     private List<NicDriverModeration.Keyword> ReadNicDriverModeration(string instanceId)
+        => ReadNicDriverModeration(instanceId, out _);
+
+    private List<NicDriverModeration.Keyword> ReadNicDriverModeration(string instanceId, out string? error)
     {
 #if DEVELOPER_QA
         DevRecordDataRead("ReadNicDriverModeration");
 #endif
+        error = null;
         List<NicDriverModeration.Keyword> keywords = [];
-        string? classKey = GetClassKeyForDevice(instanceId);
+        string? classKey = GetClassKeyForDevice(instanceId, out string? lookupError);
         if (string.IsNullOrWhiteSpace(classKey))
         {
+            if (lookupError is not null) error = $"{instanceId}: {lookupError}";
             return keywords;
         }
 
@@ -61,6 +65,7 @@ public sealed partial class MainForm
         catch (Exception ex) when (ex is SecurityException or IOException or UnauthorizedAccessException)
         {
             WriteLog($"NIC.MODERATION.READ.WARN: {instanceId} {ex.Message}");
+            error = $"{instanceId}: {ex.Message}";
         }
 
         return keywords;
@@ -112,17 +117,31 @@ public sealed partial class MainForm
     }
 
     // Removing the saved NIC ITR profile hands moderation back to the driver.
-    private void RestoreNicDriverModerationForSavedProfiles(IReadOnlyList<string> adapterIds, OperationReport? report)
+    private bool RestoreNicDriverModerationForSavedProfiles(string[] adapterIds, OperationReport? report)
     {
-        HashSet<string> savedKeys = new(
-            ReadSavedStartupConfig(out _).NicItrEntries.Select(entry => entry.Hwid),
-            StringComparer.OrdinalIgnoreCase);
-
-        foreach (string instanceId in adapterIds.Where(id => savedKeys.Contains(GetNicItrPersistenceKey(id))))
+        bool success = true;
+        HashSet<string> restored = new(StringComparer.OrdinalIgnoreCase);
+        foreach (NicItrConfigEntry entry in ReadSavedStartupConfig(out _).NicItrEntries)
         {
-            List<NicDriverModeration.Change> changes = NicDriverModeration.PlanRestoreDefault(ReadNicDriverModeration(instanceId));
-            WriteNicDriverModeration(instanceId, changes, "RESTORE", report);
+            string? instanceId = DeviceTweakerImodRuntime.SelectNicProfileTarget(entry.Hwid, adapterIds, out bool ambiguous);
+            if (instanceId is null && DeviceTweakerImodRuntime.IsPciInstanceMatch(entry.Hwid))
+                instanceId = entry.Hwid; // A disconnected adapter can still have its class key.
+            if (instanceId is null)
+            {
+                WriteLog($"NIC.MODERATION.RESTORE.SKIP: {entry.Hwid} reason={(ambiguous ? "ambiguous" : "missing")}");
+                continue;
+            }
+            if (!restored.Add(instanceId)) continue;
+            List<NicDriverModeration.Change> changes = NicDriverModeration.PlanRestoreDefault(ReadNicDriverModeration(instanceId, out string? readError));
+            if (readError is not null)
+            {
+                report?.AddError("NIC ITR moderation", readError);
+                success = false;
+                continue;
+            }
+            success &= WriteNicDriverModeration(instanceId, changes, "RESTORE", report);
         }
+        return success;
     }
 
     private static void SetNicItrReadbackText(DeviceBlock block, string text, bool replaceInput = true)
@@ -516,8 +535,12 @@ public sealed partial class MainForm
             string instanceId = block.Device.InstanceId;
             ImodConfig config = await Task.Run(() => ReadSavedStartupConfig(out _));
             string scriptPath = GetStartupProfilePath();
-            string hwid = GetNicItrPersistenceKey(block.Device.InstanceId);
-            config.NicItrEntries.RemoveAll(e => string.Equals(e.Hwid, hwid, StringComparison.OrdinalIgnoreCase));
+            string hwid = instanceId;
+            string[] adapters = _blocks
+                .Where(b => b.Kind is DeviceKind.NET_NDIS or DeviceKind.NET_CX && !b.Device.IsTestDevice)
+                .Select(b => b.Device.InstanceId).ToArray();
+            config.NicItrEntries.RemoveAll(e => string.Equals(e.Hwid, hwid, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(DeviceTweakerImodRuntime.SelectNicProfileTarget(e.Hwid, adapters, out _), hwid, StringComparison.OrdinalIgnoreCase));
             config.NicItrEntries.Add(new NicItrConfigEntry
             {
                 Hwid = hwid,
@@ -531,24 +554,28 @@ public sealed partial class MainForm
                 Values = values,
             });
 
-            await SaveStartupProfile(config);
+            bool startupEnabled = await SaveStartupProfile(config);
 
-            block.NicItrStatusLabel.Text = "current: saved for startup";
-            block.NicItrStatusLabel.ForeColor = _statusActive;
+            block.NicItrStatusLabel.Text = startupEnabled ? "current: saved for startup" : "current: saved (startup task disabled)";
+            block.NicItrStatusLabel.ForeColor = startupEnabled ? _statusActive : _statusInactive;
             UpdateNicItrInputTimeLabel(block);
             WriteLog($"NIC.ITR.SAVE: {block.Device.InstanceId} key={hwid} profile=\"{profile.FamilyName}\" values={FormatNicItrValueList(values, profile)} path={scriptPath}");
 
             // Adaptive driver moderation would overwrite the saved register value.
-            bool moderationChanged = await Task.Run(() =>
+            bool moderationReady = await Task.Run(() =>
             {
-                List<NicDriverModeration.Change> moderation = NicDriverModeration.PlanDisable(ReadNicDriverModeration(instanceId));
+                List<NicDriverModeration.Keyword> keywords = ReadNicDriverModeration(instanceId, out string? readError);
+                if (readError is not null) return false;
+                List<NicDriverModeration.Change> moderation = NicDriverModeration.PlanDisable(keywords);
                 return WriteNicDriverModeration(instanceId, moderation, "OFF");
             });
-            if (!moderationChanged)
+            if (!moderationReady)
             {
-                block.NicItrStatusLabel.Text = "current: saved; driver moderation unchanged";
+                block.NicItrStatusLabel.Text = "current: saved; moderation setup incomplete";
                 block.NicItrStatusLabel.ForeColor = _statusDanger;
             }
+            if (!startupEnabled)
+                SetNicItrTooltip(block, "Profile saved. The startup task is still disabled.");
 
             UpdateBlockInfoText(block);
         }
@@ -746,17 +773,6 @@ public sealed partial class MainForm
         {
             block.NicItrBox.Text = normalized;
         }
-    }
-
-    private string GetNicItrPersistenceKey(string instanceId)
-    {
-        Match match = Regex.Match(
-            instanceId ?? string.Empty,
-            "VEN_([0-9A-Fa-f]{4})&DEV_([0-9A-Fa-f]{4})",
-            RegexOptions.CultureInvariant);
-        return match.Success
-            ? $"VEN_{match.Groups[1].Value.ToUpperInvariant()}&DEV_{match.Groups[2].Value.ToUpperInvariant()}"
-            : NormalizeInstanceId(instanceId);
     }
 
     private static bool TryParseUInt64Flexible(string text, out ulong value)

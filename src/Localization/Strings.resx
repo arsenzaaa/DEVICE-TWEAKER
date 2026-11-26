@@ -115,11 +115,11 @@
   <data name="Message.AllProcessorsInMachine" xml:space="preserve"><value>AllProcessorsInMachine</value></data>
   <data name="Message.An.older.DTIMOD.driver.is.loaded.Restart.Windows" xml:space="preserve"><value>An older DTIMOD driver is loaded. Restart Windows, then press CHECK again.</value></data>
   <data name="Message.Anti.cheat.components.were.found.Compatibility.with.DTIMOD" xml:space="preserve"><value>Anti-cheat components were found. Compatibility with DTIMOD/KDU is not confirmed; a conflict is possible, not detected.</value></data>
-  <data name="Message.AppData.keeps.it.in.your.user.profile" xml:space="preserve"><value>AppData keeps it in your user profile.</value></data>
+  <data name="Message.AppData.keeps.it.in.your.user.profile" xml:space="preserve"><value>APPDATA saves it in your Windows user profile.</value></data>
   <data name="Message.Applied" xml:space="preserve"><value>Applied</value></data>
-  <data name="Message.Applied.steps.were.saved" xml:space="preserve"><value>Applied steps were saved.</value></data>
-  <data name="Message.Applied.steps.were.saved.One.optional.step.was" xml:space="preserve"><value>Applied steps were saved. One optional step was not completed.</value></data>
-  <data name="Message.Applied.steps.were.saved.One.or.more.steps" xml:space="preserve"><value>Applied steps were saved. One or more steps were not completed.</value></data>
+  <data name="Message.Applied.steps.were.saved" xml:space="preserve"><value>Applied settings were saved.</value></data>
+  <data name="Message.Applied.steps.were.saved.One.optional.step.was" xml:space="preserve"><value>Settings were saved. An optional step did not complete.</value></data>
+  <data name="Message.Applied.steps.were.saved.One.or.more.steps" xml:space="preserve"><value>Some settings could not be applied. Completed changes were saved.</value></data>
   <data name="Message.Applied.with.APPLY.AUTO.A.reboot.may.be" xml:space="preserve"><value>Applied with APPLY / AUTO. A reboot may be required.</value></data>
   <data name="Message.Applied.with.warnings.Core.settings.were.successfully.configured" xml:space="preserve"><value>Applied with warnings. Core settings were successfully configured.</value></data>
   <data name="Message.Apply" xml:space="preserve"><value>Apply</value></data>
@@ -143,7 +143,7 @@
   <data name="Message.Background.raw.input.throttling.appeared.in.the.Windows" xml:space="preserve"><value>Background raw input throttling appeared in the Windows 11 22H2 preview update KB5027303.</value></data>
   <data name="Message.Backup.83855792" xml:space="preserve"><value>Backup</value></data>
   <data name="Message.Backup.deleted.No.backups.remain" xml:space="preserve"><value>Backup deleted. No backups remain.</value></data>
-  <data name="Message.Backup.deleted.Select.another.backup.or.close.this" xml:space="preserve"><value>Backup deleted. Select another backup or close this window.</value></data>
+  <data name="Message.Backup.deleted.Select.another.backup.or.close.this" xml:space="preserve"><value>Backup deleted. You can select another backup.</value></data>
   <data name="Message.Backup.restored" xml:space="preserve"><value>Backup restored.</value></data>
   <data name="Message.Backup.saved" xml:space="preserve"><value>Backup saved.</value></data>
   <data name="Message.BackupAccessDenied" xml:space="preserve"><value>BackupAccessDenied</value></data>
@@ -319,7 +319,7 @@ See the session log for details.</value></data>
   <data name="Message.IRQ.count.WMI.data.HW.supported.modes.CHECK" xml:space="preserve"><value>IRQ count: WMI data. HW: supported modes. CHECK beside IRQ Mode reads the current mode through DTIMOD.</value></data>
   <data name="Message.IRQ.count.WMI.data.WMI.hint.MSI.MSI" xml:space="preserve"><value>IRQ count: WMI data. WMI hint: MSI / MSI-X estimate from IRQ numbers above 999, not the active interrupt mode. It cannot tell MSI from MSI-X. HW: device capabilities.</value></data>
   <data name="Message.IRQ.count.comes.from.WMI.HW.lists.supported" xml:space="preserve"><value>IRQ count comes from WMI. HW lists supported modes. Click READ IRQ MODE at the top to read all PCI interrupt modes through DTIMOD.sys.</value></data>
-  <data name="Message.IRQ.count.comes.from.WMI.IRQ.Mode.uses" xml:space="preserve"><value>IRQ count comes from WMI. IRQ Mode uses Windows allocated resources. HW lists supported modes. Refresh updates the readings without loading a driver.</value></data>
+  <data name="Message.IRQ.count.comes.from.WMI.IRQ.Mode.uses" xml:space="preserve"><value>IRQ counts interrupt resources reported by WMI. IRQ Mode uses Windows resources and PCI data when available. HW lists supported modes. REFRESH reads the current state without loading DTIMOD.</value></data>
   <data name="Message.IRQ.count.must.be.Auto.or.a.number" xml:space="preserve"><value>IRQ count must be Auto or a number from 0 to 64.</value></data>
   <data name="Message.ImodReadFailed" xml:space="preserve"><value>ImodReadFailed</value></data>
   <data name="Message.ImodVerificationMismatch" xml:space="preserve"><value>ImodVerificationMismatch</value></data>
@@ -404,8 +404,8 @@ See the session log for details.</value></data>
   <data name="Message.No.HID.roles" xml:space="preserve"><value>No HID roles</value></data>
   <data name="Message.No.IRQ" xml:space="preserve"><value>No IRQ</value></data>
   <data name="Message.No.additional.details" xml:space="preserve"><value>No additional details.</value></data>
-  <data name="Message.No.backup.files.were.found.in.the.EXE" xml:space="preserve"><value>No backup files were found in the EXE folder or APPDATA.</value></data>
-  <data name="Message.No.backup.snapshot.was.found" xml:space="preserve"><value>No backup snapshot was found.</value></data>
+  <data name="Message.No.backup.files.were.found.in.the.EXE" xml:space="preserve"><value>No backups found next to the EXE or in AppData.</value></data>
+  <data name="Message.No.backup.snapshot.was.found" xml:space="preserve"><value>No backups found.</value></data>
   <data name="Message.No.backup.was.created" xml:space="preserve"><value>No backup was created.</value></data>
   <data name="Message.No.devices.match.this.filter" xml:space="preserve"><value>No devices match this filter.</value></data>
   <data name="Message.No.eligible.USB.IMOD.target.for.SET" xml:space="preserve"><value>No eligible USB IMOD target for SET.</value></data>
@@ -523,7 +523,7 @@ See the session log for details.</value></data>
   <data name="Message.Registry.HKLM.System.CurrentControlSet.Control.Session.Manager.kernel" xml:space="preserve"><value>Registry: HKLM\System\CurrentControlSet\Control\Session Manager\kernel</value></data>
   <data name="Message.Registry.configuration.is.not.a.driver.load.verdict" xml:space="preserve"><value>Registry configuration is not a driver-load verdict. Driver loading and anti-cheat compatibility are untested.</value></data>
   <data name="Message.Registry.path.copied.to.clipboard" xml:space="preserve"><value>Registry path copied to clipboard.</value></data>
-  <data name="Message.Registry.settings.IMOD.startup.profile.from.the.backup" xml:space="preserve"><value>Registry settings / IMOD startup profile from the backup.</value></data>
+  <data name="Message.Registry.settings.IMOD.startup.profile.from.the.backup" xml:space="preserve"><value>Device settings and the saved IMOD/NIC ITR profile.</value></data>
   <data name="Message.RegistryWriteDenied" xml:space="preserve"><value>RegistryWriteDenied</value></data>
   <data name="Message.Release.regression" xml:space="preserve"><value>Release regression</value></data>
   <data name="Message.Removing.IMOD.persistence" xml:space="preserve"><value>Removing IMOD persistence...</value></data>
@@ -536,7 +536,7 @@ See the session log for details.</value></data>
   <data name="Message.Restore.did.not.finish.Any.completed.rollback.steps" xml:space="preserve"><value>Restore did not finish. Any completed rollback steps were preserved.</value></data>
   <data name="Message.Restore.did.not.finish.Open.DETAILS.before.rebooting" xml:space="preserve"><value>Restore did not finish. Open DETAILS before rebooting.</value></data>
   <data name="Message.Restore.settings.Ctrl.Z" xml:space="preserve"><value>Restore settings (Ctrl+Z)</value></data>
-  <data name="Message.Restore.the.selected.backup" xml:space="preserve"><value>Restore the selected backup?</value></data>
+  <data name="Message.Restore.the.selected.backup" xml:space="preserve"><value>Apply the settings from this backup?</value></data>
   <data name="Message.RestoreWriteFailed" xml:space="preserve"><value>RestoreWriteFailed</value></data>
   <data name="Message.Result.Dialog.Gallery" xml:space="preserve"><value>Result Dialog Gallery</value></data>
   <data name="Message.Right.click.the.EXE.and.choose.Run.as" xml:space="preserve"><value>Right-click the EXE and choose 'Run as administrator'.</value></data>
@@ -579,7 +579,7 @@ Right-click the EXE and choose 'Run as administrator'.</value></data>
   <data name="Message.See.DETAILS.for.applied.skipped.settings.and.their" xml:space="preserve"><value>See DETAILS for applied / skipped settings and their reasons.</value></data>
   <data name="Message.See.the.log.for.details" xml:space="preserve"><value>See the log for details.</value></data>
   <data name="Message.Select.CCD0.cores.only" xml:space="preserve"><value>Select CCD0 cores only</value></data>
-  <data name="Message.Select.a.backup.to.restore.settings" xml:space="preserve"><value>Select a backup to restore settings:</value></data>
+  <data name="Message.Select.a.backup.to.restore.settings" xml:space="preserve"><value>Choose a backup to restore settings.</value></data>
   <data name="Message.Select.a.test.device.first" xml:space="preserve"><value>Select a test device first.</value></data>
   <data name="Message.Select.all.logical.cores" xml:space="preserve"><value>Select all logical cores</value></data>
   <data name="Message.Select.physical.P.cores.only" xml:space="preserve"><value>Select physical P-cores only</value></data>
@@ -596,7 +596,7 @@ Right-click the EXE and choose 'Run as administrator'.</value></data>
   <data name="Message.Skipped.12698ce1" xml:space="preserve"><value>Skipped</value></data>
   <data name="Message.Skipping.USB.IMOD" xml:space="preserve"><value>Skipping USB IMOD...</value></data>
   <data name="Message.Skipping.USB.selective.suspend" xml:space="preserve"><value>Skipping USB selective suspend...</value></data>
-  <data name="Message.Skipping.this.copy.keeps.the.original.settings.backup" xml:space="preserve"><value>Skipping this copy keeps the original-settings backup.</value></data>
+  <data name="Message.Skipping.this.copy.keeps.the.original.settings.backup" xml:space="preserve"><value>SKIP keeps the original backup without creating another.</value></data>
   <data name="Message.Some.background.listeners.can.bypass.this.limit" xml:space="preserve"><value>Some background listeners can bypass this limit.</value></data>
   <data name="Message.Some.changes.may.already.have.been.applied" xml:space="preserve"><value>Some changes may already have been applied.</value></data>
   <data name="Message.Some.power.settings.require.a.device.restart" xml:space="preserve"><value>Some power settings require a device restart.</value></data>
@@ -633,16 +633,16 @@ Right-click the EXE and choose 'Run as administrator'.</value></data>
   <data name="Message.Test.CPU.mode.OFF" xml:space="preserve"><value>Test CPU mode: OFF</value></data>
   <data name="Message.Test.Devices" xml:space="preserve"><value>Test Devices</value></data>
   <data name="Message.Test.options" xml:space="preserve"><value>Test options</value></data>
-  <data name="Message.The.EXE.folder.keeps.the.backup.next.to" xml:space="preserve"><value>The EXE folder keeps the backup next to the program.</value></data>
+  <data name="Message.The.EXE.folder.keeps.the.backup.next.to" xml:space="preserve"><value>EXE FOLDER saves the backup next to the program.</value></data>
   <data name="Message.The.backup.could.not.be.created.No.changes" xml:space="preserve"><value>The backup could not be created. No changes were made.</value></data>
-  <data name="Message.The.backup.could.not.be.deleted.See.LOGS" xml:space="preserve"><value>The backup could not be deleted. See LOGS for details.</value></data>
+  <data name="Message.The.backup.could.not.be.deleted.See.LOGS" xml:space="preserve"><value>Could not delete the backup. See LOGS for details.</value></data>
   <data name="Message.The.backup.file.could.not.be.created" xml:space="preserve"><value>The backup file could not be created.</value></data>
   <data name="Message.The.cause.of.rejection.is.unconfirmed.Other.policies" xml:space="preserve"><value>The cause of rejection is unconfirmed. Other policies or anti-cheats may still block DTIMOD.</value></data>
   <data name="Message.The.change.was.included.in.the.July.2023" xml:space="preserve"><value>The change was included in the July 2023 update KB5028185.</value></data>
   <data name="Message.The.driver.check.did.not.complete" xml:space="preserve"><value>The driver check did not complete.</value></data>
   <data name="Message.The.operation.stopped.before.any.changes.were.made" xml:space="preserve"><value>The operation stopped before any changes were made.</value></data>
   <data name="Message.The.operation.was.cancelled" xml:space="preserve"><value>The operation was cancelled.</value></data>
-  <data name="Message.The.original.settings.backup.BASELINE.is.protected.from" xml:space="preserve"><value>The original-settings backup (BASELINE) is protected from deletion.</value></data>
+  <data name="Message.The.original.settings.backup.BASELINE.is.protected.from" xml:space="preserve"><value>The original backup cannot be deleted.</value></data>
   <data name="Message.The.program.can.continue.but.the.log.may" xml:space="preserve"><value>The program can continue, but the log may be incomplete. Include this message when reporting an issue.</value></data>
   <data name="Message.The.protected.ORIGINAL.STATE.snapshot.is.always.retained" xml:space="preserve"><value>The protected ORIGINAL STATE snapshot is always retained.</value></data>
   <data name="Message.The.register.value.could.not.be.verified" xml:space="preserve"><value>The register value could not be verified.</value></data>
@@ -726,7 +726,7 @@ Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IM
   <data name="Message.WARNING" xml:space="preserve"><value>WARNING</value></data>
   <data name="Message.Warning.e981ddae" xml:space="preserve"><value>Warning</value></data>
   <data name="Message.Where.should.DEVICE.TWEAKER.save.the.pre.auto" xml:space="preserve"><value>Where should DEVICE TWEAKER save the pre-auto backup?</value></data>
-  <data name="Message.Where.should.the.additional.backup.be.saved" xml:space="preserve"><value>Where should the additional backup be saved?</value></data>
+  <data name="Message.Where.should.the.additional.backup.be.saved" xml:space="preserve"><value>Choose where to save the extra backup.</value></data>
   <data name="Message.Wi.Fi.settings.are.preserved.by.DEVICE.TWEAKER" xml:space="preserve"><value>Wi-Fi settings are preserved by DEVICE TWEAKER.</value></data>
   <data name="Message.Windows.CPU.topology.APIs.failed.no.affinity.changes" xml:space="preserve"><value>Windows CPU topology APIs failed; no affinity changes were applied</value></data>
   <data name="Message.Windows.Default" xml:space="preserve"><value>Windows Default</value></data>
@@ -807,8 +807,11 @@ Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IM
   <data name="Message.refresh" xml:space="preserve"><value>refresh</value></data>
   <data name="Message.registry.key.is.unavailable" xml:space="preserve"><value>registry key is unavailable</value></data>
   <data name="Message.save.failed" xml:space="preserve"><value>save failed</value></data>
-  <data name="Message.saved.driver.moderation.unchanged" xml:space="preserve"><value>saved; driver moderation unchanged</value></data>
+  <data name="Message.saved.driver.moderation.unchanged" xml:space="preserve"><value>saved; moderation setup incomplete</value></data>
   <data name="Message.saved.for.startup" xml:space="preserve"><value>saved for startup</value></data>
+  <data name="Message.saved.startup.task.disabled" xml:space="preserve"><value>saved (startup task disabled)</value></data>
+  <data name="Message.ProfileSavedTaskDisabled" xml:space="preserve"><value>Profile saved. The startup task is still disabled.</value></data>
+  <data name="Message.ProfileKeptForModerationRetry" xml:space="preserve"><value>Could not restore network moderation. The profile was kept so you can retry.</value></data>
   <data name="Message.signature.blocked" xml:space="preserve"><value>signature blocked</value></data>
   <data name="Message.single.value.for.controller" xml:space="preserve"><value>single value for controller</value></data>
   <data name="Message.test.preview" xml:space="preserve"><value>test preview</value></data>
@@ -834,13 +837,13 @@ Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IM
   <data name="Validation.MsiUnsupported" xml:space="preserve"><value>Windows reports that the PCI device does not support MSI or MSI-X; a numeric message limit was not applied.</value></data>
   <data name="Validation.MsiOnlyLimit" xml:space="preserve"><value>This is an MSI-only device. The allowed multi-message limits are 1, 2, 4, 8, or 16.</value></data>
   <data name="Read.DeviceStateReading" xml:space="preserve"><value>Reading device state...</value></data>
-  <data name="Read.DeviceStateFailed" xml:space="preserve"><value>Device data could not be refreshed. The current list was preserved.</value></data>
+  <data name="Read.DeviceStateFailed" xml:space="preserve"><value>Could not refresh device data. The current list is still available.</value></data>
   <data name="Read.DeviceReadback" xml:space="preserve"><value>Device readback</value></data>
   <data name="Inline.Imod.LastRead" xml:space="preserve"><value>Last read:</value></data>
   <data name="Action.ReadingIrq" xml:space="preserve"><value>READING IRQ...</value></data>
-  <data name="Status.IrqReading" xml:space="preserve"><value>Reading IRQ modes: {0} PCI devices...</value></data>
+  <data name="Status.IrqReading" xml:space="preserve"><value>Reading IRQ modes for {0} PCI devices…</value></data>
   <data name="Status.IrqPreparing" xml:space="preserve"><value>Preparing DTIMOD to read IRQ modes...</value></data>
-  <data name="Status.IrqCompleted" xml:space="preserve"><value>PCI devices checked: {0} · unavailable: {1} · results in IRQ Mode</value></data>
+  <data name="Status.IrqCompleted" xml:space="preserve"><value>PCI devices checked: {0} · unavailable: {1} · see IRQ Mode</value></data>
   <data name="Status.IrqReadCount" xml:space="preserve"><value>READ IRQ: {0}/{1}</value></data>
   <data name="Operation.CheckBusy" xml:space="preserve"><value>CHECK…</value></data>
   <data name="Operation.SaveBusy" xml:space="preserve"><value>SAVE…</value></data>
@@ -854,7 +857,7 @@ Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IM
   <data name="SystemCheck.RegistryValues" xml:space="preserve"><value>Registry values</value></data>
   <data name="SystemCheck.Scope" xml:space="preserve"><value>Driver loading and anti-cheat compatibility are not tested.</value></data>
   <data name="SystemCheck.AntiCheatScope" xml:space="preserve"><value>Anti-cheat compatibility is not tested by this check.</value></data>
-  <data name="SystemCheck.BlocklistConfigured" xml:space="preserve"><value>Driver blocklist is configured on.</value></data>
+  <data name="SystemCheck.BlocklistConfigured" xml:space="preserve"><value>The driver blocklist is enabled in the registry.</value></data>
   <data name="SystemCheck.HvciEnabled" xml:space="preserve"><value>Memory integrity (HVCI) is enabled.</value></data>
   <data name="BackupReason.BeforeAuto" xml:space="preserve"><value>Before auto-optimization</value></data>
   <data name="BackupReason.BeforeApply" xml:space="preserve"><value>Before applying settings</value></data>
@@ -868,8 +871,8 @@ Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IM
   <data name="Driver.Title" xml:space="preserve"><value>DTIMOD DRIVER</value></data>
   <data name="Driver.CheckAction" xml:space="preserve"><value>CHECK SYSTEM</value></data>
   <data name="Driver.Purpose" xml:space="preserve"><value>DTIMOD provides hardware access for USB IMOD, NIC ITR and PCI register reads.</value></data>
-  <data name="Driver.CompatibilityNotice" xml:space="preserve"><value>Easy Anti-Cheat, Riot Vanguard, FACEIT Anti-Cheat and other protection software may block the driver or disconnect you from a game. Compatibility is not guaranteed.</value></data>
-  <data name="Driver.LifetimeNotice" xml:space="preserve"><value>Closing DEVICE TWEAKER does not unload the driver. Restart Windows to unload it. Saved profiles can load it again at sign-in, wake or device reconnection.</value></data>
+  <data name="Driver.CompatibilityNotice" xml:space="preserve"><value>Easy Anti-Cheat, Riot Vanguard, FACEIT Anti-Cheat and other anti-cheat software can block DTIMOD or disconnect you from a match.</value></data>
+  <data name="Driver.LifetimeNotice" xml:space="preserve"><value>Closing the app does not unload DTIMOD. Restart Windows to unload it. A saved profile can reload it at sign-in, after resume or when a device reconnects.</value></data>
   <data name="Driver.Cancelled" xml:space="preserve"><value>Driver access cancelled.</value></data>
   <data name="Driver.CheckHeading" xml:space="preserve"><value>Windows check</value></data>
   <data name="Driver.CompatibilityHeading" xml:space="preserve"><value>Compatibility</value></data>
@@ -887,15 +890,12 @@ Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IM
   <data name="Driver.BriefRisk" xml:space="preserve"><value>Anti-cheat software may block DTIMOD or disconnect you from a game.</value></data>
   <data name="Driver.BriefLifetime" xml:space="preserve"><value>Closing the app does not unload DTIMOD. Saved profiles can load it automatically.</value></data>
   <data name="Driver.LifetimeHeading" xml:space="preserve"><value>Driver lifetime</value></data>
-  <data name="Driver.AutoChoice" xml:space="preserve"><value>APPLY configures USB IMOD. SKIP continues AUTO without USB IMOD.</value></data>
+  <data name="Driver.AutoChoice" xml:space="preserve"><value>APPLY includes USB IMOD tuning. SKIP keeps the current profile.</value></data>
   <data name="Read.DeviceListChanged" xml:space="preserve">
     <value>Devices changed while refreshing. Press REFRESH to read the current list.</value>
   </data>
-  <data name="Message.Backup.restored.with.warnings.Open.DETAILS" xml:space="preserve">
-    <value>Backup restored with warnings. Open DETAILS.</value>
-  </data>
-  <data name="Message.Saved.settings.were.restored.but.some.live.power.settings" xml:space="preserve">
-    <value>Saved settings were restored, but some live power settings could not be applied. Open DETAILS.</value>
+  <data name="Message.Saved.settings.were.restored" xml:space="preserve">
+    <value>Saved settings were restored.</value>
   </data>
   <data name="Message.Saved.settings.component" xml:space="preserve">
     <value>Saved settings</value>
@@ -907,7 +907,7 @@ Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IM
     <value>Saved setting</value>
   </data>
   <data name="Message.The.original.backup.could.not.read.this.value" xml:space="preserve">
-    <value>The original backup could not read this value; it was left unchanged.</value>
+    <value>This setting was unreadable when the backup was created. Its current value was kept.</value>
   </data>
   <data name="Message.Power.scheme.component" xml:space="preserve">
     <value>Power scheme</value>
@@ -933,4 +933,27 @@ Please reboot your PC, then run CHECK or AUTO-OPTIMIZATION again to apply USB IM
   <data name="Restore.NicItrProfile" xml:space="preserve">
     <value>NIC ITR startup profile</value>
   </data>
+  <data name="Message.No.changes.to.apply" xml:space="preserve"><value>No changes to apply.</value></data>
+  <data name="Action.DeleteProfile" xml:space="preserve"><value>DELETE PROFILE</value></data>
+  <data name="Message.UsbDeleteProfileConfirm" xml:space="preserve"><value>Remove the shared USB IMOD and NIC ITR startup profile?
+
+The staged DTIMOD.sys file will also be removed if it matches this build and is no longer in use.</value></data>
+  <data name="Message.UsbDeleteProfileTooltip" xml:space="preserve"><value>Remove the shared USB IMOD and NIC ITR startup profile.</value></data>
+  <data name="Message.UsbDeleteProfileDone" xml:space="preserve"><value>Startup profile removed. Restart Windows to clear active register changes.</value></data>
+  <data name="Message.UsbDeleteProfileDriverRemoved" xml:space="preserve"><value>Startup profile and driver file removed. Restart Windows to clear active register changes.</value></data>
+  <data name="Message.UsbDeleteProfileDriverLoaded" xml:space="preserve"><value>Startup profile removed. Restart Windows to unload DTIMOD, then use DELETE PROFILE again to remove the file.</value></data>
+  <data name="Message.UsbDeleteProfileDriverKept" xml:space="preserve"><value>Startup profile removed. DTIMOD.sys was kept because it could not be safely removed. See the log.</value></data>
+  <data name="Message.UsbDeleteProfileFailed" xml:space="preserve"><value>The startup profile could not be fully removed. Open DETAILS.</value></data>
+  <data name="Message.UsbImodInvalidInput" xml:space="preserve"><value>USB IMOD was not applied because the input is invalid.</value></data>
+  <data name="Validation.InvalidImodRole" xml:space="preserve"><value>Enter a valid USB IMOD interval in the "{0}" field.</value></data>
+  <data name="Message.UsbImodAmbiguousLegacy" xml:space="preserve"><value>An older USB IMOD profile matches multiple controllers. Select the intended controller again.</value></data>
+  <data name="Message.UsbImodWriteFailedKeptProfile" xml:space="preserve"><value>USB IMOD was not applied. The previous startup profile was kept.</value></data>
+  <data name="Message.UsbImodPartialKeptProfile" xml:space="preserve"><value>Only some USB IMOD values were written. The previous startup profile was kept.</value></data>
+  <data name="Message.UsbImodWrittenSaveFailed" xml:space="preserve"><value>USB IMOD was written, but startup persistence was not saved.</value></data>
+  <data name="Message.StartupProfileSaveFailed" xml:space="preserve"><value>Startup persistence was not saved.</value></data>
+  <data name="Message.UsbImodWrittenRemoveFailed" xml:space="preserve"><value>USB IMOD was written, but the old startup profile could not be fully removed.</value></data>
+  <data name="Message.UsbImodWrittenSaved" xml:space="preserve"><value>USB IMOD was written and its startup profile was saved.</value></data>
+  <data name="Message.UsbImodWrittenNoStartup" xml:space="preserve"><value>USB IMOD was written. No custom USB settings remain in the startup profile.</value></data>
+  <data name="Message.RssSavedActive" xml:space="preserve"><value>RSS settings saved and confirmed on the adapter.</value></data>
+  <data name="Message.RssSavedPending" xml:space="preserve"><value>RSS settings saved. Check the active adapter settings after restarting Windows.</value></data>
 </root>

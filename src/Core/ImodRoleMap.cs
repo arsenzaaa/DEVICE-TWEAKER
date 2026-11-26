@@ -64,59 +64,6 @@ internal static class ImodRoleMap
         return rolesByInterrupter;
     }
 
-    // Without an exact map, the controller's roles are spread over its active
-    // interrupters in priority order; extra roles share the last interrupter.
-    internal static bool TryAssignFallbackRoles(
-        IReadOnlySet<string> fallbackRoles,
-        Dictionary<uint, List<uint>> interruptersByRootPort,
-        uint maxIntrs,
-        Dictionary<uint, HashSet<string>> rolesByInterrupter,
-        out string detail)
-    {
-        List<uint> activeInterrupters = interruptersByRootPort
-            .Values
-            .SelectMany(static intrs => intrs)
-            .Where(intr => intr < maxIntrs)
-            .Distinct()
-            .OrderBy(static intr => intr)
-            .ToList();
-
-        if (activeInterrupters.Count == 0)
-        {
-            detail = "no active xHCI interrupters were discovered";
-            return false;
-        }
-
-        List<string> orderedRoles = Priority
-            .Where(role => fallbackRoles.Contains(role))
-            .ToList();
-
-        foreach (string role in fallbackRoles.OrderBy(static role => role, StringComparer.OrdinalIgnoreCase))
-        {
-            if (!orderedRoles.Contains(role, StringComparer.OrdinalIgnoreCase))
-            {
-                orderedRoles.Add(role);
-            }
-        }
-
-        for (int i = 0; i < orderedRoles.Count; i++)
-        {
-            uint intr = activeInterrupters[Math.Min(i, activeInterrupters.Count - 1)];
-            if (!rolesByInterrupter.TryGetValue(intr, out HashSet<string>? roles))
-            {
-                roles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                rolesByInterrupter[intr] = roles;
-            }
-
-            roles.Add(orderedRoles[i]);
-        }
-
-        detail = string.Join(", ", rolesByInterrupter
-            .OrderBy(static kvp => kvp.Key)
-            .Select(kvp => $"intr{kvp.Key}={string.Join("+", kvp.Value.OrderBy(static role => role, StringComparer.OrdinalIgnoreCase))}"));
-        return rolesByInterrupter.Count > 0;
-    }
-
     internal static HashSet<string> ControllerRoleFallback(ImodRoleSnapshot roleSnapshot, string controllerDeviceId)
     {
         HashSet<string> roles = new(StringComparer.OrdinalIgnoreCase);

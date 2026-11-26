@@ -2,22 +2,22 @@
 
 [Documentation](./README.md) / Screenshots · [Русский](./SCREENSHOTS.ru.md)
 
-Interface examples with demonstration data. Click an image to open it at its original size.
+Screenshots use demo device data. Select an image to see it at full size.
 
-## Device settings
+## Graphics card
 
-CPU affinity, MSI mode and interrupt priority on an Intel hybrid system.
+Interrupt affinity for an RTX 4090 on an Intel hybrid CPU. Two P-cores are selected.
 
-[![DEVICE TWEAKER device settings](../assets/screenshots/intel-affinity.en.png)](../assets/screenshots/intel-affinity.en.png)
+[![RTX 4090 card with two P-cores selected](../assets/screenshots/intel-affinity.en.png)](../assets/screenshots/intel-affinity.en.png)
 
 ## USB controller
 
-Controller affinity, power settings and USB IMOD.
+In XHCI mode, the AMD USB controller uses one IMOD interval.
 
 [![USB controller settings](../assets/screenshots/usb-xhci.en.png)](../assets/screenshots/usb-xhci.en.png)
 
 ## Network adapter
 
-RSS processor selection, queue count and NIC ITR on an Intel I226-V.
+An Intel I226-V with four RSS queues selected and CPU 8 as the base processor. The NIC ITR test profile appears below the RSS controls.
 
 [![Network adapter settings](../assets/screenshots/network-rss.en.png)](../assets/screenshots/network-rss.en.png)

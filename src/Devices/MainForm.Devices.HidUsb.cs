@@ -6,68 +6,6 @@ namespace DeviceTweakerCS;
 
 public sealed partial class MainForm
 {
-    private Dictionary<string, List<string>> GetHidControllerRoleMap(Dictionary<string, WmiPnPDevice> deviceLookup, List<(string ControllerId, string DependentId)> usbPairs)
-    {
-        Dictionary<string, List<string>> map = new(StringComparer.OrdinalIgnoreCase);
-        WriteLog("USBROLE.HID: start HID scan");
-
-        foreach (string devicePath in HidInterop.EnumerateHidDevicePaths())
-        {
-            _ = HidInterop.TryReadProductAndUsage(devicePath, out string product, out int? usagePage, out int? usageId);
-            string? productRole = GetHidProductType(product);
-
-            string? inst = HidInterop.TryParseInstanceIdFromDevicePath(devicePath);
-            inst = NormalizeInstanceId(inst);
-
-            WmiPnPDevice? pnpDev = null;
-            if (!string.IsNullOrWhiteSpace(inst))
-            {
-                deviceLookup.TryGetValue(inst, out pnpDev);
-            }
-
-            string? usageRole = GetHidUsageRole(usagePage, usageId);
-            string? pnpRole = GetPnpHidRole(pnpDev);
-            string? role = ResolveHidRole(product, inst, productRole, usageRole, pnpRole);
-
-            if (string.IsNullOrWhiteSpace(inst) || string.IsNullOrWhiteSpace(role))
-            {
-                WriteLog($"USBROLE.HID: skip no-inst-or-role path={devicePath} prod=\"{product}\" role={role}");
-                continue;
-            }
-
-            if (deviceLookup.Count > 0 && !deviceLookup.ContainsKey(inst))
-            {
-                WriteLog($"USBROLE.HID: skip absent in DeviceLookup inst={inst} prod=\"{product}\" role={role}");
-            }
-
-            foreach ((string controllerId, string dependentId) in usbPairs)
-            {
-                if (!dependentId.Contains(inst, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                foreach (string key in GetUsbControllerKeys(controllerId, NormalizeInstanceId))
-                {
-                    if (!map.TryGetValue(key, out List<string>? roles))
-                    {
-                        roles = [];
-                        map[key] = roles;
-                    }
-
-                    if (!roles.Contains(role, StringComparer.OrdinalIgnoreCase))
-                    {
-                        roles.Add(role);
-                        WriteLog($"USBROLE.HID: mapped controller {key} -> {role} (inst={inst} usagePage={usagePage} usage={usageId} prod=\"{product}\")");
-                    }
-                }
-            }
-        }
-
-        WriteLog($"USBROLE.HID: end HID scan, controllers mapped={map.Keys.Count}");
-        return map;
-    }
-
     private List<UsbControllerInfo> FindUsbControllersByVidPid(string id, List<(string ControllerId, string DependentId)> usbPairs)
     {
         List<UsbControllerInfo> list = [];

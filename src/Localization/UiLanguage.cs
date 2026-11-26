@@ -125,9 +125,9 @@ internal static partial class UiLanguage
             ("MSI Limit", "MSI Limit"),
             ("IRQ Priority", "IRQ Priority"),
             ("NDIS Mode", "NDIS Mode"),
-            ("RSS Queues", "RSS Queues"),
+            ("RSS Queues", "Очереди RSS"),
             ("RSS receive queues", "RSS receive queues"),
-            ("Power Saving", "Power Saving"),
+            ("Power Saving", "Энергосбережение"),
             ("Mouse Throttle:", "Mouse Throttle"),
             ("Raw mouse throttle", "Raw mouse throttle"),
             ("Raw Input", "Raw Input"),
@@ -149,6 +149,8 @@ internal static partial class UiLanguage
                 string sourcePattern = $@"(?<![A-Za-z0-9]){Regex.Escape(sourceToken)}(?![A-Za-z0-9])";
                 if (Regex.IsMatch(entry.Key, sourcePattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
                     && !entry.Value.Contains(requiredToken, StringComparison.OrdinalIgnoreCase)
+                    && !(requiredToken == "Очереди RSS" && entry.Value.Contains("RSS Queues", StringComparison.OrdinalIgnoreCase))
+                    && !(requiredToken == "Энергосбережение" && entry.Value.Contains("Power Saving", StringComparison.OrdinalIgnoreCase))
                     && !(requiredToken == "interrupter" && entry.Value.Contains("интерраптер", StringComparison.OrdinalIgnoreCase))
                     && !(requiredToken == "IMOD persistence" && entry.Value.Contains("IMOD", StringComparison.Ordinal)
                         && entry.Value.Contains("автозапуск", StringComparison.OrdinalIgnoreCase)))
@@ -376,7 +378,7 @@ internal static partial class UiLanguage
         match = DefaultRegex().Match(source);
         if (match.Success)
         {
-            return $"стандарт: {TranslateInlineStatus(match.Groups[1].Value)}";
+            return $"базовый интервал: {TranslateInlineStatus(match.Groups[1].Value)}";
         }
 
         match = DevicesRegex().Match(source);
@@ -482,13 +484,13 @@ internal static partial class UiLanguage
         match = QueuesRegex().Match(source);
         if (match.Success)
         {
-            return $"очереди: {TranslateInlineStatus(match.Groups[1].Value)}";
+            return $"значения ITR: {TranslateInlineStatus(match.Groups[1].Value)}";
         }
 
         match = SubtitleRegex().Match(source);
         if (match.Success)
         {
-            return $"версия {match.Groups[1].Value} - разработчик {match.Groups[2].Value}";
+            return $"Версия {match.Groups[1].Value} · {match.Groups[2].Value}";
         }
 
         match = CpuValueRegex().Match(source);
@@ -500,7 +502,7 @@ internal static partial class UiLanguage
         match = ApplyChangesDirtyRegex().Match(source);
         if (match.Success)
         {
-            return $"Применить настройки (Ctrl+S) - изменено: {match.Groups[1].Value}";
+            return $"Применить настройки (Ctrl+S). Изменено: {match.Groups[1].Value}";
         }
 
         match = PendingApplyRegex().Match(source);
@@ -525,7 +527,7 @@ internal static partial class UiLanguage
         }
 
         if (source.StartsWith("Power Saving: ", StringComparison.Ordinal))
-            return "Power Saving: " + TranslateInlineStatus(source[14..]);
+            return "Энергосбережение: " + TranslateInlineStatus(source[14..]);
 
         // The value is the driver's own option text, already in the system language.
         if (source.StartsWith("Interrupt Moderation: ", StringComparison.Ordinal))
@@ -536,7 +538,7 @@ internal static partial class UiLanguage
 
         match = RssRuntimeSummaryRegex().Match(source);
         if (match.Success)
-            return $"RSS: {TranslateInlineStatus(match.Groups[1].Value)} | RSS Base: {match.Groups[2].Value} | RSS Queues: {match.Groups[3].Value}";
+            return $"RSS: {TranslateInlineStatus(match.Groups[1].Value)} | Базовый CPU: {match.Groups[2].Value} | Очереди RSS: {match.Groups[3].Value}";
 
         match = IrqSummaryRegex().Match(source);
         if (match.Success)
@@ -890,7 +892,7 @@ internal static partial class UiLanguage
     [GeneratedRegex("^current: (.+)$", RegexOptions.CultureInvariant)]
     private static partial Regex CurrentRegex();
 
-    [GeneratedRegex("^default: (.+)$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("^base interval: (.+)$", RegexOptions.CultureInvariant)]
     private static partial Regex DefaultRegex();
 
     [GeneratedRegex("^devices: (.+)$", RegexOptions.CultureInvariant)]
@@ -935,13 +937,13 @@ internal static partial class UiLanguage
     [GeneratedRegex("^preview: (.+)$", RegexOptions.CultureInvariant)]
     private static partial Regex PreviewRegex();
 
-    [GeneratedRegex("^queues: (.+)$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("^ITR values: (.+)$", RegexOptions.CultureInvariant)]
     private static partial Regex QueuesRegex();
 
     [GeneratedRegex("^enter 1 or (\\d+) values$", RegexOptions.CultureInvariant)]
     private static partial Regex EnterValuesRegex();
 
-    [GeneratedRegex("^version (.+) - developed by (@[^ ]+)$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("^Version (.+) · (@[^ ]+)$", RegexOptions.CultureInvariant)]
     private static partial Regex SubtitleRegex();
 
     [GeneratedRegex("^Value: ReservedCpuSets = (.+) \\| CPUs: (.+)$", RegexOptions.CultureInvariant)]

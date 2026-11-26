@@ -1,18 +1,18 @@
-name: Hardware report / Отчёт о железе
+name: Hardware report / Отчёт об оборудовании
 description: How the program works on your hardware / Как программа работает на вашей конфигурации
 labels: [hardware]
 body:
   - type: markdown
     attributes:
       value: |
-        These reports help verify auto-optimization, IMOD and NIC ITR on different hardware. Three logs help most: before applying, right after, and after a restart.
-        Такие отчёты помогают проверить AUTO, IMOD и NIC ITR на разном железе. Полезнее всего три лога: до применения, сразу после и после перезагрузки.
+        If available, include log excerpts from before applying, right after, and after restarting Windows.
+        Если сохранились логи до применения, сразу после него и после перезагрузки Windows, приложите нужные фрагменты.
 
         Remove personal paths, names and serial numbers before attaching files.
         Уберите из файлов личные пути, имена и серийные номера.
 
-        How to record an ISR/DPC trace: [guide chapter 10](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/10-verification.md).
-        Как записать трейс ISR/DPC: [глава 10 на русском](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/10-verification.ru.md).
+        [Record an ISR/DPC trace](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/10-verification.md#inspecting-a-trace).
+        [Записать трассу ISR/DPC](https://github.com/arsenzaaa/DEVICE-TWEAKER/blob/main/docs/guide/10-verification.ru.md#просмотр-трассы).
   - type: input
     id: version
     attributes:
@@ -32,7 +32,7 @@ body:
     attributes:
       label: What you tested / Что проверяли
       options:
-        - label: Auto-optimization / Авто-оптимизация
+        - label: Auto-optimization / Автооптимизация
         - label: MSI / Affinity
         - label: USB IMOD
         - label: NIC ITR
@@ -43,16 +43,16 @@ body:
     id: result
     attributes:
       label: Result / Результат
-      description: What was applied, what CHECK showed, any problems / Что применилось, что показал ПРОВЕРИТЬ, были ли проблемы
+      description: What was applied, what CHECK showed, any problems / Какие параметры применились, что показала проверка и какие ошибки возникли
     validations:
       required: true
   - type: textarea
     id: logs
     attributes:
       label: Logs / Логи
-      description: Drag the files from the logs folder / Перетащите файлы из папки logs
+      description: Attach the relevant log excerpts / Приложите фрагменты журнала с нужными операциями
   - type: textarea
     id: trace
     attributes:
-      label: Trace (optional) / Трейс (необязательно)
+      label: Trace (optional) / Трасса (необязательно)
       description: An xperf -a dpcisr report or .etl file before and after applying / Отчёт xperf -a dpcisr или файл .etl до и после применения

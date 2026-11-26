@@ -12,6 +12,8 @@ public sealed partial class StartupScriptTests
     [InlineData("completed-empty", 0, false, 1)]
     [InlineData("completed-ready", 0, false, 0)]
     [InlineData("start-failed", 0, false, 1)]
+    [InlineData("hash-rejected", 1, false, 0)]
+    [InlineData("hash-changed", 1, false, 0)]
     public async Task ShippedLoaderKeepsTimeoutPendingAndBlocksServiceFallback(string mode, int exitCode, bool pending, int serviceCalls)
     {
         string folder = NewFolder("startup-loader");
@@ -38,11 +40,13 @@ public sealed partial class StartupScriptTests
             }
             public sealed class ProbeProcess : IDisposable {
                 public static string Mode;
+                public static int Starts;
                 public bool HasExited;
                 public int ExitCode { get { return 0; } }
                 public StringReader StandardOutput = new StringReader("fake output");
                 public StringReader StandardError = new StringReader("");
                 public static ProbeProcess Start(ProcessStartInfo info) {
+                    Starts++;
                     if (Mode == "start-failed") throw new IOException("start failed");
                     return new ProbeProcess();
                 }
@@ -70,7 +74,13 @@ public sealed partial class StartupScriptTests
             $loader = $loader.Replace('[System.Diagnostics.Process]::Start', '[ProbeProcess]::Start').Replace('[DeviceTweakerImodRuntime]', '[ProbeRuntime]').Replace('[DeviceTweakerLoaderJournal]', '[ProbeJournal]')
             Invoke-Expression $loader
             function Write-ImodLog { param([string]$text) }
-            function Test-ImodFileHash { return $true }
+            $script:driverChecks = 0
+            function Test-ImodFileHash {
+                param([string]$name)
+                if ($name -ne 'DTIMOD.sys') { return $true }
+                $script:driverChecks++
+                return ($Mode -ne 'hash-rejected' -and ($Mode -ne 'hash-changed' -or $script:driverChecks -eq 1))
+            }
             $ImodKduPath = Join-Path $PSScriptRoot 'fake-loader.txt'
             $ImodKduDbPath = Join-Path $PSScriptRoot 'fake-db.txt'
             $ImodDriverPath = Join-Path $PSScriptRoot 'fake-driver.txt'
@@ -81,14 +91,33 @@ public sealed partial class StartupScriptTests
             if ($result.Count -ne 1 -or $result[0] -isnot [bool]) { throw 'Loader leaked pipeline output instead of one Boolean' }
             [ProbeJournal]::Pending = $false; [ProbeRuntime]::Available = $false; [ProbeRuntime]::Services = 0
             $applyUsbImod = $false; $nicItrData = @(); $imodLoadGate = New-Object ProbeGate
+            $profilePath = Join-Path $PSScriptRoot 'profile.json'
+            $importedProfileText = '{}'
+            [System.IO.File]::WriteAllText($profilePath, $importedProfileText)
+            $profileCheck = $ast.Find({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $a.Name -eq 'Test-ImportedImodProfile' }, $true)
+            Invoke-Expression $profileCheck.Extent.Text
             $coordinator = $ast.Find({ param($a) $a -is [System.Management.Automation.Language.TryStatementAst] -and $a.Extent.Text.Contains('startup apply begin; driver=') }, $true)
             if ($null -eq $coordinator) { throw 'Startup coordinator missing' }
             $body = $coordinator.Extent.Text.Replace('[DeviceTweakerImodRuntime]', '[ProbeRuntime]').Replace('[DeviceTweakerLoaderJournal]', '[ProbeJournal]')
+            if ($Mode -like 'hash-*') {
+                [ProbeProcess]::Starts = 0
+                try { Invoke-Expression $body }
+                finally {
+                    Write-Output ("checks=" + $script:driverChecks + "; kdu=" + [ProbeProcess]::Starts + "; services=" + [ProbeRuntime]::Services)
+                }
+                throw 'Expected driver verification to stop startup'
+            }
             Invoke-Expression $body
             [pscustomobject]@{ exitCode=$imodExitCode; pending=[ProbeJournal]::Pending; services=[ProbeRuntime]::Services; loaderResult=$result[0] } | ConvertTo-Json -Compress
             """, new UTF8Encoding(true));
 
         (int code, string output) = await RunPowerShell(probe, "-Mode", mode);
+        if (mode.StartsWith("hash-", StringComparison.Ordinal))
+        {
+            Assert.Equal(1, code);
+            Assert.Contains(mode == "hash-rejected" ? "checks=1; kdu=0; services=0" : "checks=2; kdu=1; services=0", output);
+            return;
+        }
         Assert.True(code == 0, output);
         using JsonDocument json = JsonDocument.Parse(output.Trim().Split('\n')[^1]);
         Assert.Equal(exitCode, json.RootElement.GetProperty("exitCode").GetInt32());

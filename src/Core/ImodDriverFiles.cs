@@ -5,6 +5,16 @@ using static DeviceTweakerCS.ImodDriverNative;
 
 namespace DeviceTweakerCS;
 
+internal enum StagedDriverCleanup
+{
+    Absent,
+    Deleted,
+    Loaded,
+    Referenced,
+    HashMismatch,
+    Unverified
+}
+
 // Embedded driver/loader resources and their verified files on disk. No GUI state.
 internal static class ImodDriverFiles
 {
@@ -112,6 +122,59 @@ internal static class ImodDriverFiles
             error = $"failed to stage DTIMOD.sys: {ex.Message}";
             return false;
         }
+    }
+
+    internal static StagedDriverCleanup CleanUpStagedDriver(Action<string> log)
+    {
+        QaRun.DemandWrite("PUBLISHED DRIVER FILE CLEANUP");
+        try
+        {
+            DriverLoadGate.AssertLoaderIdle();
+            string windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+            if (string.IsNullOrEmpty(windows))
+                throw new InvalidOperationException("Windows directory could not be resolved.");
+
+            string path = Path.Combine(windows, "DTIMOD.sys");
+            using Stream resource = OpenImodDriverResourceStream()
+                ?? throw new InvalidOperationException("Embedded DTIMOD.sys is missing.");
+            string expectedHash = Convert.ToHexString(SHA256.HashData(resource));
+            StagedDriverCleanup result = CleanUpStagedFile(path, expectedHash,
+                DriverIdentity.IsLoaded, DriverIdentity.HasRegisteredService);
+            log($"IMOD.DRIVER.CLEANUP: path=\"{path}\" result={result}");
+            return result;
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException
+            or UnauthorizedAccessException or IOException or System.Security.SecurityException)
+        {
+            log($"IMOD.DRIVER.CLEANUP: result=Unverified error=\"{CompactLogValue(ex.Message)}\"");
+            return StagedDriverCleanup.Unverified;
+        }
+    }
+
+    // The caller holds the shared driver-load lock. The stream denies writes while verifying the payload.
+    internal static StagedDriverCleanup CleanUpStagedFile(string path, string expectedHash,
+        Func<bool> isLoaded, Func<bool> hasRegisteredService)
+    {
+        if (QaRun.IsReadOnly) QaRun.DemandArtifactPath(path);
+        if (isLoaded()) return StagedDriverCleanup.Loaded;
+
+        const FileAttributes unconventional = FileAttributes.Directory | FileAttributes.ReparsePoint;
+        FileAttributes attributes;
+        try { attributes = File.GetAttributes(path); }
+        catch (FileNotFoundException) { return StagedDriverCleanup.Absent; }
+
+        if ((attributes & unconventional) != 0
+            || (File.GetAttributes(Path.GetDirectoryName(path)!) & FileAttributes.ReparsePoint) != 0)
+            throw new IOException($"Unexpected file or directory attributes for {path}.");
+
+        if (hasRegisteredService()) return StagedDriverCleanup.Referenced;
+
+        using FileStream staged = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+        if (!string.Equals(Convert.ToHexString(SHA256.HashData(staged)), expectedHash, StringComparison.Ordinal))
+            return StagedDriverCleanup.HashMismatch;
+
+        File.Delete(path);
+        return StagedDriverCleanup.Deleted;
     }
 
     // Same protection as the startup folder (StartupBundle.SecureFolder): a real directory, owned by

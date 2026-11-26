@@ -41,12 +41,12 @@ public sealed class DriverRuntimeTests
         bool available = scenario == "existing";
         var result = DriverReadyPolicy.Ensure(
             () => { calls.Add("open"); return available; },
+            () => { calls.Add("verify"); return true; },
             () => { calls.Add("kdu"); return scenario == "kdu"; }, () => calls.Add("idle"),
             () => { calls.Add("service"); return available = scenario == "service"; });
         string[] expected = scenario switch {
-            "existing" => ["open"], "kdu" => ["open", "kdu"],
-            "service" => ["open", "kdu", "idle", "service"],
-            _ => ["open", "kdu", "idle", "service"] };
+            "existing" => ["open"], "kdu" => ["open", "verify", "kdu"],
+            _ => ["open", "verify", "kdu", "idle", "verify", "service"] };
         Assert.Equal(expected, calls);
         Assert.Equal(scenario switch { "existing" => DriverReadyResult.Existing, "kdu" => DriverReadyResult.Kdu,
             "service" => DriverReadyResult.Service, _ => DriverReadyResult.Unavailable }, result);
@@ -56,7 +56,7 @@ public sealed class DriverRuntimeTests
     public void PendingKduStopsServiceEvenIfDeviceAppeared()
     {
         bool pending = false, appeared = false;
-        Assert.Throws<TimeoutException>(() => DriverReadyPolicy.Ensure(() => appeared,
+        Assert.Throws<TimeoutException>(() => DriverReadyPolicy.Ensure(() => appeared, () => true,
             () => { pending = appeared = true; return false; },
             () => { if (pending) throw new TimeoutException(); },
             () => throw new Exception("SCM must never run after timeout")));
@@ -65,8 +65,22 @@ public sealed class DriverRuntimeTests
     [Fact]
     public void ExistingDeviceProbeFailureStopsAllLoading()
         => Assert.Throws<IOException>(() => DriverReadyPolicy.Ensure(
-            () => throw new IOException("device probe failed"),
+            () => throw new IOException("device probe failed"), () => true,
             () => throw new Exception("must not map"), () => { }, () => throw new Exception("must not start")));
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RefusedFilePreventsTheNextLoader(bool validAtFirst)
+    {
+        int attempts = 0;
+        DriverReadyResult result = DriverReadyPolicy.Ensure(
+            () => false, () => validAtFirst && attempts == 0,
+            () => { attempts++; return false; }, () => { },
+            () => throw new InvalidOperationException("SCM received an unverified file"));
+        Assert.Equal(DriverReadyResult.Unavailable, result);
+        Assert.Equal(validAtFirst ? 1 : 0, attempts);
+    }
 
     [Fact]
     public async Task ProductionMutexLeaseSerializesCompetingOperationsAndReleasesAfterFailure()

@@ -106,7 +106,7 @@ public sealed class DriverEnvironmentTests
     public void CompactPromptKeepsObservedWindowsRestrictionVisible(uint blocklist, bool hvci)
     {
         string text = DriverEnvironment.BuildCompactConfirmation(Snapshot(blocklist, hvci));
-        Assert.Contains(blocklist != 0 ? "Driver blocklist is configured on." : "Memory integrity (HVCI) is enabled.", text);
+        Assert.Contains(blocklist != 0 ? "The driver blocklist is enabled in the registry." : "Memory integrity (HVCI) is enabled.", text);
         Assert.DoesNotContain("prevent", text);
     }
 
@@ -139,27 +139,29 @@ public sealed class DriverEnvironmentTests
     {
         string text = DriverEnvironment.AntiCheatNotice + "\n\n" + DriverEnvironment.LifetimeNotice;
         Assert.Contains("does not unload", text);
-        Assert.Contains("Saved profiles can load it again", text);
-        Assert.Contains("disconnect you from a game", text);
+        Assert.Contains("Restart Windows to unload it", text);
+        Assert.Contains("reload it at sign-in", text);
+        Assert.Contains("disconnect you from a match", text);
         var translate = typeof(UiLanguage).GetMethod("TranslateRussian", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
         string ru = (string)translate.Invoke(null, [text])!;
         Assert.Contains("не выгружает", ru);
-        Assert.Contains("Сохранённые профили", ru);
-        Assert.DoesNotContain("Saved profiles", ru);
+        Assert.Contains("перезагрузите Windows", ru);
+        Assert.Contains("Сохранённый профиль может загрузить драйвер", ru);
+        Assert.DoesNotContain("A saved profile", ru);
     }
     [Fact] public void AcknowledgedSessionKeepsAutoChoiceWithoutRepeatingTheNotice()
     {
         string text = DriverEnvironment.BuildCompactConfirmation(Snapshot(1), includeCompatibilityNotice: false);
         Assert.StartsWith("Include USB IMOD", text);
-        Assert.Contains("APPLY configures USB IMOD. SKIP continues AUTO without USB IMOD.", text);
+        Assert.Contains("APPLY includes USB IMOD tuning. SKIP keeps the current profile.", text);
         var translate = typeof(UiLanguage).GetMethod("TranslateRussian", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
         string ru = (string)translate.Invoke(null, [text])!;
-        Assert.Contains("ПРИМЕНИТЬ настраивает USB IMOD.", ru);
-        Assert.Contains("ПРОПУСТИТЬ продолжает АВТО без USB IMOD.", ru);
-        Assert.DoesNotContain("APPLY configures", ru);
-        Assert.Contains("Driver blocklist is configured on.", text);
+        Assert.Contains("ПРИМЕНИТЬ включает настройку USB IMOD.", ru);
+        Assert.Contains("ПРОПУСТИТЬ сохраняет текущий профиль.", ru);
+        Assert.DoesNotContain("APPLY includes", ru);
+        Assert.Contains("The driver blocklist is enabled in the registry.", text);
         Assert.DoesNotContain(DriverEnvironment.BriefCompatibilityNotice, text);
         Assert.DoesNotContain("Easy Anti-Cheat", text);
-        Assert.DoesNotContain("Closing DEVICE TWEAKER", text);
+        Assert.DoesNotContain(DriverEnvironment.LifetimeNotice, text);
     }
 }

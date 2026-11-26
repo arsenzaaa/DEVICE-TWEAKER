@@ -24,7 +24,7 @@ public sealed partial class MainForm
         public string? DriverError { get; set; }
     }
 
-    private bool TryApplyImod(ImodConfig config, ImodRoleSnapshot roleSnapshot, bool persistDriver, out ImodApplyStats stats, out string? error)
+    private bool TryApplyImod(ImodConfig config, ImodRoleSnapshot roleSnapshot, bool persistDriver, IReadOnlySet<string>? targetIds, out ImodApplyStats stats, out string? error)
     {
         DemandRealWrite("USB IMOD");
         stats = new ImodApplyStats();
@@ -46,6 +46,9 @@ public sealed partial class MainForm
             return false;
         }
 
+        string[] controllerIds = controllers.Select(controller => controller.DeviceId).ToArray();
+        string[] profileKeys = config.Overrides.Select(entry => entry.Hwid).ToArray();
+        if (targetIds is not null) controllers.RemoveAll(controller => !targetIds.Contains(controller.DeviceId));
         stats.ControllersFound = controllers.Count;
         if (controllers.Count == 0)
         {
@@ -109,42 +112,26 @@ public sealed partial class MainForm
                 bool enabled = true;
                 string? overrideMatch = null;
 
-                foreach (ImodConfigEntry entry in config.Overrides)
+                string? match = DeviceTweakerImodRuntime.SelectUsbProfileMatch(controller.DeviceId,
+                    controllerIds, profileKeys, out bool ambiguous);
+                if (ambiguous)
                 {
-                    if (string.IsNullOrWhiteSpace(entry.Hwid))
-                    {
-                        continue;
-                    }
-
-                    if (controller.DeviceId.IndexOf(entry.Hwid, StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        if (entry.Enabled.HasValue)
-                        {
-                            enabled = entry.Enabled.Value;
-                        }
-                        if (entry.Interval.HasValue)
-                        {
-                            desiredInterval = entry.Interval.Value;
-                            desiredIntervals = null;
-                        }
-                        if (entry.Intervals is { Count: > 0 })
-                        {
-                            desiredIntervals = entry.Intervals;
-                        }
-                        if (entry.AdaptiveRoleBinding == true && entry.RoleIntervals is { Count: > 0 })
-                        {
-                            adaptiveEntry = entry;
-                        }
-                        if (entry.HcsparamsOffset.HasValue)
-                        {
-                            hcsparamsOffset = entry.HcsparamsOffset.Value;
-                        }
-                        if (entry.Rtsoff.HasValue)
-                        {
-                            rtsoff = entry.Rtsoff.Value;
-                        }
-                        overrideMatch = entry.Hwid;
-                    }
+                    stats.ControllersFailed++;
+                    stats.DriverError = "An older USB IMOD profile matches multiple controllers. Select the intended controller again.";
+                    WriteLog($"IMOD.PROFILE: ambiguous legacy selection for {controller.DeviceId}");
+                    continue;
+                }
+                ImodConfigEntry? entry = match is null ? null : config.Overrides.Last(candidate =>
+                    string.Equals(candidate.Hwid, match, StringComparison.OrdinalIgnoreCase));
+                if (entry is not null)
+                {
+                    enabled = entry.Enabled ?? enabled;
+                    desiredInterval = entry.Interval ?? desiredInterval;
+                    desiredIntervals = entry.Intervals;
+                    if (entry.AdaptiveRoleBinding == true && entry.RoleIntervals is { Count: > 0 }) adaptiveEntry = entry;
+                    hcsparamsOffset = entry.HcsparamsOffset ?? hcsparamsOffset;
+                    rtsoff = entry.Rtsoff ?? rtsoff;
+                    overrideMatch = entry.Hwid;
                 }
 
                 if (!enabled)
@@ -796,6 +783,8 @@ public sealed partial class MainForm
 
             ClearImodKernelCiBlockStatus();
             using ImodDriverContext imodDriver = driverContext!;
+            string[] controllerIds = controllers.Select(controller => controller.DeviceId).ToArray();
+            string[] profileKeys = config.Overrides.Select(entry => entry.Hwid).ToArray();
             foreach (ImodControllerInfo controller in controllers)
             {
                 if (controller.ProblemCode == CmProbDisabled || !controller.HasBase)
@@ -812,22 +801,14 @@ public sealed partial class MainForm
                 uint hcsparamsOffset = config.GlobalHcsparamsOffset;
                 uint rtsoff = config.GlobalRtsoff;
 
-                foreach (ImodConfigEntry entry in config.Overrides)
+                string? match = DeviceTweakerImodRuntime.SelectUsbProfileMatch(controller.DeviceId,
+                    controllerIds, profileKeys, out _);
+                ImodConfigEntry? entry = match is null ? null : config.Overrides.Last(candidate =>
+                    string.Equals(candidate.Hwid, match, StringComparison.OrdinalIgnoreCase));
+                if (entry is not null)
                 {
-                    if (string.IsNullOrWhiteSpace(entry.Hwid)
-                        || controller.DeviceId.IndexOf(entry.Hwid, StringComparison.OrdinalIgnoreCase) < 0)
-                    {
-                        continue;
-                    }
-
-                    if (entry.HcsparamsOffset.HasValue)
-                    {
-                        hcsparamsOffset = entry.HcsparamsOffset.Value;
-                    }
-                    if (entry.Rtsoff.HasValue)
-                    {
-                        rtsoff = entry.Rtsoff.Value;
-                    }
+                    hcsparamsOffset = entry.HcsparamsOffset ?? hcsparamsOffset;
+                    rtsoff = entry.Rtsoff ?? rtsoff;
                 }
 
                 if (!DeviceTweakerImodRuntime.TryResolveXhciRuntimeLayout(
@@ -858,7 +839,7 @@ public sealed partial class MainForm
                 {
                     string normalizedControllerId = NormalizeInstanceId(controller.DeviceId);
                     valuesByDeviceId[normalizedControllerId] = values;
-                    if (TryFormatImodInterrupterRoleMap(roleSnapshot, controller, imodDriver, maxIntrs, values, out string mapText, out string mapDetail))
+                    if (TryFormatImodInterrupterRoleMap(roleSnapshot, controller, imodDriver, values, out string mapText, out string mapDetail))
                     {
                         mapByDeviceId[normalizedControllerId] = mapText;
                         mapDetailByDeviceId[normalizedControllerId] = mapDetail;
@@ -978,13 +959,10 @@ public sealed partial class MainForm
             return false;
         }
 
-        if (!TryResolveAdaptiveRolesByInterrupter(
+        if (!TryBuildExactAdaptiveRolesByInterrupter(
                 roleSnapshot, controller,
                 imodDriver,
-                maxIntrs,
-                out Dictionary<uint, HashSet<string>> rolesByInterrupter,
-                out detail,
-                allowFallback: false))
+                out Dictionary<uint, HashSet<string>> rolesByInterrupter, out detail))
         {
             return false;
         }
@@ -1049,7 +1027,6 @@ public sealed partial class MainForm
     private bool TryFormatImodInterrupterRoleMap(
         ImodRoleSnapshot roleSnapshot, ImodControllerInfo controller,
         ImodDriverContext imodDriver,
-        uint maxIntrs,
         IReadOnlyList<uint> currentIntervals,
         out string mapText,
         out string detail)
@@ -1064,13 +1041,10 @@ public sealed partial class MainForm
 
         Dictionary<uint, HashSet<string>> rolesByInterrupter = [];
         string resolveDetail = string.Empty;
-        bool hasRoleMap = TryResolveAdaptiveRolesByInterrupter(
+        bool hasRoleMap = TryBuildExactAdaptiveRolesByInterrupter(
             roleSnapshot, controller,
             imodDriver,
-            maxIntrs,
-            out rolesByInterrupter,
-            out resolveDetail,
-            allowFallback: false);
+            out rolesByInterrupter, out resolveDetail);
         if (!hasRoleMap)
         {
             WriteLog($"IMOD.MAP.ROLES.WARN: unavailable {controller.DeviceId}: {resolveDetail}");
@@ -1086,66 +1060,13 @@ public sealed partial class MainForm
             .Select(block => new ImodRoleDevice(block.Device.InstanceId, block.Device.UsbRoles, block.Device.AudioEndpoints)),
         _usbRoleOverrideByController);
 
-    private bool TryResolveAdaptiveRolesByInterrupter(
-        ImodRoleSnapshot roleSnapshot, ImodControllerInfo controller,
-        ImodDriverContext imodDriver,
-        uint maxIntrs,
-        out Dictionary<uint, HashSet<string>> rolesByInterrupter,
-        out string detail,
-        bool allowFallback = true)
-    {
-        rolesByInterrupter = [];
-
-        if (!TryBuildExactAdaptiveRolesByInterrupter(
-                roleSnapshot, controller,
-                imodDriver,
-                maxIntrs,
-                out rolesByInterrupter,
-                out Dictionary<uint, List<uint>> interruptersByRootPort,
-                out detail))
-        {
-            if (!allowFallback)
-            {
-                return false;
-            }
-
-            if (!TryReadXhciRootPortInterrupters(controller, imodDriver, maxIntrs, out interruptersByRootPort, out string fallbackReadDetail))
-            {
-                detail = $"{detail}; {fallbackReadDetail}";
-                return false;
-            }
-        }
-        else
-        {
-            return true;
-        }
-
-        HashSet<string> fallbackRoles = ImodRoleMap.ControllerRoleFallback(roleSnapshot, controller.DeviceId);
-        if (fallbackRoles.Count == 0)
-        {
-            detail = "no exact USB role/interrupter map and no controller role fallback";
-            return false;
-        }
-
-        if (!ImodRoleMap.TryAssignFallbackRoles(fallbackRoles, interruptersByRootPort, maxIntrs, rolesByInterrupter, out detail))
-        {
-            return false;
-        }
-
-        detail = "fallback controller roles assigned to active interrupters: " + detail;
-        return true;
-    }
-
     private bool TryBuildExactAdaptiveRolesByInterrupter(
         ImodRoleSnapshot roleSnapshot, ImodControllerInfo controller,
         ImodDriverContext imodDriver,
-        uint maxIntrs,
         out Dictionary<uint, HashSet<string>> rolesByInterrupter,
-        out Dictionary<uint, List<uint>> interruptersByRootPort,
         out string detail)
     {
         rolesByInterrupter = [];
-        interruptersByRootPort = [];
         detail = "no exact USB role/interrupter map";
 
         if (!TryReadXhciTopology(controller, imodDriver, out DeviceTweakerImodRuntime.XhciInterrupterTopology topology, out string topologyDetail))
@@ -1153,8 +1074,6 @@ public sealed partial class MainForm
             detail = topologyDetail;
             return false;
         }
-
-        interruptersByRootPort = topology.ByRootPort;
 
         List<UsbEndpointInfo> endpoints;
         try
@@ -1191,30 +1110,6 @@ public sealed partial class MainForm
         return DeviceTweakerImodRuntime.TryReadXhciInterrupterTopology(
             imodDriver.Registers, controller.BaseAddress, controller.MemoryLength, ImodDefaultHcsparamsOffset,
             out _, out topology, out detail);
-    }
-
-    private static bool TryReadXhciRootPortInterrupters(
-        ImodControllerInfo controller,
-        ImodDriverContext imodDriver,
-        uint maxIntrs,
-        out Dictionary<uint, List<uint>> interruptersByRootPort,
-        out string detail)
-    {
-        interruptersByRootPort = [];
-        if (!TryReadXhciTopology(controller, imodDriver, out DeviceTweakerImodRuntime.XhciInterrupterTopology topology, out detail))
-        {
-            return false;
-        }
-
-        interruptersByRootPort = topology.ByRootPort;
-        if (interruptersByRootPort.Count == 0)
-        {
-            detail = "no active xHCI slot root-port interrupter map was found";
-            return false;
-        }
-
-        detail = $"ok; endpointTargets={topology.EndpointTargetCount}, slotTargets={topology.SlotTargetCount}";
-        return true;
     }
 
     private static bool IsAdministrator()

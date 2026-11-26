@@ -2,7 +2,7 @@
 
 Describe the problem and resulting behavior.
 
-Опишите проблему и результат для пользователя.
+Опишите проблему и что изменилось для пользователя.
 
 ## Verification / Проверка
 
@@ -12,4 +12,4 @@ Describe the checks you ran and their results. Include the relevant configuratio
 
 Code: build and checks for the affected behavior. UI: both languages and relevant scaling. Documentation: content, links and rendering. Hardware: device, Windows build, driver and readback.
 
-Код: сборка и проверки затронутого поведения. Интерфейс: оба языка и нужные масштабы. Документация: содержание, ссылки и отображение. Аппаратные изменения: устройство, сборка Windows, драйвер и readback.
+Код: сборка и проверки затронутого поведения. Интерфейс: оба языка и нужные масштабы. Документация: содержание, ссылки и отображение. Аппаратные изменения: устройство, сборка Windows, драйвер и результат повторного чтения настроек.

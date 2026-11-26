@@ -18,11 +18,12 @@ public sealed class StartupConfigReaderTests : IDisposable
     [Theory]
     [InlineData("{broken")]
     [InlineData("null")]
+    [InlineData("{}")]
     [InlineData("{\"schemaVersion\":2}")]
-    [InlineData("{\"usb\":null}")]
-    [InlineData("{\"usb\":{\"controllers\":[null]}}")]
-    [InlineData("{\"nicItr\":[{\"values\":null}]}")]
-    [InlineData("{\"usb\":{\"interval\":\"invalid\"}}")]
+    [InlineData("{\"schemaVersion\":1,\"usb\":null}")]
+    [InlineData("{\"schemaVersion\":1,\"usb\":{\"controllers\":[null]}}")]
+    [InlineData("{\"schemaVersion\":1,\"nicItr\":[{\"values\":null}]}")]
+    [InlineData("{\"schemaVersion\":1,\"usb\":{\"interval\":\"invalid\"}}")]
     public void CorruptCurrentProfileCannotBecomeEmptyOrFallBackToLegacy(string json)
     {
         File.WriteAllText(Current, json);

@@ -280,6 +280,17 @@ internal static class UsbSelectiveSuspendPolicy
         }
     }
 
+    internal static void ResetActivePowerPlanDefaults()
+    {
+        QaRun.DemandWrite("ResetActivePowerPlanDefaults");
+        if (!TryGetActiveScheme(out Guid scheme))
+            throw new InvalidOperationException("Could not read the active Windows power scheme.");
+        uint ac = ReadPowerPlanDefaultIndex(scheme, ac: true);
+        uint dc = ReadPowerPlanDefaultIndex(scheme, ac: false);
+        RestorePowerPlanIndex(scheme, ac: true, ac);
+        RestorePowerPlanIndex(scheme, ac: false, dc);
+    }
+
     public static void SetPowerPlanEnabled(bool enabled)
     {
         QaRun.DemandWrite("SetPowerPlanEnabled");

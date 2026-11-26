@@ -833,74 +833,16 @@ public sealed partial class MainForm
         return string.Join(", ", values.Select(FormatImodValue));
     }
 
-    private static string GetImodOverrideKey(string instanceId)
-    {
-        if (string.IsNullOrWhiteSpace(instanceId))
-        {
-            return string.Empty;
-        }
-
-        int index = instanceId.IndexOf("DEV_", StringComparison.OrdinalIgnoreCase);
-        if (index >= 0 && index + 8 <= instanceId.Length)
-        {
-            string candidate = instanceId.Substring(index, 8).ToUpperInvariant();
-            if (candidate.Length == 8 && candidate[0..4] == "DEV_")
-            {
-                bool isHex = true;
-                foreach (char ch in candidate.AsSpan(4, 4))
-                {
-                    if (!IsHexDigit(ch))
-                    {
-                        isHex = false;
-                        break;
-                    }
-                }
-
-                if (isHex)
-                {
-                    return candidate;
-                }
-            }
-        }
-
-        return instanceId;
-    }
-
-    private static bool IsHexDigit(char ch)
-    {
-        return (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'F') || (ch >= 'a' && ch <= 'f');
-    }
-
     private uint GetEffectiveImodInterval(string instanceId, ImodConfig config)
+        => FindImodOverride(instanceId, config)?.Interval ?? config.GlobalInterval;
+
+    private ImodConfigEntry? FindImodOverride(string instanceId, ImodConfig config)
     {
-        uint interval = config.GlobalInterval;
-        foreach (ImodConfigEntry entry in config.Overrides)
-        {
-            if (!string.IsNullOrWhiteSpace(entry.Hwid)
-                && instanceId.Contains(entry.Hwid, StringComparison.OrdinalIgnoreCase)
-                && (!entry.Enabled.HasValue || entry.Enabled.Value)
-                && entry.Interval.HasValue)
-            {
-                interval = entry.Interval.Value;
-            }
-        }
-
-        return interval;
-    }
-
-    private static ImodConfigEntry? FindImodOverride(string instanceId, ImodConfig config)
-    {
-        ImodConfigEntry? match = null;
-        foreach (ImodConfigEntry entry in config.Overrides)
-        {
-            if (!string.IsNullOrWhiteSpace(entry.Hwid)
-                && instanceId.Contains(entry.Hwid, StringComparison.OrdinalIgnoreCase))
-            {
-                match = entry;
-            }
-        }
-
-        return match;
+        string[] controllers = _blocks.Where(block => block.Device.UsbIsXhci)
+            .Select(block => block.Device.InstanceId).Append(instanceId).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        string? match = DeviceTweakerImodRuntime.SelectUsbProfileMatch(instanceId, controllers,
+            config.Overrides.Select(entry => entry.Hwid).ToArray(), out _);
+        return match is null ? null : config.Overrides.Last(entry => string.Equals(entry.Hwid, match, StringComparison.OrdinalIgnoreCase));
     }
 
     private static string ComputeEmbeddedImodResourceHash(string exactName, string suffix)
@@ -1019,7 +961,7 @@ public sealed partial class MainForm
 
     private sealed record ImodApplyResult(ImodApplyOutcome Outcome, string? Note, string? TechnicalDetails);
 
-    private async Task<ImodApplyResult> ApplyImodSettingsAsync()
+    private async Task<ImodApplyResult> ApplyImodSettingsAsync(IReadOnlySet<string>? targetIds = null)
     {
         string? note = null;
         string? technicalDetails = null;
@@ -1031,13 +973,31 @@ public sealed partial class MainForm
             return new(ImodApplyOutcome.SkippedNoUsb, note, technicalDetails);
         }
 
-        List<DeviceBlock> targetBlocks = xhciBlocks.Where(b => IsUsbImodTarget(b.Device)).ToList();
+        List<DeviceBlock> targetBlocks = xhciBlocks.Where(b => IsUsbImodTarget(b.Device)
+            && (targetIds is null || targetIds.Contains(b.Device.InstanceId))).ToList();
+        if (targetBlocks.Count == 0 && targetIds is not null)
+            return new(ImodApplyOutcome.SkippedNoController, null, null);
 
         if (!ConfirmDriverUse())
             return new(ImodApplyOutcome.SkippedByUser, "Driver access cancelled.", null);
 
-        ImodConfig config = ReadSavedStartupConfig(out _);
-        List<string> invalidInputs = [];
+        StartupConfigReadResult<ImodConfig> saved = ReadSavedStartupConfigResult();
+        if (saved.State == StartupConfigReadState.Error)
+        {
+            string diagnostic = $"{saved.Source}: {saved.Error}";
+            WriteLog($"IMOD.CONFIG: apply blocked; {FlattenLogText(diagnostic)}");
+            return new(ImodApplyOutcome.Failed, "The saved startup profile could not be read. No settings were saved.", diagnostic);
+        }
+        ImodConfig config = saved.Value ?? new ImodConfig();
+        // Validate the entire selected draft before altering any config or editor text.
+        foreach (DeviceBlock block in targetBlocks)
+        {
+            // SET can await a backup while the role editors are still editable.
+            if ((targetIds is not null && block.FindInvalidImodRole?.Invoke() is not null)
+                || !TryParseImodInput(block.ImodBox.Text, config.GlobalInterval, out _))
+                return new(ImodApplyOutcome.Failed, "USB IMOD was not applied because the input is invalid.", block.Device.InstanceId);
+        }
+        string[] controllerIds = xhciBlocks.Select(block => block.Device.InstanceId).ToArray();
 
         foreach (DeviceBlock block in targetBlocks)
         {
@@ -1054,7 +1014,10 @@ public sealed partial class MainForm
 
             string text = block.ImodBox.Text ?? string.Empty;
             text = text.Trim();
-            string hwid = GetImodOverrideKey(block.Device.InstanceId);
+            string hwid = instanceId;
+            string? legacy = DeviceTweakerImodRuntime.SelectUsbProfileMatch(instanceId, controllerIds,
+                config.Overrides.Select(entry => entry.Hwid).Where(key => !DeviceTweakerImodRuntime.IsPciInstanceMatch(key)).ToArray(), out bool ambiguous);
+            bool keepBaselineOverride = legacy is not null || ambiguous;
             ImodConfigEntry? existing = null;
             foreach (ImodConfigEntry entry in config.Overrides)
             {
@@ -1064,23 +1027,8 @@ public sealed partial class MainForm
                 }
             }
 
-            if (text.Length == 0)
-            {
-                config.Overrides.RemoveAll(e =>
-                    string.Equals(e.Hwid, hwid, StringComparison.OrdinalIgnoreCase));
-                block.ImodBox.Text = FormatImodValue(config.GlobalInterval);
-                continue;
-            }
-
-            if (!TryParseImodInput(text, config.GlobalInterval, out ImodInput parsedInput))
-            {
-                string shortPnp = GetShortPnpId(block.Device.InstanceId);
-                string label = string.IsNullOrWhiteSpace(shortPnp) ? block.Device.Name : $"{block.Device.Name} ({shortPnp})";
-                invalidInputs.Add(label);
-                parsedInput = new ImodInput(config.GlobalInterval, null, null, true);
-            }
-
-            if (parsedInput.IsDefault)
+            _ = TryParseImodInput(text, config.GlobalInterval, out ImodInput parsedInput);
+            if (parsedInput.IsDefault && !keepBaselineOverride)
             {
                 config.Overrides.RemoveAll(e =>
                     string.Equals(e.Hwid, hwid, StringComparison.OrdinalIgnoreCase));
@@ -1120,7 +1068,7 @@ public sealed partial class MainForm
             }
         }
 
-        foreach (DeviceBlock block in xhciBlocks.Where(b => !IsUsbImodTarget(b.Device)))
+        foreach (DeviceBlock block in xhciBlocks.Where(b => targetIds is null && !IsUsbImodTarget(b.Device)))
         {
             string hwid = block.Device.InstanceId;
             ImodConfigEntry? existing = null;
@@ -1154,17 +1102,9 @@ public sealed partial class MainForm
             WriteLog($"IMOD.CONFIG: skip non-hid {block.Device.InstanceId} roles=\"{block.Device.UsbRoles}\"");
         }
 
-        if (invalidInputs.Count > 0)
-        {
-            string shown = string.Join(", ", invalidInputs.Take(3));
-            string suffix = invalidInputs.Count > 3 ? " ..." : string.Empty;
-            note = $"{invalidInputs.Count} invalid value(s) were reset to {FormatImodValue(config.GlobalInterval)}.";
-            technicalDetails = $"Invalid IMOD values: {shown}{suffix}";
-        }
-
         bool hasCustomUsb = HasCustomUsbImod(config);
         bool hasCustom = hasCustomUsb || config.NicItrEntries.Count > 0;
-        bool shouldApplyUsbLive = hasCustomUsb || !hasCustom;
+        bool shouldApplyUsbLive = targetIds is not null || hasCustomUsb || !hasCustom;
         string startupPath = GetStartupProfilePath();
         ImodApplyStats stats = new();
         if (shouldApplyUsbLive)
@@ -1174,7 +1114,7 @@ public sealed partial class MainForm
             {
                 try
                 {
-                    bool ok = TryApplyImod(config, roleSnapshot, hasCustom, out ImodApplyStats workStats, out string? error);
+                    bool ok = TryApplyImod(config, roleSnapshot, hasCustom, targetIds, out ImodApplyStats workStats, out string? error);
                     return (Ok: ok, Stats: workStats, Error: error, UnexpectedFailure: false);
                 }
                 catch (Exception error)
@@ -1199,16 +1139,41 @@ public sealed partial class MainForm
             WriteLog("IMOD: USB live apply skipped (no custom USB IMOD config; NIC ITR startup config preserved)");
         }
 
+        if (shouldApplyUsbLive)
+        {
+            string liveResult = $"controllersApplied={stats.ControllersApplied}; controllersPartial={stats.ControllersPartiallyApplied}; controllersFailed={stats.ControllersFailed}; missingBase={stats.MissingBase}; readFailures={stats.ReadFailures}; writes={stats.WritesSucceeded}/{stats.WritesAttempted}; startup=preserved";
+            if (stats.WritesSucceeded == 0)
+            {
+                WriteLog($"IMOD: no USB write completed; {liveResult}");
+                if (stats.WriteFailures == 0 && stats.ControllersFailed == 0 && stats.ReadFailures == 0 && stats.MissingBase == 0)
+                    return new(ImodApplyOutcome.SkippedNoController, "IMOD skipped (no eligible USB controllers).", liveResult);
+                return new(ImodApplyOutcome.Failed, stats.DriverError ?? "USB IMOD was not applied. The previous startup profile was kept.", liveResult);
+            }
+            if (stats.ControllersPartiallyApplied > 0 || stats.ControllersFailed > 0 || stats.ReadFailures > 0
+                || stats.WriteFailures > 0 || stats.MissingBase > 0
+                || (targetIds is not null && stats.ControllersApplied < targetIds.Count))
+            {
+                WriteLog($"IMOD: partial USB write; {liveResult}");
+                return new(ImodApplyOutcome.AppliedWithWarnings,
+                    "Only some USB IMOD values were written. The previous startup profile was kept.", liveResult);
+            }
+        }
+
         if (hasCustom)
         {
             try
             {
-                await SaveStartupProfile(config);
+                bool startupEnabled = await SaveStartupProfile(config);
                 WriteLog($"IMOD.CONFIG: startup profile saved {startupPath}");
+                if (!startupEnabled)
+                    return new(ImodApplyOutcome.AppliedWithWarnings,
+                        "Profile saved. The startup task is still disabled.", null);
             }
             catch (Exception ex)
             {
-                note = "USB IMOD is active for this session, but startup persistence was not saved.";
+                note = shouldApplyUsbLive
+                    ? "USB IMOD was written, but startup persistence was not saved."
+                    : "Startup persistence was not saved.";
                 technicalDetails = ex.ToString();
                 WriteLog($"IMOD.CONFIG: write failed {startupPath}: {FlattenLogText(ex.ToString())}");
                 return new(ImodApplyOutcome.AppliedWithWarnings, note, technicalDetails);
@@ -1216,7 +1181,10 @@ public sealed partial class MainForm
         }
         else
         {
-            await RemoveImodPersistenceFiles();
+            OperationReport removal = new();
+            await RemoveImodPersistenceFiles(removal);
+            if (!removal.Succeeded || removal.Warnings.Count > 0)
+                return new(ImodApplyOutcome.AppliedWithWarnings, "USB IMOD was written, but the old startup profile could not be fully removed.", null);
             config.HasScript = false;
         }
 
@@ -1230,47 +1198,10 @@ public sealed partial class MainForm
             return new(ImodApplyOutcome.Applied, note, technicalDetails);
         }
 
-        if (stats.ControllersFound == 0)
-        {
-            note = "IMOD skipped (no XHCI controllers found).";
-            WriteLog($"IMOD: {note}");
-            return new(ImodApplyOutcome.SkippedNoController, note, technicalDetails);
-        }
-
-        if (stats.ControllersApplied == 0)
-        {
-            if (stats.ControllersPartiallyApplied > 0)
-            {
-                note = $"USB IMOD was only partially written ({stats.WritesSucceeded}/{stats.WritesAttempted} writes).";
-                technicalDetails = $"controllersPartial={stats.ControllersPartiallyApplied}; controllersFailed={stats.ControllersFailed}; readFailures={stats.ReadFailures}; writeFailures={stats.WriteFailures}";
-                WriteLog($"IMOD: {note} {technicalDetails}");
-                return new(ImodApplyOutcome.AppliedWithWarnings, note, technicalDetails);
-            }
-
-            if (stats.WriteFailures > 0 || stats.ControllersFailed > 0 || stats.ReadFailures > 0 || stats.WritesAttempted > 0)
-            {
-                note = stats.DriverError ?? "USB IMOD was not applied.";
-                technicalDetails = $"controllersFailed={stats.ControllersFailed}; readFailures={stats.ReadFailures}; writeFailures={stats.WriteFailures}; writesAttempted={stats.WritesAttempted}";
-                WriteLog($"IMOD: {note} {technicalDetails}");
-                return new(ImodApplyOutcome.Failed, note, technicalDetails);
-            }
-
-            note = "IMOD skipped (no eligible USB controllers).";
-            WriteLog($"IMOD: {note}");
-            return new(ImodApplyOutcome.SkippedNoController, note, technicalDetails);
-        }
-
-        if (stats.ReadFailures > 0 || stats.WriteFailures > 0 || stats.ControllersPartiallyApplied > 0 || stats.ControllersFailed > 0)
-        {
-            note = $"USB IMOD was applied with warnings ({stats.WritesSucceeded}/{stats.WritesAttempted} writes).";
-            technicalDetails = $"controllersApplied={stats.ControllersApplied}; controllersPartial={stats.ControllersPartiallyApplied}; controllersFailed={stats.ControllersFailed}; readFailures={stats.ReadFailures}; writeFailures={stats.WriteFailures}";
-            return new(ImodApplyOutcome.AppliedWithWarnings, note, technicalDetails);
-        }
-        else
-        {
-            note = $"IMOD applied to {stats.ControllersApplied} USB controller(s).";
-        }
-
+        note = hasCustom && hasCustomUsb
+            ? "USB IMOD was written and its startup profile was saved."
+            : "USB IMOD was written. No custom USB settings remain in the startup profile.";
+        technicalDetails = $"controllersApplied={stats.ControllersApplied}; writes={stats.WritesSucceeded}/{stats.WritesAttempted}; startup={(hasCustom ? "saved" : "removed")}";
         return new(ImodApplyOutcome.Applied, note, technicalDetails);
     }
 
@@ -1301,11 +1232,22 @@ public sealed partial class MainForm
         }
     }
 
+    private bool RejectInvalidImodRole(DeviceBlock block)
+    {
+        if (block.FindInvalidImodRole?.Invoke() is not string role) return false;
+        WriteLog($"IMOD.INPUT.INVALID: instance=\"{SanitizeLogValue(block.Device.InstanceId)}\" role={role}");
+        string label = UiLanguage.Text(role + ":").TrimEnd(':');
+        ShowThemedInfo(string.Format(CultureInfo.CurrentCulture, UiResources.Get(UiText.InvalidImodRole),
+            label), "USB IMOD");
+        return true;
+    }
+
     // SET on an IMOD card: backup, write the intervals, save autostart, then read them back.
     private async Task ApplyImodFromBlock(DeviceBlock? targetBlock)
     {
         WriteLog("UI: SET IMOD button clicked");
-        if (targetBlock is not null && targetBlock.Device.IsTestDevice)
+        if (targetBlock is null || RejectInvalidImodRole(targetBlock)) return;
+        if (targetBlock.Device.IsTestDevice)
         {
             RefreshTestImodPreview(targetBlock, "test-imod-set");
             return;
@@ -1334,7 +1276,8 @@ public sealed partial class MainForm
 
         report.SetBackupPath(_lastBackupPath);
 
-        (ImodApplyOutcome outcome, string? note, string? technicalDetails) = await ApplyImodSettingsAsync();
+        (ImodApplyOutcome outcome, string? note, string? technicalDetails) = await ApplyImodSettingsAsync(
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { targetBlock.Device.InstanceId });
         if (_uiDisposing || IsDisposed || Disposing) return;
         if (outcome is ImodApplyOutcome.SkippedNoUsb or ImodApplyOutcome.SkippedNoController or ImodApplyOutcome.SkippedByUser)
         {
@@ -1363,10 +1306,10 @@ public sealed partial class MainForm
             successMessage: note ?? "IMOD applied.",
             partialMessage: "USB IMOD completed with warnings or failed steps.",
             operationName: "USB IMOD");
-    
+
     }
 
-    // DELETE on an IMOD card: controller defaults, autostart removed.
+    // Remove the shared profile after confirmation and preserve a rollback copy.
     private async Task DeleteImodFromBlock(DeviceBlock? targetBlock)
     {
         WriteLog("UI: DELETE IMOD button clicked");
@@ -1385,26 +1328,59 @@ public sealed partial class MainForm
         using IDisposable? operation = TryBeginDeviceOperation("IMOD DELETE");
         if (operation is null) return;
 
-        OperationReport report = new();
-        try
-        {
-            await ResetImodIntervalsToDefault("imod-delete", report);
-        }
-        catch (Exception ex)
-        {
-            WriteLog($"IMOD.DELETE: failed: {ex.Message}");
-            report.AddError("IMOD delete", ex.Message);
-        }
+        if (!ConfirmImodProfileRemoval()) return;
 
-        ShowOperationResult(
-            report,
-            successMessage: "IMOD reset to defaults.\nStartup script removed. Reboot your PC to unload DTIMOD.sys from memory if it was loaded.",
-            partialMessage: "IMOD delete finished with errors. Some persistence files may still remain. If the driver was loaded, reboot to unload DTIMOD.sys from memory.",
-            operationName: "USB IMOD DELETE");
-        if (report.Succeeded)
+        OperationReport report = new();
+        StagedDriverCleanup? driverCleanup = null;
+        if (!await CreateDeviceTweakerBackup("pre-imod-delete", showDialog: false))
         {
-            WriteLog("IMOD.DELETE: done; reboot recommended to unload DTIMOD.sys from memory");
+            report.MarkNoChangesMade();
+            report.AddError("Automatic backup", "backup could not be created; changes were not applied");
         }
-    
+        else
+        {
+            report.SetBackupPath(_lastBackupPath);
+            try
+            {
+                driverCleanup = await RemoveImodPersistenceFiles(report, cleanUpStagedDriver: true);
+                if (report.Succeeded && report.Warnings.Count == 0)
+                {
+                    _imodConfigLoaded = false;
+                    foreach (DeviceBlock block in _blocks.Where(block => IsUsbImodTarget(block.Device)))
+                    {
+                        block.ImodBox.Text = FormatImodValue(ImodDefaultInterval);
+                        block.ImodAutoCheck.Checked = false;
+                        if (block.InitialEditorState is { } baseline)
+                            block.RestoreInitialState(baseline with { ImodText = block.ImodBox.Text, ImodEnabled = false });
+                    }
+                    UpdateApplyButtonDirtyCount();
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteLog($"IMOD.DELETE: failed: {ex.Message}");
+                report.AddError("IMOD delete", ex.Message);
+            }
+        }
+        if (IsDisposed || Disposing) return;
+
+        ShowImodDeleteResult(report, driverCleanup);
+    }
+
+    private bool ConfirmImodProfileRemoval()
+        => ShowThemedConfirm(
+            "Remove the shared USB IMOD and NIC ITR startup profile?\n\nThe staged DTIMOD.sys file will also be removed if it matches this build and is no longer in use.",
+            "DELETE PROFILE", "DELETE", "CANCEL");
+
+    private void ShowImodDeleteResult(OperationReport report, StagedDriverCleanup? driverCleanup)
+    {
+        string message = driverCleanup switch
+        {
+            StagedDriverCleanup.Deleted => "Startup profile and driver file removed. Restart Windows to clear active register changes.",
+            StagedDriverCleanup.Loaded => "Startup profile removed. Restart Windows to unload DTIMOD, then use DELETE PROFILE again to remove the file.",
+            StagedDriverCleanup.Referenced or StagedDriverCleanup.HashMismatch or StagedDriverCleanup.Unverified => "Startup profile removed. DTIMOD.sys was kept because it could not be safely removed. See the log.",
+            _ => "Startup profile removed. Restart Windows to clear active register changes."
+        };
+        ShowOperationResult(report, message, "The startup profile could not be fully removed. Open DETAILS.", "DELETE PROFILE");
     }
 }

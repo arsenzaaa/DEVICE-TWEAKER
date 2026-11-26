@@ -2,9 +2,7 @@
 
 [Documentation](./README.md) / Settings · [Русский](./SETTINGS.ru.md)
 
-Settings, stored values and readback for each control.
-
-[Interface](#interface) · [Interrupts](#interrupts) · [USB xHCI IMOD](#usb-xhci-imod) · [Network adapters](#network-adapters) · [Additional settings](#additional-settings) · [Intelligent auto-optimization and restore](#intelligent-auto-optimization-and-restore)
+[Interface](#interface) · [Interrupts](#interrupts) · [USB xHCI IMOD](#usb-xhci-imod) · [Network adapters](#network-adapters) · [Additional settings](#additional-settings) · [Auto-optimization and restore](#auto-optimization-and-restore)
 
 ## Interface
 
@@ -16,15 +14,15 @@ The interface language is saved in `%LOCALAPPDATA%\DEVICE TWEAKER\settings.json`
 
 ### MSI / MSI-X
 
-**MSI Mode** selects the saved interrupt setting. Changing the dropdown creates a pending edit; **APPLY** writes `MSISupported` to the device's registry key. Restart Windows before checking whether its driver uses the new setting. Disabling MSI is refused when PCI capabilities explicitly report message interrupts without line-based INTx support.
+Choose a value in **MSI Mode** and click **APPLY** to write `MSISupported` to the device's registry key. Restart Windows before checking whether its driver uses the new setting. Disabling MSI is refused when PCI capabilities explicitly report message interrupts without line-based INTx support.
 
-**IRQ Mode** reports the current mode: Line, MSI, MSI-X, or MSI/MSI-X when the available data cannot distinguish the two message modes. A saved **Enabled** setting alongside **Line** can mean a reboot is still needed or the device driver did not use the setting. [Chapter 2](./guide/02-msi.md) explains the difference.
+**IRQ Mode** reports Line, MSI or MSI-X. It shows MSI/MSI-X when it can confirm message-signaled interrupts but cannot distinguish the two modes. See [MSI and MSI-X](./guide/02-msi.md) for examples.
 
-**READ IRQ MODE** queries every PCI device in the list, including cards hidden by filters. It reads allocated Windows interrupt resources and, through DTIMOD, the PCI `MSI Enable` / `MSI-X Enable` bits. Reading these bits distinguishes MSI from MSI-X even with one IRQ. The command can load DTIMOD; it does not apply settings. Progress and the final readable/total count appear on the button, with a summary in its tooltip.
+**READ IRQ MODE** queries every PCI device in the list, including cards hidden by filters. It reads allocated Windows interrupt resources and, through DTIMOD, the PCI `MSI Enable` / `MSI-X Enable` bits. Reading these bits distinguishes MSI from MSI-X even with one IRQ. The command can load DTIMOD; it does not apply settings. The button shows progress and the number of devices with a result out of the total checked. Its tooltip lists how many results were unavailable.
 
-Opening the program or pressing **REFRESH** also starts background reads, using Windows resources or an already loaded DTIMOD. These reads do not load the driver. The old result is cleared before rereading; unavailable data, read errors and conflicting evidence are shown separately and logged. **No IRQ** means no allocated interrupt resources. A successful read describes the state at that moment: [MSI-X routing can change at runtime](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/dynamically-configuring-msi-x).
+Opening the program or pressing **REFRESH** also starts background reads, using Windows resources or an already loaded DTIMOD. These reads do not load the driver. These background checks clear the old result before rereading. The card and log distinguish unavailable data, read failures and conflicting information. **No IRQ** means no allocated interrupt resources. A successful read describes the state at that moment: [MSI-X routing can change at runtime](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/dynamically-configuring-msi-x).
 
-**HW** lists the device's supported interrupt modes and message limit. **IRQ** shows its allocated Windows interrupt-resource count.
+**HW** lists the device's supported interrupt modes and maximum message count. **IRQ** shows the interrupt-resource count from WMI. The configured limit is shown separately in **MSI Limit**.
 
 **MSI Limit** sets `MessageNumberLimit`. **Unlimited** removes the custom registry limit so Windows and the driver can select the count. Numeric input is checked against detected capabilities. See [enabling MSI](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/enabling-message-signaled-interrupts-in-the-registry).
 
@@ -32,41 +30,27 @@ Opening the program or pressing **REFRESH** also starts background reads, using 
 
 ### Interrupt Affinity
 
-**[Interrupt Affinity](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/interrupt-affinity-and-priority)** selects the logical processors eligible to service a device's IRQs. The CPU list identifies SMT/HT siblings, Intel P/E cores, AMD CCD/CCX, and available CPPC rankings. The selection can therefore be made by physical core and sibling thread, not just by CPU number.
+**CPU Affinity** selects the logical processors eligible to service a device's interrupts. The list shows SMT siblings and available topology information, including P-/E-cores on hybrid CPUs, CCD/CCX and CPPC rank. The selection covers processor group 0, up to 64 logical processors.
 
-**SpecCPU** writes `DevicePolicy` and `AssignmentSetOverride`. Clearing the CPU selection for a regular device writes `DevicePolicy=0` (`MachineDefault`) and removes `AssignmentSetOverride`; NDIS adapters follow the selected RSS/IRQ mode.
-
-The mask covers processor group 0, up to 64 logical processors. [Chapter 3](./guide/03-affinity.md) describes processor selection; [chapter 10](./guide/10-verification.md) covers ISR/DPC traces.
-
-**Policy** also offers `MachineDefault`, `All`, `AllClose`, `Single`, and [`SpreadMessages`](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_device_policy). Only `SpecCPU` uses the CPUs selected in the list as a mask. The other policies leave processor selection to Windows; `SpreadMessages` can place different messages on different CPUs when the device and driver use multiple MSI-X vectors. The policy itself does not create additional vectors.
+**Policy** controls how Windows selects processors. Use **SpecCPU** for the mask shown in the card. On devices with an affinity picker, clearing the selection and clicking **APPLY** removes the custom mask and restores **MachineDefault**. NDIS adapters use the selected RSS/IRQ mode. The [affinity chapter](./guide/03-affinity.md) lists the policies and registry values.
 
 ## USB xHCI IMOD
 
-USB IMOD uses DTIMOD. The application requests confirmation once per session; AUTO includes it in the USB IMOD prompt. **DRIVER INFO** displays HVCI, the driver-blocklist registry setting and FACEIT/Vanguard service states. Loading and compatibility are described in the [driver chapter](./guide/11-driver.md).
+IMOD sets the xHCI interrupt moderation interval and uses [DTIMOD](./guide/11-driver.md). **XHCI** uses one value for the whole controller. **Devices** uses values for detected roles when the device map is available. **Interrupters** lets you set values by index. See the [USB chapter](./guide/05-usb-imod.md) for interval units, role mapping and AUTO values.
 
-AUTO sets mouse IMOD to `0x0`, disabling moderation regardless of polling rate. Manual values are configured separately.
-
-**[IMOD](https://cdrdv2-public.intel.com/625472/625472_xHCI_Rev1_2b.pdf)** sets the xHCI interrupt-moderation interval. The register belongs to a controller *interrupter* with its own Event Ring, not to an individual mouse or keyboard. Each step is 250 ns: `0xC8` is 50 µs, `0xFA0` is 1 ms, and `0x0` disables moderation.
-
-**Devices** builds a profile for detected mice, keyboards, gamepads, and USB audio, then attempts to map them to interrupters through the xHCI topology. If a reliable map is unavailable, it applies one controller-wide value. **XHCI** writes one value to all interrupters; **Interrupters** opens per-index control. The details show the controller's first 64 interrupters.
-
-The current-value tooltip shows the last read time. After a device is attached or removed, the map is marked "devices changed"; **CHECK** rereads it.
+Hover over the current value to see when it was read. If a device is connected or removed, the map is marked "devices changed". Click **CHECK** to read it again.
 
 ### Commands
 
-- **SET** writes the selected configuration and reads the registers back. The program saves custom values to the startup task (see below).
+- **SET** writes the selected controller's registers and refreshes the displayed values. Custom settings are saved for startup after a successful write.
 - **CHECK** rereads the registers and loads DTIMOD if needed. **REFRESH** updates the device list and available current state; hardware reads use an already loaded DTIMOD.
-- **DELETE** removes the shared startup configuration for IMOD and saved NIC ITR profiles and restores the network driver's moderation that **SAVE** turned off. The UI switches to the default IMOD value (0xC8). With the driver loaded, the program can also reset IMOD registers. USB IMOD writes are skipped when only saved NIC ITR profiles remain in the configuration. Restart Windows to finish resetting.
-
-**DELETE** does not create a separate automatic backup.
+- **DELETE PROFILE** backs up and removes the shared USB IMOD and NIC ITR startup profile. Restart Windows to clear active register changes. See [Delete or restore](./guide/05-usb-imod.md#delete-or-restore) for network moderation and driver-file cleanup.
 
 The main **APPLY** button also applies USB IMOD along with the other device settings.
 
-The [USB chapter](./guide/05-usb-imod.md) explains interrupter mapping, moderation intervals and device-role profiles.
-
 ### IMOD / NIC ITR at startup
 
-The saved profile is stored in `%ProgramData%\DEVICE TWEAKER\Startup`. The `\DEVICE TWEAKER\IMOD` task runs as SYSTEM at sign-in, after resume and on relevant USB/HID events. It applies settings independently of the EXE. The previous AppData/Run startup layout is migrated with its saved values.
+The saved profile is stored in `%ProgramData%\DEVICE TWEAKER\Startup`. The `\DEVICE TWEAKER\IMOD` task runs as SYSTEM at sign-in, after resume and on relevant USB/HID events. It applies settings independently of the EXE. A profile in the previous AppData/Run layout is converted when you save new settings or restore a backup.
 
 Files, hash checks, permissions and logs are described in the [driver chapter](./guide/11-driver.md#saved-profile).
 
@@ -76,17 +60,19 @@ Files, hash checks, permissions and logs are described in the [driver chapter](.
 
 **[RSS](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-receive-side-scaling)** distributes incoming packet processing across CPUs using a hash and an indirection table. **RSS Queues** sets the requested receive-queue count; the base CPU is the starting point for processor selection. **NDIS Mode** applies RSS, Interrupt Affinity, or both.
 
-Queue choices follow the adapter's advertised driver options. RSS processor selection uses one logical processor per physical core, with `*MaxRssProcessors` and `*RssMaxProcNumber` defining the requested range. For adapters without MSI-X, multiple advertised queues can share one processor. AUTO requests one queue on one physical core; SMT does not double this count. The [network chapter](./guide/06-network.md) explains these settings.
+Queue choices follow the adapter driver's advertised options. RSS processor selection uses one logical CPU per physical core. AUTO queue selection and the distinction between CPUs and queues are covered in the [network chapter](./guide/06-network.md#what-rss-does).
 
-The card displays saved parameters and active `Get-NetAdapterRss` state, with differences recorded in the log. The [Balanced profile](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/standardized-inf-keywords-for-rss) manages processor placement automatically. RSS writes take effect through the adapter driver; the application leaves adapter restart to the user.
+The card shows the saved queue setting and a summary of active RSS. The log compares the requested settings with the adapter's current values. With the [Balanced profile](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/standardized-inf-keywords-for-rss), Windows chooses the processor range automatically, while the queue count and maximum processor count remain configurable. Restart Windows to let the adapter driver read the saved values.
+
+**Affinity (RSS mask)** shows the processors selected by DEVICE TWEAKER. Check the active RSS state to see what the adapter adopted.
 
 ### NIC ITR
 
 **NIC ITR** accesses hardware moderation registers on supported network controllers: Intel I210/I211, I219, I225/I226, I350, 82576/82580, Realtek RTL8111/8168, RTL8125/8126, and compatible Killer models. Hardware writes are disabled for unknown PCI IDs.
 
-**SET** writes the register now, **SAVE** stores a profile in the startup task without changing the current register, and **CHECK** rereads the hardware.
+**SET** writes the register now. **SAVE** stores a startup profile for the adapter. **CHECK** reads the current register values.
 
-The driver's own adaptive moderation would overwrite the register, so **SAVE** turns it off in the registry (`*InterruptModeration`, and `ITR` on Intel). The change takes effect after a restart. The card's **Interrupt Moderation** line shows the current state; **DELETE** in the IMOD block restores the driver default. Register formats and interval units differ by controller family: an [Intel EITR](https://cdrdv2-public.intel.com/333016/333016%20-%20I210_Datasheet_v_3_7.pdf) value is not a ready-made Realtek profile. A shorter interval can increase both interrupt rate and CPU load.
+**SAVE** turns off supported driver-moderation settings (`*InterruptModeration` and, on applicable Intel drivers, `ITR`). The driver reads them when the adapter starts. **Interrupt Moderation** in the card shows the configured driver values. Use **DELETE PROFILE** in the USB IMOD block to remove the saved profile and restore [applicable driver defaults](./guide/05-usb-imod.md#delete-or-restore).
 
 ## Additional settings
 
@@ -94,19 +80,23 @@ The driver's own adaptive moderation would overwrite the register, so **SAVE** t
 
 **Power Saving** controls available settings for the USB controller and its root hubs, including [USB selective suspend](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/usb-selective-suspend). For a wired network adapter, the switch changes whether Windows may turn off the device to save power. Availability depends on the driver.
 
-On supported Windows 11 builds, **Mouse Throttle** changes `RawMouseThrottleDuration`, a throttle interval for background [Raw Input](https://learn.microsoft.com/en-us/windows/win32/inputdev/raw-input) listeners to which Windows applies this mechanism. Some background registrations can bypass it. The setting does not change the mouse's USB polling rate or target the foreground window.
+**Mouse Throttle** sets the interval Windows applies to eligible background Raw Input listeners. Switching it off removes the custom registry value. See [Mouse Throttle](./guide/08-input.md#mouse-throttle) for the supported Windows builds and interval units.
 
 **Raw Input measurements** estimate the mouse event rate while the mouse is moving. The input chapter explains [event delivery and polling rate](./guide/08-input.md).
 
 The **MOUSE**, **KEYBOARD**, **GAMEPAD**, **USB**, **GPU**, **NETWORK**, **AUDIO**, and **STORAGE** category buttons jump to matching devices in the full list. Text search hides nonmatching devices.
 
-## Intelligent auto-optimization and restore
+## Auto-optimization and restore
 
 **AUTO-OPTIMIZATION** selects physical cores from topology and CPPC rankings. On multi-CCD systems it selects a target CCD separately; two SMT threads of one core are not counted as two independent cores. A discrete GPU gets two distinct physical cores; an integrated GPU's affinity is returned to Windows defaults. Input devices, wired network adapters, and audio have separate sharing rules.
 
-Assignments without a suitable core or a reliably detected role are skipped with a reason in the report. If CPU topology cannot be determined reliably, affinity masks are not written. For NDIS adapters, the RSS/IRQ mode is chosen using the detected runtime state. USB IMOD tuning can be included when starting intelligent auto-optimization; NIC ITR remains manual.
+Assignments without a suitable core or a reliably detected role are skipped with a reason in the report. If CPU topology cannot be determined reliably, affinity masks are not written. On NDIS adapters, AUTO chooses RSS, IRQ, or BOTH based on the adapter's current settings and capabilities. Choose whether to include USB IMOD before starting. NIC ITR is configured manually.
 
-A validated backup is created before the main manual apply, IMOD / NIC ITR **SET**, NIC ITR **SAVE**, backup restoration, and the main reset. Intelligent auto-optimization requires an original-settings snapshot; an extra backup is optional. No write begins if a required snapshot cannot be created. Saved backups can be selected under **RESTORE**.
+Auto-optimization clears [ReservedCpuSets](./guide/07-cpu-topology.md#reservedcpusets) when the reservation panel is available.
+
+The application creates and verifies a backup before manual **APPLY**, USB IMOD or NIC ITR **SET**, NIC ITR **SAVE**, restore and reset. Auto-optimization requires a backup of the original settings. The extra backup is optional. If a required backup fails, the operation stops before writing. Choose a backup under **RESTORE**.
+
+Backups store Windows registry paths for the device and driver instances present at the time. Use them on the Windows installation and hardware configuration where they were created.
 
 Restoring a backup with an outdated NIC ITR layout skips the incompatible startup entry and reports a warning. The other supported settings are restored. Save NIC ITR again for that adapter; see [NIC ITR compatibility](./guide/06-network.md#nic-itr).
 

@@ -53,7 +53,7 @@ public sealed partial class MainForm
         string detailText =
             $"{mappedDeviceLine}\r\n\r\n{visibleInterruptLines}\r\n{ImodMapText.Detailed(values, labelsByInterrupter)}\r\n{ImodMapText.Raw(values)}\r\n{ImodMapText.Time(values)}\r\nsource: test preview only; no driver read/write";
 
-        block.ImodDefaultLabel.Text = $"default: {FormatImodValue(fallback)}";
+        block.ImodDefaultLabel.Text = $"base interval: {FormatImodValue(fallback)}";
         block.ImodDefaultLabel.Tag = FormatImodValue(fallback);
         // Fixed time keeps workbench snapshots comparable between runs.
         block.ImodMapReadAt = DateTime.Today.AddHours(12);

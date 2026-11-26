@@ -1604,7 +1604,7 @@ public sealed partial class MainForm
             ShowOperationResult(
                 preview,
                 "Core optimization was saved.",
-                "Applied steps were saved. One optional step was not completed.",
+                "Settings were saved. An optional step did not complete.",
                 operationName: "AUTO-OPTIMIZATION");
         };
 
@@ -1622,7 +1622,7 @@ public sealed partial class MainForm
             AttachPreviewBackupPath(preview);
             ShowOperationResult(
                 preview,
-                "Applied steps were saved.",
+                "Applied settings were saved.",
                 "Partially applied (5/8 successful, 3 skipped or failed).",
                 operationName: "AUTO-OPTIMIZATION");
         };

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "imod-invalid-role",
+  "preset": "Intel14900K",
+  "language": "EN",
+  "filter": "USB",
+  "width": 1200,
+  "height": 900,
+  "steps": [
+    { "id": "show-audio", "action": "reveal", "target": "id:IMOD_ROLE_AUDIO", "device": "DEV_1242" },
+    { "id": "invalid-audio", "action": "text", "target": "id:IMOD_ROLE_AUDIO", "device": "DEV_1242", "value": "0xZZ" },
+    { "id": "show-set", "action": "reveal", "target": "text:SET", "device": "DEV_1242" },
+    { "id": "try-set", "action": "click", "target": "text:SET", "device": "DEV_1242" },
+    { "id": "set-refused", "action": "wait", "target": "id:INFO_DIALOG", "property": "visible", "value": "true", "durationMs": 1500 },
+    { "id": "set-names-audio", "action": "assert", "target": "text:Enter a valid USB\u00a0IMOD interval in the \"Audio\" field.", "property": "visible", "value": "true" },
+    { "id": "set-message-en", "action": "capture", "target": "@active" },
+    { "id": "close-set-message", "action": "click", "target": "active:id:OK" },
+    { "id": "ru", "action": "language", "value": "RU" },
+    { "id": "try-apply", "action": "click", "target": "text:ПРИМЕНИТЬ" },
+    { "id": "apply-refused", "action": "wait", "target": "id:INFO_DIALOG", "property": "visible", "value": "true", "durationMs": 1500 },
+    { "id": "apply-names-audio", "action": "assert", "target": "text:Введите допустимый интервал USB\u00a0IMOD в\u00a0поле \"Аудио\".", "property": "visible", "value": "true" },
+    { "id": "apply-message-ru", "action": "capture", "target": "@active" },
+    { "id": "close-apply-message", "action": "click", "target": "active:id:OK" },
+    { "id": "return-audio", "action": "reveal", "target": "id:IMOD_ROLE_AUDIO", "device": "DEV_1242" },
+    { "id": "correct-audio", "action": "text", "target": "id:IMOD_ROLE_AUDIO", "device": "DEV_1242", "value": "0xFA1" },
+    { "id": "show-set-ru", "action": "reveal", "target": "text:ЗАДАТЬ", "device": "DEV_1242" },
+    { "id": "valid-set", "action": "click", "target": "text:ЗАДАТЬ", "device": "DEV_1242" },
+    { "id": "valid-set-returned", "action": "assert", "target": "text:ЗАДАТЬ", "device": "DEV_1242", "property": "enabled", "value": "true" }
+  ]
+}

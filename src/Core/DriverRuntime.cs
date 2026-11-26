@@ -10,12 +10,14 @@ namespace DeviceTweakerCS
     {
         // Used by ImodDriverContext; callbacks retain native handles and diagnostic details.
         public static DriverReadyResult Ensure(System.Func<bool> openExisting,
-            System.Func<bool> loadKdu, System.Action assertIdle, System.Func<bool> loadService)
+            System.Func<bool> verifyDriver, System.Func<bool> loadKdu, System.Action assertIdle,
+            System.Func<bool> loadService)
         {
             if (openExisting()) return DriverReadyResult.Existing;
+            if (!verifyDriver()) return DriverReadyResult.Unavailable;
             if (loadKdu()) return DriverReadyResult.Kdu;
             assertIdle(); // An unknown KDU outcome must stop SCM fallback.
-            return loadService() ? DriverReadyResult.Service : DriverReadyResult.Unavailable;
+            return verifyDriver() && loadService() ? DriverReadyResult.Service : DriverReadyResult.Unavailable;
         }
     }
 

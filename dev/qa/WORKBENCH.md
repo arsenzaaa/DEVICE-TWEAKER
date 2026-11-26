@@ -20,7 +20,7 @@ Cache preparation and the scenario run in one bounded private job, including com
 
 `-BuildRoot` selects a shared cache directory, including across worktrees. Use a short path when a nested checkout makes Windows DLL paths too long; it does not change Windows settings.
 
-`-FreshBuild` creates an independent build for diagnosing a suspected build problem. An incomplete or altered cache entry stops reuse; it is preserved for inspection. Failed entries are not overwritten and old builds are never deleted automatically. Before archiving a build, retain it with the sessions that reference it, or accept that source/build verification will require restoring it. A session's `build-reference.json` identifies the exact directory and manifest hash.
+If build preparation is interrupted before the manifest is saved, the next run builds in a new directory and keeps the old logs. A finished build with changed files fails validation. Use `-FreshBuild` to make an independent build for comparison. Keep archived builds with the sessions that reference them. A session's `build-reference.json` records the exact directory and manifest hash.
 
 Create a task-specific JSON using [device-flow.json](Scenarios/device-flow.json) or [control-states.json](Scenarios/control-states.json). After editing, rerun the same scenario against the previous successful run:
 
@@ -96,7 +96,7 @@ Control selectors: `@main`, `@active`, `id:NAME`, `text:CAPTION`. For cards, spe
 
 Transitions accept `trigger`, `durationMs`, `intervalMs`, `requireChange`, `requireSettled`. The last two default to true. Missing changes or unfinished transitions fail. Frames still require inspection; passing is not an automatic smoothness guarantee.
 
-At least three real frames are saved. Slow capture can make observation exceed `durationMs`; `timelines` records actual frame times and intervals. Requested intervals are not presented as achieved frame rates.
+At least three real frames are saved. If the final two frames differ, a settling check takes up to two more frames and still requires two consecutive identical images. Slow capture and confirmation frames can extend observation beyond `durationMs`. `timelines` records the actual intervals.
 
 ## Full verification
 
@@ -106,7 +106,7 @@ At least three real frames are saved. Slow capture can make observation exceed `
 
 [usb-role-order.json](Scenarios/usb-role-order.json) shows all USB roles on one controller: EN/RU headers, language transition and a narrowed window. Run `Invoke-DevSession.ps1 -Scenario .\dev\qa\Scenarios\usb-role-order.json`. This caption-order review scenario runs separately from the general suite.
 
-`Invoke-Qa.ps1` runs the integration scenarios twice and compares checkpoints: `device-flow`, `control-states`, `dtimod-status`, `imod-check`, `imod-editor`, four `text-fields-*`, six `dialog-audit-*`, `backup-menu-flow`, `navigation-audit`, `irq-check-loading` and the three `refresh-reuse*` scenarios. This checks reproducibility of the current build. Gallery, EN/RU, scaling models, log/resource audits, tests and intentional mutations follow. `dtimod-status` uses shared lifecycle code with fake backends and actual error dialogs, without loading the driver.
+`Invoke-Qa.ps1` runs the integration scenarios twice and compares checkpoints: `device-flow`, `control-states`, `dtimod-status`, `imod-check`, `imod-editor`, four `text-fields-*`, the EN/RU dialog audits at three layout scales, `backup-menu-flow`, `navigation-audit`, `irq-check-loading` and the three `refresh-reuse*` scenarios. This checks reproducibility of the current build. Gallery, EN/RU, scaling models, log/resource audits, tests and intentional mutations follow. `dtimod-status` uses shared lifecycle code with fake backends and actual error dialogs, without loading the driver.
 
 Registry, power plans, startup and drivers are neither changed nor completely emulated. A new feature needs its own scenario and shared technical-code checks against fake data; coverage does not appear automatically.
 
@@ -118,7 +118,7 @@ The native reference editor is created and given a message-loop turn before glyp
 
 ## Dialogs and menus
 
-`dialog-audit-en/ru` covers save/restore windows, file paths, system checks with known/unavailable data, confirmations, backup location, empty/normal/long lists and success/warnings/partial/failed/stress results. `-120/-144` variants set `layoutDpi` to 120/144: 125/150% models without changing Windows DPI. `audit-dialog` records label height, button capacity and window bounds.
+`dialog-audit-en/ru` covers save/restore windows, file paths, system checks with known/unavailable data, confirmations, backup location, empty/normal/long lists and success/warnings/partial/failed/stress results. The integration runner generates the 125% and 150% variants from the same scenario steps. `audit-dialog` records label height, button capacity and window bounds.
 
 `backup-menu-flow` uses a fake callback through the shared menu to verify deletion: window retention, original-backup protection, an empty list, failure/exception, selection of a remaining file and full paths. No real backup files are deleted. `navigation-audit` opens actual dropdowns with F4, navigates items, closes with Escape and changes categories in EN/RU.
 
@@ -137,8 +137,6 @@ In `transition`, a nonempty `value` checks the target's selected `property` befo
 `irq-global-label` checks the single global IRQ button: hidden PCI devices, failure and retry. Keyboard activation must query the same complete set once each, without driver loading.
 
 `irq-summary` checks the five-button top row: one global IRQ button outside the cards, no overlaps, caption capacity, EN/RU, success/failure/retry, complete PCI coverage, Space activation and 1200/1000 widths. layoutDpi 120/144 variants check scaling models.
-
-`irq-summary` covers the global READ IRQ MODE button in EN/RU: success, failure, retry, focus, keyboard activation and 1200/1000 widths, with five aligned actions and no former strip. The redundant `irq-top-actions` scenario has been removed.
 
 ## Interaction latency and motion
 

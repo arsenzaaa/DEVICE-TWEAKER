@@ -46,7 +46,7 @@ public sealed partial class MainForm
         return copy;
     }
 
-    private Task SaveStartupProfile(ImodConfig config)
+    private Task<bool> SaveStartupProfile(ImodConfig config)
     {
         // Deliberately synchronous, before taking inputs or scheduling work.
         DemandRealWrite("SaveStartupProfile");
@@ -56,23 +56,25 @@ public sealed partial class MainForm
         return SaveStartupProfileCoreAsync(config, snapshot);
     }
 
-    private async Task SaveStartupProfileCoreAsync(ImodConfig owner, ImodConfig snapshot)
+    private async Task<bool> SaveStartupProfileCoreAsync(ImodConfig owner, ImodConfig snapshot)
     {
-        await Task.Run(() =>
+        bool enabled = await Task.Run(() =>
         {
             DemandRealWrite("SaveStartupProfile worker");
             // Recheck immediately before replacement, including changes made by
             // another program since the UI first loaded the saved profile.
             _ = ReadSavedStartupConfig(out _);
-            InstallStartupBundle(snapshot);
+            return InstallStartupBundle(snapshot);
         });
         owner.HasScript = true;
         snapshot.HasScript = true;
         _imodConfigCache = snapshot;
         _imodConfigLoaded = true;
+        return enabled;
     }
 
-    private Task RemoveImodPersistenceFiles(OperationReport? report = null)
+    private Task<StagedDriverCleanup?> RemoveImodPersistenceFiles(
+        OperationReport? report = null, bool cleanUpStagedDriver = false)
     {
         DemandRealWrite("RemoveImodPersistenceFiles");
         string[] adapterIds = _blocks
@@ -81,11 +83,14 @@ public sealed partial class MainForm
         return Task.Run(() =>
         {
             DemandRealWrite("RemoveImodPersistenceFiles worker");
-            RestoreNicDriverModerationForSavedProfiles(adapterIds, report);
-            RemoveStartupBundle(report);
-            DeleteFileIfExists(Path.Combine(GetScriptRoot(), "dtimod.sys"), "IMOD.DRIVER.LEGACY", report);
+            using DriverLoadGate gate = DriverLoadGate.Enter();
+            CreateStartupBundle().Remove(report, () => RestoreNicDriverModerationForSavedProfiles(adapterIds, report));
+            if (report is { Succeeded: false }) return (StagedDriverCleanup?)null;
+
             DeleteFileIfExists(Path.Combine(GetScriptRoot(), ImodDriverName), "IMOD.DRIVER.LEGACY", report);
-            WriteLog($"IMOD.DRIVER: keep staged system driver {GetImodDriverSystemPath()}");
+            return cleanUpStagedDriver && report is { Succeeded: true } && report.Warnings.Count == 0
+                ? ImodDriverFiles.CleanUpStagedDriver(WriteLog)
+                : (StagedDriverCleanup?)null;
         });
     }
 }

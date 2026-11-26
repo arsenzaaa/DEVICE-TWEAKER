@@ -61,7 +61,7 @@ public sealed partial class MainForm
             case "system-unknown": ShowDriverEnvironmentDetails(this, environment with { Blocklist = new(null, "unavailable"), HvciRunning = null, Faceit = new("FACEIT", null, "unavailable") }); break;
             case "imod-confirmed": ShowThemedConfirm(DriverEnvironment.BuildCompactConfirmation(environment, includeCompatibilityNotice: false), "USB IMOD TUNING", "APPLY", "SKIP", environment); break;
             case "imod": ShowThemedConfirm(DriverEnvironment.BuildCompactConfirmation(environment), "USB IMOD TUNING", "APPLY", "SKIP", environment); break;
-            case "confirm": ShowThemedConfirm("Restore the selected backup?", "RESTORE", "RESTORE", "CANCEL"); break;
+            case "confirm": ShowThemedConfirm("Apply the settings from this backup?", "RESTORE", "RESTORE", "CANCEL"); break;
             case "backup-location": ShowAutoBackupChoiceDialog(); break;
             case "restore-empty": ShowRestoreChoiceDialog([], out _); break;
             case "restore":
@@ -115,11 +115,31 @@ public sealed partial class MainForm
                 ShowOperationResult(msiReport, string.Empty, "The operation stopped before any changes were made.", "APPLY");
                 break;
             case "restore-nic-skipped":
+            case "restore-refresh-failed":
                 DeviceTweakerBackup restored = new();
-                restored.SkippedNicItrEntries.Add("hwid=VEN_10EC&DEV_3000 reason=layout-changed saved=[offset=0xE2] current=[offset=0xA00]");
+                if (name == "restore-nic-skipped")
+                    restored.SkippedNicItrEntries.Add("hwid=VEN_10EC&DEV_3000 reason=layout-changed saved=[offset=0xE2] current=[offset=0xA00]");
                 OperationReport restoreReport = new() { IsDeveloperPreview = true };
                 restoreReport.MergeIssues(CreateBackupRestoreReport(restored));
-                ShowOperationResult(restoreReport, "Backup restored with warnings. Open DETAILS.", string.Empty, "RESTORE");
+                OperationReport? refreshReport = null;
+                if (name == "restore-refresh-failed")
+                {
+                    refreshReport = new();
+                    refreshReport.AddError(UiResources.English(UiText.DeviceReadback), UiResources.English(UiText.DeviceStateFailed), "Synthetic device-state timeout.");
+                }
+                ShowCompletedBackupRestore(restoreReport, DevBackupPath, refreshReport);
+                break;
+            case "delete-profile-confirm": ConfirmImodProfileRemoval(); break;
+            case "delete-profile-file-removed":
+            case "delete-profile-driver-loaded":
+            case "delete-profile-file-kept":
+                StagedDriverCleanup cleanup = name switch
+                {
+                    "delete-profile-file-removed" => StagedDriverCleanup.Deleted,
+                    "delete-profile-driver-loaded" => StagedDriverCleanup.Loaded,
+                    _ => StagedDriverCleanup.Unverified,
+                };
+                ShowImodDeleteResult(new OperationReport { IsDeveloperPreview = true }, cleanup);
                 break;
             case "reset-success":
                 ShowOperationResult(new OperationReport { IsDeveloperPreview = true },
@@ -138,7 +158,7 @@ public sealed partial class MainForm
                 if (name == "warnings") report.AddWarning("USB POWER", "Some power settings require a device restart.");
                 if (name is "partial" or "failed") report.AddError("USB IMOD", "The register value could not be verified.", "Readback mismatch: expected 0xC8; received 0xFA0.");
                 if (name == "stress") for (int i = 1; i <= 14; i++) report.AddError($"COMPONENT {i:00}", "The register value could not be verified.", $"Readback #{i}: " + new string('A', 420));
-                ShowOperationResult(report, "Please reboot your PC to finish applying the changes.", name == "failed" ? "The operation stopped before any changes were made." : "Applied steps were saved. One optional step was not completed.", operationName: "APPLY");
+                ShowOperationResult(report, "Please reboot your PC to finish applying the changes.", name == "failed" ? "The operation stopped before any changes were made." : "Settings were saved. An optional step did not complete.", operationName: "APPLY");
                 break;
             default: throw new InvalidDataException("Unknown dialog preview: " + name);
         }

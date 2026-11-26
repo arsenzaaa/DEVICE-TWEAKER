@@ -27,6 +27,7 @@ public sealed partial class MainForm
         MinimumSize = UiScale(1172, 840);
         MaximumSize = Size.Empty;
         SizeGripStyle = SizeGripStyle.Show;
+        FitMainWindowToWorkArea(Screen.PrimaryScreen?.WorkingArea);
         ApplyQaInitialWindowBounds();
 
         Panel brandPanel = new()
@@ -57,7 +58,7 @@ public sealed partial class MainForm
         {
             informationalVersion = informationalVersion.Split('+')[0];
         }
-        string subtitleText = $"version {informationalVersion} - developed by {developerHandle}";
+        string subtitleText = $"Version {informationalVersion} · {developerHandle}";
 
         LinkLabel logoSubtitle = new()
         {
@@ -79,6 +80,11 @@ public sealed partial class MainForm
         if (linkStart >= 0)
         {
             logoSubtitle.LinkArea = new LinkArea(linkStart, developerHandle.Length);
+            logoSubtitle.TextChanged += (_, _) =>
+            {
+                int start = logoSubtitle.Text.IndexOf(developerHandle, StringComparison.Ordinal);
+                if (start >= 0) logoSubtitle.LinkArea = new LinkArea(start, developerHandle.Length);
+            };
             logoSubtitle.LinkClicked += (_, _) => OpenUrl(developerUrl);
             logoSubtitle.Cursor = Cursors.Hand;
         }
@@ -447,9 +453,28 @@ public sealed partial class MainForm
             WriteLog("UI: APPLY button clicked");
             bool sandboxDryRun = IsSandboxDryRunActive();
             OperationReport report = CreateApplyReport(sandboxDryRun);
-            if (!sandboxDryRun && _blocks.Any(b => !b.Device.IsTestDevice && b.Kind == DeviceKind.USB
-                && b.Device.UsbIsXhci && b.Device.UsbHasDevices)
-                && !ConfirmDriverUse()) return;
+            List<(DeviceBlock Block, DeviceSettingChanges Changes)> deviceEdits = [];
+            HashSet<string> imodTargets = new(StringComparer.OrdinalIgnoreCase);
+            foreach (DeviceBlock block in _blocks)
+            {
+                if (block.Device.Wifi || block.InitialEditorState is not { } baseline) continue;
+                if (RejectInvalidImodRole(block)) return;
+                DeviceEditorState draft = CaptureEditorState(block);
+                DeviceSettingChanges changes = baseline.GetDeviceChanges(draft, block.Kind, block.PolicyCombo.Enabled);
+                if (changes != DeviceSettingChanges.None) deviceEdits.Add((block, changes));
+                if (!block.Device.IsTestDevice && IsUsbImodTarget(block.Device) && baseline.HasImodChange(draft))
+                    imodTargets.Add(block.Device.InstanceId);
+            }
+            bool applyImod = imodTargets.Count > 0;
+            if (deviceEdits.Count == 0 && !applyImod && !_reservedCpuSetsDirty && !_rawMouseThrottlePending)
+            {
+                WriteLog("APPLY: no pending changes");
+                ShowThemedInfo("No changes to apply.");
+                return;
+            }
+            if (!sandboxDryRun && applyImod && !ConfirmDriverUse()) return;
+            bool applyUsbPowerPlan = deviceEdits.Any(edit => edit.Block.Kind == DeviceKind.USB
+                && !edit.Block.Device.IsTestDevice && edit.Changes.HasFlag(DeviceSettingChanges.Power));
             if (!sandboxDryRun)
             {
                 if (!await CreateDeviceTweakerBackup("pre-apply", showDialog: false))
@@ -471,23 +496,16 @@ public sealed partial class MainForm
                 WriteLog("APPLY: dry-run -> skipped pre-apply backup");
             }
 
-            int applyTotal = Math.Max(1, _blocks.Count) + 3;
+            int applyTotal = Math.Max(1, deviceEdits.Count) + 3;
             BeginDevicesBusyWork(sandboxDryRun ? "Previewing APPLY..." : "Applying changes...", applyTotal);
             try
             {
                 int errorsBeforeDevices = report.Errors.Count;
                 int saved = 0;
-                int saveTotal = Math.Max(1, _blocks.Count);
-                foreach (DeviceBlock b in _blocks)
+                int saveTotal = deviceEdits.Count;
+                foreach ((DeviceBlock b, DeviceSettingChanges changes) in deviceEdits)
                 {
                     saved++;
-                    if (b.Device.Wifi)
-                    {
-                        WriteLog($"APPLY.SKIP: {b.Device.InstanceId} Kind={b.Kind} reason=wifi");
-                        TickDevicesBusy($"Applying device settings ({saved}/{saveTotal})", 1);
-                        continue;
-                    }
-
                     if (sandboxDryRun && !b.Device.IsTestDevice)
                     {
                         WriteLog($"APPLY.DRYRUN: {b.Device.InstanceId} Kind={b.Kind} skipped (real device)");
@@ -500,11 +518,11 @@ public sealed partial class MainForm
                             ? $"Previewing device settings ({saved}/{saveTotal})"
                             : $"Applying device settings ({saved}/{saveTotal})",
                         1);
-                    await SaveBlockSettings(b, report: report);
+                    await SaveBlockSettings(b, report: report, changes: changes);
                 }
-                if (report.Errors.Count == errorsBeforeDevices)
+                if (deviceEdits.Count > 0 && report.Errors.Count == errorsBeforeDevices)
                 {
-                    report.AddSuccess("DEVICE SETTINGS", $"{_blocks.Count} processed");
+                    report.AddSuccess("DEVICE SETTINGS", $"{deviceEdits.Count} processed");
                 }
 
                 await ApplyPendingReservedCpuSets(report);
@@ -516,11 +534,11 @@ public sealed partial class MainForm
                 {
                     WriteLog("APPLY.DRYRUN: USB selective suspend skipped");
                 }
-                else
+                else if (applyUsbPowerPlan)
                 {
                     await ApplyUsbSelectiveSuspendPowerPlan(forceDisable: false, report);
                 }
-                if (!sandboxDryRun && report.Errors.Count == errorsBeforePower)
+                if (!sandboxDryRun && applyUsbPowerPlan && report.Errors.Count == errorsBeforePower)
                 {
                     report.AddSuccess("USB POWER", "Applied");
                 }
@@ -530,9 +548,9 @@ public sealed partial class MainForm
                 {
                     WriteLog("APPLY.DRYRUN: IMOD apply skipped");
                 }
-                else
+                else if (applyImod)
                 {
-                    (ImodApplyOutcome imodOutcome, string? imodNote, string? imodTechnicalDetails) = await ApplyImodSettingsAsync();
+                    (ImodApplyOutcome imodOutcome, string? imodNote, string? imodTechnicalDetails) = await ApplyImodSettingsAsync(imodTargets);
                     if (_uiDisposing || IsDisposed || Disposing) return;
                     if (!string.IsNullOrWhiteSpace(imodNote))
                     {
@@ -580,7 +598,7 @@ public sealed partial class MainForm
                 ShowOperationResult(
                     report,
                     successMessage: "Please reboot your PC to finish applying the changes.",
-                    partialMessage: "Applied steps were saved. One or more steps were not completed.",
+                    partialMessage: "Some settings could not be applied. Completed changes were saved.",
                     operationName: "APPLY");
             }
         };
@@ -781,7 +799,7 @@ public sealed partial class MainForm
                 ShowOperationResult(
                     report,
                     successMessage: "Please reboot your PC to finish applying the changes.",
-                    partialMessage: "Applied steps were saved. One or more steps were not completed.",
+                    partialMessage: "Some settings could not be applied. Completed changes were saved.",
                     operationName: "AUTO-OPTIMIZATION");
             }
         };
@@ -810,11 +828,21 @@ public sealed partial class MainForm
         DpiChanged += (_, _) =>
         {
             UpdateUiScale();
+            FitMainWindowToWorkArea(Screen.FromControl(this).WorkingArea);
             _initialDeviceViewportHeightAdjusted = false;
             QueueDeviceLayoutRebuild(force: true);
         };
         MouseWheel += (_, e) => HandleDevicesMouseWheel(e);
         KeyDown += OnMainFormKeyDown;
+    }
+
+    private void FitMainWindowToWorkArea(Rectangle? workArea)
+    {
+        if (QaRun.IsReadOnly || workArea is not Rectangle work || work.Width <= 0 || work.Height <= 0) return;
+        Size preferredMinimum = UiScale(1172, 840);
+        MinimumSize = new Size(Math.Min(preferredMinimum.Width, work.Width), Math.Min(preferredMinimum.Height, work.Height));
+        if (WindowState == FormWindowState.Normal)
+            Size = new Size(Math.Min(Width, work.Width), Math.Min(Height, work.Height));
     }
 
     private int GetCurrentWindowDpi()
@@ -1170,13 +1198,6 @@ public sealed partial class MainForm
         box.ApplyContentLayout();
     }
 
-    /// <summary>Legacy no-op kept for any remaining plain TextBox call sites.</summary>
-    private void StyleDarkTextBox(TextBox box, int leftMargin = 6, int rightMargin = 4)
-    {
-        _ = box;
-        _ = leftMargin;
-        _ = rightMargin;
-    }
 
     private void SetTopButtonHoverStyle(Button btn)
     {

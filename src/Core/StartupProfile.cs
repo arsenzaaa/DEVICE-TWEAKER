@@ -10,6 +10,7 @@ internal sealed class StartupProfile
 {
     public const int CurrentSchemaVersion = 1;
 
+    [JsonRequired]
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string CreatedBy { get; set; } = string.Empty;
     public StartupFile Driver { get; set; } = new();

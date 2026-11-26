@@ -97,27 +97,6 @@ public sealed class ImodRoleMapTests
         Assert.Equal(expected, role);
     }
 
-    [Fact]
-    public void FallbackSpreadsRolesOverActiveInterruptersInPriorityOrder()
-    {
-        Dictionary<uint, List<uint>> byRootPort = new() { [1] = [2], [2] = [0], [3] = [5] };
-        Dictionary<uint, HashSet<string>> roles = [];
-
-        Assert.True(ImodRoleMap.TryAssignFallbackRoles(
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Webcam", "Audio", "Mouse" },
-            byRootPort, maxIntrs: 4, roles, out string detail));
-
-        Assert.Equal("intr0=Mouse, intr2=Audio+Webcam", detail);
-    }
-
-    [Fact]
-    public void FallbackNeedsAnActiveInterrupter()
-    {
-        Assert.False(ImodRoleMap.TryAssignFallbackRoles(
-            new HashSet<string> { "Mouse" }, new Dictionary<uint, List<uint>> { [1] = [9] }, maxIntrs: 4, [], out string detail));
-        Assert.Equal("no active xHCI interrupters were discovered", detail);
-    }
-
     [Theory]
     [InlineData("Мышь 8K", "Mouse")]
     [InlineData("Клавиатура", "Keyboard")]

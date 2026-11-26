@@ -22,6 +22,19 @@ public sealed class DeviceSettingsWriterTests
         Assert.Equal((0, RegistryValueKind.DWord), v.Data["DevicePolicy"]); Assert.False(v.Data.ContainsKey("AssignmentSetOverride"));
         Assert.Equal(new[] { "set:DevicePolicy", "delete:AssignmentSetOverride" }, v.Trace);
     }
+    [Theory]
+    [InlineData(1, 0UL)]
+    [InlineData(2, 0UL)]
+    [InlineData(3, 16UL)]
+    [InlineData(5, 16UL)]
+    public void WindowsSelectedPolicyIsSavedWithoutACpuMask(int policy, ulong previousSelection)
+    {
+        Values values = new();
+        values.Set("AssignmentSetOverride", new byte[] { 16 }, RegistryValueKind.Binary);
+        DeviceSettingsWriter.SetAffinity(values, policy, previousSelection, 8);
+        Assert.Equal((policy, RegistryValueKind.DWord), values.Data["DevicePolicy"]);
+        Assert.False(values.Data.ContainsKey("AssignmentSetOverride"));
+    }
     [Fact] public void ExplicitAffinityWritesFull64BitLittleEndianMask()
     {
         Values v = new(); DeviceSettingsWriter.SetAffinity(v, 4, 0x8000000000000001, 8);

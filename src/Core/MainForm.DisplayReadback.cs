@@ -4,11 +4,11 @@ public sealed partial class MainForm
 {
     private sealed record DisplayReadTarget(string InstanceId, DeviceKind Kind, bool Wifi);
     private sealed record DeviceDisplayState(string InstanceId, bool? PowerSaving, NdisRssRuntimeState? Rss);
-    private sealed record DisplaySnapshot(DeviceDisplayState[] Devices,
-        Dictionary<string, SignedDriverInfo>? Drivers, string? DriverError);
+    private sealed record DisplaySnapshot(DeviceDisplayState[] Devices);
 
     private sealed record DriverMetadata(Dictionary<string, SignedDriverInfo> Drivers, string? Error);
     private readonly BackgroundSnapshotReader<DriverMetadata> _driverMetadataReader = new();
+    private Task? _driverMetadataRead;
     private readonly BackgroundSnapshotReader<DisplaySnapshot> _displayReader = new();
     private readonly CancellationTokenSource _displayReadLifetime = new();
     private readonly Dictionary<string, bool> _displayPowerCache = new(StringComparer.OrdinalIgnoreCase);
@@ -16,12 +16,10 @@ public sealed partial class MainForm
 
     private static bool HasDisplayPower(DeviceKind kind) => kind is DeviceKind.USB or DeviceKind.NET_NDIS or DeviceKind.NET_CX;
 
-    private Task<SnapshotReadResult<DisplaySnapshot>> ReadDisplaySnapshotAsync(IEnumerable<DeviceInfo> devices,
-        Task<SnapshotReadResult<DriverMetadata>>? metadataRead = null)
+    private Task<SnapshotReadResult<DisplaySnapshot>> ReadDisplaySnapshotAsync(IEnumerable<DeviceInfo> devices)
     {
         DisplayReadTarget[] targets = devices.Where(device => !device.IsTestDevice)
             .Select(device => new DisplayReadTarget(device.InstanceId, device.Kind, device.Wifi)).ToArray();
-        bool readDrivers = _detailedLogEnabled && _signedDriverInfoCache is null;
         // Pure virtual fixtures must never query host WMI or network providers.
         if (_testDevicesEnabled && _testDevicesOnly)
         {
@@ -29,47 +27,47 @@ public sealed partial class MainForm
             if (_devDisplayReadModel is { } model)
                 return ReadDevDisplaySnapshotAsync(model);
 #endif
-            return Task.FromResult(new SnapshotReadResult<DisplaySnapshot>(new([], null, null), null));
+            return Task.FromResult(new SnapshotReadResult<DisplaySnapshot>(new([]), null));
         }
         CancellationToken lifetime = _displayReadLifetime.Token;
-        if (readDrivers) metadataRead ??= BeginDriverMetadataRead();
-        return _displayReader.ReadTaskAsync(() => CompleteDisplaySnapshotAsync(
-            () => ReadDisplaySnapshot(targets, false,
-                target => { lifetime.ThrowIfCancellationRequested(); return ReadDisplayPower(target); },
-                id => ReadNdisRssRuntimeState(id, lifetime), ReadSignedDriverSnapshot),
-            readDrivers ? metadataRead : null),
+        return _displayReader.ReadAsync(() => ReadDisplaySnapshot(targets,
+            target => { lifetime.ThrowIfCancellationRequested(); return ReadDisplayPower(target); },
+            id => ReadNdisRssRuntimeState(id, lifetime)),
             TimeSpan.FromSeconds(30), error => AppDiagnostics.Warn("DISPLAY.LATE", error));
     }
 
     // Driver metadata is diagnostic data independent of device discovery and RSS.
     // Start it once per uncached refresh; the reader owns even a timed-out worker.
-    private Task<SnapshotReadResult<DriverMetadata>>? BeginDriverMetadataRead()
+    private void BeginDriverMetadataRead()
     {
-        if (!_detailedLogEnabled || _signedDriverInfoCache is not null || (_testDevicesEnabled && _testDevicesOnly))
-            return null;
+        if (!_detailedLogEnabled || _signedDriverInfoCache is not null || _driverMetadataRead is { IsCompleted: false }
+            || (_testDevicesEnabled && _testDevicesOnly))
+            return;
         CancellationToken lifetime = _displayReadLifetime.Token;
-        return _driverMetadataReader.ReadAsync(() =>
+        _driverMetadataRead = PublishDriverMetadataAsync(_driverMetadataReader.ReadAsync(() =>
         {
             lifetime.ThrowIfCancellationRequested();
-            var result = ReadSignedDriverSnapshot();
-            return new DriverMetadata(result.Item1, result.Item2);
-        }, TimeSpan.FromSeconds(30), error => AppDiagnostics.Warn("DISPLAY.DRIVERS.LATE", error));
+            var drivers = ReadSignedDriverInfoMap(out string? error);
+            return new DriverMetadata(drivers, error);
+        }, TimeSpan.FromSeconds(30), error => AppDiagnostics.Warn("DISPLAY.DRIVERS.LATE", error)));
     }
 
-    private static async Task<DisplaySnapshot> CompleteDisplaySnapshotAsync(Func<DisplaySnapshot> readState,
-        Task<SnapshotReadResult<DriverMetadata>>? metadataRead)
+    private async Task PublishDriverMetadataAsync(Task<SnapshotReadResult<DriverMetadata>> read)
     {
-        DisplaySnapshot state = readState();
-        if (metadataRead is null) return state;
-        SnapshotReadResult<DriverMetadata> metadata = await metadataRead.ConfigureAwait(false);
-        if (metadata.Snapshot is null)
-            throw new IOException(metadata.Error ?? "Driver metadata read failed.");
-        return state with { Drivers = metadata.Snapshot.Drivers, DriverError = metadata.Snapshot.Error };
+        SnapshotReadResult<DriverMetadata> result = await read;
+        if (_uiDisposing || IsDisposed || Disposing) return;
+        _signedDriverInfoError = result.Error ?? result.Snapshot?.Error;
+        if (_signedDriverInfoError is not null)
+            WriteLog($"DISPLAY.DRIVERS.WARN: {FlattenLogText(_signedDriverInfoError)}");
+        else if (result.Snapshot is { } metadata)
+        {
+            if (metadata.Drivers.Count > 0) _signedDriverInfoCache = metadata.Drivers;
+            WriteLog($"DISPLAY.DRIVERS: signedDrivers={metadata.Drivers.Count}");
+        }
     }
 
-    private static DisplaySnapshot ReadDisplaySnapshot(DisplayReadTarget[] targets, bool readDrivers,
-        Func<DisplayReadTarget, bool> readPower, Func<string, NdisRssRuntimeState> readRss,
-        Func<(Dictionary<string, SignedDriverInfo> Drivers, string? Error)> readDriverMap)
+    private static DisplaySnapshot ReadDisplaySnapshot(DisplayReadTarget[] targets,
+        Func<DisplayReadTarget, bool> readPower, Func<string, NdisRssRuntimeState> readRss)
     {
         List<DeviceDisplayState> states = [];
         foreach (DisplayReadTarget target in targets)
@@ -81,8 +79,7 @@ public sealed partial class MainForm
                 ? readRss(target.InstanceId) : null;
             states.Add(new(target.InstanceId, power, rss));
         }
-        var driverMap = readDrivers ? readDriverMap() : (null, null);
-        return new(states.ToArray(), driverMap.Item1, driverMap.Item2);
+        return new(states.ToArray());
     }
 
     private bool ReadDisplayPower(DisplayReadTarget target)
@@ -98,12 +95,6 @@ public sealed partial class MainForm
         return caps is null || DevicePowerPolicy.IsNicTurnOffAllowed(caps.Value);
     }
 
-    private static (Dictionary<string, SignedDriverInfo>, string?) ReadSignedDriverSnapshot()
-    {
-        var map = ReadSignedDriverInfoMap(out string? error);
-        return (map, error);
-    }
-
     private void PublishDisplaySnapshot(DisplaySnapshot snapshot, bool replaceDevices)
     {
         if (replaceDevices)
@@ -117,12 +108,6 @@ public sealed partial class MainForm
             if (state.PowerSaving is bool power) _displayPowerCache[id] = power;
             if (state.Rss is not null) _ndisRssRuntimeCache[id] = state.Rss;
         }
-        if (snapshot.Drivers is not null)
-        {
-            _signedDriverInfoError = snapshot.DriverError;
-            if (snapshot.DriverError is null && snapshot.Drivers.Count > 0)
-                _signedDriverInfoCache = snapshot.Drivers;
-        }
     }
 
     private bool GetDisplayPowerState(string instanceId)
@@ -131,6 +116,7 @@ public sealed partial class MainForm
 
     private async Task ReloadBlockSettingsAsync(DeviceBlock block, OperationReport report)
     {
+        BeginDriverMetadataRead();
         SnapshotReadResult<DisplaySnapshot> result = await ReadDisplaySnapshotAsync([block.Device]);
         if (_uiDisposing || IsDisposed || Disposing || !_blocks.Contains(block)) return;
         if (result.Snapshot is null)
