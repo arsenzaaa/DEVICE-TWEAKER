@@ -750,6 +750,10 @@ public sealed partial class MainForm
             nicReadbackX = nicValueX + readbackInset;
             txtNicItr.Location = new Point(nicValueX, txtNicItr.Top);
 
+            btnNicItr.Width = MeasureCardRowButtonWidth(btnNicItr, 54, 26);
+            btnNicItrSave.Width = MeasureCardRowButtonWidth(btnNicItrSave, 58, 26);
+            btnNicItrCheck.Width = MeasureCardRowButtonWidth(btnNicItrCheck, 76, 26);
+
             int buttonsWidth = btnNicItr.Width + nicButtonGap
                 + btnNicItrSave.Width + nicButtonGap
                 + btnNicItrCheck.Width;
@@ -1089,13 +1093,7 @@ public sealed partial class MainForm
             imodReadbackPanel.Visible = showDetails;
             string detailsButtonText = imodDetailsExpanded ? "HIDE" : "DETAILS";
             btnImodDetails.Text = detailsButtonText;
-            btnImodDetails.Width = Math.Max(
-                UiScale(88),
-                TextRenderer.MeasureText(
-                    UiLanguage.Text(detailsButtonText),
-                    btnImodDetails.Font,
-                    Size.Empty,
-                    TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width + UiScale(30));
+            btnImodDetails.Width = MeasureCardRowButtonWidth(btnImodDetails, 88, 30, detailsButtonText);
             btnImodDetails.Height = Math.Max(UiScale(26), btnImodDetails.Font.Height + UiScale(10));
 
             if (createdBlock is not null)
@@ -1142,31 +1140,12 @@ public sealed partial class MainForm
             // the right edge, where layout diagnostics correctly see it as
             // clipped after a language switch.
             int usableSettingsWidth = Math.Max(UiScale(120), availableSettingsWidth - UiScale(4));
-            string localizedDetailsText = UiLanguage.Text(imodDetailsExpanded ? "HIDE" : "DETAILS");
-            btnImodDetails.Width = Math.Max(
-                UiScale(88),
-                TextRenderer.MeasureText(
-                    localizedDetailsText,
-                    btnImodDetails.Font,
-                    Size.Empty,
-                    TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width + UiScale(30));
+            btnImodDetails.Width = MeasureCardRowButtonWidth(btnImodDetails, 88, 30, imodDetailsExpanded ? "HIDE" : "DETAILS");
             btnImodDetails.Height = Math.Max(UiScale(26), btnImodDetails.Font.Height + UiScale(10));
 
-            int LocalizedButtonWidth(Button button, int minimumWidth)
-            {
-                string localizedText = UiLanguage.Text(GetSourceControlText(button));
-                return Math.Max(
-                    UiScale(minimumWidth),
-                    TextRenderer.MeasureText(
-                        localizedText,
-                        button.Font,
-                        Size.Empty,
-                        TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width + UiScale(30));
-            }
-
-            btnImodApply.Width = LocalizedButtonWidth(btnImodApply, 54);
-            btnImodDelete.Width = LocalizedButtonWidth(btnImodDelete, 76);
-            btnImodCheck.Width = LocalizedButtonWidth(btnImodCheck, 76);
+            btnImodApply.Width = MeasureCardRowButtonWidth(btnImodApply, 54, 30);
+            btnImodDelete.Width = MeasureCardRowButtonWidth(btnImodDelete, 76, 30);
+            btnImodCheck.Width = MeasureCardRowButtonWidth(btnImodCheck, 76, 30);
 
             lblImodMode.Location = new Point(0, imodRowTop + labelOffset);
             int widestModeText = cmbImodMode.Items.Cast<object>()

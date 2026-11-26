@@ -28,6 +28,14 @@ public sealed partial class MainForm
             string original = GetSourceControlText(button);
             string statusBefore = nic.NicItrStatusLabel?.Text ?? string.Empty;
             bool enabledBefore = button.Enabled;
+            DeviceBlock? owningBlock = suffix.StartsWith("usb-", StringComparison.Ordinal) ? usb
+                : suffix.StartsWith("nic-", StringComparison.Ordinal) ? nic
+                : null;
+            Control? rowEditor = suffix.StartsWith("usb-", StringComparison.Ordinal) ? usb.ImodBox.Parent
+                : suffix.StartsWith("nic-", StringComparison.Ordinal) ? nic.NicItrBox?.Parent
+                : null;
+            Rectangle buttonBoundsBefore = button.Bounds;
+            Rectangle? editorBoundsBefore = rowEditor?.Bounds;
             DevReveal(button);
             using (IDisposable operation = TryBeginDeviceOperation("FEEDBACK AUDIT")
                 ?? throw new InvalidOperationException("Feedback audit could not acquire operation."))
@@ -39,6 +47,9 @@ public sealed partial class MainForm
                         throw new InvalidOperationException("Busy caption was not immediate.");
                     if (TryBeginDeviceOperation("REPEATED AUDIT") is not null)
                         throw new InvalidOperationException("Operation guard allowed duplicate work.");
+                    owningBlock?.RelayoutAction?.Invoke();
+                    if (button.Bounds != buttonBoundsBefore || (rowEditor is not null && rowEditor.Bounds != editorBoundsBefore))
+                        throw new InvalidOperationException("Busy feedback shifted card row layout during relayout: " + suffix);
                     await Task.Delay(60);
                     int textWidth = TextRenderer.MeasureText(button.Text, button.Font, Size.Empty,
                         TextFormatFlags.SingleLine).Width;
@@ -55,6 +66,8 @@ public sealed partial class MainForm
                 catch (InvalidOperationException error) when (error.Message == "Modeled operation failure") { }
                 if (button.Text != UiLanguage.Text(original))
                     throw new InvalidOperationException("Failure exit did not restore the button caption.");
+                if (button.Bounds != buttonBoundsBefore || (rowEditor is not null && rowEditor.Bounds != editorBoundsBefore) || !DevInViewport(button))
+                    throw new InvalidOperationException("Button feedback exit altered or clipped row layout: " + suffix);
             }
             if (button.Enabled != enabledBefore || (nic.NicItrStatusLabel?.Text ?? string.Empty) != statusBefore)
                 throw new InvalidOperationException("Feedback changed enabled state or hardware result text.");

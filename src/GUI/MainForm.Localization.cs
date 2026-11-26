@@ -356,34 +356,29 @@ public sealed partial class MainForm
         SetLocalizedControlText(control, state.SourceText);
     }
 
+    private int MeasureCardRowButtonWidth(Button button, int minimumUnscaledWidth, int horizontalPadding, string? sourceText = null)
+    {
+        string localizedText = UiLanguage.Text(sourceText ?? GetIdleControlSourceText(button));
+        return Math.Max(
+            UiScale(minimumUnscaledWidth),
+            TextRenderer.MeasureText(
+                localizedText,
+                button.Font,
+                Size.Empty,
+                TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width + UiScale(horizontalPadding));
+    }
+
     private void SetLocalizedControlText(Control control, string sourceText)
     {
         string localized = UiLanguage.Text(sourceText);
-        if (control is Button && sourceText is ("SET" or "SAVE" or "CHECK" or "DELETE"))
-        {
-            int minimumWidth = sourceText switch
-            {
-                "SET" => UiScale(54),
-                "SAVE" => UiScale(58),
-                _ => UiScale(76),
-            };
-            int measuredWidth = TextRenderer.MeasureText(
-                localized,
-                control.Font,
-                Size.Empty,
-                TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width;
-            // Leave real breathing room for Cyrillic glyph overhang and the
-            // one-pixel focus/border inset used by the custom dark buttons.
-            control.Width = Math.Max(minimumWidth, measuredWidth + UiScale(26));
-        }
-        else if (control is Button && string.Equals(control.FindForm()?.Name, "TEST_ADMIN_DIALOG", StringComparison.Ordinal))
+        if (control is Button button && string.Equals(control.FindForm()?.Name, "TEST_ADMIN_DIALOG", StringComparison.Ordinal))
         {
             int measuredWidth = TextRenderer.MeasureText(
                 localized,
-                control.Font,
+                button.Font,
                 Size.Empty,
                 TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width;
-            control.Width = Math.Max(control.Width, measuredWidth + UiScale(26));
+            button.Width = Math.Max(button.Width, measuredWidth + UiScale(26));
         }
 
         if (string.Equals(control.Text, localized, StringComparison.Ordinal))

@@ -974,6 +974,20 @@ public sealed partial class MainForm
         if (!string.Equals(block.InfoLabel.Text, infoText, StringComparison.Ordinal))
         {
             block.InfoLabel.Text = infoText;
+            if (_deviceBuildLayoutDepth == 0
+                && !block.Group.IsDisposed
+                && block.RelayoutAction is not null
+                && block.InfoLabel.ClientSize.Width > 0)
+            {
+                int requiredHeight = Math.Max(
+                    UiScale(70),
+                    GetPreferredTextHeight(block.InfoLabel, block.InfoLabel.ClientSize.Width) + UiScale(20));
+                if (requiredHeight != block.InfoLabel.Height)
+                {
+                    block.RelayoutAction();
+                    LayoutBlocks(relayoutCards: false);
+                }
+            }
         }
 
         string fullRegPath = GetFullRegPath($"HKLM\\{regBase}");
