@@ -640,30 +640,7 @@ public sealed partial class MainForm : Form
 
         try
         {
-            object? raw = key.GetValue("AssignmentSetOverride");
-            if (raw is byte[] bytes)
-            {
-                if (bytes.Length >= 8)
-                {
-                    return BitConverter.ToUInt64(bytes, 0);
-                }
-
-                if (bytes.Length >= 4)
-                {
-                    return BitConverter.ToUInt32(bytes, 0);
-                }
-
-                return null;
-            }
-
-            return raw switch
-            {
-                int i => (uint)i,
-                uint ui => ui,
-                long l => (ulong)l,
-                ulong ul => ul,
-                _ => null,
-            };
+            return TryReadAffinityMaskValue(key.GetValue("AssignmentSetOverride"));
         }
         catch
         {

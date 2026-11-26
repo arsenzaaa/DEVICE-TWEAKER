@@ -57,6 +57,7 @@ Source comparison: [v0.0.4 → v0.1.0](https://github.com/arsenzaaa/DEVICE-TWEAK
 - A second launch no longer selects an Explorer window opened on a folder named DEVICE TWEAKER.
 - Translated restore results, device-scan failures and power-plan diagnostics that remained English in the Russian interface.
 - Device discovery continues if the Windows Storage WMI query (`MSFT_PhysicalDisk`) fails, retaining NVMe and SATA/AHCI controller entries with a warning in the log.
+- Reading `AssignmentSetOverride` supports 1–7 byte `REG_BINARY` values in little-endian order instead of requiring 4 or 8 bytes, so short registry affinity masks display correctly.
 - NIC ITR resolves its register bank from PCI BAR configuration, verifies Windows resource ranges and rejects MSI-X table/PBA overlap. Corrected Killer E3000 (`10EC:3000`) and RTL8118AS (`10EC:8162`) register layouts.
 - Backup restoration and startup installation now agree on outdated NIC ITR entries: incompatible entries are skipped, with a restore warning and layout details in the log. Other entries and the source backup are preserved.
 - MSI cannot be disabled when PCI capabilities explicitly report message interrupts without line-based INTx support. The refusal is translated in both interface languages.

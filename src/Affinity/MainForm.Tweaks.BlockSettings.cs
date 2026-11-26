@@ -208,19 +208,41 @@ public sealed partial class MainForm
         block.NdisModeCombo.SelectedItem = text;
     }
 
-    internal static ulong ReadAffinityMaskValue(object? rawOverride)
+    internal static ulong? TryReadAffinityMaskValue(object? rawOverride)
     {
-        return rawOverride switch
+        switch (rawOverride)
         {
-            byte[] bytes when bytes.Length >= 8 => BitConverter.ToUInt64(bytes, 0),
-            byte[] bytes when bytes.Length >= 4 => BitConverter.ToUInt32(bytes, 0),
-            int intVal => (uint)intVal,
-            uint uintVal => uintVal,
-            long longVal => (ulong)longVal,
-            ulong ulongVal => ulongVal,
-            _ => 0,
-        };
+            case byte[] bytes:
+            {
+                if (bytes.Length == 0)
+                {
+                    return null;
+                }
+
+                ulong mask = 0;
+                int count = Math.Min(bytes.Length, sizeof(ulong));
+                for (int i = 0; i < count; i++)
+                {
+                    mask |= (ulong)bytes[i] << (i * 8);
+                }
+
+                return mask;
+            }
+            case int intVal:
+                return (uint)intVal;
+            case uint uintVal:
+                return uintVal;
+            case long longVal:
+                return (ulong)longVal;
+            case ulong ulongVal:
+                return ulongVal;
+            default:
+                return null;
+        }
     }
+
+    internal static ulong ReadAffinityMaskValue(object? rawOverride)
+        => TryReadAffinityMaskValue(rawOverride) ?? 0;
 
     private static (int Policy, ulong Mask) ReadAffinityPolicyState(string affPath)
     {
