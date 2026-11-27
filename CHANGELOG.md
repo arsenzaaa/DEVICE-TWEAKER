@@ -20,7 +20,8 @@ Source comparison: [v0.0.4 → v0.1.0](https://github.com/arsenzaaa/DEVICE-TWEAK
 
 - Corrected CPU labels on homogeneous processors: Core and Core/SMT replace P-Core and P-Core/HT. Hybrid-CPU labels and core-allocation rules are unchanged.
 - Retained driver-advertised RSS queue counts on adapters without MSI-X. Queue count is tracked separately from processor count, including readback diagnostics. AUTO selects the smallest advertised queue count and falls back to one if the driver provides no options.
-- Affinity policies that let Windows choose CPUs are saved without a manual mask. RSS readback checks both ends of the CPU range, including processor groups, before confirming the configuration.
+- Affinity policies that let Windows choose CPUs are saved without a manual mask. RSS writes `*RSSProfile = 4` (`NUMAScalingStatic`, backed up and cleared on reset) so hybrid CPUs do not stay on `Balanced` and ignore the configured processor range; RSS readback checks both ends of the CPU range, including processor groups, before confirming the configuration.
+- `ReservedCpuSets` now encodes `REG_BINARY` masks padded to a multiple of 8 bytes (one 64-bit `KAFFINITY` per processor group) as required by `ntoskrnl`, while still decoding shorter legacy masks cleanly.
 - Reworked the English and Russian guide and settings reference, removed repeated explanations and corrected gallery descriptions. Updated interface examples with the corrected CPU labels.
 
 ### Driver access

@@ -1,20 +1,27 @@
 # Graphics card
 
-[Documentation](../README.md) / [Guide](./README.md) / 04 · [Русский](./04-gpu.ru.md)
+[Documentation](../README.md) / [Guide](./README.md) / 04 · [Русский](./04-gpu.md)
 
-## AUTO policy for GPUs
+## Why AUTO assigns two physical cores to a discrete GPU
 
-For a discrete GPU, AUTO looks for a pair of neighboring physical cores in the preferred topology, excluding E-cores. It avoids the core that contains CPU 0 when possible. AUTO configures **High** IRQ Priority, enables MSI and clears the custom MSI Limit. It sets **SpecCPU** when it finds a pair and otherwise skips the affinity assignment. Integrated graphics use Windows interrupt placement.
+Graphics stacks (`dxgkrnl.sys` together with `nvlddmkm.sys` or `amdkmdag.sys`) generate frequent, bursty interrupts and DPCs for VSync, DMA fence completions and GPU scheduling. Pinning a discrete GPU to a **single** logical CPU frequently degrades frame-time consistency: in WPA/MXA traces, incoming GPU ISRs preempt the driver's own in-flight DPC on that core and stall subsequent work.
 
-The selected cores are eligible to receive the GPU's interrupts. Which cores handle the interrupts and DPCs depends on the driver and the allocated vectors.
+To avoid self-contention while keeping GPU interrupts localized within the same L3 cache domain, **AUTO-OPTIMIZATION** picks a pair of **neighboring physical cores** in the preferred topology:
+
+- E-cores are excluded on hybrid Intel processors.
+- The physical core hosting CPU 0 is avoided whenever another suitable pair exists, because CPU 0 carries the heaviest baseline share of clock timers and unsteered system DPCs.
+- AUTO enables MSI, clears any custom `MessageNumberLimit`, sets **High** IRQ Priority (`DIRQL 12` hint), and writes **SpecCPU** for the selected pair. If no valid pair is available, the affinity write is skipped rather than forcing a single-core pin.
+- Integrated GPUs are left on Windows default interrupt routing.
+
+Keep in mind that `AssignmentSetOverride` defines which CPUs are *eligible* to receive the GPU's interrupts. How ISR and DPC execution actually spreads across those cores depends on the allocated MSI/MSI-X vectors and how the vendor driver schedules its DPCs and system threads.
 
 ## Manual configuration
 
-The GPU card exposes CPU Affinity, MSI Mode/Limit, IRQ Priority and Policy. Restart Windows after applying changes. If you changed MSI, click **READ IRQ MODE** and check the **IRQ Mode** field.
+The GPU card exposes **CPU Affinity**, **MSI Mode / MSI Limit**, **IRQ Priority** and **Policy**. After clicking **APPLY**, reboot Windows and use **READ IRQ MODE** to confirm that the driver actually came up in MSI or MSI-X mode.
 
-## Checking the result
+## Verification
 
-Compare frame times and graphics-driver ISR/DPC activity with the original settings. Keep the game scene, graphics settings and FPS limit fixed. Use the procedure in [verifying changes](./10-verification.md).
+Compare frame times (including 1% / 0.1% lows and frame-time variance) alongside `dxgkrnl` / vendor-driver ISR and DPC activity in an ETW trace. Keep the scene, graphics preset, resolution and FPS cap identical across runs; see [Chapter 10](./10-verification.md).
 
 ---
 

@@ -2,33 +2,37 @@
 
 [Documentation](../README.md) / [Guide](./README.md) / 02 · [Русский](./02-msi.ru.md)
 
-## Line and message
+## Line-based INTx vs message-signaled interrupts
 
-A PCI device can signal an event through an interrupt line or a message. MSI uses a memory write instead of an interrupt pin; MSI-X gives the driver more control over its messages. The device and driver determine which modes are available. See [message-signaled interrupts](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/introduction-to-message-signaled-interrupts).
+Legacy PCI devices signal interrupts over level-triggered **INTx** lines routed through the IOAPIC. Because lines are often shared across multiple devices (`IRQ sharing`), a single trigger forces Windows to walk a chain of registered ISRs (`KiChainedDispatch`) until a driver claims the interrupt — a well-known source of elevated interrupt latency and stability issues (*Windows Internals*, 7th ed., Part 2, ch. 8). Drivers on level-triggered lines also frequently have to perform an extra MMIO read to flush posted DMA writes and deassert the line.
 
-## Saved setting and current mode
+**MSI** replaces the shared pin with a PCIe memory write directed straight to the local APIC. Each device gets dedicated vectors (shown as negative IRQ numbers in Device Manager), and PCIe transaction ordering guarantees that prior DMA data is visible in memory by the time the interrupt arrives.
 
-**MSI Mode** selects the device setting. **APPLY** writes `MSISupported` to its registry key.
+**MSI-X** extends this model up to **2048 vectors**, with an independent message address and data entry per vector stored in the device's MSI-X table (in BAR space). That allows a driver to route separate queues or interrupters — such as network RSS receive queues or xHCI interrupters — directly to different CPUs or NUMA nodes. Availability depends on both the hardware capability and the driver. See [Introduction to message-signaled interrupts](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/introduction-to-message-signaled-interrupts).
 
-**IRQ Mode** shows the mode currently reported for the device. Click **READ IRQ MODE** at the top to read all listed PCI devices, including cards hidden by a filter. This command can load DTIMOD. Automatic background reads use Windows resources or an already loaded driver.
+## Configured setting vs live IRQ Mode
 
-For example, **MSI Mode: Enabled** with **IRQ Mode: Line** means that MSI is configured and the device is currently using a line interrupt. If both readings persist after a reboot, check the device and driver.
+**MSI Mode** controls the device's `MSISupported` registry value under `Device Parameters\Interrupt Management\MessageSignaledInterruptProperties`. Clicking **APPLY** writes the registry setting; Windows reads it when the device stack starts (after a reboot).
 
-The **HW** part of the card lists supported modes and the maximum number of messages. The nearby **IRQ** number counts interrupt resources reported by WMI. A device can have one allocated interrupt resource while supporting multiple messages. When the data confirms message-based interrupts, the card shows **MSI/MSI-X** until PCI configuration can distinguish the two.
+**IRQ Mode** reports what the device is actually using right now. Click **READ IRQ MODE** in the toolbar to query every listed PCI device, including cards hidden by filters. That command combines Windows allocated interrupt resources with PCI configuration space (`MSI Enable` / `MSI-X Enable` bits read through DTIMOD), which distinguishes MSI from MSI-X even when only one IRQ resource is allocated. Background reads on startup or **REFRESH** never load DTIMOD on their own — they rely on Windows resources and any already loaded driver.
+
+A card showing **MSI Mode: Enabled** alongside **IRQ Mode: Line** means MSI is requested in the registry, yet the device is currently running on INTx. If that mismatch remains after rebooting, the driver or platform did not adopt MSI.
+
+The **HW** line lists the device's PCI capabilities and hardware message ceiling, while **IRQ** shows the interrupt-resource count reported by WMI. A device can support dozens of vectors in hardware while its driver only requests one. When Windows resources confirm message-signaled interrupts without PCI config readback, the card displays **MSI/MSI-X** until `READ IRQ MODE` resolves the exact bit.
 
 ## MSI Limit
 
-**MSI Limit** caps the requested message allocation. **Unlimited** removes the custom limit and lets Windows and the driver choose it. The hardware maximum shown in **HW** describes capability, not a recommended limit.
+**MSI Limit** writes `MessageNumberLimit`, capping how many message interrupts Windows allocates to the device. Selecting **Unlimited** removes the registry value so Windows and the driver negotiate the vector count normally. The maximum shown in **HW** is a hardware ceiling, not a target — artificially raising or capping the limit rarely helps unless troubleshooting a specific driver quirk.
 
-Windows accepts 1, 2, 4, 8 or 16 for MSI, and up to 2048 for MSI-X. See [enabling MSI in the registry](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/enabling-message-signaled-interrupts-in-the-registry). The program validates the entered value against the information available for the device.
+In the Windows registry, valid limits are powers of two (**1, 2, 4, 8 or 16**) for MSI and up to **2048** for MSI-X. See [Enabling message-signaled interrupts in the registry](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/enabling-message-signaled-interrupts-in-the-registry). DEVICE TWEAKER validates manual input against the detected capabilities of the device.
 
-## Apply and restore
+## Applying, safeguards and rollback
 
-Select the desired mode and limit, click **APPLY**, then restart Windows. Read **IRQ Mode** again and check normal use of the device under the same workload. Keep the original backup so you can return to it through **RESTORE**.
+After changing MSI Mode or MSI Limit, click **APPLY**, reboot, and run **READ IRQ MODE** to confirm the active state under the same workload.
 
-If PCI capabilities explicitly report message interrupts without line-based INTx support, the program refuses to disable MSI and leaves that setting unchanged.
+If a device's PCI capabilities explicitly report message-signaled interrupts without line-based INTx support, DEVICE TWEAKER refuses to disable MSI so the device cannot be left without a working interrupt path.
 
-AUTO enables MSI and removes the custom limit on devices it configures. It leaves the limit intact for display audio and skips Wi-Fi. **RESET WINDOWS DEFAULT** preserves MSI Mode and Limit. Restore a backup to return those two settings to their previous values.
+**AUTO-OPTIMIZATION** enables MSI and clears custom limits on the devices it tunes, preserves any existing limit on display audio, and skips Wi-Fi adapters. **RESET WINDOWS DEFAULT** intentionally leaves `MSISupported` and `MessageNumberLimit` untouched; use **RESTORE** with a backup to revert them.
 
 ---
 

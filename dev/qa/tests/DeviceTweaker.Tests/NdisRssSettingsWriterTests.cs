@@ -48,16 +48,17 @@ public sealed class NdisRssSettingsWriterTests
         List<string> log = []; OperationReport report = new();
         Writer(key, log, create => Assert.True(create)).SetExtra(Instance,
             new(4, 8, new[] { 4, 6, 8 }), report, "NIC");
-        Assert.Equal(new[] { "*RssBaseProcGroup", "*MaxRssProcessors", "*RSSMaxProcGroup", "*RssMaxProcNumber", "*NumaNodeId" }, key.Calls.Select(x => x.Name));
-        Assert.All(key.Calls.Take(4), x => Assert.Equal(RegistryValueKind.DWord, x.Kind));
+        Assert.Equal(new[] { "*RssBaseProcGroup", "*MaxRssProcessors", "*RSSMaxProcGroup", "*RssMaxProcNumber", "*RSSProfile", "*NumaNodeId" }, key.Calls.Select(x => x.Name));
+        Assert.All(key.Calls.Take(5), x => Assert.Equal(RegistryValueKind.DWord, x.Kind));
         Assert.Equal(0, key.Values["*RssBaseProcGroup"]);
         Assert.Equal(3, key.Values["*MaxRssProcessors"]);
         Assert.Equal(0, key.Values["*RSSMaxProcGroup"]);
         Assert.Equal(8, key.Values["*RssMaxProcNumber"]);
+        Assert.Equal(4, key.Values["*RSSProfile"]);
         Assert.False(key.Values.ContainsKey("*NumaNodeId"));
         Assert.Equal(1, key.Disposed); Assert.True(report.Succeeded);
-        Assert.Equal(4, log.Count(x => x.StartsWith("RSS.REG.SET:")));
-        Assert.Contains(log, x => x.Contains("numa=automatic") && x.Contains("cpus=[4,6,8]"));
+        Assert.Equal(5, log.Count(x => x.StartsWith("RSS.REG.SET:")));
+        Assert.Contains(log, x => x.Contains("profile=NUMAStatic(4)") && x.Contains("numa=automatic") && x.Contains("cpus=[4,6,8]"));
     }
 
     [Theory]
@@ -125,13 +126,13 @@ public sealed class NdisRssSettingsWriterTests
     [Fact]
     public void Clear_OpensExistingKeyOnlyAndPreservesUnrelatedValues()
     {
-        Key key = new(); key.Values["unrelated"] = 42; key.Values["*RssMaxProcNumber"] = 8;
+        Key key = new(); key.Values["unrelated"] = 42; key.Values["*RssMaxProcNumber"] = 8; key.Values["*RSSProfile"] = 4;
         List<string> log = []; OperationReport report = new();
         Writer(key, log, create => Assert.False(create)).ClearExtra(Instance, report, null);
-        Assert.Equal(5, key.Calls.Count); Assert.Single(key.Values); Assert.Equal(42, key.Values["unrelated"]);
+        Assert.Equal(6, key.Calls.Count); Assert.Single(key.Values); Assert.Equal(42, key.Values["unrelated"]);
         Assert.All(key.Calls, x => Assert.Equal("delete", x.Action));
         Assert.True(report.Succeeded); Assert.Equal(1, key.Disposed);
-        Assert.Equal(5, log.Count(x => x.Contains("status=cleared-or-absent")));
+        Assert.Equal(6, log.Count(x => x.Contains("status=cleared-or-absent")));
     }
 
     [Fact]

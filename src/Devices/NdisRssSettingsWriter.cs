@@ -47,9 +47,12 @@ internal sealed class NdisRssSettingsWriter
                 values.Set("*MaxRssProcessors", layout.Processors.Count, RegistryValueKind.DWord);
                 values.Set("*RSSMaxProcGroup", 0, RegistryValueKind.DWord);
                 values.Set("*RssMaxProcNumber", layout.MaxProcessor, RegistryValueKind.DWord);
+                // Explicit NUMAStatic (4) so ndis.sys does not default to Balanced (6)
+                // on hybrid CPUs and ignore *RssBaseProcNumber / *RssMaxProcNumber.
+                values.Set("*RSSProfile", 4, RegistryValueKind.DWord);
                 // Keep NDIS's NUMA selection; do not force node 0.
                 values.Delete("*NumaNodeId");
-            }, $"group=0 maxProcessors={layout.Processors.Count} maxProc={layout.MaxProcessor} cpus=[{string.Join(',', layout.Processors)}] numa=automatic");
+            }, $"group=0 maxProcessors={layout.Processors.Count} maxProc={layout.MaxProcessor} cpus=[{string.Join(',', layout.Processors)}] profile=NUMAStatic(4) numa=automatic");
 
     internal void ClearBaseCore(string instance, OperationReport? report, string? name)
         => ClearSingle(instance, "*RssBaseProcNumber", "clear RSS base CPU", report, name);
@@ -61,7 +64,7 @@ internal sealed class NdisRssSettingsWriter
         => Run(instance, create: false, "RSS.CLEAR", "clear extended RSS values", report, name,
             values =>
             {
-                foreach (string value in new[] { "*RssBaseProcGroup", "*MaxRssProcessors", "*RSSMaxProcGroup", "*RssMaxProcNumber", "*NumaNodeId" })
+                foreach (string value in new[] { "*RssBaseProcGroup", "*MaxRssProcessors", "*RSSMaxProcGroup", "*RssMaxProcNumber", "*RSSProfile", "*NumaNodeId" })
                     values.Delete(value);
             }, "values=extra-rss keyPresent=true");
 

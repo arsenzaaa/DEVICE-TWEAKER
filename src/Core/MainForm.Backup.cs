@@ -169,6 +169,7 @@ public sealed partial class MainForm
                             "*MaxRssProcessors",
                             "*RSSMaxProcGroup",
                             "*RssMaxProcNumber",
+                            "*RSSProfile",
                             "*NumaNodeId");
                     }
 

@@ -2,38 +2,45 @@
 
 [Documentation](../README.md) / [Guide](./README.md) / 07 · [Русский](./07-cpu-topology.ru.md)
 
-## Reading the CPU list
+## Reading the processor map
 
-Use the CPU list to see which logical processors share a physical core. Where available, the labels include CCD, CCX and CPPC information. On homogeneous CPUs, look for Core and Core/SMT. On hybrid CPUs, P-Core and E-Core distinguish core types. For example, `CPU 6 (Core, R131, #4)` and `CPU 7 (Core/SMT, R131, #4)` belong to one physical core.
+DEVICE TWEAKER queries Windows topology (`GetSystemCpuSetInformation` and processor-relationship data) to map logical processors onto physical cores, cache domains and firmware performance ranks:
 
-CPPC ratings rank cores by the firmware's estimate of their performance. CCD and CCX labels identify chiplets and core groups. Cache information helps distinguish CCDs on multi-chiplet processors.
+- **Homogeneous CPUs** label the two logical processors of one physical core as `Core` and `Core/SMT` (for example, `CPU 6 (Core, R131, #4)` and `CPU 7 (Core/SMT, R131, #4)` share the same physical core).
+- **Hybrid CPUs** distinguish `P-Core` and `E-Core` via `EfficiencyClass` and SMT pairing.
+- **CPPC ranks** reflect the firmware's estimate of each core's preferred boost capability.
+- **CCD / CCX and L3 cache domains** (`LastLevelCacheIndex`) separate chiplets on multi-CCD processors, where crossing between CCDs incurs inter-chiplet latency.
+
+Understanding SMT matters differently for threads versus interrupts. The Windows thread scheduler already prioritizes an idle physical core over a busy SMT sibling (*Windows Internals*, 7th ed., Part 1, ch. 4), so normal threads naturally spread across physical cores while idle cores exist. Hardware interrupts and DPCs do **not** follow those SMT-avoidance rules — an interrupt fires on its assigned logical CPU regardless of what is running on its sibling thread.
 
 ## How AUTO uses topology
 
-AUTO selects a target CCD and physical cores using its topology rules, SMT relationships and available ratings. It assigns two physical cores to a discrete GPU. Windows chooses the cores for integrated graphics. Other roles receive their own assignments. Unreliable detection of required topology blocks the relevant automatic write.
+**AUTO-OPTIMIZATION** chooses a target CCD and allocates physical cores using SMT relationships, core classes and CPPC ranks: two neighboring physical cores for a discrete GPU, Windows defaults for integrated graphics, and separate placement rules for input, wired networking and audio. If required topology metadata cannot be read reliably, AUTO skips the affected automatic affinity writes rather than guessing.
 
-AUTO changes device settings while leaving SMT, E-cores and game-thread affinity unchanged. Core assignments depend on the detected topology; compare the resulting performance under your workload.
+AUTO modifies only device settings — it never disables SMT, parks/unparks E-cores or alters game-thread affinity.
 
 ## ReservedCpuSets
 
-Use **Reserved CPU Sets** to reserve logical CPUs at the system level. Windows can still use them when required, for example when a thread's affinity restricts it to those CPUs. The CPU checkboxes in a device card configure its interrupt affinity.
+**Reserved CPU Sets** applies a system-wide core reservation via the Windows **CPU Sets** mechanism. Unlike traditional hard affinity masks (`SetProcessAffinityMask`), CPU Sets act as soft scheduling boundaries that **also constrain kernel and system threads**: reserved logical processors are marked `Allocated` in `SYSTEM_CPU_SET_INFORMATION`, kept clear of general background threads, and kept unparked. Windows will still run a thread on a reserved CPU if that thread's explicit affinity or CPU Set targets it.
 
-The reservation mask is stored here:
+The reservation bitmask is stored in the registry as little-endian `REG_BINARY`, padded to a multiple of 8 bytes (one 64-bit `KAFFINITY` mask per processor group, as required by `ntoskrnl`):
 
 ```text
 HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Kernel
   ReservedCpuSets  REG_BINARY
 ```
 
-Choose the CPUs and click **APPLY**. Clearing all selections and applying removes the registry value. The program creates a backup before writing. If writing fails, the edits remain pending. The panel is available when CPU Set IDs can be determined reliably.
+Select the logical CPUs to reserve and click **APPLY** (clearing all selections and applying deletes the registry value). DEVICE TWEAKER enables the panel only when CPU Set IDs can be mapped reliably, backs up the value before writing, and leaves edits pending if a write fails.
 
-**AUTO-OPTIMIZATION** clears the reservation when this panel is available. To keep a custom reservation, use **APPLY** to configure device settings manually.
+> **Avoid mixing reserved and unreserved CPUs in a single process affinity mask.** As noted in Windows scheduling behavior and *Windows Internals* (7th ed., Part 1, pp. 278–283), forcing a hard affinity mask that spans both reserved and unreserved processors can cause erratic thread placement. Keep ordinary processes on the unreserved pool and target reserved cores explicitly only for dedicated workloads.
 
-For the CPU Sets and thread-affinity model, see *Windows Internals*, 7th ed., Part 1, pp. 278–283, and the [CPU Sets API documentation](https://learn.microsoft.com/en-us/windows/win32/procthread/cpu-sets).
+**AUTO-OPTIMIZATION** clears `ReservedCpuSets` whenever the panel is available. If you want to keep a custom reservation alongside device tuning, apply device changes manually via **APPLY**.
 
-## Checking the selection
+See *Windows Internals*, 7th ed., Part 1, pp. 278–283, and the [CPU Sets documentation](https://learn.microsoft.com/en-us/windows/win32/procthread/cpu-sets).
 
-Use the core and CCD/CCX labels to confirm the selection. After rebooting, check where threads and interrupt handlers ran using the [trace procedure](./10-verification.md#inspecting-a-trace).
+## Verification
+
+Confirm that your selected logical processors match the intended physical cores and CCD/CCX labels. After rebooting, verify actual thread and ISR/DPC placement in an ETW trace ([Chapter 10](./10-verification.md#inspecting-a-trace)).
 
 ---
 

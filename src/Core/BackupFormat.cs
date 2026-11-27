@@ -120,6 +120,7 @@ internal static class BackupFormat
                 or "*MaxRssProcessors"
                 or "*RSSMaxProcGroup"
                 or "*RssMaxProcNumber"
+                or "*RSSProfile"
                 or "*NumaNodeId"
                 or "PnPCapabilities"
                 or "*InterruptModeration"

@@ -129,11 +129,11 @@ internal static class ControlContracts
             using Label pending = new();
             main.Controls.Add(pending);
             pending.Text = "pending APPLY: 1K (DWORD=1)";
-            Check("pending value is translated in RU", "ожидает ПРИМЕНИТЬ: 1K (DWORD=1)", pending.Text);
+            Check("pending value is translated in RU", "ожидает применения: 1K (DWORD=1)", pending.Text);
             setLanguage.Invoke(null, [Enum.Parse(languageCode, "English"), false]);
             Check("RU to EN preserves the pending value", "pending APPLY: 1K (DWORD=1)", pending.Text);
             setLanguage.Invoke(null, [Enum.Parse(languageCode, "Russian"), false]);
-            Check("EN to RU preserves the pending value", "ожидает ПРИМЕНИТЬ: 1K (DWORD=1)", pending.Text);
+            Check("EN to RU preserves the pending value", "ожидает применения: 1K (DWORD=1)", pending.Text);
             using CheckBox stateToggle = (CheckBox)New("ThemedCheckBox");
             stateToggle.Checked = true;
             stateToggle.GetType().GetProperty("SyncCheckedStateText")!.SetValue(stateToggle, true);

@@ -160,26 +160,7 @@ public sealed partial class MainForm
             }
         }
 
-        int maxIndex = setBits.Count > 0 ? setBits.Max() : -1;
-        int byteCount = maxIndex >= 0 ? (maxIndex / 8) + 1 : 0;
-        byte[] bytes = new byte[byteCount];
-
-        foreach (int id in setBits)
-        {
-            if (id < 0)
-            {
-                continue;
-            }
-
-            int byteIndex = id / 8;
-            int bitIndex = id % 8;
-            if (byteIndex >= 0 && byteIndex < bytes.Length)
-            {
-                bytes[byteIndex] = (byte)(bytes[byteIndex] | (1 << bitIndex));
-            }
-        }
-
-        return bytes;
+        return BuildReservedCpuSetBytes(setBits);
     }
 
     private async Task ResetReservedCpuSets(OperationReport? report = null)
@@ -312,10 +293,12 @@ public sealed partial class MainForm
         WriteLog("RESERVED.APPLY: staged value committed after backup");
     }
 
+    // ntoskrnl!KiInitializeReservedCpuSets requires REG_BINARY length to be a
+    // multiple of 8 bytes (64-bit KAFFINITY mask per processor group).
     private static byte[] BuildReservedCpuSetBytes(IReadOnlyList<int> setBits)
     {
         int maxIndex = setBits.Count > 0 ? setBits.Max() : -1;
-        int byteCount = maxIndex >= 0 ? (maxIndex / 8) + 1 : 0;
+        int byteCount = maxIndex >= 0 ? ((maxIndex / 64) + 1) * 8 : 0;
         byte[] bytes = new byte[byteCount];
         foreach (int id in setBits)
         {
