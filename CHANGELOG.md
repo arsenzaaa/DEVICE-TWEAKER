@@ -33,12 +33,12 @@ Source comparison: [v0.0.4 → v0.1.0](https://github.com/arsenzaaa/DEVICE-TWEAK
 ### Interface and responsiveness
 
 - The main window fits the monitor work area at startup and after a DPI change.
-- Centered the buttons in result, information and backup-location dialogs, and ensured dialog footers and card action buttons accommodate localized busy captions without clipping. Added space between the power-saving label and its toggle in Russian, and improved Intel USB badge contrast.
+- Centered the buttons in result, information and backup-location dialogs, updated device badge colors (including higher-contrast Intel USB badges), and added spacing between the power-saving label and its toggle in Russian.
+- Action buttons display localized in-progress captions during operations, wrap cleanly on narrow/high-DPI panels, and preserve focus hygiene while disabled.
 - REFRESH rescans devices and reuses compatible cards, keeping pending edits and the scroll position. A change in CPU topology forces a rebuild.
 - REFRESH keeps a pending CPU selection with its affinity policy or RSS mode when saved settings change. Driver details for the log are read independently of the device-list update.
-- Raw Input (`WM_INPUT`) measurement runs on a dedicated background message-only thread with cached rate calculations and bounded history, preventing high-rate (1K–8K) mouse/keyboard traffic from stalling window controls or delaying window close.
-- Disabling an action button during an operation releases focus cleanly instead of jumping focus to the first device card.
-- Animations share a frame clock with at most one pending UI callback. The clock stops when there are no active animations and does not change Windows timer resolution or display settings.
+- Moved Raw Input (`WM_INPUT`) capture off the UI window onto a dedicated background message-only thread with cached rate calculations and bounded history, keeping window controls responsive and window close immediate on 1K–8K devices.
+- Added short transitions for toggles, scrolling and button hover driven by a shared frame clock with at most one pending UI callback; the clock stops while idle and does not change Windows timer resolution or display settings.
 - An incomplete IMOD readback no longer shifts later values into the wrong interrupter rows. The failed index and address are recorded in the log.
 
 ### Applying and resetting settings
@@ -67,8 +67,8 @@ Source comparison: [v0.0.4 → v0.1.0](https://github.com/arsenzaaa/DEVICE-TWEAK
 
 ### Maintenance and QA
 
-- Separated startup bundle management, backup files/registry access, USB role mapping, IMOD map formatting, driver-file preparation and the KDU process from MainForm. Startup profile and backup formats are preserved.
-- Streamlined the local QA suite (`Invoke-Qa.ps1 -Mode Fast` / `-Mode Full`, single-pass Workbench scenarios, 3-build cache retention) and added UX regression tests covering focus hygiene, background Raw Input shutdown, IMOD expansion and localized busy button widths.
+- Separated startup bundle management, backup files/registry access, USB role mapping, IMOD map formatting, driver-file preparation, RSS settings writing and the KDU process from MainForm. Startup profile and backup formats are preserved.
+- Added the read-only hidden-desktop GUI workbench, `-Mode Fast` / `-Mode Full` QA runner with bounded build cache, native C driver lifecycle models, and expanded xUnit coverage for the restricted driver API, USB topology, incomplete readback, hardware UI layouts and UX regressions.
 
 ## [0.0.4](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/tag/v0.0.4) · 2026-10-31
 
