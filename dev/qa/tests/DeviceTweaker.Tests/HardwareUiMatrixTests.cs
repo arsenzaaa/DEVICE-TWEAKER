@@ -104,6 +104,18 @@ public sealed class HardwareUiMatrixTests
                             {
                                 VerifyFeedbackStability(form, block, $"{profile.Id}/{language}/scale={scale:0.00}", failures);
                             }
+
+                            // Also exercise 1024x768 viewport clamping (e.g. small displays / CI VMs) at elevated DPI.
+                            if (scale > 1f)
+                            {
+                                form.Size = new Size(1024, 728);
+                                InvokeLayoutBlocks(form);
+                                VerifyAllBlocks(form, $"{profile.Id}/{language}/scale={scale:0.00}/1024x728", failures);
+                                foreach (DeviceBlock block in GetBlocks(form))
+                                {
+                                    VerifyFeedbackStability(form, block, $"{profile.Id}/{language}/scale={scale:0.00}/1024x728", failures);
+                                }
+                            }
                         }
                     }
                 }

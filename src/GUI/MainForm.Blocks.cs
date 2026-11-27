@@ -736,6 +736,27 @@ public sealed partial class MainForm
             UseMnemonic = false,
         };
 
+        void PlaceWrappedButtonRow(Button[] buttons, int startX, int startY, int maxWidth, int gapX, int gapY)
+        {
+            int x = startX;
+            int y = startY;
+            int rowHeight = 0;
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                Button button = buttons[i];
+                if (x > startX && x + button.Width > maxWidth)
+                {
+                    x = startX;
+                    y += rowHeight + gapY;
+                    rowHeight = 0;
+                }
+
+                button.Location = new Point(x, y);
+                x = button.Right + gapX;
+                rowHeight = Math.Max(rowHeight, button.Height);
+            }
+        }
+
         void LayoutNicItrRow()
         {
             if (!showNicItr)
@@ -768,16 +789,29 @@ public sealed partial class MainForm
                 : Math.Min(nicInputDesiredWidth, Math.Max(currentInputMinimum, inputAvailable));
 
             txtNicItr.Size = new Size(inputWidth, UiScale(24));
-            btnNicItr.Location = inline
-                ? new Point(txtNicItr.Right + nicInlineGap, txtNicItr.Top)
-                : new Point(nicValueX, txtNicItr.Bottom + UiScale(6));
-            btnNicItrSave.Location = new Point(btnNicItr.Right + nicButtonGap, btnNicItr.Top);
-            btnNicItrCheck.Location = new Point(btnNicItrSave.Right + nicButtonGap, btnNicItr.Top);
+            if (inline)
+            {
+                btnNicItr.Location = new Point(txtNicItr.Right + nicInlineGap, txtNicItr.Top);
+                btnNicItrSave.Location = new Point(btnNicItr.Right + nicButtonGap, btnNicItr.Top);
+                btnNicItrCheck.Location = new Point(btnNicItrSave.Right + nicButtonGap, btnNicItr.Top);
+            }
+            else
+            {
+                int buttonRowLeft = nicValueX + buttonsWidth <= usableSettingsWidth ? nicValueX : 0;
+                PlaceWrappedButtonRow(
+                    [btnNicItr, btnNicItrSave, btnNicItrCheck],
+                    buttonRowLeft,
+                    txtNicItr.Bottom + UiScale(6),
+                    usableSettingsWidth,
+                    nicButtonGap,
+                    UiScale(4));
+            }
 
+            int buttonsBottom = Math.Max(btnNicItr.Bottom, Math.Max(btnNicItrSave.Bottom, btnNicItrCheck.Bottom));
             int statusWidth = Math.Max(UiScale(120), usableSettingsWidth - nicReadbackX - UiScale(8));
             lblNicItrStatus.Location = new Point(
                 nicReadbackX,
-                Math.Max(txtNicItr.Bottom, btnNicItrCheck.Bottom) + UiScale(4));
+                Math.Max(txtNicItr.Bottom, buttonsBottom) + UiScale(4));
             lblNicItrStatus.Size = new Size(statusWidth, UiScale(22));
             lblNicItrTime.Location = new Point(nicReadbackX, lblNicItrStatus.Bottom + UiScale(2));
             lblNicItrTime.Size = new Size(statusWidth, nicDetailHeight);
@@ -1201,11 +1235,25 @@ public sealed partial class MainForm
 
             int imodButtonTop = useInlineImodButtons ? txtImod.Top : txtImod.Bottom + UiScale(6);
             int imodButtonLeft = useInlineImodButtons ? txtImod.Right + inlineGap : 0;
-            btnImodApply.Location = new Point(imodButtonLeft, imodButtonTop);
-            btnImodDelete.Location = new Point(btnImodApply.Right + buttonGap, imodButtonTop);
-            btnImodCheck.Location = new Point(btnImodDelete.Right + buttonGap, imodButtonTop);
+            if (useInlineImodButtons)
+            {
+                btnImodApply.Location = new Point(imodButtonLeft, imodButtonTop);
+                btnImodDelete.Location = new Point(btnImodApply.Right + buttonGap, imodButtonTop);
+                btnImodCheck.Location = new Point(btnImodDelete.Right + buttonGap, imodButtonTop);
+            }
+            else
+            {
+                PlaceWrappedButtonRow(
+                    [btnImodApply, btnImodDelete, btnImodCheck],
+                    imodButtonLeft,
+                    imodButtonTop,
+                    usableSettingsWidth,
+                    buttonGap,
+                    UiScale(4));
+            }
 
-            int statusTop = Math.Max(txtImod.Bottom, btnImodCheck.Bottom) + UiScale(6);
+            int imodButtonsBottom = Math.Max(btnImodApply.Bottom, Math.Max(btnImodDelete.Bottom, btnImodCheck.Bottom));
+            int statusTop = Math.Max(txtImod.Bottom, imodButtonsBottom) + UiScale(6);
             if (imodRoleEditor.Panel.Visible)
             {
                 int editorPanelWidth = Math.Max(UiScale(80), usableSettingsWidth - valueX - UiScale(8));
