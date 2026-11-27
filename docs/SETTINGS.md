@@ -42,7 +42,7 @@ Hover over the current value to see when it was read. If a device is connected o
 
 ### Commands
 
-- **SET** writes the selected controller's registers and refreshes the displayed values. Custom settings are saved for startup after a successful write.
+- **SET** writes the selected controller's registers, refreshes the displayed values and automatically expands the interrupter readback details table. Custom settings are saved for startup after a successful write.
 - **CHECK** rereads the registers and loads DTIMOD if needed. **REFRESH** updates the device list and available current state; hardware reads use an already loaded DTIMOD.
 - **DELETE PROFILE** backs up and removes the shared USB IMOD and NIC ITR startup profile. Restart Windows to clear active register changes. See [Delete or restore](./guide/05-usb-imod.md#delete-or-restore) for network moderation and driver-file cleanup.
 

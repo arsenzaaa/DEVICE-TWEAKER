@@ -2,16 +2,16 @@
 
 **English** · [Русский](./README.ru.md)
 
-A utility for configuring MSI, interrupt affinity, ReservedCpuSets and USB IMOD on Windows. It brings together controls familiar from MSI Utility V3 and Interrupt Affinity Policy Tool and adds auto-optimization based on CPU topology.
+Windows hardware interrupt and device tuning in one place — MSI/MSI-X, interrupt affinity, ReservedCpuSets, USB IMOD, RSS, and NIC ITR, with CPU-topology auto-optimization, live readback, and safe backups.
 
 **[Download for Windows](https://github.com/arsenzaaa/DEVICE-TWEAKER/releases/latest/download/DEVICE.TWEAKER.SelfContained.exe)** · [Guide](./docs/guide/README.md) · [Screenshots](./docs/SCREENSHOTS.md) · [Changelog](./CHANGELOG.md)
 
 ## Features
 
-- Adjust MSI Mode, MSI Limit, IRQ Priority and interrupt affinity. Read the active IRQ mode and configure ReservedCpuSets in a separate panel.
-- Select cores for graphics cards, input devices and network adapters with **AUTO-OPTIMIZATION**. Adjust individual device settings with **APPLY**.
-- Configure USB IMOD by controller, device role or interrupter index. Choose the processors and the number of queues for RSS. Read, apply or save NIC ITR on supported Intel and Realtek adapters.
-- Measure the mouse event rate, adjust Mouse Throttle and power saving, and restore backed-up settings.
+- **Interrupts & affinity:** configure MSI/MSI-X, MSI Limit, IRQ Priority, CPU affinity masks, and ReservedCpuSets, with live IRQ mode readback across PCI devices.
+- **Topology-aware auto-optimization:** automatically place GPU, input, and network interrupts on optimal physical cores (P/E cores, CCD/CCX, SMT) — or fine-tune any device manually with **APPLY**.
+- **USB IMOD & network tuning:** set xHCI IMOD per controller, device role, or interrupter with full readback; configure RSS queues/base CPU and read, apply, or save NIC ITR on supported Intel and Realtek adapters.
+- **Input, power & safe rollback:** measure real-time mouse polling rate, toggle Mouse Throttle and power saving, and restore previous settings from automatic backups.
 
 ## Getting started
 
