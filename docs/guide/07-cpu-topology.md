@@ -11,13 +11,13 @@ DEVICE TWEAKER queries Windows topology (`GetSystemCpuSetInformation` and proces
 - **CPPC ranks** reflect the firmware's estimate of each core's preferred boost capability.
 - **CCD / CCX and L3 cache domains** (`LastLevelCacheIndex`) separate chiplets on multi-CCD processors, where crossing between CCDs incurs inter-chiplet latency.
 
-Understanding SMT matters differently for threads versus interrupts. The Windows thread scheduler already prioritizes an idle physical core over a busy SMT sibling (*Windows Internals*, 7th ed., Part 1, ch. 4), so normal threads naturally spread across physical cores while idle cores exist. Hardware interrupts and DPCs do **not** follow those SMT-avoidance rules — an interrupt fires on its assigned logical CPU regardless of what is running on its sibling thread.
+Understanding SMT matters differently for threads versus interrupts. The Windows thread scheduler already prioritizes an idle physical core over a busy SMT sibling (*Windows Internals*, 7th ed., Part 1, ch. 4), so normal threads naturally spread across physical cores while idle cores exist. Hardware interrupts and DPCs do **not** follow those SMT-avoidance rules: an interrupt fires on its assigned logical CPU regardless of what is running on its sibling thread.
 
 ## How AUTO uses topology
 
 **AUTO-OPTIMIZATION** chooses a target CCD and allocates physical cores using SMT relationships, core classes and CPPC ranks: two neighboring physical cores for a discrete GPU, Windows defaults for integrated graphics, and separate placement rules for input, wired networking and audio. If required topology metadata cannot be read reliably, AUTO skips the affected automatic affinity writes rather than guessing.
 
-AUTO modifies only device settings — it never disables SMT, parks/unparks E-cores or alters game-thread affinity.
+AUTO modifies only device settings. It never disables SMT, parks/unparks E-cores or alters game-thread affinity.
 
 ## ReservedCpuSets
 

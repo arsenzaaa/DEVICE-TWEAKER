@@ -4,7 +4,7 @@
 
 ## xHCI interrupters and how IMOD works
 
-A USB peripheral does not own an MSI/MSI-X vector of its own — all vectors belong to the PCIe **xHCI host controller**. The delivery path runs through the controller's interrupters:
+A USB peripheral does not own an MSI/MSI-X vector of its own; all vectors belong to the PCIe **xHCI host controller**. The delivery path runs through the controller's interrupters:
 
 ```text
 USB device → Endpoint (Device Slot) → Transfer Event → Event Ring → Interrupter (IMOD) → MSI/MSI-X vector → CPU
@@ -14,11 +14,11 @@ Each interrupter owns an Event Ring and an **IMOD** (Interrupt Moderation) MMIO 
 
 IMOD sets the minimum delay between consecutive interrupts from an interrupter in **250 ns** steps:
 
-- **`0xFA0`** (`4000 × 250 ns = 1 ms`) — the hardware reset default defined in section 5.5.2.2 of the [xHCI specification](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/extensible-host-controler-interface-usb-xhci.pdf).
-- **`0xC8`** (`200 × 250 ns = 50 µs`) — the operating value that Microsoft's `usbxhci.sys` typically programs at controller initialization on Windows 8/10/11 (used as DEVICE TWEAKER's baseline reference). Always read the controller back to see what your driver actually set.
-- **`0x0`** — disables interrupt moderation completely.
+- **`0xFA0`** (`4000 × 250 ns = 1 ms`): the hardware reset default defined in section 5.5.2.2 of the [xHCI specification](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/extensible-host-controler-interface-usb-xhci.pdf).
+- **`0xC8`** (`200 × 250 ns = 50 µs`): the operating value that Microsoft's `usbxhci.sys` typically programs at controller initialization on Windows 8/10/11 (used as DEVICE TWEAKER's baseline reference). Always read the controller back to see what your driver actually set.
+- **`0x0`**: disables interrupt moderation completely.
 
-The practical effect depends heavily on polling rate and device role. At 1000 Hz (1000 µs between polls), the Windows default of 50 µs is modest; at **4000–8000 Hz** (250–125 µs period), a 50 µs moderation window is 20–40% of the polling interval and can introduce measurable jitter, while a 1 ms interval (`0xFA0`) severely bottlenecks high-rate mice. Conversely, on **USB audio** interfaces or non-critical controllers, higher moderation (`0xFA0` or more, as long as audio stays clean) cuts interrupt frequency and CPU load. Lower moderation always trades reduced batching delay for higher interrupt rates — verify on your own hardware rather than assuming `0x0` helps every device.
+The practical effect depends heavily on polling rate and device role. At 1000 Hz (1000 µs between polls), the Windows default of 50 µs is modest; at **4000–8000 Hz** (250–125 µs period), a 50 µs moderation window is 20–40% of the polling interval and can introduce measurable jitter, while a 1 ms interval (`0xFA0`) severely bottlenecks high-rate mice. Conversely, on **USB audio** interfaces or non-critical controllers, higher moderation (`0xFA0` or more, as long as audio stays clean) cuts interrupt frequency and CPU load. Lower moderation always trades reduced batching delay for higher interrupt rates. Verify on your own hardware rather than assuming `0x0` helps every device.
 
 ## Choosing a mode
 

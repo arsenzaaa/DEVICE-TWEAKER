@@ -1,17 +1,17 @@
 # DTIMOD.sys, KDU and startup
 
-[Documentation](../README.md) / [Guide](./README.md) / 11 · [Русский](./11-driver.md)
+[Documentation](../README.md) / [Guide](./README.md) / 11 · [Русский](./11-driver.ru.md)
 
 ## When DTIMOD is needed
 
-Only **USB IMOD**, **NIC ITR** and hardware PCI configuration queries require `DTIMOD.sys`. Standard settings — MSI Mode/Limit, Interrupt Affinity, RSS, ReservedCpuSets, Mouse Throttle and device power policies — use regular Windows registry, WMI and Power APIs. [IRQ Mode](./02-msi.md) combines Windows allocated interrupt resources with PCI configuration bits (`MSI Enable` / `MSI-X Enable`) whenever DTIMOD is available.
+Only **USB IMOD**, **NIC ITR** and hardware PCI configuration queries require `DTIMOD.sys`. Standard settings (MSI Mode/Limit, Interrupt Affinity, RSS, ReservedCpuSets, Mouse Throttle and device power policies) use regular Windows registry, WMI and Power APIs. [IRQ Mode](./02-msi.md) combines Windows allocated interrupt resources with PCI configuration bits (`MSI Enable` / `MSI-X Enable`) whenever DTIMOD is available.
 
 ## Loading through KDU and compatibility boundaries
 
 `DTIMOD.sys` is signed with a test certificate and has no public Microsoft WHQL signature for standard Driver Signature Enforcement (DSE). The bundled [KDU](../../src/IMOD/KDU/README.md) loader maps it via a signed vulnerable helper driver. Because of this mechanism:
 
 - **HVCI (Memory Integrity)**, the **Microsoft Vulnerable Driver Blocklist** and antivirus tools can block loading; Microsoft Defender frequently flags KDU as `HackTool`. Failure details are written to the operation report and application log.
-- **Kernel anti-cheats** may reject DTIMOD or kick an active game session while the driver is resident in memory (EAC can report `Forbidden Tool`; compatibility with Vanguard and FACEIT is not established). Closing DEVICE TWEAKER only closes its handle to the driver — **reboot Windows** to unload DTIMOD or replace an older resident build.
+- **Kernel anti-cheats** may reject DTIMOD or kick an active game session while the driver is resident in memory (EAC can report `Forbidden Tool`; compatibility with Vanguard and FACEIT is not established). Closing DEVICE TWEAKER only closes its handle to the driver. **Reboot Windows** to unload DTIMOD or replace an older resident build.
 
 DEVICE TWEAKER requests confirmation once per session before loading the driver or saving/restoring a driver-backed profile (in AUTO, this confirmation is combined with the USB IMOD prompt). **DRIVER INFO** checks HVCI status, the driver-blocklist registry key and FACEIT/Vanguard service states; it reports system configuration only and does not load DTIMOD or test anti-cheat compatibility.
 
@@ -40,7 +40,7 @@ If you manually disable `\DEVICE TWEAKER\IMOD` in Task Scheduler, saving a profi
 
 The target PCI controller must remain present and powered throughout register access, including during startup-profile application (unplugging a USB peripheral normally leaves its xHCI host controller online).
 
-DTIMOD validates every requested MMIO address against the controller's allocated memory ranges, but it does **not** synchronize register access with Windows PnP or power state transitions — hardware resources can change during [surprise removal](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/handling-an-irp-mn-surprise-removal-request) or [stop/rebalance](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/handling-an-irp-mn-stop-device-request--windows-2000-and-later-).
+DTIMOD validates every requested MMIO address against the controller's allocated memory ranges, but it does **not** synchronize register access with Windows PnP or power state transitions: hardware resources can change during [surprise removal](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/handling-an-irp-mn-surprise-removal-request) or [stop/rebalance](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/handling-an-irp-mn-stop-device-request--windows-2000-and-later-).
 
 ## Scoped register access and USB mapping
 

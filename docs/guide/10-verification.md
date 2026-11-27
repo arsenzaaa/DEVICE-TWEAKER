@@ -1,6 +1,6 @@
 # Verifying results
 
-[Documentation](../README.md) / [Guide](./README.md) / 10 · [Русский](./10-verification.md)
+[Documentation](../README.md) / [Guide](./README.md) / 10 · [Русский](./10-verification.ru.md)
 
 ## Confirming applied state vs runtime behavior
 
@@ -14,13 +14,13 @@ Application logs live in `logs` beside the EXE and record the build, requested s
 
 ## Controlled before/after testing
 
-1. Keep the initial backup intact and record the Windows build, device model, driver version and **VBS/HVCI** state. Under an active hypervisor (VBS/HVCI), every external hardware interrupt triggers a `VMEXIT` and SynIC delivery (*Windows Internals*, 7th ed., Part 2, ch. 9) — never compare traces captured with different virtualization states.
+1. Keep the initial backup intact and record the Windows build, device model, driver version and **VBS/HVCI** state. Under an active hypervisor (VBS/HVCI), every external hardware interrupt triggers a `VMEXIT` and SynIC delivery (*Windows Internals*, 7th ed., Part 2, ch. 9). Never compare traces captured with different virtualization states.
 2. Pick a metric that matches the setting: frame times (1% / 0.1% lows and variance) and GPU ISR/DPC placement for GPU affinity; packet loss, CPU load and receive DPCs for RSS/ITR; event jitter for USB IMOD. Run the exact same scene or traffic pattern multiple times to gauge run-to-run noise.
 3. Change one variable at a time, reboot when required, and repeat the same runs with the same tool.
 
 ## Inspecting a trace
 
-Windows ETW kernel tracing carries zero overhead while inactive (the kernel's performance group masks remain cleared — *Windows Internals*, 7th ed., Part 2, pp. 499–500). During an active capture, keep the provider flags and trace duration identical across before/after comparisons (typically 10–30 seconds).
+Windows ETW kernel tracing carries zero overhead while inactive (the kernel's performance group masks remain cleared; *Windows Internals*, 7th ed., Part 2, pp. 499–500). During an active capture, keep the provider flags and trace duration identical across before/after comparisons (typically 10–30 seconds).
 
 ### Xperf and WPA
 
@@ -55,7 +55,7 @@ Open `interrupts.etl` in **Windows Performance Analyzer (WPA)**:
 
 For audio dropouts or video stutter, capture a trace with a [Windows Performance Recorder (WPR) multimedia profile](https://learn.microsoft.com/en-us/windows-hardware/test/wpt/optimizing-windows-devices-for-multimedia-experiences-exercise-2) and open it from the MXA directory with `xa -i "C:\Traces\Media.etl"`.
 
-Locate a dropout in **Audio Glitches**, inspect concurrent driver activity in **CPU Scheduler** over that exact interval, and open **Callstacks** (when stacks were captured) to pinpoint the offending module — Microsoft's [MXA walkthrough](https://learn.microsoft.com/en-us/shows/defrag-tools/151-media-experience-analyzer-part-3-audio-glitch-analysis) shows a textbook case of a long network-driver DPC causing audio glitches.
+Locate a dropout in **Audio Glitches**, inspect concurrent driver activity in **CPU Scheduler** over that exact interval, and open **Callstacks** (when stacks were captured) to pinpoint the offending module. Microsoft's [MXA walkthrough](https://learn.microsoft.com/en-us/shows/defrag-tools/151-media-experience-analyzer-part-3-audio-glitch-analysis) shows a textbook case of a long network-driver DPC causing audio glitches.
 
 ## When something goes wrong
 

@@ -1,6 +1,6 @@
 # Graphics card
 
-[Documentation](../README.md) / [Guide](./README.md) / 04 · [Русский](./04-gpu.md)
+[Documentation](../README.md) / [Guide](./README.md) / 04 · [Русский](./04-gpu.ru.md)
 
 ## Why AUTO assigns two physical cores to a discrete GPU
 

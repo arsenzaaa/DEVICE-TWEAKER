@@ -1,10 +1,10 @@
 # Device power saving
 
-[Documentation](../README.md) / [Guide](./README.md) / 09 · [Русский](./09-power.md)
+[Documentation](../README.md) / [Guide](./README.md) / 09 · [Русский](./09-power.ru.md)
 
 ## What Power Saving controls
 
-Toggle **Power Saving** in a device card and click **APPLY** (after an automatic backup) to control whether Windows may suspend or power down that device while idle. Disabling [USB selective suspend](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/usb-selective-suspend) prevents idle USB controllers and hubs from entering low-power states — trading slightly higher idle power draw (and battery consumption on laptops) for avoiding wake-up latency or dropouts on sensitive peripherals.
+Toggle **Power Saving** in a device card and click **APPLY** (after an automatic backup) to control whether Windows may suspend or power down that device while idle. Disabling [USB selective suspend](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/usb-selective-suspend) prevents idle USB controllers and hubs from entering low-power states, trading slightly higher idle power draw (and battery consumption on laptops) for avoiding wake-up latency or dropouts on sensitive peripherals.
 
 **AUTO-OPTIMIZATION** disables power saving on the USB controllers and wired network adapters it configures; Wi-Fi adapters are left untouched.
 

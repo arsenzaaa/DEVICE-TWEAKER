@@ -18,7 +18,7 @@ Select a value in **MSI Mode** and click **APPLY** to write `MSISupported` to th
 
 **IRQ Mode** reports `Line`, `MSI`, or `MSI-X` (or `MSI/MSI-X` when Windows resources confirm message interrupts without PCI config readback to tell them apart). See [MSI and MSI-X](./guide/02-msi.md).
 
-**READ IRQ MODE** queries every PCI device in the list — including cards hidden by filters — combining Windows allocated interrupt resources with PCI `MSI Enable` and `MSI-X Enable` bits via DTIMOD so MSI and MSI-X can be distinguished even with a single allocated IRQ. It can load DTIMOD, never modifies device settings, displays progress and resolved/total counts on the button, and lists unavailable results in its tooltip.
+**READ IRQ MODE** queries every PCI device in the list (including cards hidden by filters), combining Windows allocated interrupt resources with PCI `MSI Enable` and `MSI-X Enable` bits via DTIMOD so MSI and MSI-X can be distinguished even with a single allocated IRQ. It can load DTIMOD, never modifies device settings, displays progress and resolved/total counts on the button, and lists unavailable results in its tooltip.
 
 Startup and **REFRESH** also run background reads using Windows resources and any already loaded DTIMOD without loading the driver. Previous readings are cleared before rereading, and both the card and log separate unavailable data, read errors and conflicting states. **No IRQ** means no allocated interrupt resources. A read reflects the state at that moment, since [MSI-X routing can change dynamically at runtime](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/dynamically-configuring-msi-x).
 
@@ -26,7 +26,7 @@ Startup and **REFRESH** also run background reads using Windows resources and an
 
 **MSI Limit** sets `MessageNumberLimit`. **Unlimited** deletes the custom value so Windows and the driver negotiate the vector count normally; manual numbers are validated against detected capabilities ([Enabling MSI in the registry](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/enabling-message-signaled-interrupts-in-the-registry)).
 
-**IRQ Priority** writes `DevicePriority` — the DIRQL preference hint used by Windows when assigning IDT vectors (affecting ISR preemption level only, not DPC priority). See [IRQ Priority](./guide/03-affinity.md#irq-priority).
+**IRQ Priority** writes `DevicePriority`, the DIRQL preference hint used by Windows when assigning IDT vectors (affecting ISR preemption level only, not DPC priority). See [IRQ Priority](./guide/03-affinity.md#irq-priority).
 
 ### Interrupt Affinity
 
@@ -38,7 +38,7 @@ Startup and **REFRESH** also run background reads using Windows resources and an
 
 IMOD configures the xHCI interrupt-moderation interval (250 ns steps; Windows `usbxhci.sys` typically initializes controllers to `0xC8` / 50 µs vs `0xFA0` / 1 ms in the xHCI spec) through [DTIMOD](./guide/11-driver.md). **XHCI** applies one interval across the controller, **Devices** assigns per-role values when the xHCI slot map is available, and **Interrupters** sets values by index. See [Chapter 5](./guide/05-usb-imod.md) for role priority, polling-rate trade-offs and AUTO defaults.
 
-Hover over the current value for the last read timestamp. If USB peripherals are connected or removed, the map is flagged "devices changed" — click **CHECK** to reread it.
+Hover over the current value for the last read timestamp. If USB peripherals are connected or removed, the map is flagged "devices changed"; click **CHECK** to reread it.
 
 ### Commands
 
@@ -96,7 +96,7 @@ AUTO clears [ReservedCpuSets](./guide/07-cpu-topology.md#reservedcpusets) when t
 
 DEVICE TWEAKER creates and verifies a backup before manual **APPLY**, USB IMOD or NIC ITR **SET**, NIC ITR **SAVE**, **RESTORE** and reset. AUTO requires a backup of original settings (the extra snapshot is optional) and aborts before writing if a required backup fails. Select any snapshot under **RESTORE**.
 
-Backups store exact Windows registry paths for the device and driver instances present when captured — restore them only on the same Windows installation and hardware configuration.
+Backups store exact Windows registry paths for the device and driver instances present when captured. Restore them only on the same Windows installation and hardware configuration.
 
 When restoring a backup with an outdated NIC ITR register layout, the incompatible startup entry is skipped with a warning while all other supported settings are restored; save NIC ITR again for that adapter ([NIC ITR](./guide/06-network.md#nic-itr)).
 

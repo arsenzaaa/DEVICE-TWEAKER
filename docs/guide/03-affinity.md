@@ -1,6 +1,6 @@
 # Affinity, policies and interrupt priority
 
-[Documentation](../README.md) / [Guide](./README.md) / 03 · [Русский](./03-affinity.md)
+[Documentation](../README.md) / [Guide](./README.md) / 03 · [Русский](./03-affinity.ru.md)
 
 ## Why interrupt placement matters
 
@@ -8,7 +8,7 @@ By default, Windows concentrates a large share of system timers (the clock owner
 
 When choosing cores manually, read the topology labels carefully:
 
-- **SMT siblings** share execution units and L1/L2 caches on the same physical core — pinning a heavy device to the SMT sibling of a busy game thread still creates contention.
+- **SMT siblings** share execution units and L1/L2 caches on the same physical core. Pinning a heavy device to the SMT sibling of a busy game thread still creates contention.
 - **Hybrid CPUs** distinguish P-cores from E-cores.
 - **Multi-CCD processors** separate L3 cache domains across chiplets; keep related cores within the intended CCD.
 
@@ -16,12 +16,12 @@ See [Chapter 7](./07-cpu-topology.md) for reading the processor map. For manual 
 
 ## Policies (`IRQ_DEVICE_POLICY`)
 
-- **SpecCPU** (`IrqPolicySpecifiedProcessors`, value `4`) — pins interrupts strictly to the logical CPUs checked in the card.
-- **MachineDefault** (`IrqPolicyMachineDefault`, value `0`) — hands placement back to Windows. On standard devices, selecting **MachineDefault** (or clearing all CPU checkboxes) and clicking **APPLY** removes the manual override. On NDIS adapters, use the **RSS / IRQ / BOTH** selector instead.
-- **AllClose** (`IrqPolicyAllCloseProcessors`) — targets processors on the device's NUMA node (equivalent to **All** on single-node desktops).
-- **Single** (`IrqPolicyOneCloseProcessor`) — requests a single processor close to the device; on non-NUMA systems Windows may pick any CPU.
-- **All** (`IrqPolicyAllProcessorsInMachine`) — permits assignment across all processors in the machine.
-- **SpreadMessages** (`IrqPolicySpreadMessagesAcrossAllProcessors`) — asks Windows to spread multiple MSI/MSI-X messages across distinct processors, using the vectors allocated to the driver.
+- **SpecCPU** (`IrqPolicySpecifiedProcessors`, value `4`): pins interrupts strictly to the logical CPUs checked in the card.
+- **MachineDefault** (`IrqPolicyMachineDefault`, value `0`): hands placement back to Windows. On standard devices, selecting **MachineDefault** (or clearing all CPU checkboxes) and clicking **APPLY** removes the manual override. On NDIS adapters, use the **RSS / IRQ / BOTH** selector instead.
+- **AllClose** (`IrqPolicyAllCloseProcessors`): targets processors on the device's NUMA node (equivalent to **All** on single-node desktops).
+- **Single** (`IrqPolicyOneCloseProcessor`): requests a single processor close to the device; on non-NUMA systems Windows may pick any CPU.
+- **All** (`IrqPolicyAllProcessorsInMachine`): permits assignment across all processors in the machine.
+- **SpreadMessages** (`IrqPolicySpreadMessagesAcrossAllProcessors`): asks Windows to spread multiple MSI/MSI-X messages across distinct processors, using the vectors allocated to the driver.
 
 Selecting any Windows-managed policy clears manual CPU checkmarks in the card. See *Windows Internals*, 7th ed., Part 2, pp. 52–54 (Table 8-5), and [IRQ_DEVICE_POLICY](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_irq_device_policy).
 
@@ -58,7 +58,7 @@ AUTO sets **High** on devices it actively places, leaves integrated graphics and
 
 For NVMe/SATA storage controllers, Windows and the storage miniport manage multi-queue CPU distribution directly, so storage cards expose MSI and IRQ Priority rather than manual CPU masks.
 
-After rebooting, verify the applied policy in the log and inspect an ETW trace under load. Compare where the driver's ISRs and DPCs actually execute against your application's busiest threads — for instance, verifying whether moving a noisy device off CPU 0 eliminates overlap with the main game thread. See [Chapter 10](./10-verification.md).
+After rebooting, verify the applied policy in the log and inspect an ETW trace under load. Compare where the driver's ISRs and DPCs actually execute against your application's busiest threads (for instance, checking whether moving a noisy device off CPU 0 eliminates overlap with the main game thread). See [Chapter 10](./10-verification.md).
 
 ---
 
